@@ -816,24 +816,13 @@ function renderAltItems(containerId, cat, prefill=null){
             ${['股下','カット寸法','総丈'].map(t=>`
               <button onclick="setDimType('${uid}','${t}')" id="dt-${uid}-${t.replace(' ','')}"
                 style="padding:5px 11px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;
-                border:1px solid var(--border2);background:${pf&&pf.dimLabel===t?'var(--gold)':'var(--s3)'};
+                border:1px solid var(--border2);
+                background:${pf&&pf.dimLabel===t?'var(--gold)':'var(--s3)'};
                 color:${pf&&pf.dimLabel===t?'#0a0a0f':'var(--text2)'};">${t}</button>
             `).join('')}
           </div>
-          <div id="dim-label-display-${uid}" style="font-size:10px;color:var(--text3);margin-bottom:4px;">${pf&&pf.dimLabel?pf.dimLabel:'種別を選択'}</div>
           <div class="dim-row">
-            <span class="dim-unit" style="min-width:56px;color:var(--text2);">現寸</span>
-            <input class="dim-input" type="number" id="dim-cur-${uid}" placeholder="0.0" step="0.5" min="0" value="${pf&&pf.dimCur?pf.dimCur:''}" oninput="calcFinish('${uid}')">
-            <span class="dim-unit">cm</span>
-          </div>
-          <div class="dim-row" style="margin-top:6px;">
-            <span class="dim-unit" style="min-width:56px;color:var(--text2);">カット</span>
-            <input class="dim-input" type="number" id="dim-cut-${uid}" placeholder="0.0" step="0.5" min="0" value="${pf&&pf.dimCut?pf.dimCut:''}" oninput="calcFinish('${uid}')">
-            <span class="dim-unit">cm</span>
-          </div>
-          <div class="dim-row" style="margin-top:6px;background:var(--gold-bg);border-radius:6px;padding:4px 8px;">
-            <span class="dim-unit" style="min-width:56px;color:var(--gold);">仕上がり</span>
-            <span id="dim-fin-${uid}" style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--gold);">${pf&&pf.dimCur&&pf.dimCut?(parseFloat(pf.dimCur)-parseFloat(pf.dimCut)).toFixed(1):'—'}</span>
+            <input class="dim-input" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0" value="${pf&&pf.dim?pf.dim:''}">
             <span class="dim-unit">cm</span>
           </div>
         </div>`
@@ -848,15 +837,7 @@ function renderAltItems(containerId, cat, prefill=null){
   }).join('');
 }
 
-function calcFinish(uid){
-  const cur=parseFloat(document.getElementById('dim-cur-'+uid)?.value||0);
-  const cut=parseFloat(document.getElementById('dim-cut-'+uid)?.value||0);
-  const fin=document.getElementById('dim-fin-'+uid);
-  if(fin) fin.textContent=(cur&&cut)?(cur-cut).toFixed(1):'—';
-}
-
 function setDimType(uid, label){
-  // ボタンスタイル更新
   ['股下','カット寸法','総丈'].forEach(t=>{
     const btn=document.getElementById('dt-'+uid+'-'+t.replace(' ',''));
     if(!btn) return;
@@ -865,10 +846,6 @@ function setDimType(uid, label){
     btn.style.color=active?'#0a0a0f':'var(--text2)';
     btn.style.borderColor=active?'var(--gold)':'var(--border2)';
   });
-  // ラベル表示更新
-  const disp=document.getElementById('dim-label-display-'+uid);
-  if(disp) disp.textContent=label;
-  // dimLabelをdata属性に保存
   const body=document.getElementById('body-'+uid);
   if(body) body.dataset.dimLabel=label;
 }
@@ -904,11 +881,9 @@ function collectAltItems(containerId, cat){
     else if(document.getElementById(`dir-dashi-${uid}`)?.classList.contains('active-dashi')) dir='出し';
     const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
     if(a.dim_type==='length'){
-      const dimCur=parseFloat(document.getElementById('dim-cur-'+uid)?.value||0)||null;
-      const dimCut=parseFloat(document.getElementById('dim-cut-'+uid)?.value||0)||null;
-      const dimFin=(dimCur&&dimCut)?(dimCur-dimCut):null;
+      const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
       const dimLabel=getDimLabel(uid);
-      result.push({name:a.name, dir, dimCur, dimCut, dimFin, dimLabel, memo, dim_type:'length'});
+      result.push({name:a.name, dir, dim, dimLabel, memo, dim_type:'length'});
     } else {
       const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
       result.push({name:a.name, dir, dim, memo, dim_type:'cm'});
@@ -1011,9 +986,7 @@ function exportExcel(){
     let s=a.name+(a.dir?' '+a.dir:'');
     if(a.dim_type==='length'){
       if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dimCur) s+=` 現${a.dimCur}cm`;
-      if(a.dimCut) s+=` カット${a.dimCut}cm`;
-      if(a.dimFin) s+=` →${a.dimFin}cm`;
+      if(a.dim) s+=` ${a.dim}cm`;
     } else if(a.dim){
       s+=` ${a.dim}cm`;
     }
@@ -1083,9 +1056,7 @@ function renderHistory(){
     let s=a.name+(a.dir?' '+a.dir:'');
     if(a.dim_type==='length'){
       if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dimCur) s+=` 現${a.dimCur}cm`;
-      if(a.dimCut) s+=` カット${a.dimCut}cm`;
-      if(a.dimFin) s+=` →${a.dimFin}cm`;
+      if(a.dim) s+=` ${a.dim}cm`;
     } else if(a.dim){
       s+=` ${a.dim}cm`;
     }
@@ -1174,9 +1145,7 @@ function openDetail(id){
     let s=a.name+(a.dir?' '+a.dir:'');
     if(a.dim_type==='length'){
       if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dimCur) s+=` 現${a.dimCur}cm`;
-      if(a.dimCut) s+=` カット${a.dimCut}cm`;
-      if(a.dimFin!=null) s+=` →仕上${a.dimFin}cm`;
+      if(a.dim) s+=` ${a.dim}cm`;
     } else if(a.dim){ s+=` ${a.dim}cm`; }
     if(a.memo) s+=` (${a.memo})`;
     return s;
@@ -1446,9 +1415,7 @@ function printRecord(){
     let s=a.name+(a.dir?' '+a.dir:'');
     if(a.dim_type==='length'){
       if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dimCur) s+=` 現${a.dimCur}cm`;
-      if(a.dimCut) s+=` カット${a.dimCut}cm`;
-      if(a.dimFin!=null) s+=` →仕上${a.dimFin}cm`;
+      if(a.dim) s+=` ${a.dim}cm`;
     } else if(a.dim){ s+=` ${a.dim}cm`; }
     if(a.memo) s+=` (${a.memo})`;
     return s;
