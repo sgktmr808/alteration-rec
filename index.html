@@ -116,7 +116,7 @@ select option{background:#1a1a24;}
 .tcustom:focus{outline:none;border-color:var(--gold);}
 
 /* SAVE */
-.save-btn{display:block;width:calc(100%-32px);margin:4px 16px 16px;padding:15px;border-radius:14px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--font);cursor:pointer;letter-spacing:.06em;}
+.save-btn{display:block;width:calc(100% - 32px);margin:4px 16px 16px;padding:15px;border-radius:14px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--font);cursor:pointer;letter-spacing:.06em;}
 
 /* CARDS */
 .filter-bar{padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
@@ -163,7 +163,9 @@ select option{background:#1a1a24;}
 .empty-icon{font-size:36px;margin-bottom:10px;}
 
 /* MODAL */
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:400;overflow-y:auto;padding:12px 12px calc(var(--safe-b)+24px);}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:400;}
+.overlay.open{display:flex;flex-direction:column;justify-content:flex-end;}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:20px 20px 0 0;max-width:100%;width:100%;max-height:88vh;overflow-y:auto;padding-bottom:calc(var(--safe-b)+8px);}
 .overlay.open{display:block;}
 .modal{background:var(--s1);border:1px solid var(--border2);border-radius:18px;overflow:hidden;max-width:520px;margin:0 auto;}
 .modal-hdr{padding:14px 16px;background:var(--s2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;}
@@ -388,6 +390,7 @@ select option{background:#1a1a24;}
 <!-- ══ DETAIL MODAL ══ -->
 <div class="overlay" id="detail-overlay" onclick="closeDetailOvl(event)">
   <div class="modal">
+    <div style="text-align:center;padding:10px 0 0;"><div style="width:36px;height:4px;border-radius:2px;background:var(--border2);display:inline-block;"></div></div>
     <div class="modal-hdr">
       <span class="modal-title" id="detail-title">詳細</span>
     </div>
@@ -397,16 +400,17 @@ select option{background:#1a1a24;}
     </div>
     <div class="modal-body" id="detail-body"></div>
     <div class="modal-actions">
-      <button class="maction" style="background:var(--s3);color:var(--text2);border:1px solid var(--border2);" onclick="closeDetail()">✕ 閉じる</button>
       <button class="maction ma-print" onclick="window.print()">🖨 印刷</button>
       <button class="maction ma-del" onclick="deleteRecord()">削除</button>
     </div>
+    <button class="modal-close-btn" onclick="closeDetail()">✕ 閉じる</button>
   </div>
 </div>
 
 <!-- ══ MASTER MODAL ══ -->
 <div class="overlay" id="master-overlay" onclick="closeMasterOvl(event)">
   <div class="modal">
+    <div style="text-align:center;padding:10px 0 0;"><div style="width:36px;height:4px;border-radius:2px;background:var(--border2);display:inline-block;"></div></div>
     <div class="modal-hdr">
       <span class="modal-title">マスター管理</span>
     </div>
@@ -417,7 +421,7 @@ select option{background:#1a1a24;}
       <div class="msection-title">カテゴリー</div>
       <div class="mlist" id="cat-list"></div>
       <div class="madd-row"><input class="madd-input" id="cat-input" placeholder="カテゴリーを追加"><button class="madd-btn" onclick="addCat()">追加</button></div>
-      <button onclick="closeMaster()" style="display:block;width:100%;margin-top:20px;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--font);cursor:pointer;">✕ 閉じる</button>
+      <button class="modal-close-btn" onclick="closeMaster()">✕ 閉じる</button>
     </div>
   </div>
 </div>
