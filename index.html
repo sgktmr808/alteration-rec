@@ -616,122 +616,229 @@ const PATTERNS=['無地','ストライプ','チェック','ヘリンボーン','
 // 実行工程：補正項目ごとの加工方法
 const PROCESS_MAP = {
   '裾上げ': {
-    methods:['シングル','ダブル(糸止め)','ダブル(スナップ)','モーニング','Gカット','手まつり','ロックステッチ'],
-    sub:{'Gカット':['2本ステッチ','チェーンステッチ']},
+    methods:[
+      {id:'single', label:'シングル', group:'style', exclusive:['double']},
+      {id:'double', label:'ダブル(糸止め)', group:'style', exclusive:['single']},
+      {id:'double_snap', label:'ダブル(スナップ)', group:'style', exclusive:['single']},
+      {id:'morning', label:'モーニング', group:'style', exclusive:['single','double','double_snap']},
+      {id:'gcut', label:'Gカット', group:'style', exclusive:['single','double','double_snap','morning']},
+      {id:'tematsu', label:'手まつり', group:'finish'},
+      {id:'lock', label:'ロックステッチ', group:'finish'},
+      {id:'gomu', label:'ゴム補正', group:'option'},
+    ],
+    sub:{
+      'ダブル(糸止め)':['3cm幅','3.5cm幅','4cm幅','4.5cm幅','5cm幅','指定'],
+      'ダブル(スナップ)':['3cm幅','3.5cm幅','4cm幅','4.5cm幅','5cm幅','指定'],
+      'Gカット':['2本ステッチ','チェーンステッチ'],
+    },
   },
   '着丈': {
-    methods:['シングル','まつり縫い','千鳥掛け','ミシン','ロック処理','三つ折り','袋縫い','手まつり','ロックステッチ'],
-    sub:{},
-  },
-  '裾': {
-    methods:['シングル','まつり縫い','千鳥掛け','ミシン','ロック処理','三つ折り','手まつり','ロックステッチ'],
+    methods:[
+      {id:'single',label:'シングル',group:'style'},
+      {id:'tematsu',label:'手まつり',group:'style'},
+      {id:'chidori',label:'千鳥掛け',group:'style'},
+      {id:'machine',label:'ミシン',group:'style'},
+      {id:'lock',label:'ロック処理',group:'style'},
+      {id:'mitsuo',label:'三つ折り',group:'style'},
+      {id:'fuse',label:'袋縫い',group:'style'},
+      {id:'lockst',label:'ロックステッチ',group:'style'},
+    ],
     sub:{},
   },
   '袖丈': {
-    methods:['シングル','アキあり','アキなし','本切羽','飾りボタンあり','カフスあり','カフスなし','まつり縫い','ロック処理','リブ付け','袖山から詰め'],
+    methods:[
+      {id:'single',label:'シングル',group:'style'},
+      {id:'aki_ari',label:'アキあり',group:'option'},
+      {id:'aki_nashi',label:'アキなし',group:'option'},
+      {id:'honkiriha',label:'本切羽',group:'option'},
+      {id:'kazari',label:'飾りボタンあり',group:'option'},
+      {id:'cuffs_on',label:'カフスあり',group:'option'},
+      {id:'cuffs_off',label:'カフスなし',group:'option'},
+      {id:'tematsu',label:'まつり縫い',group:'finish'},
+      {id:'lock',label:'ロック処理',group:'finish'},
+      {id:'ribu',label:'リブ付け',group:'finish'},
+      {id:'sodayama',label:'袖山から詰め',group:'option'},
+    ],
     sub:{},
   },
   '身幅': {
-    methods:['内のみ','外のみ','両脇','折り伏せ','袋縫い','限界あり'],
+    methods:[
+      {id:'uchi',label:'内のみ',group:'pos'},
+      {id:'soto',label:'外のみ',group:'pos'},
+      {id:'ryowaki',label:'両脇',group:'pos'},
+      {id:'fuse',label:'折り伏せ',group:'finish'},
+      {id:'fukuro',label:'袋縫い',group:'finish'},
+      {id:'limit',label:'限界あり',group:'note'},
+    ],
     sub:{},
   },
   'ウエスト絞り': {
-    methods:['脇縫い','背縫い','両方'],
+    methods:[
+      {id:'waki',label:'脇縫い',group:'pos'},
+      {id:'se',label:'背縫い',group:'pos'},
+      {id:'both',label:'両方',group:'pos'},
+    ],
     sub:{},
   },
   'ウエスト': {
-    methods:['3方詰め','インベルさわり','ループ移動','ステッチ入れ直し','タグ移動','アジャスター移動','ゴム補正','インベルループ下切替','マチ入れ'],
-    sub:{'ループ移動':['1本','2本','3本','4本','5本','6本','7本'],'ステッチ入れ直し':['1本','2本']},
+    methods:[
+      {id:'san',label:'3方詰め',group:'option'},
+      {id:'inbel',label:'インベルさわり',group:'option'},
+      {id:'loop',label:'ループ移動',group:'option'},
+      {id:'stitch',label:'ステッチ入れ直し',group:'option'},
+      {id:'tag',label:'タグ移動',group:'option'},
+      {id:'adj',label:'アジャスター移動',group:'option'},
+      {id:'gomu',label:'ゴム補正',group:'option'},
+      {id:'inbel_loop',label:'インベルループ下切替',group:'option'},
+      {id:'machi',label:'マチ入れ',group:'option'},
+    ],
+    sub:{
+      'ループ移動':['1本','2本','3本','4本','5本','6本','7本'],
+      'ステッチ入れ直し':['1本','2本'],
+    },
   },
   '裾幅': {
-    methods:['内のみ','外のみ','両脇','折り伏せ','袋縫い'],
+    methods:[
+      {id:'uchi',label:'内のみ',group:'pos'},
+      {id:'soto',label:'外のみ',group:'pos'},
+      {id:'ryowaki',label:'両脇',group:'pos'},
+      {id:'fuse',label:'折り伏せ',group:'finish'},
+      {id:'fukuro',label:'袋縫い',group:'finish'},
+    ],
     sub:{},
   },
   'わたり': {
-    methods:['脇縫い','内股縫い','限界あり'],
+    methods:[
+      {id:'uchi',label:'内のみ',group:'pos'},
+      {id:'soto',label:'外のみ',group:'pos'},
+      {id:'both',label:'内外',group:'pos',exclusive:['uchi','soto']},
+    ],
     sub:{},
   },
   '股上': {
-    methods:['前股上','後股上','両方','限界あり'],
+    methods:[
+      {id:'mae',label:'前股上',group:'pos'},
+      {id:'ushiro',label:'後股上',group:'pos'},
+      {id:'both',label:'両方',group:'pos'},
+      {id:'limit',label:'限界あり',group:'note'},
+    ],
     sub:{},
   },
   'ヒップ': {
-    methods:['脇縫い','限界あり'],
+    methods:[
+      {id:'waki',label:'脇縫い',group:'pos'},
+      {id:'limit',label:'限界あり',group:'note'},
+    ],
     sub:{},
   },
   'バスト': {
-    methods:['脇縫い','ダーツ','限界あり'],
+    methods:[
+      {id:'waki',label:'脇縫い',group:'pos'},
+      {id:'darts',label:'ダーツ',group:'pos'},
+      {id:'limit',label:'限界あり',group:'note'},
+    ],
     sub:{},
   },
   '肩幅': {
-    methods:['肩線','袖付け'],
+    methods:[
+      {id:'kata',label:'肩線',group:'pos'},
+      {id:'sode',label:'袖付け',group:'pos'},
+    ],
     sub:{},
   },
   '袖口': {
-    methods:['縫い代詰め','折り返し'],
+    methods:[
+      {id:'tsume',label:'縫い代詰め',group:'pos'},
+      {id:'ori',label:'折り返し',group:'pos'},
+    ],
     sub:{},
   },
   '肩ひも調整': {
-    methods:['縫い縮め','ホック付け'],
+    methods:[
+      {id:'chiji',label:'縫い縮め',group:'pos'},
+      {id:'hook',label:'ホック付け',group:'pos'},
+    ],
     sub:{},
   },
   'ベントさわり': {
-    methods:['サイドベント','センターベント'],
+    methods:[
+      {id:'side',label:'サイドベント',group:'pos'},
+      {id:'center',label:'センターベント',group:'pos'},
+    ],
     sub:{},
   },
   'スリット加工': {
-    methods:['あき止め','縫い閉じ'],
+    methods:[
+      {id:'aki',label:'あき止め',group:'pos'},
+      {id:'toji',label:'縫い閉じ',group:'pos'},
+    ],
     sub:{},
   },
   'スリット移動': {
-    methods:['ファスナー移動','折り伏せ','ステッチ'],
+    methods:[
+      {id:'zip',label:'ファスナー移動',group:'option'},
+      {id:'fuse',label:'折り伏せ',group:'finish'},
+      {id:'stitch',label:'ステッチ',group:'finish'},
+    ],
     sub:{'ステッチ':['1本','2本','3本']},
   },
   '裏地修理': {
-    methods:['部分補修','全取替'],
+    methods:[{id:'part',label:'部分補修',group:'pos'},{id:'full',label:'全取替',group:'pos'}],
     sub:{},
   },
   '襟修理': {
-    methods:['縫い直し','付け直し'],
+    methods:[{id:'nao',label:'縫い直し',group:'pos'},{id:'tsuke',label:'付け直し',group:'pos'}],
     sub:{},
   },
   'ボタン付け替え': {
-    methods:['同位置','移動あり'],
+    methods:[{id:'same',label:'同位置',group:'pos'},{id:'move',label:'移動あり',group:'pos'}],
     sub:{},
   },
   'ほつれ補修': {
-    methods:['かがり縫い','ミシン'],
+    methods:[{id:'kaga',label:'かがり縫い',group:'pos'},{id:'machine',label:'ミシン',group:'pos'}],
     sub:{},
   },
   '穴修理': {
-    methods:['かがり縫い','当て布'],
+    methods:[{id:'kaga',label:'かがり縫い',group:'pos'},{id:'ate',label:'当て布',group:'pos'}],
     sub:{},
   },
   'タグ付け': {
-    methods:['ミシン','まつり縫い'],
+    methods:[{id:'machine',label:'ミシン',group:'pos'},{id:'matsu',label:'まつり縫い',group:'pos'}],
     sub:{},
   },
   'ボタン補強': {
-    methods:['特殊（革当て）','特殊（当て布）','特殊（金具）'],
+    methods:[
+      {id:'kawa',label:'特殊（革当て）',group:'pos'},
+      {id:'nuno',label:'特殊（当て布）',group:'pos'},
+      {id:'metal',label:'特殊（金具）',group:'pos'},
+    ],
     sub:{},
   },
   'プレス': {
-    methods:['全体','部分','スチームのみ','ドライ'],
+    methods:[
+      {id:'all',label:'全体',group:'pos'},
+      {id:'part',label:'部分',group:'pos'},
+      {id:'steam',label:'スチームのみ',group:'pos'},
+      {id:'dry',label:'ドライ',group:'pos'},
+    ],
     sub:{},
   },
   'デニムダメージ残し加工': {
-    methods:['特殊切替','ロールアップ'],
+    methods:[
+      {id:'tokushu',label:'特殊切替',group:'style',exclusive:['roll']},
+      {id:'roll',label:'ロールアップ',group:'style',exclusive:['tokushu']},
+    ],
     sub:{
       '特殊切替':['幅広','幅合わせ(片側)','幅合わせ(両脇)'],
       'ロールアップ':['幅広','幅合わせ(片側)','幅合わせ(両脇)'],
     },
   },
   'ドローコードチップ補強': {
-    methods:['金属チップ','樹脂チップ','結び直し'],
+    methods:[{id:'metal',label:'金属チップ',group:'pos'},{id:'resin',label:'樹脂チップ',group:'pos'},{id:'musu',label:'結び直し',group:'pos'}],
     sub:{},
   },
   'ファスナー交換': {
-    methods:['YKK','ブランド純正','汎用'],
+    methods:[{id:'ykk',label:'YKK',group:'pos'},{id:'brand',label:'ブランド純正',group:'pos'},{id:'gen',label:'汎用',group:'pos'}],
     sub:{},
   },
 };
@@ -986,7 +1093,9 @@ function renderAltItems(containerId, cat, prefill=null){
         <input type="checkbox" id="chk-${uid}" ${pf?'checked':''} onclick="event.stopPropagation();toggleAlt('${uid}')">
         <span class="alt-item-name">${a.name}</span>
       </div>
-      <div class="alt-item-body${pf?' open':''}" id="body-${uid}" data-altname="${a.name}">
+      <div class="alt-item-body${pf?' open':''}" id="body-${uid}" data-altname="${a.name}"
+        data-processes="${pf&&pf.processes?JSON.stringify(pf.processes).replace(/"/g,'&quot;'):'[]'}"
+        data-processsubs="${pf&&pf.processSubs?JSON.stringify(pf.processSubs).replace(/"/g,'&quot;'):'{}'}">
         ${a.dir==='none'?'':`
         <div class="dir-btns">
           ${a.dir==='both'?`
@@ -1000,22 +1109,28 @@ function renderAltItems(containerId, cat, prefill=null){
           `}
         </div>`}
         ${isWorkSection?`
-        <div style="margin-bottom:6px;">
+        <div style="margin-bottom:6px;" id="proc-container-${uid}" data-altname="${a.name}">
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;" id="proc-wrap-${uid}">
-            ${((PROCESS_MAP[a.name]||{}).methods||[]).map(p=>`
-              <button onclick="selProcess('${uid}','${p}')" id="proc-${uid}-${p.replace(/[^a-zA-Z0-9]/g,'_')}"
-                class="ppill${pf&&pf.process===p?' active':''}">${p}</button>
-            `).join('')}
+            ${((PROCESS_MAP[a.name]||{}).methods||[]).map(m=>{
+              const isActive=pf&&pf.processes&&pf.processes.includes(m.label);
+              return `<button onclick="toggleProcess('${uid}','${m.label}','${m.group||''}','${(m.exclusive||[]).join(',')}','${a.name}')"
+                id="proc-${uid}-${m.id}"
+                class="ppill${isActive?' active':''}"
+                style="${m.group==='finish'?'font-size:11px;background:var(--s4);':''}${m.group==='note'?'font-size:11px;color:var(--amber);border-color:var(--amber);':''}"
+              >${m.label}</button>`;
+            }).join('')}
           </div>
           <div id="proc-sub-${uid}" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;">
             ${(()=>{
+              if(!pf||!pf.processes) return '';
               const subs=(PROCESS_MAP[a.name]||{}).sub||{};
-              const curProc=pf&&pf.process||'';
-              const subOpts=subs[curProc]||[];
-              return subOpts.map(s=>`
-                <button onclick="selSubProcess('${uid}','${s}')" id="procsub-${uid}-${s.replace(/[^a-zA-Z0-9]/g,'_')}"
-                  class="ppill${pf&&pf.processSub===s?' active':''}" style="font-size:11px;background:var(--s4);">${s}</button>
-              `).join('');
+              const activeProcs=pf.processes||[];
+              return activeProcs.flatMap(p=>( subs[p]||[]).map(s=>`
+                <button onclick="toggleSubProcess('${uid}','${p}','${s}')"
+                  id="procsub-${uid}-${(p+s).replace(/[^a-zA-Z0-9]/g,'_')}"
+                  class="ppill${pf.processSubs&&pf.processSubs[p]&&pf.processSubs[p].includes(s)?' active':''}"
+                  style="font-size:11px;background:var(--s4);">${s}</button>
+              `)).join('');
             })()}
           </div>
           <input class="alt-memo-input" type="text" id="proc-custom-${uid}" placeholder="その他・詳細メモ" value="${pf&&pf.processMemo?pf.processMemo:''}">
@@ -1047,48 +1162,89 @@ function renderAltItems(containerId, cat, prefill=null){
   }).join('');
 }
 
-function selProcess(uid, val){
+function toggleProcess(uid, label, group, exclusiveStr, altName){
   const body=document.getElementById('body-'+uid);
-  const cur=body?.dataset?.process||'';
-  const next=cur===val?'':val;
-  body.dataset.process=next;
-  body.dataset.processSub='';
-  // メインボタン更新
-  document.querySelectorAll('[id^="proc-'+uid+'-"]').forEach(btn=>{
-    if(btn.id.startsWith('procsub-')) return;
-    const bval=btn.id.replace('proc-'+uid+'-','').replace(/_/g,' ');
-    btn.classList.toggle('active', next!==''&&btn.id===('proc-'+uid+'-'+val.replace(/[^a-zA-Z0-9]/g,'_')));
-  });
-  // サブオプション更新
-  const subWrap=document.getElementById('proc-sub-'+uid);
-  if(subWrap){
-    const altName=body?.dataset?.altname||'';
-    const subs=(PROCESS_MAP[altName]||{}).sub||{};
-    const subOpts=subs[next]||[];
-    subWrap.innerHTML=subOpts.map(s=>`
-      <button onclick="selSubProcess('${uid}','${s}')" id="procsub-${uid}-${s.replace(/[^a-zA-Z0-9]/g,'_')}"
-        class="ppill" style="font-size:11px;background:var(--s4);">${s}</button>
-    `).join('');
+  if(!body) return;
+  let procs=JSON.parse(body.dataset.processes||'[]');
+  const exclusives=exclusiveStr?exclusiveStr.split(',').filter(Boolean):[];
+
+  if(procs.includes(label)){
+    // 選択解除
+    procs=procs.filter(p=>p!==label);
+    // このラベルのサブも解除
+    let subs=JSON.parse(body.dataset.processSubs||'{}');
+    delete subs[label];
+    body.dataset.processSubs=JSON.stringify(subs);
+  } else {
+    // exclusive処理：排他グループを解除
+    if(exclusives.length){
+      const methods=(PROCESS_MAP[altName]||{}).methods||[];
+      exclusives.forEach(exId=>{
+        const exMethod=methods.find(m=>m.id===exId);
+        if(exMethod) procs=procs.filter(p=>p!==exMethod.label);
+      });
+    }
+    procs.push(label);
   }
-}
+  body.dataset.processes=JSON.stringify(procs);
 
-function selSubProcess(uid, val){
-  const body=document.getElementById('body-'+uid);
-  const cur=body?.dataset?.processSub||'';
-  const next=cur===val?'':val;
-  body.dataset.processSub=next;
-  document.querySelectorAll('[id^="procsub-'+uid+'-"]').forEach(btn=>{
-    btn.classList.toggle('active', next!==''&&btn.id===('procsub-'+uid+'-'+val.replace(/[^a-zA-Z0-9]/g,'_')));
+  // ボタン表示更新
+  const methods=(PROCESS_MAP[altName]||{}).methods||[];
+  methods.forEach(m=>{
+    const btn=document.getElementById('proc-'+uid+'-'+m.id);
+    if(!btn) return;
+    btn.classList.toggle('active', procs.includes(m.label));
   });
+
+  // サブオプション更新
+  updateSubOptions(uid, altName, procs);
 }
 
-function getProcess(uid){
-  return document.getElementById('body-'+uid)?.dataset?.process||'';
+function updateSubOptions(uid, altName, procs){
+  const subWrap=document.getElementById('proc-sub-'+uid);
+  if(!subWrap) return;
+  const subs=(PROCESS_MAP[altName]||{}).sub||{};
+  const body=document.getElementById('body-'+uid);
+  const processSubs=JSON.parse(body?.dataset?.processSubs||'{}');
+
+  let subHTML='';
+  procs.forEach(p=>{
+    const subOpts=subs[p]||[];
+    subOpts.forEach(s=>{
+      const isActive=processSubs[p]&&processSubs[p].includes(s);
+      subHTML+=`<button onclick="toggleSubProcess('${uid}','${p}','${s}')"
+        id="procsub-${uid}-${(p+s).replace(/[^a-zA-Z0-9]/g,'_')}"
+        class="ppill${isActive?' active':''}"
+        style="font-size:11px;background:var(--s4);">${s}</button>`;
+    });
+  });
+  subWrap.innerHTML=subHTML;
 }
 
-function getProcessSub(uid){
-  return document.getElementById('body-'+uid)?.dataset?.processSub||'';
+function toggleSubProcess(uid, procLabel, subVal){
+  const body=document.getElementById('body-'+uid);
+  if(!body) return;
+  let subs=JSON.parse(body.dataset.processSubs||'{}');
+  if(!subs[procLabel]) subs[procLabel]=[];
+  const idx=subs[procLabel].indexOf(subVal);
+  if(idx>=0) subs[procLabel].splice(idx,1);
+  else subs[procLabel].push(subVal);
+  body.dataset.processSubs=JSON.stringify(subs);
+
+  const btn=document.getElementById('procsub-'+uid+'-'+(procLabel+subVal).replace(/[^a-zA-Z0-9]/g,'_'));
+  if(btn) btn.classList.toggle('active', idx<0);
 }
+
+function getProcesses(uid){
+  return JSON.parse(document.getElementById('body-'+uid)?.dataset?.processes||'[]');
+}
+function getProcessSubs(uid){
+  return JSON.parse(document.getElementById('body-'+uid)?.dataset?.processSubs||'{}');
+}
+// 後方互換
+function getProcess(uid){ return getProcesses(uid).join(','); }
+function getProcessSub(uid){ return ''; }
+
 
 function setDimType(uid, label){
   ['股下','カット寸法','総丈'].forEach(t=>{
@@ -1138,10 +1294,10 @@ function collectAltItems(containerId, cat){
     else if(document.getElementById(`dir-dashi-${uid}`)?.classList.contains('active-dashi')) dir='出し';
     else if(document.getElementById(`dir-none-${uid}`)?.classList.contains('active-none')) dir='未定';
     if(isWork){
-      const process=getProcess(uid);
-      const processSub=getProcessSub(uid);
+      const processes=getProcesses(uid);
+      const processSubs=getProcessSubs(uid);
       const processMemo=document.getElementById('proc-custom-'+uid)?.value?.trim()||'';
-      result.push({name:a.name, dir, process, processSub, processMemo});
+      result.push({name:a.name, dir, processes, processSubs, processMemo});
     } else {
       const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
       if(a.dim_type==='length'){
@@ -1251,14 +1407,30 @@ function altStr(alts){
 function workStr(alts){
   return (alts||[]).map(a=>{
     let s=a.name+(a.dir?' '+a.dir:'');
-    if(a.process) s+=' ['+a.process+(a.processSub?' → '+a.processSub:'')+']';
+    const procs=a.processes||[];
+    if(procs.length){
+      const subs=a.processSubs||{};
+      const procStrs=procs.map(p=>{
+        const subList=subs[p]||[];
+        return p+(subList.length?' ('+subList.join('/')+')'  :'');
+      });
+      s+=' ['+procStrs.join(' / ')+']';
+    }
     if(a.processMemo) s+=' ('+a.processMemo+')';
     return s;
   }).join('\n');
 }
 const workStr2=alts=>(alts||[]).map(a=>{
   let s=a.name+(a.dir?' '+a.dir:'');
-  if(a.process) s+=' ['+a.process+(a.processSub?' → '+a.processSub:'')+']';
+  const procs=a.processes||[];
+  if(procs.length){
+    const subs=a.processSubs||{};
+    const procStrs=procs.map(p=>{
+      const subList=subs[p]||[];
+      return p+(subList.length?' ('+subList.join('/')+')'  :'');
+    });
+    s+=' ['+procStrs.join(' / ')+']';
+  }
   if(a.processMemo) s+=' ('+a.processMemo+')';
   return s;
 }).join(' / ');
