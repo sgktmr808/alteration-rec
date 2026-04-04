@@ -158,6 +158,27 @@ select option{background:#1a1a24;}
 .sinput{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:9px 13px;color:var(--text);font-size:15px;font-family:var(--font);}
 .sinput:focus{outline:none;border-color:var(--gold);}
 
+/* HISTORY TABLE */
+.hist-table{width:100%;border-collapse:collapse;font-size:12px;min-width:640px;}
+.hist-table th{
+  background:var(--s2);color:var(--text3);
+  font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:8px 10px;text-align:left;border-bottom:2px solid var(--border2);
+  white-space:nowrap;position:sticky;top:0;z-index:10;
+}
+.hist-table td{
+  padding:9px 10px;border-bottom:1px solid var(--border);
+  color:var(--text);vertical-align:top;white-space:nowrap;
+  max-width:160px;overflow:hidden;text-overflow:ellipsis;
+}
+.hist-table tr{cursor:pointer;transition:background .12s;}
+.hist-table tr:hover td{background:var(--s2);}
+.hist-table tr:active td{background:var(--s3);}
+.hist-table td.wrap{white-space:normal;max-width:200px;}
+.hist-table .td-no{font-family:var(--mono);color:var(--text3);font-size:11px;}
+.hist-table .td-price{font-family:var(--mono);font-weight:700;color:var(--gold);text-align:right;}
+.hist-table .td-status{text-align:center;}
+
 /* EMPTY */
 .empty{text-align:center;padding:60px 20px;color:var(--text3);font-size:14px;line-height:2.2;}
 .empty-icon{font-size:36px;margin-bottom:10px;}
@@ -437,7 +458,10 @@ select option{background:#1a1a24;}
 
 <!-- ══ 履歴 ══ -->
 <div class="screen" id="screen-history">
-  <div class="hdr"><div><div class="hdr-title">履歴</div></div></div>
+  <div class="hdr">
+    <div><div class="hdr-title">履歴</div></div>
+    <button class="hdr-ghost" onclick="exportExcel()">📊 Excel出力</button>
+  </div>
   <div class="search-wrap"><input class="sinput" type="search" placeholder="客名・伝票No・品名・素材で検索…" id="search-input" oninput="renderHistory()"></div>
   <div style="padding:6px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div>
@@ -453,7 +477,7 @@ select option{background:#1a1a24;}
     <button onclick="clearDateFilter()" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:4px 0;">日付フィルターをクリア</button>
   </div>
   <div class="filter-bar" id="hist-filter"></div>
-  <div class="card-list" id="history-list" style="margin-top:8px"></div>
+  <div id="history-list" style="margin-top:8px;overflow-x:auto;padding:0 16px 8px;"></div>
 </div>
 
 <!-- ══ DETAIL MODAL ══ -->
@@ -848,6 +872,54 @@ function renderWork(){
 function setWF(f){workFilter=f;renderWork();}
 
 // ══ HISTORY ══
+function exportExcel(){
+  const q=(document.getElementById('search-input')?.value||'').toLowerCase();
+  const dateFrom=document.getElementById('hist-date-from')?.value||'';
+  const dateTo=document.getElementById('hist-date-to')?.value||'';
+  let all=gR();
+  if(q) all=all.filter(r=>[r.client,r.ticket,r.item,r.material,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(dateFrom) all=all.filter(r=>r.inDate&&r.inDate>=dateFrom);
+  if(dateTo) all=all.filter(r=>r.inDate&&r.inDate<=dateTo);
+  if(histFilter!=='all') all=all.filter(r=>r.type===histFilter);
+
+  if(!all.length){alert('出力するデータがありません');return;}
+
+  const altSummary=alts=>(alts||[]).map(a=>a.name+(a.dir?' '+a.dir:'')+(a.dim?' '+a.dim+'cm':'')).join(' / ');
+  const tpLabel=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
+  const stLabel=id=>(STATUS_LIST.find(s=>s.id===id)||{label:''}).label;
+
+  const esc=v=>{
+    const s=String(v||'');
+    if(s.includes(',')|| s.includes('"')|| s.includes('\n')) return '"'+s.replace(/"/g,'""')+'"';
+    return s;
+  };
+
+  const headers=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','担当者','品名','カテゴリー','色','柄','素材','客様指定補正','指定メモ','実行工程','工程メモ','特殊','ミシン','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス'];
+
+  const rows=all.map(r=>[
+    r.inDate,r.inTime,r.outDate,
+    r.ticket?'#'+r.ticket:'',
+    tpLabel(r.type),r.store,r.client,r.staff,
+    r.item,r.category,r.colorName||r.colorHex,r.pattern,r.material,
+    altSummary(r.clientAlts),r.clientAltMemo,
+    altSummary(r.workAlts),r.workAltMemo,r.special,
+    r.machine,r.needle,r.thread,r.threadColor,r.foot,r.machineMemo,
+    r.time||'',r.materials,r.price||'',r.note,
+    stLabel(r.status)
+  ].map(esc).join(','));
+
+  const bom='\uFEFF';
+  const csv=bom+[headers.map(esc).join(','),...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const today=new Date().toISOString().split('T')[0];
+  a.download=`補正記録_${today}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function clearDateFilter(){
   document.getElementById('hist-date-from').value='';
   document.getElementById('hist-date-to').value='';
@@ -867,7 +939,47 @@ function renderHistory(){
   ).join('');
   if(histFilter!=='all') all=all.filter(r=>r.type===histFilter);
   const el=document.getElementById('history-list');
-  el.innerHTML=all.length?all.map(renderCard).join(''):`<div class="empty"><div class="empty-icon">📋</div>記録がありません</div>`;
+  if(!all.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div>記録がありません</div>`;
+    return;
+  }
+  const stLabel=id=>(STATUS_LIST.find(s=>s.id===id)||{label:'—'}).label;
+  const tpLabel=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
+  const altSummary=alts=>(alts||[]).map(a=>a.name+(a.dir?' '+a.dir:'')+(a.dim?' '+a.dim+'cm':'')).join(' / ');
+  el.innerHTML=`<table class="hist-table">
+    <thead><tr>
+      <th>持込日</th>
+      <th>納品日</th>
+      <th>伝票No.</th>
+      <th>案件</th>
+      <th>店名</th>
+      <th>客名</th>
+      <th>担当者</th>
+      <th>品名</th>
+      <th>カテゴリー</th>
+      <th>素材</th>
+      <th>補正内容</th>
+      <th>金額</th>
+      <th>状態</th>
+    </tr></thead>
+    <tbody>
+    ${all.map(r=>`<tr onclick="openDetail('${r.id}')">
+      <td>${r.inDate||'—'}</td>
+      <td>${r.outDate||'—'}</td>
+      <td class="td-no">${r.ticket?'#'+r.ticket:''}</td>
+      <td>${tpLabel(r.type)}</td>
+      <td>${r.store||'—'}</td>
+      <td>${r.client||'—'}</td>
+      <td>${r.staff||'—'}</td>
+      <td>${r.item||'—'}</td>
+      <td>${r.category||'—'}</td>
+      <td>${r.material||'—'}</td>
+      <td class="wrap">${altSummary(r.clientAlts)||'—'}</td>
+      <td class="td-price">${r.price?'¥'+r.price.toLocaleString():''}</td>
+      <td class="td-status">${stLabel(r.status)}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
 }
 function setHF(f){histFilter=f;renderHistory();}
 
