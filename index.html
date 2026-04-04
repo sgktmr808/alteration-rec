@@ -35,7 +35,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .nav-icon{font-size:19px;line-height:1;}
 
 /* SCREENS */
-.screen{display:none;min-height:100dvh;padding-top:calc(var(--safe-t));padding-bottom:calc(var(--safe-b)+90px);overflow-y:auto;}
+.screen{display:none;min-height:100dvh;padding-top:calc(var(--safe-t));padding-bottom:calc(var(--safe-b) + 96px);overflow-y:auto;}
 .screen.active{display:block;}
 
 /* HEADER */
@@ -116,7 +116,7 @@ select option{background:#1a1a24;}
 .tcustom:focus{outline:none;border-color:var(--gold);}
 
 /* SAVE */
-.save-btn{display:block;width:calc(100% - 32px);margin:4px 16px 16px;padding:15px;border-radius:14px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--font);cursor:pointer;letter-spacing:.06em;}
+.save-btn{display:block;width:calc(100%-32px);margin:4px 16px 16px;padding:15px;border-radius:14px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--font);cursor:pointer;letter-spacing:.06em;}
 
 /* CARDS */
 .filter-bar{padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
@@ -163,25 +163,56 @@ select option{background:#1a1a24;}
 .empty-icon{font-size:36px;margin-bottom:10px;}
 
 /* MODAL */
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:400;}
-.overlay.open{display:flex;flex-direction:column;justify-content:flex-end;}
-
-.overlay.open{display:block;}
-.modal{background:var(--s1);border-radius:20px 20px 0 0;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;}
-.modal-hdr{padding:14px 16px;background:var(--s2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;}
-.modal-title{font-size:16px;font-weight:700;}
-.mclose{width:38px;height:38px;border-radius:50%;border:none;background:var(--gold);color:#0a0a0f;font-size:18px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1;}
+.overlay{
+  display:none;position:fixed;inset:0;z-index:400;
+  background:rgba(0,0,0,0.75);
+  align-items:flex-end;
+  -webkit-overflow-scrolling:touch;
+}
+.overlay.open{display:flex;}
+.modal{
+  background:var(--s1);
+  border-radius:20px 20px 0 0;
+  width:100%;
+  max-height:82vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding-bottom:calc(var(--safe-b) + 8px);
+}
+.modal-pull{
+  flex-shrink:0;
+  display:flex;justify-content:center;
+  padding:10px 0 6px;
+}
+.modal-pull-bar{
+  width:36px;height:4px;border-radius:2px;
+  background:rgba(255,255,255,0.15);
+}
+.modal-hdr{
+  flex-shrink:0;
+  padding:8px 16px 12px;
+  background:var(--s2);
+  border-bottom:1px solid var(--border);
+  font-size:16px;font-weight:700;
+}
+.modal-inner{
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
 .modal-body{padding:14px 16px;}
-.drow{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);gap:12px;}
-.drow:last-child{border-bottom:none;}
-.dkey{font-size:11px;color:var(--text3);flex-shrink:0;padding-top:2px;}
-.dval{font-size:14px;color:var(--text);font-weight:500;text-align:right;word-break:break-all;}
-.dval-pre{font-size:13px;color:var(--text);white-space:pre-wrap;text-align:right;line-height:1.6;}
-.modal-actions{display:flex;gap:8px;padding:0 16px 16px;}
-.maction{flex:1;padding:11px;border-radius:11px;border:none;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;}
-.ma-print{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3);}
-.ma-del{background:var(--red-bg);color:var(--red);border:1px solid rgba(192,90,90,.3);}
-
+.modal-close-btn{
+  flex-shrink:0;
+  display:block;
+  width:calc(100% - 32px);
+  margin:8px 16px 12px;
+  padding:14px;
+  border-radius:12px;border:none;
+  background:var(--gold);color:#0a0a0f;
+  font-size:15px;font-weight:700;
+  font-family:var(--font);cursor:pointer;
+}
 /* STEPPER */
 .stepper{display:flex;gap:6px;padding:12px 14px;flex-wrap:wrap;}
 .stepbtn{flex:1;min-width:76px;padding:8px 4px;border-radius:10px;border:1px solid var(--border2);background:var(--s2);color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;}
@@ -390,9 +421,9 @@ select option{background:#1a1a24;}
 <!-- ══ DETAIL MODAL ══ -->
 <div class="overlay" id="detail-overlay" onclick="closeDetailOvl(event)">
   <div class="modal">
-    <div class="modal-drag"><div class="modal-drag-bar"></div></div>
-    <div class="modal-hdr"><span class="modal-title" id="detail-title">詳細</span></div>
-    <div class="modal-scroll">
+    <div class="modal-pull"><div class="modal-pull-bar"></div></div>
+    <div class="modal-hdr" id="detail-title">詳細</div>
+    <div class="modal-inner">
       <div class="sec stepper-wrap" style="margin:14px 14px 0;border-radius:12px;">
         <div class="sec-hdr">ステータス更新</div>
         <div class="stepper" id="detail-stepper"></div>
@@ -410,16 +441,22 @@ select option{background:#1a1a24;}
 <!-- ══ MASTER MODAL ══ -->
 <div class="overlay" id="master-overlay" onclick="closeMasterOvl(event)">
   <div class="modal">
-    <div class="modal-drag"><div class="modal-drag-bar"></div></div>
-    <div class="modal-hdr"><span class="modal-title">マスター管理</span></div>
-    <div class="modal-scroll">
+    <div class="modal-pull"><div class="modal-pull-bar"></div></div>
+    <div class="modal-hdr">マスター管理</div>
+    <div class="modal-inner">
       <div class="modal-body">
         <div class="msection-title">店名</div>
         <div class="mlist" id="store-list"></div>
-        <div class="madd-row"><input class="madd-input" id="store-input" placeholder="店名を追加"><button class="madd-btn" onclick="addStore()">追加</button></div>
+        <div class="madd-row">
+          <input class="madd-input" id="store-input" placeholder="店名を追加">
+          <button class="madd-btn" onclick="addStore()">追加</button>
+        </div>
         <div class="msection-title">カテゴリー</div>
         <div class="mlist" id="cat-list"></div>
-        <div class="madd-row"><input class="madd-input" id="cat-input" placeholder="カテゴリーを追加"><button class="madd-btn" onclick="addCat()">追加</button></div>
+        <div class="madd-row">
+          <input class="madd-input" id="cat-input" placeholder="カテゴリーを追加">
+          <button class="madd-btn" onclick="addCat()">追加</button>
+        </div>
       </div>
       <button class="modal-close-btn" onclick="closeMaster()">✕ 閉じる</button>
     </div>
