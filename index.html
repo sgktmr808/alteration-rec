@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="補正記録">
@@ -11,1979 +11,1295 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>補正記録</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#0a0a0f;--s1:#13131a;--s2:#1a1a24;--s3:#22222e;--s4:#2a2a38;
-  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
-  --gold:#c8a84a;--gold2:#e2c46a;--gold-bg:rgba(200,168,74,0.1);
-  --blue:#5b9bd5;--blue-bg:rgba(91,155,213,0.1);
-  --green:#5aac7a;--green-bg:rgba(90,172,122,0.1);
-  --red:#c05a5a;--red-bg:rgba(192,90,90,0.1);
-  --amber:#c4843a;--amber-bg:rgba(196,132,58,0.1);
-  --purple:#9b72cf;--purple-bg:rgba(155,114,207,0.1);
-  --text:#efefef;--text2:#8888a0;--text3:#55556a;
-  --font:'Noto Sans JP',sans-serif;--mono:'DM Mono',monospace;
-  --safe-t:env(safe-area-inset-top);--safe-b:env(safe-area-inset-bottom);
+  --bd:rgba(255,255,255,.07);--bd2:rgba(255,255,255,.13);
+  --gold:#c8a84a;--gold-bg:rgba(200,168,74,.12);
+  --blue:#5b9bd5;--blue-bg:rgba(91,155,213,.12);
+  --green:#5aac7a;--green-bg:rgba(90,172,122,.12);
+  --red:#c05a5a;--red-bg:rgba(192,90,90,.12);
+  --amber:#c4843a;--amber-bg:rgba(196,132,58,.12);
+  --purple:#9b72cf;--purple-bg:rgba(155,114,207,.12);
+  --tx:#efefef;--tx2:#8888a0;--tx3:#55556a;
+  --f:'Noto Sans JP',sans-serif;--fm:'DM Mono',monospace;
+  --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);}
-
-/* NAV */
-.nav{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,0.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;padding-bottom:calc(var(--safe-b) + 4px);z-index:300;}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 6px;border:none;background:none;color:var(--text3);font-size:10px;font-family:var(--font);cursor:pointer;transition:color .15s;letter-spacing:.04em;}
-.nav-btn.active{color:var(--gold);}
-.nav-icon{font-size:19px;line-height:1;}
-
-/* SCREENS */
-.screen{display:none;min-height:100dvh;padding-top:calc(var(--safe-t));padding-bottom:calc(var(--safe-b) + 96px);overflow-y:auto;}
-.screen.active{display:block;}
-
-/* HEADER */
-.hdr{padding:calc(var(--safe-t)+12px) 16px 11px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.93);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
-.hdr-title{font-size:17px;font-weight:700;letter-spacing:.03em;}
-.hdr-sub{font-size:11px;color:var(--text3);font-family:var(--mono);}
-.hdr-ghost{padding:7px 14px;border-radius:20px;border:1px solid var(--border2);background:none;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer;}
-
-/* FORM */
-.form-scroll{padding:14px 16px 8px;}
-.sec{background:var(--s1);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;}
-.sec-hdr{padding:9px 14px;background:var(--s2);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;}
-.field{padding:11px 14px;border-bottom:1px solid var(--border);}
-.field:last-child{border-bottom:none;}
-.flabel{font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:500;letter-spacing:.07em;}
-.field input,.field select,.field textarea{width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-size:15px;font-family:var(--font);-webkit-appearance:none;transition:border-color .15s;}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--gold);}
-.field textarea{min-height:72px;resize:vertical;line-height:1.6;}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-select option{background:#1a1a24;}
-
-/* TYPE PILLS */
-.type-wrap{padding:10px 14px 12px;display:flex;flex-wrap:wrap;gap:6px;}
-.tpill{padding:6px 11px;border-radius:20px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.tpill.aq{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
-.tpill.as{background:var(--green-bg);color:var(--green);border-color:var(--green);}
-.tpill.ac{background:var(--gold-bg);color:var(--gold);border-color:var(--gold);}
-.tpill.ar{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
-.tpill.acl{background:var(--red-bg);color:var(--red);border-color:var(--red);}
-.tpill.aos{background:var(--purple-bg);color:var(--purple);border-color:var(--purple);}
-.tpill.ao{background:var(--s4);color:var(--text2);border-color:var(--border2);}
-
-/* COLOR/PATTERN PICKER */
-.color-grid{padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-.color-swatch{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s;flex-shrink:0;}
-.color-swatch.selected{border-color:#fff;transform:scale(1.15);}
-.color-label{font-size:11px;color:var(--text3);margin-top:4px;text-align:center;}
-.pattern-wrap{padding:6px 14px 12px;display:flex;flex-wrap:wrap;gap:6px;}
-.ppill{padding:5px 11px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;}
-.ppill.active{background:var(--gold-bg);color:var(--gold);border-color:var(--gold);}
-.color-custom-row{padding:0 14px 12px;display:flex;align-items:center;gap:8px;}
-.color-custom-row input[type=color]{width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:50%;padding:0;}
-.color-custom-row input[type=text]{flex:1;background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:14px;font-family:var(--font);}
-.color-custom-row input[type=text]:focus{outline:none;border-color:var(--gold);}
-
-/* ALT ITEMS */
-.alt-items{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
-.alt-item{background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
-.alt-item-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;}
-.alt-item-head input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;}
-.alt-item-name{font-size:14px;flex:1;}
-.alt-item-body{display:none;padding:8px 12px 10px;border-top:1px solid var(--border);background:var(--s3);}
-.alt-item-body.open{display:block;}
-.dir-btns{display:flex;gap:6px;margin-bottom:8px;}
-.dir-btn{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
-.dir-btn.active-tsume{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
-.dir-btn.active-none{background:var(--s4);color:var(--text2);border-color:var(--border2);}
-.dir-btn.active-dashi{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
-.dim-row{display:flex;align-items:center;gap:8px;}
-.dim-input{flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:15px;font-family:var(--mono);text-align:right;}
-.dim-input:focus{outline:none;border-color:var(--gold);}
-.dim-unit{font-size:13px;color:var(--text3);}
-.alt-memo-input{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;color:var(--text);font-size:13px;font-family:var(--font);margin-top:6px;}
-.alt-memo-input:focus{outline:none;border-color:var(--gold);}
-
-/* MACHINE */
-.machine-grid{padding:10px 14px;display:flex;flex-direction:column;gap:8px;}
-.mrow{display:grid;grid-template-columns:88px 1fr;align-items:center;gap:10px;}
-.mlabel{font-size:12px;color:var(--text3);}
-.minput{background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:14px;font-family:var(--mono);width:100%;}
-.minput:focus{outline:none;border-color:var(--gold);}
-
-/* TIME */
-.time-row{display:flex;align-items:center;gap:8px;padding:10px 14px;}
-.tbtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);background:var(--s3);color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.tval{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--gold);min-width:52px;text-align:center;}
-.tunit{font-size:12px;color:var(--text3);}
-.tcustom{width:80px;background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;color:var(--text);font-size:14px;font-family:var(--mono);}
-.tcustom:focus{outline:none;border-color:var(--gold);}
-
-/* SAVE */
-.save-btn{display:block;width:calc(100%-32px);margin:4px 16px 16px;padding:15px;border-radius:14px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--font);cursor:pointer;letter-spacing:.06em;}
-
-/* CARDS */
-.filter-bar{padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
-.filter-bar::-webkit-scrollbar{display:none;}
-.fpill{flex-shrink:0;padding:6px 12px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;}
-.fpill.active{background:var(--gold);color:#0a0a0f;border-color:var(--gold);font-weight:700;}
-.card-list{padding:0 16px;display:flex;flex-direction:column;gap:10px;}
-.rcard{background:var(--s1);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s;}
-.rcard:active{border-color:var(--gold);}
-.rcard-head{padding:11px 14px;background:var(--s2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-.rcard-meta{flex:1;min-width:0;}
-.rcard-top{display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;}
-.rcard-no{font-size:11px;font-family:var(--mono);color:var(--text3);}
-.rcard-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rcard-sub{font-size:12px;color:var(--text2);margin-top:2px;}
-.rcard-body{padding:9px 14px;display:flex;flex-wrap:wrap;gap:5px;}
-.rtag{font-size:11px;padding:2px 8px;border-radius:5px;background:var(--s3);color:var(--text2);border:1px solid var(--border);}
-.rcard-foot{padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-.rdate{font-size:11px;color:var(--text3);}
-.rprice{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--gold);}
-
-/* BADGES */
-.sbadge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0;}
-.s-received{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3);}
-.s-working{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(196,132,58,.3);}
-.s-done{background:var(--green-bg);color:var(--green);border:1px solid rgba(90,172,122,.3);}
-.s-returned{background:var(--s3);color:var(--text3);border:1px solid var(--border);}
-.tbadge{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:600;}
-.t-quick{background:var(--blue-bg);color:var(--blue);}
-.t-shop{background:var(--green-bg);color:var(--green);}
-.t-customer{background:var(--gold-bg);color:var(--gold);}
-.t-redo{background:var(--amber-bg);color:var(--amber);}
-.t-claim{background:var(--red-bg);color:var(--red);}
-.t-other-store{background:var(--purple-bg);color:var(--purple);}
-.t-other{background:var(--s3);color:var(--text3);}
-
-/* SEARCH */
-.search-wrap{padding:10px 16px 4px;}
-.sinput{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:9px 13px;color:var(--text);font-size:15px;font-family:var(--font);}
-.sinput:focus{outline:none;border-color:var(--gold);}
-
-/* HISTORY TABLE */
-.hist-table{width:100%;border-collapse:collapse;font-size:12px;min-width:640px;}
-.hist-table th{
-  background:var(--s2);color:var(--text3);
-  font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-  padding:8px 10px;text-align:left;border-bottom:2px solid var(--border2);
-  white-space:nowrap;position:sticky;top:0;z-index:10;
-}
-.hist-table td{
-  padding:9px 10px;border-bottom:1px solid var(--border);
-  color:var(--text);vertical-align:top;white-space:nowrap;
-  max-width:160px;overflow:hidden;text-overflow:ellipsis;
-}
-.hist-table tr{cursor:pointer;transition:background .12s;}
-.hist-table tr:hover td{background:var(--s2);}
-.hist-table tr:active td{background:var(--s3);}
-.hist-table td.wrap{white-space:normal;max-width:200px;}
-.hist-table .td-no{font-family:var(--mono);color:var(--text3);font-size:11px;}
-.hist-table .td-price{font-family:var(--mono);font-weight:700;color:var(--gold);text-align:right;}
-.hist-table .td-status{text-align:center;}
-
-/* EMPTY */
-.empty{text-align:center;padding:60px 20px;color:var(--text3);font-size:14px;line-height:2.2;}
-.empty-icon{font-size:36px;margin-bottom:10px;}
-
-/* MODAL */
-.overlay{
-  display:none;position:fixed;inset:0;z-index:400;
-  background:rgba(0,0,0,0.75);
-  align-items:flex-end;
-  -webkit-overflow-scrolling:touch;
-}
-.overlay.open{display:flex;}
-.modal{
-  background:var(--s1);
-  border-radius:20px 20px 0 0;
-  width:100%;
-  max-height:82vh;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  padding-bottom:calc(var(--safe-b) + 8px);
-}
-.modal-pull{
-  flex-shrink:0;
-  display:flex;justify-content:center;
-  padding:10px 0 6px;
-}
-.modal-pull-bar{
-  width:36px;height:4px;border-radius:2px;
-  background:rgba(255,255,255,0.15);
-}
-.modal-hdr{
-  flex-shrink:0;
-  padding:8px 16px 12px;
-  background:var(--s2);
-  border-bottom:1px solid var(--border);
-  font-size:16px;font-weight:700;
-}
-.modal-inner{
-  flex:1;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-}
-.modal-body{padding:14px 16px;overflow-x:hidden;}
-.modal-close-btn{
-  flex-shrink:0;
-  display:block;
-  width:calc(100% - 32px);
-  margin:8px 16px 12px;
-  padding:14px;
-  border-radius:12px;border:none;
-  background:var(--gold);color:#0a0a0f;
-  font-size:15px;font-weight:700;
-  font-family:var(--font);cursor:pointer;
-}
-/* STEPPER */
-.stepper{display:flex;gap:6px;padding:12px 14px;flex-wrap:wrap;}
-.stepbtn{flex:1;min-width:76px;padding:8px 4px;border-radius:10px;border:1px solid var(--border2);background:var(--s2);color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;}
-.stepbtn.s-received.on{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
-.stepbtn.s-working.on{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
-.stepbtn.s-done.on{background:var(--green-bg);color:var(--green);border-color:var(--green);}
-.stepbtn.s-returned.on{background:var(--s4);color:var(--text2);border-color:var(--border2);}
-
-/* MASTER */
-.mlist{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
-.mitem{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--s2);border-radius:9px;border:1px solid var(--border);}
-.mitem-name{font-size:14px;}
-.mdel{width:26px;height:26px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:14px;cursor:pointer;}
-.madd-row{display:flex;gap:8px;}
-.madd-input{flex:1;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-size:15px;font-family:var(--font);}
-.madd-input:focus{outline:none;border-color:var(--gold);}
-.madd-btn{padding:9px 16px;border-radius:9px;border:none;background:var(--gold);color:#0a0a0f;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;}
-.msection-title{font-size:11px;color:var(--text3);margin:16px 0 8px;letter-spacing:.08em;text-transform:uppercase;}
-
-/* COLOR DOT in card */
-.color-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:3px;}
-
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--f)}
+.screen{display:none;min-height:100dvh;padding-top:var(--st);padding-bottom:calc(var(--sb) + 72px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.screen.on{display:block}
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(10,10,15,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--bd);display:flex;padding-bottom:calc(var(--sb) + 2px)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 5px;border:none;background:none;color:var(--tx3);font-size:10px;font-family:var(--f);cursor:pointer}
+.nb.on{color:var(--gold)}
+.ni{font-size:20px;line-height:1}
+.hdr{padding:calc(var(--st) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;background:rgba(10,10,15,.93);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--bd)}
+.ht{font-size:17px;font-weight:700}
+.hv{font-size:10px;color:var(--tx3);font-family:var(--fm);margin-top:1px}
+.btn-g{padding:7px 13px;border-radius:18px;border:1px solid var(--bd2);background:none;color:var(--tx2);font-size:12px;font-family:var(--f);cursor:pointer}
+.btn-gold{padding:8px 16px;border-radius:18px;border:none;background:var(--gold);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
+.fb{padding:12px 16px 0}
+.sec{background:var(--s1);border:1px solid var(--bd);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.sh{padding:8px 14px;background:var(--s2);border-bottom:1px solid var(--bd);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase}
+.fld{padding:10px 14px;border-bottom:1px solid var(--bd)}
+.fld:last-child{border-bottom:none}
+.fl{font-size:10px;color:var(--tx3);margin-bottom:5px;font-weight:500;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center}
+.fld input[type=text],.fld input[type=number],.fld input[type=date],.fld input[type=time],.fld select,.fld textarea{width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);-webkit-appearance:none;outline:none}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--gold)}
+.fld textarea{min-height:64px;resize:vertical;line-height:1.6}
+.fld2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+select option{background:#1a1a24}
+.tpill{padding:6px 12px;border-radius:20px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tpill.q{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+.tpill.s,.tpill.sp{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+.tpill.c{background:var(--gold-bg);color:var(--gold);border-color:var(--gold)}
+.tpill.r{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
+.tpill.cl{background:var(--red-bg);color:var(--red);border-color:var(--red)}
+.tpill.os{background:var(--purple-bg);color:var(--purple);border-color:var(--purple)}
+.tpill.o{background:var(--s4);color:var(--tx2)}
+.tog{padding:5px 12px;border-radius:16px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer;transition:all .15s;white-space:nowrap}
+.tog.on-a{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
+.tog.on-b{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+.cg{padding:8px 14px;display:flex;flex-wrap:wrap;gap:8px}
+.csw{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s;flex-shrink:0}
+.csw.on{border-color:#fff;transform:scale(1.2)}
+.clb{font-size:9px;color:var(--tx3);text-align:center;margin-top:2px}
+.ppill{padding:5px 11px;border-radius:16px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:12px;cursor:pointer;transition:all .15s}
+.ppill.on{background:var(--gold-bg);color:var(--gold);border-color:var(--gold)}
+.alt-list{padding:8px 14px;display:flex;flex-direction:column;gap:6px}
+.ai{background:var(--s2);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+.ah{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer}
+.ah input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;cursor:pointer}
+.an{font-size:14px;flex:1}
+.ab{display:none;padding:8px 12px 10px;border-top:1px solid var(--bd);background:var(--s3)}
+.ab.on{display:block}
+.dr{display:flex;gap:6px;margin-bottom:8px}
+.db{flex:1;padding:7px 4px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+.db.t{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+.db.d{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
+.db.n{background:var(--s4);color:var(--tx2)}
+.dtrow{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
+.dtb{padding:4px 10px;border-radius:14px;font-size:11px;font-weight:600;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);cursor:pointer;transition:all .15s}
+.dtb.on{background:var(--gold-bg);color:var(--gold);border-color:var(--gold)}
+.dmrow{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.dmi{flex:1;background:var(--s2);border:1px solid var(--bd2);border-radius:8px;padding:7px 10px;color:var(--tx);font-size:15px;font-family:var(--fm);text-align:right;outline:none}
+.dmi:focus{border-color:var(--gold)}
+.dmu{font-size:12px;color:var(--tx3)}
+.pw{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+.pb{padding:5px 10px;border-radius:14px;font-size:12px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);cursor:pointer;transition:all .15s}
+.pb.on{background:var(--gold-bg);color:var(--gold);border-color:var(--gold)}
+.pb.fin{font-size:11px;background:var(--s4)}
+.pb.fin.on{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+.sw{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.sb{padding:4px 9px;border-radius:12px;font-size:11px;border:1px solid var(--bd2);background:var(--s4);color:var(--tx3);cursor:pointer;transition:all .15s}
+.sb.on{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+.pm{width:100%;background:var(--s2);border:1px solid var(--bd2);border-radius:8px;padding:7px 10px;color:var(--tx);font-size:13px;font-family:var(--f);outline:none;margin-top:2px}
+.pm:focus{border-color:var(--gold)}
+.mg{padding:8px 14px;display:flex;flex-direction:column;gap:7px}
+.mr{display:grid;grid-template-columns:76px 1fr;align-items:center;gap:8px}
+.ml{font-size:12px;color:var(--tx3)}
+.mi{background:var(--s3);border:1px solid var(--bd2);border-radius:8px;padding:8px 10px;color:var(--tx);font-size:14px;font-family:var(--fm);width:100%;outline:none}
+.mi:focus{border-color:var(--gold)}
+.tr{display:flex;align-items:center;gap:8px;padding:10px 14px}
+.tb2{width:36px;height:36px;border-radius:50%;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tv{font-size:22px;font-weight:700;font-family:var(--fm);color:var(--gold);min-width:44px;text-align:center}
+.tu{font-size:12px;color:var(--tx3)}
+.tc{width:68px;background:var(--s3);border:1px solid var(--bd2);border-radius:8px;padding:7px 8px;color:var(--tx);font-size:14px;font-family:var(--fm);outline:none}
+.tc:focus{border-color:var(--gold)}
+.save-btn{display:block;width:calc(100% - 32px);margin:4px 16px 16px;padding:15px;border-radius:14px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--f);cursor:pointer}
+.fbar{padding:8px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.fbar::-webkit-scrollbar{display:none}
+.fp{flex-shrink:0;padding:6px 13px;border-radius:16px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:12px;cursor:pointer;transition:all .15s}
+.fp.on{background:var(--gold);color:#0a0a0f;border-color:var(--gold);font-weight:700}
+.cl{padding:0 16px;display:flex;flex-direction:column;gap:10px}
+.rc{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;cursor:pointer}
+.rh{padding:10px 14px;background:var(--s2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.rm{flex:1;min-width:0}
+.rt{display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap}
+.rno{font-size:11px;font-family:var(--fm);color:var(--tx3)}
+.rn{font-size:15px;font-weight:700}
+.rs{font-size:12px;color:var(--tx2);margin-top:1px}
+.rb{padding:8px 14px;display:flex;flex-wrap:wrap;gap:4px}
+.rtg{font-size:11px;padding:2px 7px;border-radius:5px;background:var(--s3);color:var(--tx2);border:1px solid var(--bd)}
+.rf{padding:7px 14px;border-top:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.rd{font-size:11px;color:var(--tx3)}
+.rp{font-size:15px;font-weight:700;font-family:var(--fm);color:var(--gold)}
+.sbg{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0}
+.s-recv{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3)}
+.s-work{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(196,132,58,.3)}
+.s-done{background:var(--green-bg);color:var(--green);border:1px solid rgba(90,172,122,.3)}
+.s-ret{background:var(--s3);color:var(--tx3);border:1px solid var(--bd)}
+.tbg{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:600}
+.sw2{padding:8px 16px 4px}
+.si{width:100%;background:var(--s2);border:1px solid var(--bd2);border-radius:10px;padding:9px 13px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none}
+.si:focus{border-color:var(--gold)}
+.df{padding:6px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.df label{font-size:10px;color:var(--tx3);display:block;margin-bottom:3px}
+.df input{width:100%;background:var(--s2);border:1px solid var(--bd2);border-radius:9px;padding:8px 10px;color:var(--tx);font-size:13px;font-family:var(--f);-webkit-appearance:none;outline:none}
+.df input:focus{border-color:var(--gold)}
+.cd-btn{display:block;text-align:right;padding:4px 16px 0;font-size:11px;color:var(--tx3);background:none;border:none;cursor:pointer;font-family:var(--f)}
+.htw{overflow-x:auto;padding:8px 16px;-webkit-overflow-scrolling:touch}
+.ht{width:100%;border-collapse:collapse;font-size:12px;min-width:680px}
+.ht th{background:var(--s2);color:var(--tx3);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;text-align:left;border-bottom:2px solid var(--bd2);white-space:nowrap;position:sticky;top:0}
+.ht td{padding:8px 10px;border-bottom:1px solid var(--bd);color:var(--tx);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.ht tr:hover td,.ht tr:active td{background:var(--s2)}
+.empty{text-align:center;padding:56px 20px;color:var(--tx3);font-size:14px;line-height:2.4}
+.ei{font-size:36px;margin-bottom:8px}
+.ov{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.78);align-items:flex-end}
+.ov.on{display:flex}
+.md{background:var(--s1);border-radius:20px 20px 0 0;width:100%;max-width:100vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;padding-bottom:calc(var(--sb) + 8px)}
+.mp{flex-shrink:0;display:flex;justify-content:center;padding:10px 0 4px}
+.mpb{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15)}
+.mh{flex-shrink:0;padding:8px 16px 12px;background:var(--s2);border-bottom:1px solid var(--bd);font-size:16px;font-weight:700}
+.ms{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.mb{padding:14px 16px}
+.mc{display:block;width:calc(100% - 32px);margin:8px 16px 4px;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#0a0a0f;font-size:15px;font-weight:700;font-family:var(--f);cursor:pointer}
+.dw{display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bd);gap:10px}
+.dw:last-child{border-bottom:none}
+.dk{font-size:11px;color:var(--tx3);flex-shrink:0;padding-top:2px}
+.dv{font-size:14px;color:var(--tx);font-weight:500;text-align:right;word-break:break-all}
+.dvp{font-size:13px;color:var(--tx);white-space:pre-wrap;text-align:right;line-height:1.6}
+.ma{display:flex;gap:8px;padding:0 16px}
+.mac{flex:1;padding:11px;border-radius:11px;border:none;font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer}
+.step{display:flex;gap:6px;padding:10px 14px;flex-wrap:wrap}
+.stb{flex:1;min-width:68px;padding:8px 4px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx3);font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
+.stb.recv{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+.stb.work{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
+.stb.done{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+.stb.ret{background:var(--s4);color:var(--tx2)}
+.mst{font-size:11px;color:var(--tx3);margin:12px 0 6px;letter-spacing:.08em;text-transform:uppercase}
+.mli{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.mit{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--s2);border-radius:9px;border:1px solid var(--bd)}
+.mn{font-size:14px}
+.mdl{width:26px;height:26px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mar{display:flex;gap:8px}
+.mai{flex:1;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none}
+.mai:focus{border-color:var(--gold)}
+.mab{padding:9px 16px;border-radius:9px;border:none;background:var(--gold);color:#0a0a0f;font-size:14px;font-weight:700;font-family:var(--f);cursor:pointer}
+.ea{display:none;margin-bottom:12px}
+.eat{width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:10px;color:var(--tx);font-size:12px;font-family:var(--fm);min-height:70px;resize:none;line-height:1.5;outline:none}
+.cpb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer}
+.imb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
 @media print{
-  body *{visibility:hidden;}
-  .print-area, .print-area *{visibility:visible;}
-  .print-area{
-    position:fixed;inset:0;
-    background:#fff;color:#000;
-    font-family:'Noto Sans JP',sans-serif;
-    padding:16px;
-    overflow:visible;
-  }
-  .print-header{
-    border-bottom:2px solid #000;
-    padding-bottom:10px;
-    margin-bottom:14px;
-    display:flex;justify-content:space-between;align-items:flex-end;
-  }
-  .print-title{font-size:18px;font-weight:700;}
-  .print-no{font-size:13px;color:#444;}
-  .print-row{
-    display:flex;justify-content:space-between;
-    padding:6px 0;border-bottom:1px solid #ddd;
-    font-size:13px;gap:12px;
-  }
-  .print-key{color:#666;flex-shrink:0;min-width:90px;}
-  .print-val{color:#000;font-weight:500;text-align:right;word-break:break-all;}
-  .print-val-pre{color:#000;white-space:pre-wrap;text-align:right;font-size:12px;line-height:1.6;}
-  .print-section{font-size:10px;font-weight:700;letter-spacing:.1em;color:#888;text-transform:uppercase;margin:12px 0 4px;}
-  .print-footer{margin-top:16px;font-size:11px;color:#888;text-align:right;}
+  body *{visibility:hidden}
+  #print-area,#print-area *{visibility:visible}
+  #print-area{position:fixed;inset:0;background:#fff;color:#000;font-family:var(--f);padding:16px;overflow:visible}
+  .ph{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end}
+  .pt{font-size:18px;font-weight:700}
+  .pn{font-size:12px;color:#444}
+  .pr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #ddd;font-size:13px;gap:10px}
+  .pk{color:#666;flex-shrink:0;min-width:90px}
+  .pv{color:#000;font-weight:500;text-align:right;word-break:break-all}
+  .pvp{color:#000;white-space:pre-wrap;text-align:right;font-size:12px;line-height:1.6}
+  .ps{font-size:10px;font-weight:700;letter-spacing:.1em;color:#888;text-transform:uppercase;margin:10px 0 4px}
+  .pf{margin-top:14px;font-size:11px;color:#888;text-align:right}
 }
 </style>
 </head>
 <body>
 
-<!-- ══ 受付 ══ -->
-<div class="screen active" id="screen-new">
+<div class="screen on" id="scr-new">
   <div class="hdr">
-    <div><div class="hdr-title">新規受付</div><div class="hdr-sub">v15b</div></div>
-    <button class="hdr-ghost" onclick="openMaster()">マスター管理</button>
+    <div><div class="ht">新規受付</div><div class="hv">v16</div></div>
+    <button class="btn-g" onclick="openMaster()">マスター管理</button>
   </div>
-  <div class="form-scroll">
-
-    <!-- 受付情報 -->
+  <div class="fb">
     <div class="sec">
-      <div class="sec-hdr">📋 受付情報</div>
-      <div class="field">
-        <div class="flabel">案件種別</div>
-        <div class="type-wrap" id="type-pills"></div>
-      </div>
-      <div class="field">
-        <div class="flabel">店名</div>
-        <select id="f-store"></select>
-      </div>
-      <div class="field field-row">
-        <div>
-          <div class="flabel">持ち込み日</div>
-          <input type="date" id="f-in-date">
-        </div>
-        <div>
-          <div class="flabel">持ち込み時刻</div>
-          <input type="time" id="f-in-time">
-        </div>
-      </div>
-      <div class="field">
-        <div class="flabel">納品日</div>
-        <input type="date" id="f-out-date">
-      </div>
+      <div class="sh">📋 受付情報</div>
+      <div class="fld"><div class="fl">案件種別</div><div id="type-wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
+      <div class="fld"><div class="fl">店名</div><select id="f-store"></select></div>
+      <div class="fld"><div class="fld2">
+        <div><div class="fl">持ち込み日</div><input type="date" id="f-in-date"></div>
+        <div><div class="fl">持ち込み時刻</div><input type="time" id="f-in-time"></div>
+      </div></div>
+      <div class="fld"><div class="fl">納品日</div><input type="date" id="f-out-date"></div>
     </div>
-
-    <!-- 伝票・顧客 -->
     <div class="sec">
-      <div class="sec-hdr">🏷 伝票・顧客</div>
-      <div class="field">
-        <div class="flabel">伝票No.（下5桁）</div>
-        <input type="text" id="f-ticket" placeholder="00001" maxlength="5" pattern="[0-9]{5}" autocomplete="off" inputmode="numeric">
+      <div class="sh">🏷 伝票・顧客</div>
+      <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="f-ticket" maxlength="5" inputmode="numeric" autocomplete="off"></div>
+      <div class="fld">
+        <div class="fl">客名 <button id="btn-staff" class="tog" onclick="togStaff()">スタッフ</button></div>
+        <input type="text" id="f-client" autocomplete="off">
       </div>
-      <div class="field">
-        <div class="flabel">客名</div>
-        <input type="text" id="f-client" placeholder="" autocomplete="off">
-      </div>
-      <div class="field">
-        <div class="flabel">担当者名</div>
-        <input type="text" id="f-staff" placeholder="" autocomplete="off">
-      </div>
+      <div class="fld"><div class="fl">担当者名</div><input type="text" id="f-staff" autocomplete="off"></div>
     </div>
-
-    <!-- 商品情報 -->
     <div class="sec">
-      <div class="sec-hdr">👔 商品情報</div>
-      <div class="field">
-        <div class="flabel">品名</div>
-        <input type="text" id="f-item" placeholder="" autocomplete="off">
-      </div>
-      <div class="field">
-        <div class="flabel">カテゴリー</div>
-        <select id="f-category" onchange="onCategoryChange()"></select>
-      </div>
-      <!-- 色選択 -->
+      <div class="sh">👔 商品情報</div>
+      <div class="fld"><div class="fl">品名</div><input type="text" id="f-item" autocomplete="off"></div>
+      <div class="fld"><div class="fl">カテゴリー</div><select id="f-cat" onchange="onCatChange()"></select></div>
       <div>
-        <div class="flabel" style="padding:10px 14px 6px;">色</div>
-        <div class="color-grid" id="color-swatches"></div>
-        <div class="color-custom-row">
-          <input type="color" id="color-custom-picker" value="#888888" onchange="onCustomColor()">
-          <input type="text" id="color-custom-text" placeholder="カラー名・色番号（任意）">
+        <div class="fl" style="padding:10px 14px 6px">色</div>
+        <div class="cg" id="color-wrap"></div>
+        <div style="display:flex;gap:8px;padding:0 14px 10px;align-items:center">
+          <input type="color" id="color-picker" value="#888888" onchange="onCustomColor()" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:50%;flex-shrink:0">
+          <input type="text" id="color-text" placeholder="カラー名・色番号（任意）" style="flex:1;background:var(--s3);border:1px solid var(--bd2);border-radius:8px;padding:8px 10px;color:var(--tx);font-size:14px;font-family:var(--f);outline:none">
         </div>
       </div>
-      <!-- 柄選択 -->
       <div>
-        <div class="flabel" style="padding:4px 14px 6px;">柄</div>
-        <div class="pattern-wrap" id="pattern-pills"></div>
+        <div class="fl" style="padding:0 14px 6px">柄</div>
+        <div style="padding:0 14px 12px;display:flex;flex-wrap:wrap;gap:6px" id="pat-wrap"></div>
       </div>
-      <div class="field">
-        <div class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
-          素材
-          <button id="btn-special-mat" onclick="toggleSpecialMat()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border2);background:var(--s3);color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;">特殊素材</button>
-        </div>
-        <input type="text" id="f-material" placeholder="">
-      </div>
-div>
-
-    <!-- 補正内容 -->
-    <div class="sec">
-      <div class="sec-hdr">✂️ お客様指定 補正箇所</div>
-      <div class="alt-items" id="alt-items"></div>
-      <div class="field" style="border-top:1px solid var(--border)">
-        <div class="flabel">補足メモ</div>
-        <textarea id="f-client-alt-memo" placeholder="お客様からの要望・補足"></textarea>
+      <div class="fld">
+        <div class="fl">素材 <button id="btn-spm" class="tog" onclick="togSpm()">特殊素材</button></div>
+        <input type="text" id="f-material">
       </div>
     </div>
-
-    <!-- 実行工程 -->
     <div class="sec">
-      <div class="sec-hdr">🔧 実行工程箇所 <span style="color:var(--amber);font-size:9px;font-weight:400;margin-left:4px">実際の作業内容</span></div>
-      <div class="alt-items" id="work-items"></div>
-      <div class="field" style="border-top:1px solid var(--border)">
-        <div class="flabel">実行工程メモ・変更点</div>
-        <textarea id="f-work-alt-memo" placeholder="指定との差異・追加工程など"></textarea>
-      </div>
-      <div class="field">
-        <div class="flabel">特殊</div>
-        <textarea id="f-special" placeholder="特殊加工・注意事項・リスクなど" style="min-height:56px;"></textarea>
-      </div>
+      <div class="sh">✂️ お客様指定 補正箇所</div>
+      <div class="alt-list" id="alt-client"></div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="f-cmemo"></textarea></div>
     </div>
-
-    <!-- 機材設定 -->
     <div class="sec">
-      <div class="sec-hdr">⚙️ 機材設定</div>
-      <div class="machine-grid">
-        <div class="mrow"><span class="mlabel">ミシン</span><input class="minput" type="text" id="m-machine" value="JUKI DDL-8300c"></div>
-        <div class="mrow"><span class="mlabel">針番手</span><input class="minput" type="text" id="m-needle" placeholder="11号"></div>
-        <div class="mrow"><span class="mlabel">糸番手</span><input class="minput" type="text" id="m-thread" placeholder="#60 キングスパン"></div>
-        <div class="mrow"><span class="mlabel">糸色番号</span><input class="minput" type="text" id="m-thread-color" placeholder="401 / ホワイト"></div>
-        <div class="mrow"><span class="mlabel">押さえ</span><input class="minput" type="text" id="m-foot" placeholder="普通押さえ"></div>
-      </div>
-      <div class="field" style="border-top:1px solid var(--border)">
-        <div class="flabel">機材メモ（テンション・ステッチ長等）</div>
-        <textarea id="m-memo" placeholder="上糸テンション3.5 / ステッチ長2.5mm" style="min-height:56px;"></textarea>
-      </div>
+      <div class="sh">🔧 実行工程箇所</div>
+      <div class="alt-list" id="alt-work"></div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="f-wmemo"></textarea></div>
+      <div class="fld"><div class="fl">特殊</div><textarea id="f-special" style="min-height:52px"></textarea></div>
     </div>
-
-    <!-- 作業情報 -->
     <div class="sec">
-      <div class="sec-hdr">⏱ 作業情報</div>
-      <div class="flabel" style="padding:10px 14px 0;">補正所要時間</div>
-      <div class="time-row">
-        <button class="tbtn" onclick="adjTime(-5)">－</button>
-        <span class="tval" id="tdisp">0</span>
-        <span class="tunit">分</span>
-        <button class="tbtn" onclick="adjTime(5)">＋</button>
-        <input class="tcustom" type="number" id="f-time" placeholder="直接" min="0" oninput="syncTime()">
-        <span class="tunit">分</span>
+      <div class="sh">⚙️ 機材設定</div>
+      <div class="mg">
+        <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine" value="JUKI DDL-8300c"></div>
+        <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle"></div>
+        <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread"></div>
+        <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor"></div>
+        <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot"></div>
       </div>
-      <div class="field" style="border-top:1px solid var(--border)">
-        <div class="flabel">使用資材</div>
-        <textarea id="f-materials" placeholder="接着芯・補強テープ等" style="min-height:56px;"></textarea>
-      </div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">機材メモ</div><textarea id="m-memo" style="min-height:52px"></textarea></div>
     </div>
-
-    <!-- 金額・備考 -->
     <div class="sec">
-      <div class="sec-hdr">💴 金額・備考</div>
-      <div class="field">
-        <div class="flabel">金額（円）</div>
-        <input type="number" id="f-price" placeholder="0" min="0" step="100">
+      <div class="sh">⏱ 作業情報</div>
+      <div class="fl" style="padding:10px 14px 0">補正所要時間</div>
+      <div class="tr">
+        <button class="tb2" onclick="adjT(-5)">－</button>
+        <span class="tv" id="t-disp">0</span>
+        <span class="tu">分</span>
+        <button class="tb2" onclick="adjT(5)">＋</button>
+        <input class="tc" type="number" id="f-time" placeholder="直接" min="0" oninput="syncT()">
+        <span class="tu">分</span>
       </div>
-      <div class="field">
-        <div class="flabel">備考</div>
-        <textarea id="f-note" placeholder="その他特記事項"></textarea>
-      </div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">使用資材</div><textarea id="f-materials" style="min-height:52px"></textarea></div>
     </div>
-
-    <button class="save-btn" onclick="saveRecord()">受付を登録</button>
+    <div class="sec">
+      <div class="sh">💴 金額・備考</div>
+      <div class="fld"><div class="fl">金額（円）</div><input type="number" id="f-price" min="0" step="100"></div>
+      <div class="fld"><div class="fl">備考</div><textarea id="f-note"></textarea></div>
+    </div>
+    <button class="save-btn" onclick="saveRec()">受付を登録</button>
   </div>
 </div>
 
-<!-- ══ 作業中 ══ -->
-<div class="screen" id="screen-work">
+<div class="screen" id="scr-work">
+  <div class="hdr"><div><div class="ht">作業中</div><div class="hv" id="wc"></div></div></div>
+  <div class="fbar" id="wf"></div>
+  <div class="cl" id="wl"></div>
+</div>
+
+<div class="screen" id="scr-hist">
   <div class="hdr">
-    <div><div class="hdr-title">作業中</div><div class="hdr-sub" id="work-count"></div></div>
+    <div><div class="ht">履歴</div></div>
+    <button class="btn-g" onclick="doCSV()">📊 Excel出力</button>
   </div>
-  <div class="filter-bar" id="work-filter"></div>
-  <div class="card-list" id="work-list"></div>
+  <div class="sw2"><input class="si" type="search" placeholder="客名・伝票No・品名…" id="srch" oninput="renderHist()"></div>
+  <div class="df">
+    <div><label>持込日 FROM</label><input type="date" id="hf" onchange="renderHist()"></div>
+    <div><label>持込日 TO</label><input type="date" id="ht2" onchange="renderHist()"></div>
+  </div>
+  <button class="cd-btn" onclick="clrDate()">日付フィルターをクリア</button>
+  <div class="fbar" id="hf2"></div>
+  <div class="htw"><div id="hl"></div></div>
 </div>
 
-<!-- ══ 履歴 ══ -->
-<div class="screen" id="screen-history">
-  <div class="hdr">
-    <div><div class="hdr-title">履歴</div></div>
-    <button class="hdr-ghost" onclick="exportExcel()">📊 Excel出力</button>
-  </div>
-  <div class="search-wrap"><input class="sinput" type="search" placeholder="客名・伝票No・品名・素材で検索…" id="search-input" oninput="renderHistory()"></div>
-  <div style="padding:6px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    <div>
-      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;letter-spacing:.06em;">持込日 FROM</div>
-      <input type="date" id="hist-date-from" onchange="renderHistory()" style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-family:var(--font);-webkit-appearance:none;">
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;letter-spacing:.06em;">持込日 TO</div>
-      <input type="date" id="hist-date-to" onchange="renderHistory()" style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-family:var(--font);-webkit-appearance:none;">
-    </div>
-  </div>
-  <div style="padding:6px 16px 0;text-align:right;">
-    <button onclick="clearDateFilter()" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:4px 0;">日付フィルターをクリア</button>
-  </div>
-  <div class="filter-bar" id="hist-filter"></div>
-  <div id="history-list" style="margin-top:8px;overflow-x:auto;padding:0 16px 8px;"></div>
-</div>
-
-<!-- ══ DETAIL MODAL ══ -->
-<div class="overlay" id="detail-overlay" onclick="closeDetailOvl(event)">
-  <div class="modal">
-    <div class="modal-pull"><div class="modal-pull-bar"></div></div>
-    <div class="modal-hdr" id="detail-title">詳細</div>
-    <div class="modal-inner">
-      <div class="sec stepper-wrap" style="margin:14px 14px 0;border-radius:12px;">
-        <div class="sec-hdr">ステータス更新</div>
-        <div class="stepper" id="detail-stepper"></div>
+<div class="ov" id="ov-det" onclick="closeOv('ov-det',event)">
+  <div class="md">
+    <div class="mp"><div class="mpb"></div></div>
+    <div class="mh" id="det-title">詳細</div>
+    <div class="ms">
+      <div class="sec" style="margin:12px 14px 0;border-radius:12px">
+        <div class="sh">ステータス更新</div>
+        <div class="step" id="det-step"></div>
       </div>
-      <div class="modal-body" id="detail-body"></div>
-      <div class="modal-actions">
-        <button class="maction ma-print" onclick="printRecord()">🖨 PDF出力</button>
-        <button class="maction ma-del" onclick="deleteRecord()">削除</button>
+      <div class="mb" id="det-body"></div>
+      <div class="ma">
+        <button class="mac" style="background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3)" onclick="doPrint()">🖨 PDF</button>
+        <button class="mac" style="background:var(--gold-bg);color:var(--gold);border:1px solid rgba(200,168,74,.3)" onclick="openEdit()">✏️ 編集</button>
+        <button class="mac" style="background:var(--red-bg);color:var(--red);border:1px solid rgba(192,90,90,.3)" onclick="doDel()">削除</button>
       </div>
-      <button class="modal-close-btn" onclick="closeDetail()">✕ 閉じる</button>
+      <button class="mc" onclick="closeOvBtn('ov-det')">✕ 閉じる</button>
     </div>
   </div>
 </div>
 
-<!-- ══ MASTER MODAL ══ -->
-<div class="overlay" id="master-overlay" onclick="closeMasterOvl(event)">
-  <div class="modal">
-    <div class="modal-pull"><div class="modal-pull-bar"></div></div>
-    <div class="modal-hdr">マスター管理</div>
-    <div class="modal-inner">
-      <div class="modal-body">
-        <div style="display:flex;gap:8px;margin-bottom:16px;">
-          <button onclick="exportMaster()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;">📤 エクスポート</button>
-          <button onclick="showImport()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--green-bg);color:var(--green);border:1px solid rgba(90,172,122,.3);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;">📥 インポート</button>
+<div class="ov" id="ov-edit" onclick="closeOv('ov-edit',event)">
+  <div class="md">
+    <div class="mp"><div class="mpb"></div></div>
+    <div class="mh">記録を編集</div>
+    <div class="ms">
+      <div class="mb" id="edit-body"></div>
+      <button class="mc" style="background:var(--blue);color:#fff" onclick="saveEdit()">💾 保存する</button>
+      <button class="mc" style="background:var(--s3);color:var(--tx2);margin-top:6px" onclick="closeOvBtn('ov-edit')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-master" onclick="closeOv('ov-master',event)">
+  <div class="md">
+    <div class="mp"><div class="mpb"></div></div>
+    <div class="mh">マスター管理</div>
+    <div class="ms">
+      <div class="mb">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button onclick="doExport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📤 エクスポート</button>
+          <button onclick="showImport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(90,172,122,.3);background:var(--green-bg);color:var(--green);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📥 インポート</button>
         </div>
-        <div id="export-area" style="display:none;margin-bottom:16px;">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">以下のテキストをコピーして保存してください</div>
-          <textarea id="export-text" readonly style="width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:10px;color:var(--text);font-size:12px;font-family:var(--mono);min-height:80px;resize:none;line-height:1.5;" onclick="this.select()"></textarea>
-          <button onclick="copyExport()" style="width:100%;margin-top:6px;padding:9px;border-radius:9px;border:1px solid var(--border2);background:var(--s3);color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;" id="copy-btn">コピー</button>
+        <div class="ea" id="exp-area">
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:5px">テキストをコピーして保存</div>
+          <textarea class="eat" id="exp-text" readonly onclick="this.select()"></textarea>
+          <button class="cpb" id="cpb" onclick="doCopy()">コピー</button>
         </div>
-        <div id="import-area" style="display:none;margin-bottom:16px;">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">エクスポートしたテキストを貼り付けてください</div>
-          <textarea id="import-text" style="width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:10px;color:var(--text);font-size:12px;font-family:var(--mono);min-height:80px;resize:none;line-height:1.5;" placeholder="ここにテキストを貼り付け…"></textarea>
-          <button onclick="importMaster()" style="width:100%;margin-top:6px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;">復元する</button>
+        <div class="ea" id="imp-area">
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:5px">エクスポートしたテキストを貼り付け</div>
+          <textarea class="eat" id="imp-text" placeholder="ここに貼り付け…"></textarea>
+          <button class="imb" onclick="doImport()">復元する</button>
         </div>
-        <div class="msection-title">店名</div>
-        <div class="mlist" id="store-list"></div>
-        <div class="madd-row">
-          <input class="madd-input" id="store-input" placeholder="店名を追加">
-          <button class="madd-btn" onclick="addStore()">追加</button>
-        </div>
-        <div class="msection-title">カテゴリー</div>
-        <div class="mlist" id="cat-list"></div>
-        <div class="madd-row">
-          <input class="madd-input" id="cat-input" placeholder="カテゴリーを追加">
-          <button class="madd-btn" onclick="addCat()">追加</button>
-        </div>
+        <div class="mst">店名</div>
+        <div class="mli" id="store-list"></div>
+        <div class="mar"><input class="mai" id="store-inp" placeholder="店名を追加"><button class="mab" onclick="addStore()">追加</button></div>
+        <div class="mst">カテゴリー</div>
+        <div class="mli" id="cat-list"></div>
+        <div class="mar"><input class="mai" id="cat-inp" placeholder="カテゴリーを追加"><button class="mab" onclick="addCat()">追加</button></div>
       </div>
-      <button class="modal-close-btn" onclick="closeMaster()">✕ 閉じる</button>
+      <button class="mc" onclick="closeMaster()">✕ 閉じる</button>
     </div>
   </div>
 </div>
 
-<!-- ══ EDIT MODAL ══ -->
-<div class="overlay" id="edit-overlay" onclick="closeEditOvl(event)">
-  <div class="modal">
-    <div class="modal-pull"><div class="modal-pull-bar"></div></div>
-    <div class="modal-hdr">記録を編集</div>
-    <div class="modal-inner">
-      <div class="modal-body" id="edit-body"></div>
-      <button class="modal-close-btn" style="background:var(--blue);color:#fff;" onclick="saveEdit()">💾 保存</button>
-      <button class="modal-close-btn" style="background:var(--s3);color:var(--text2);margin-top:6px;" onclick="closeEdit()">キャンセル</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ NAV ══ -->
 <nav class="nav">
-  <button class="nav-btn active" id="nav-new" onclick="showScreen('new')"><span class="nav-icon">＋</span>受付</button>
-  <button class="nav-btn" id="nav-work" onclick="showScreen('work')"><span class="nav-icon">✂️</span>作業中</button>
-  <button class="nav-btn" id="nav-history" onclick="showScreen('history')"><span class="nav-icon">📋</span>履歴</button>
+  <button class="nb on" id="nb-new" onclick="showScr('new')"><span class="ni">＋</span>受付</button>
+  <button class="nb" id="nb-work" onclick="showScr('work')"><span class="ni">✂️</span>作業中</button>
+  <button class="nb" id="nb-hist" onclick="showScr('hist')"><span class="ni">📋</span>履歴</button>
 </nav>
 
+<div id="print-area"></div>
+
 <script>
-// ══ MASTER DATA ══
+// ══ DATA ══
 const TYPES=[
-  {id:'quick',label:'クイック',cls:'aq'},
-  {id:'shop',label:'店品',cls:'as'},
-  {id:'senpo',label:'先方品',cls:'as'},
-  {id:'customer',label:'顧客案件',cls:'ac'},
-  {id:'redo',label:'再補正',cls:'ar'},
-  {id:'claim',label:'クレーム',cls:'acl'},
-  {id:'other-store',label:'他店舗',cls:'aos'},
-  {id:'other',label:'その他',cls:'ao'},
+  {id:'quick',label:'クイック',cls:'q'},
+  {id:'shop', label:'店品',   cls:'s'},
+  {id:'senpo',label:'先方品', cls:'sp'},
+  {id:'cust', label:'顧客案件',cls:'c'},
+  {id:'redo', label:'再補正', cls:'r'},
+  {id:'claim',label:'クレーム',cls:'cl'},
+  {id:'ostr', label:'他店舗', cls:'os'},
+  {id:'other',label:'その他', cls:'o'},
 ];
-const STATUS_LIST=[
-  {id:'received',label:'受付済',cls:'s-received'},
-  {id:'working',label:'作業中',cls:'s-working'},
-  {id:'done',label:'完成',cls:'s-done'},
-  {id:'returned',label:'返却済',cls:'s-returned'},
+const STATUS=[
+  {id:'recv',label:'受付済',cls:'recv'},
+  {id:'work',label:'作業中',cls:'work'},
+  {id:'done',label:'完成',  cls:'done'},
+  {id:'ret', label:'返却済',cls:'ret'},
 ];
 const COLORS=[
-  {hex:'#1a1a1a',name:'ブラック'},
-  {hex:'#2c2c2c',name:'チャコール'},
-  {hex:'#4a4a4a',name:'ダークグレー'},
-  {hex:'#888888',name:'グレー'},
-  {hex:'#cccccc',name:'ライトグレー'},
-  {hex:'#f5f5f0',name:'オフホワイト'},
-  {hex:'#ffffff',name:'ホワイト'},
-  {hex:'#c8a878',name:'ベージュ'},
-  {hex:'#8b6914',name:'キャメル'},
-  {hex:'#5c3a1e',name:'ブラウン'},
-  {hex:'#1a3a5c',name:'ネイビー'},
-  {hex:'#1e5c1e',name:'グリーン'},
-  {hex:'#8b1a1a',name:'バーガンディ'},
-  {hex:'#c8a8c8',name:'ラベンダー'},
+  {h:'#1a1a1a',n:'ブラック'},{h:'#2c2c2c',n:'チャコール'},
+  {h:'#4a4a4a',n:'ダークグレー'},{h:'#888888',n:'グレー'},
+  {h:'#cccccc',n:'ライトグレー'},{h:'#f5f5f0',n:'オフホワイト'},
+  {h:'#ffffff',n:'ホワイト'},{h:'#c8a878',n:'ベージュ'},
+  {h:'#8b6914',n:'キャメル'},{h:'#5c3a1e',n:'ブラウン'},
+  {h:'#1a3a5c',n:'ネイビー'},{h:'#1e5c1e',n:'グリーン'},
+  {h:'#8b1a1a',n:'バーガンディ'},{h:'#c8a8c8',n:'ラベンダー'},
 ];
-const PATTERNS=['無地','ストライプ','チェック','ヘリンボーン','ツイード','プリント','ジャカード','その他'];
+const PATS=['無地','ストライプ','チェック','ヘリンボーン','ツイード','プリント','ジャカード','その他'];
 
-// カテゴリー別補正サブカテゴリー
-// dir: 'both'=詰め/出し両方, 'tsume'=詰めのみ, 'dashi'=出しのみ, 'none'=方向なし
-
-// 実行工程：補正項目ごとの加工方法
-const PROCESS_MAP = {
-  '裾上げ': {
-    methods:[
-      {id:'single', label:'シングル', group:'style', exclusive:['double']},
-      {id:'double', label:'ダブル(糸止め)', group:'style', exclusive:['single']},
-      {id:'double_snap', label:'ダブル(スナップ)', group:'style', exclusive:['single']},
-      {id:'morning', label:'モーニング', group:'style', exclusive:['single','double','double_snap']},
-      {id:'gcut', label:'Gカット', group:'style', exclusive:['single','double','double_snap','morning']},
-      {id:'tematsu', label:'手まつり', group:'finish'},
-      {id:'lock', label:'ロックステッチ', group:'finish'},
-      {id:'gomu', label:'ゴム補正', group:'option'},
-    ],
-    sub:{
-      'ダブル(糸止め)':['3cm幅','3.5cm幅','4cm幅','4.5cm幅','5cm幅','指定'],
-      'ダブル(スナップ)':['3cm幅','3.5cm幅','4cm幅','4.5cm幅','5cm幅','指定'],
-      'Gカット':['2本ステッチ','チェーンステッチ'],
-    },
-  },
-  '着丈': {
-    methods:[
-      {id:'single',label:'シングル',group:'style'},
-      {id:'tematsu',label:'手まつり',group:'style'},
-      {id:'chidori',label:'千鳥掛け',group:'style'},
-      {id:'machine',label:'ミシン',group:'style'},
-      {id:'lock',label:'ロック処理',group:'style'},
-      {id:'mitsuo',label:'三つ折り',group:'style'},
-      {id:'fuse',label:'袋縫い',group:'style'},
-      {id:'lockst',label:'ロックステッチ',group:'style'},
-    ],
-    sub:{},
-  },
-  '袖丈': {
-    methods:[
-      {id:'single',label:'シングル',group:'style'},
-      {id:'aki_ari',label:'アキあり',group:'option'},
-      {id:'aki_nashi',label:'アキなし',group:'option'},
-      {id:'honkiriha',label:'本切羽',group:'option'},
-      {id:'kazari',label:'飾りボタンあり',group:'option'},
-      {id:'cuffs_on',label:'カフスあり',group:'option'},
-      {id:'cuffs_off',label:'カフスなし',group:'option'},
-      {id:'tematsu',label:'まつり縫い',group:'finish'},
-      {id:'lock',label:'ロック処理',group:'finish'},
-      {id:'ribu',label:'リブ付け',group:'finish'},
-      {id:'sodayama',label:'袖山から詰め',group:'option'},
-    ],
-    sub:{},
-  },
-  '身幅': {
-    methods:[
-      {id:'uchi',label:'内のみ',group:'pos'},
-      {id:'soto',label:'外のみ',group:'pos'},
-      {id:'ryowaki',label:'両脇',group:'pos'},
-      {id:'fuse',label:'折り伏せ',group:'finish'},
-      {id:'fukuro',label:'袋縫い',group:'finish'},
-      {id:'limit',label:'限界あり',group:'note'},
-    ],
-    sub:{},
-  },
-  'ウエスト絞り': {
-    methods:[
-      {id:'waki',label:'脇縫い',group:'pos'},
-      {id:'se',label:'背縫い',group:'pos'},
-      {id:'both',label:'両方',group:'pos'},
-    ],
-    sub:{},
-  },
-  'ウエスト': {
-    methods:[
-      {id:'san',label:'3方詰め',group:'option'},
-      {id:'inbel',label:'インベルさわり',group:'option'},
-      {id:'loop',label:'ループ移動',group:'option'},
-      {id:'stitch',label:'ステッチ入れ直し',group:'option'},
-      {id:'tag',label:'タグ移動',group:'option'},
-      {id:'adj',label:'アジャスター移動',group:'option'},
-      {id:'gomu',label:'ゴム補正',group:'option'},
-      {id:'inbel_loop',label:'インベルループ下切替',group:'option'},
-      {id:'machi',label:'マチ入れ',group:'option'},
-    ],
-    sub:{
-      'ループ移動':['1本','2本','3本','4本','5本','6本','7本'],
-      'ステッチ入れ直し':['1本','2本'],
-    },
-  },
-  '裾幅': {
-    methods:[
-      {id:'uchi',label:'内のみ',group:'pos'},
-      {id:'soto',label:'外のみ',group:'pos'},
-      {id:'ryowaki',label:'両脇',group:'pos'},
-      {id:'fuse',label:'折り伏せ',group:'finish'},
-      {id:'fukuro',label:'袋縫い',group:'finish'},
-    ],
-    sub:{},
-  },
-  'わたり': {
-    methods:[
-      {id:'uchi',label:'内のみ',group:'pos'},
-      {id:'soto',label:'外のみ',group:'pos'},
-      {id:'both',label:'内外',group:'pos',exclusive:['uchi','soto']},
-    ],
-    sub:{},
-  },
-  '股上': {
-    methods:[
-      {id:'mae',label:'前股上',group:'pos'},
-      {id:'ushiro',label:'後股上',group:'pos'},
-      {id:'both',label:'両方',group:'pos'},
-      {id:'limit',label:'限界あり',group:'note'},
-    ],
-    sub:{},
-  },
-  'ヒップ': {
-    methods:[
-      {id:'waki',label:'脇縫い',group:'pos'},
-      {id:'limit',label:'限界あり',group:'note'},
-    ],
-    sub:{},
-  },
-  'バスト': {
-    methods:[
-      {id:'waki',label:'脇縫い',group:'pos'},
-      {id:'darts',label:'ダーツ',group:'pos'},
-      {id:'limit',label:'限界あり',group:'note'},
-    ],
-    sub:{},
-  },
-  '肩幅': {
-    methods:[
-      {id:'kata',label:'肩線',group:'pos'},
-      {id:'sode',label:'袖付け',group:'pos'},
-    ],
-    sub:{},
-  },
-  '袖口': {
-    methods:[
-      {id:'tsume',label:'縫い代詰め',group:'pos'},
-      {id:'ori',label:'折り返し',group:'pos'},
-    ],
-    sub:{},
-  },
-  '肩ひも調整': {
-    methods:[
-      {id:'chiji',label:'縫い縮め',group:'pos'},
-      {id:'hook',label:'ホック付け',group:'pos'},
-    ],
-    sub:{},
-  },
-  'ベントさわり': {
-    methods:[
-      {id:'side',label:'サイドベント',group:'pos'},
-      {id:'center',label:'センターベント',group:'pos'},
-    ],
-    sub:{},
-  },
-  'スリット加工': {
-    methods:[
-      {id:'aki',label:'あき止め',group:'pos'},
-      {id:'toji',label:'縫い閉じ',group:'pos'},
-    ],
-    sub:{},
-  },
-  'スリット移動': {
-    methods:[
-      {id:'zip',label:'ファスナー移動',group:'option'},
-      {id:'fuse',label:'折り伏せ',group:'finish'},
-      {id:'stitch',label:'ステッチ',group:'finish'},
-    ],
-    sub:{'ステッチ':['1本','2本','3本']},
-  },
-  '裏地修理': {
-    methods:[{id:'part',label:'部分補修',group:'pos'},{id:'full',label:'全取替',group:'pos'}],
-    sub:{},
-  },
-  '襟修理': {
-    methods:[{id:'nao',label:'縫い直し',group:'pos'},{id:'tsuke',label:'付け直し',group:'pos'}],
-    sub:{},
-  },
-  'ボタン付け替え': {
-    methods:[{id:'same',label:'同位置',group:'pos'},{id:'move',label:'移動あり',group:'pos'}],
-    sub:{},
-  },
-  'ほつれ補修': {
-    methods:[{id:'kaga',label:'かがり縫い',group:'pos'},{id:'machine',label:'ミシン',group:'pos'}],
-    sub:{},
-  },
-  '穴修理': {
-    methods:[{id:'kaga',label:'かがり縫い',group:'pos'},{id:'ate',label:'当て布',group:'pos'}],
-    sub:{},
-  },
-  'タグ付け': {
-    methods:[{id:'machine',label:'ミシン',group:'pos'},{id:'matsu',label:'まつり縫い',group:'pos'}],
-    sub:{},
-  },
-  'ボタン補強': {
-    methods:[
-      {id:'kawa',label:'特殊（革当て）',group:'pos'},
-      {id:'nuno',label:'特殊（当て布）',group:'pos'},
-      {id:'metal',label:'特殊（金具）',group:'pos'},
-    ],
-    sub:{},
-  },
-  'プレス': {
-    methods:[
-      {id:'all',label:'全体',group:'pos'},
-      {id:'part',label:'部分',group:'pos'},
-      {id:'steam',label:'スチームのみ',group:'pos'},
-      {id:'dry',label:'ドライ',group:'pos'},
-    ],
-    sub:{},
-  },
-  'デニムダメージ残し加工': {
-    methods:[
-      {id:'tokushu',label:'特殊切替',group:'style',exclusive:['roll']},
-      {id:'roll',label:'ロールアップ',group:'style',exclusive:['tokushu']},
-    ],
-    sub:{
-      '特殊切替':['幅広','幅合わせ(片側)','幅合わせ(両脇)'],
-      'ロールアップ':['幅広','幅合わせ(片側)','幅合わせ(両脇)'],
-    },
-  },
-  'ドローコードチップ補強': {
-    methods:[{id:'metal',label:'金属チップ',group:'pos'},{id:'resin',label:'樹脂チップ',group:'pos'},{id:'musu',label:'結び直し',group:'pos'}],
-    sub:{},
-  },
-  'ファスナー交換': {
-    methods:[{id:'ykk',label:'YKK',group:'pos'},{id:'brand',label:'ブランド純正',group:'pos'},{id:'gen',label:'汎用',group:'pos'}],
-    sub:{},
-  },
-};
-const ALT_MAP={
+const ALT={
   'パンツ':[
-    {name:'裾上げ',       dir:'none', dim_type:'length'},
-    {name:'ウエスト',     dir:'both', dim_type:'cm'},
-    {name:'裾幅',         dir:'both', dim_type:'cm'},
-    {name:'わたり',       dir:'both', dim_type:'cm'},
-    {name:'股上',         dir:'both', dim_type:'cm'},
-    {name:'ヒップ',       dir:'both', dim_type:'cm'},
-    {name:'スリット移動', dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'裾上げ',   d:'none',dm:'len'},
+    {n:'ウエスト', d:'both',dm:'cm'},
+    {n:'裾幅',     d:'both',dm:'cm'},
+    {n:'わたり',   d:'both',dm:'cm'},
+    {n:'股上',     d:'both',dm:'cm'},
+    {n:'ヒップ',   d:'both',dm:'cm'},
+    {n:'スリット移動',d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'スカート':[
-    {name:'裾上げ',       dir:'none', dim_type:'length'},
-    {name:'ウエスト',     dir:'both', dim_type:'cm'},
-    {name:'ヒップ',       dir:'both', dim_type:'cm'},
-    {name:'スリット加工', dir:'none', dim_type:'none'},
-    {name:'スリット移動', dir:'none', dim_type:'none'},
-    {name:'裏地修理',     dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'裾上げ',   d:'none',dm:'len'},
+    {n:'ウエスト', d:'both',dm:'cm'},
+    {n:'ヒップ',   d:'both',dm:'cm'},
+    {n:'スリット加工',d:'none',dm:'none'},
+    {n:'スリット移動',d:'none',dm:'none'},
+    {n:'裏地修理', d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'ジャケット':[
-    {name:'着丈',         dir:'both', dim_type:'length'},
-    {name:'袖丈',         dir:'both', dim_type:'length'},
-    {name:'身幅',         dir:'both', dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'肩幅',         dir:'tsume',dim_type:'cm'},
-    {name:'袖口',         dir:'tsume',dim_type:'cm'},
-    {name:'ベントさわり', dir:'none', dim_type:'none'},
-    {name:'裏地修理',     dir:'none', dim_type:'none'},
-    {name:'ボタン付け替え',dir:'none',dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'both',dm:'len'},
+    {n:'袖丈',     d:'both',dm:'len'},
+    {n:'身幅',     d:'both',dm:'cm'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm'},
+    {n:'肩幅',     d:'tsume',dm:'cm'},
+    {n:'袖口',     d:'tsume',dm:'cm'},
+    {n:'ベントさわり',d:'none',dm:'none'},
+    {n:'裏地修理', d:'none',dm:'none'},
+    {n:'ボタン付け替え',d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'コート':[
-    {name:'着丈',         dir:'both', dim_type:'length'},
-    {name:'袖丈',         dir:'both', dim_type:'length'},
-    {name:'身幅',         dir:'both', dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'肩幅',         dir:'tsume',dim_type:'cm'},
-    {name:'ベントさわり', dir:'none', dim_type:'none'},
-    {name:'裏地修理',     dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'both',dm:'len'},
+    {n:'袖丈',     d:'both',dm:'len'},
+    {n:'身幅',     d:'both',dm:'cm'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm'},
+    {n:'肩幅',     d:'tsume',dm:'cm'},
+    {n:'ベントさわり',d:'none',dm:'none'},
+    {n:'裏地修理', d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'シャツ':[
-    {name:'着丈',         dir:'tsume',dim_type:'length'},
-    {name:'袖丈',         dir:'both', dim_type:'length'},
-    {name:'身幅',         dir:'both', dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'肩幅',         dir:'tsume',dim_type:'cm'},
-    {name:'襟修理',       dir:'none', dim_type:'none'},
-    {name:'ボタン付け替え',dir:'none',dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'tsume',dm:'len'},
+    {n:'袖丈',     d:'both',dm:'len'},
+    {n:'身幅',     d:'both',dm:'cm'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm'},
+    {n:'肩幅',     d:'tsume',dm:'cm'},
+    {n:'襟修理',   d:'none',dm:'none'},
+    {n:'ボタン付け替え',d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'ブラウス':[
-    {name:'着丈',         dir:'tsume',dim_type:'length'},
-    {name:'袖丈',         dir:'both', dim_type:'length'},
-    {name:'身幅',         dir:'both', dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'肩幅',         dir:'tsume',dim_type:'cm'},
-    {name:'ボタン付け替え',dir:'none',dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'tsume',dm:'len'},
+    {n:'袖丈',     d:'both',dm:'len'},
+    {n:'身幅',     d:'both',dm:'cm'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm'},
+    {n:'肩幅',     d:'tsume',dm:'cm'},
+    {n:'ボタン付け替え',d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'ニット':[
-    {name:'着丈',         dir:'tsume',dim_type:'length'},
-    {name:'袖丈',         dir:'tsume',dim_type:'length'},
-    {name:'身幅',         dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'ほつれ補修',   dir:'none', dim_type:'none'},
-    {name:'穴修理',       dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'tsume',dm:'len'},
+    {n:'袖丈',     d:'tsume',dm:'len'},
+    {n:'身幅',     d:'tsume',dm:'cm'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm'},
+    {n:'ほつれ補修',d:'none',dm:'none'},
+    {n:'穴修理',   d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'カットソー':[
-    {name:'着丈',         dir:'tsume',dim_type:'length'},
-    {name:'袖丈',         dir:'tsume',dim_type:'length'},
-    {name:'身幅',         dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'ほつれ補修',   dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'tsume',dm:'len'},
+    {n:'袖丈',     d:'tsume',dm:'len'},
+    {n:'身幅',     d:'tsume',dm:'cm'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm'},
+    {n:'ほつれ補修',d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'スウェット/フーディ':[
-    {name:'着丈',         dir:'tsume',dim_type:'length'},
-    {name:'袖丈',         dir:'tsume',dim_type:'length'},
-    {name:'身幅',         dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'ほつれ補修',   dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'tsume',dm:'len'},
+    {n:'袖丈',     d:'tsume',dm:'len'},
+    {n:'身幅',     d:'tsume',dm:'cm'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm'},
+    {n:'ほつれ補修',d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'ドレス':[
-    {name:'着丈',         dir:'both', dim_type:'length'},
-    {name:'ウエスト',     dir:'both', dim_type:'cm'},
-    {name:'バスト',       dir:'both', dim_type:'cm'},
-    {name:'ヒップ',       dir:'both', dim_type:'cm'},
-    {name:'肩ひも調整',   dir:'none', dim_type:'none'},
-    {name:'裏地修理',     dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'both',dm:'len'},
+    {n:'ウエスト', d:'both',dm:'cm'},
+    {n:'バスト',   d:'both',dm:'cm'},
+    {n:'ヒップ',   d:'both',dm:'cm'},
+    {n:'肩ひも調整',d:'none',dm:'none'},
+    {n:'裏地修理', d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'ワンピース':[
-    {name:'着丈',         dir:'both', dim_type:'length'},
-    {name:'ウエスト',     dir:'both', dim_type:'cm'},
-    {name:'バスト',       dir:'both', dim_type:'cm'},
-    {name:'ヒップ',       dir:'both', dim_type:'cm'},
-    {name:'肩ひも調整',   dir:'none', dim_type:'none'},
-    {name:'裏地修理',     dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
-  ],
-  'スウェット/フーディ':[
-    {name:'着丈',         dir:'tsume',dim_type:'length'},
-    {name:'袖丈',         dir:'tsume',dim_type:'length'},
-    {name:'身幅',         dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
-    {name:'ほつれ補修',   dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'着丈',     d:'both',dm:'len'},
+    {n:'ウエスト', d:'both',dm:'cm'},
+    {n:'バスト',   d:'both',dm:'cm'},
+    {n:'ヒップ',   d:'both',dm:'cm'},
+    {n:'肩ひも調整',d:'none',dm:'none'},
+    {n:'裏地修理', d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   'デニムダメージ残し':[
-    {name:'デニムダメージ残し加工',dir:'none',dim_type:'length'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {n:'デニムダメージ残し加工',d:'none',dm:'len'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
   '付属品補正':[
-    {name:'ドローコードチップ補強',dir:'none',dim_type:'none'},
-    {name:'ファスナー交換',        dir:'none',dim_type:'none'},
-    {name:'ボタン付け替え',        dir:'none',dim_type:'none'},
+    {n:'ドローコードチップ補強',d:'none',dm:'none'},
+    {n:'ファスナー交換',        d:'none',dm:'none'},
+    {n:'ボタン付け替え',        d:'none',dm:'none'},
+  ],
+  'ユニフォーム':[
+    {n:'着丈',     d:'both',dm:'len'},
+    {n:'袖丈',     d:'both',dm:'len'},
+    {n:'身幅',     d:'both',dm:'cm'},
+    {n:'ウエスト', d:'both',dm:'cm'},
+    {n:'ヒップ',   d:'both',dm:'cm'},
+    {n:'裾上げ',   d:'none',dm:'len'},
+    {n:'ネーム刺繍',d:'none',dm:'none'},
+    {n:'タグ付け', d:'none',dm:'none'},
+    {n:'ボタン補強',d:'none',dm:'none'},
+    {n:'プレス',   d:'none',dm:'none'},
   ],
 };
-const DEFAULT_CATS=Object.keys(ALT_MAP);
-const DEFAULT_STORES=['本店'];
+
+const PROC={
+  '裾上げ':{m:[
+    {id:'sg', l:'シングル',   ex:'sty'},
+    {id:'di', l:'ダブル(糸止め)',ex:'sty',sub:['3cm','3.5cm','4cm','4.5cm','5cm','指定']},
+    {id:'ds', l:'ダブル(スナップ)',ex:'sty',sub:['3cm','3.5cm','4cm','4.5cm','5cm','指定']},
+    {id:'mo', l:'モーニング', ex:'sty'},
+    {id:'gc', l:'Gカット',    ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
+    {id:'tm', l:'手まつり'},
+    {id:'ls', l:'ロックステッチ'},
+    {id:'gm', l:'ゴム補正'},
+  ]},
+  '着丈':{m:[
+    {id:'sg',l:'シングル',ex:'sty'},{id:'tm',l:'手まつり',ex:'sty'},
+    {id:'ch',l:'千鳥掛け',ex:'sty'},{id:'mc',l:'ミシン',ex:'sty'},
+    {id:'lk',l:'ロック処理',ex:'sty'},{id:'mf',l:'三つ折り',ex:'sty'},
+    {id:'fk',l:'袋縫い',ex:'sty'},{id:'ls',l:'ロックステッチ'},
+  ]},
+  '袖丈':{m:[
+    {id:'sg',l:'シングル',ex:'sty'},{id:'aa',l:'アキあり',ex:'sty'},
+    {id:'an',l:'アキなし',ex:'sty'},{id:'hk',l:'本切羽',ex:'sty'},
+    {id:'kz',l:'飾りボタンあり'},{id:'ca',l:'カフスあり',ex:'cf'},
+    {id:'cn',l:'カフスなし',ex:'cf'},{id:'mt',l:'まつり縫い'},
+    {id:'lk',l:'ロック処理'},{id:'rb',l:'リブ付け'},
+    {id:'sy',l:'袖山から詰め'},
+  ]},
+  '身幅':{m:[
+    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
+    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},{id:'lm',l:'限界あり',fin:true},
+  ]},
+  'ウエスト絞り':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
+  'ウエスト':{m:[
+    {id:'s3',l:'3方詰め'},{id:'ib',l:'インベルさわり'},
+    {id:'lp',l:'ループ移動',sub:['1本','2本','3本','4本','5本','6本','7本']},
+    {id:'st',l:'ステッチ入れ直し',sub:['1本','2本']},
+    {id:'tg',l:'タグ移動'},{id:'aj',l:'アジャスター移動'},
+    {id:'gm',l:'ゴム補正'},{id:'il',l:'インベルループ下切替'},
+    {id:'mi',l:'マチ入れ'},
+  ]},
+  '裾幅':{m:[
+    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
+    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},
+  ]},
+  'わたり':{m:[
+    {id:'ui',l:'内のみ',ex:'wr'},{id:'so',l:'外のみ',ex:'wr'},
+    {id:'bt',l:'内外',ex:'wr'},
+  ]},
+  '股上':{m:[{id:'ma',l:'前股上'},{id:'us',l:'後股上'},{id:'bt',l:'両方'},{id:'lm',l:'限界あり',fin:true}]},
+  'ヒップ':{m:[{id:'wk',l:'脇縫い'},{id:'lm',l:'限界あり',fin:true}]},
+  'バスト':{m:[{id:'wk',l:'脇縫い'},{id:'dt',l:'ダーツ'},{id:'lm',l:'限界あり',fin:true}]},
+  '肩幅':{m:[{id:'kt',l:'肩線'},{id:'sd',l:'袖付け'}]},
+  '袖口':{m:[{id:'ts',l:'縫い代詰め'},{id:'or',l:'折り返し'}]},
+  '肩ひも調整':{m:[{id:'ch',l:'縫い縮め'},{id:'hk',l:'ホック付け'}]},
+  'ベントさわり':{m:[{id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'}]},
+  'スリット加工':{m:[{id:'ak',l:'あき止め'},{id:'tj',l:'縫い閉じ'}]},
+  'スリット移動':{m:[
+    {id:'zp',l:'ファスナー移動'},{id:'fs',l:'折り伏せ'},
+    {id:'st',l:'ステッチ',sub:['1本','2本','3本']},
+  ]},
+  '裏地修理':{m:[{id:'pt',l:'部分補修'},{id:'fl',l:'全取替'}]},
+  '襟修理':{m:[{id:'nr',l:'縫い直し'},{id:'tk',l:'付け直し'}]},
+  'ボタン付け替え':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
+  'ほつれ補修':{m:[{id:'kg',l:'かがり縫い'},{id:'mc',l:'ミシン'}]},
+  '穴修理':{m:[{id:'kg',l:'かがり縫い'},{id:'at',l:'当て布'}]},
+  'タグ付け':{m:[{id:'mc',l:'ミシン'},{id:'mt',l:'まつり縫い'}]},
+  'ボタン補強':{m:[{id:'kw',l:'特殊（革当て）'},{id:'nu',l:'特殊（当て布）'},{id:'mt',l:'特殊（金具）'}]},
+  'プレス':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
+  'デニムダメージ残し加工':{m:[
+    {id:'tk',l:'特殊切替',ex:'sty',sub:['幅広','幅合わせ(片側)','幅合わせ(両脇)']},
+    {id:'rl',l:'ロールアップ',ex:'sty',sub:['幅広','幅合わせ(片側)','幅合わせ(両脇)']},
+  ]},
+  'ドローコードチップ補強':{m:[{id:'mt',l:'金属チップ'},{id:'rs',l:'樹脂チップ'},{id:'mu',l:'結び直し'}]},
+  'ファスナー交換':{m:[{id:'yk',l:'YKK'},{id:'br',l:'ブランド純正'},{id:'gn',l:'汎用'}]},
+  'ネーム刺繍':{m:[{id:'nw',l:'新規'},{id:'rm',l:'取り外し'},{id:'rp',l:'付け替え'}]},
+};
+
+const DEF_CATS=Object.keys(ALT);
+const DEF_ST=['本店'];
 
 // ══ STORAGE ══
-const gR=()=>JSON.parse(localStorage.getItem('alt3_rec')||'[]');
-const sR=v=>localStorage.setItem('alt3_rec',JSON.stringify(v));
-const gSt=()=>JSON.parse(localStorage.getItem('alt3_stores')||JSON.stringify(DEFAULT_STORES));
-const sSt=v=>localStorage.setItem('alt3_stores',JSON.stringify(v));
-const gCt=()=>JSON.parse(localStorage.getItem('alt3_cats')||JSON.stringify(DEFAULT_CATS));
-const sCt=v=>localStorage.setItem('alt3_cats',JSON.stringify(v));
+const gR =()=>JSON.parse(localStorage.getItem('ar2_recs')||'[]');
+const sR =v=>localStorage.setItem('ar2_recs',JSON.stringify(v));
+const gSt=()=>JSON.parse(localStorage.getItem('ar2_st')||JSON.stringify(DEF_ST));
+const sSt=v=>localStorage.setItem('ar2_st',JSON.stringify(v));
+const gCt=()=>JSON.parse(localStorage.getItem('ar2_ct')||JSON.stringify(DEF_CATS));
+const sCt=v=>localStorage.setItem('ar2_ct',JSON.stringify(v));
 
 // ══ STATE ══
-let currentType=null;
-let currentColor={hex:'',name:''};
-let currentPattern='';
-let currentTime=0;
-let currentRecordId=null;
-let workFilter='all';
-let histFilter='all';
+let curType=null,curClr={h:'',n:''},curPat='',curTime=0;
+let stfOn=false,spmOn=false,wkFil='all',hiFil='all',curId=null;
 
 // ══ INIT ══
 function init(){
-  renderTypePills();
-  buildColorSwatches();
-  buildPatternPills();
-  populateSelects();
-  setDefaults();
-  renderWork();
-  renderHistory();
+  buildTypes();buildColors();buildPats();populateSels();setDefaults();
+  renderWork();renderHist();
 }
-
 function setDefaults(){
-  const now=new Date();
-  document.getElementById('f-in-date').value=now.toISOString().split('T')[0];
-  document.getElementById('f-in-time').value=now.toTimeString().slice(0,5);
-  const out=new Date(now); out.setDate(out.getDate()+3);
-  document.getElementById('f-out-date').value=out.toISOString().split('T')[0];
+  const n=new Date();
+  document.getElementById('f-in-date').value=n.toISOString().split('T')[0];
+  document.getElementById('f-in-time').value=n.toTimeString().slice(0,5);
+  const o=new Date(n);o.setDate(o.getDate()+3);
+  document.getElementById('f-out-date').value=o.toISOString().split('T')[0];
+}
+function populateSels(){
+  const ss=document.getElementById('f-store');
+  const cs=document.getElementById('f-cat');
+  const cv=cs.value;
+  ss.innerHTML=gSt().map(s=>`<option>${s}</option>`).join('');
+  cs.innerHTML=gCt().map(c=>`<option${c===cv?' selected':''}>${c}</option>`).join('');
+  onCatChange();
 }
 
-function populateSelects(){
-  const stores=gSt(); const cats=gCt();
-  const ss=document.getElementById('f-store');
-  const cs=document.getElementById('f-category');
-  ss.innerHTML=stores.map(s=>`<option>${s}</option>`).join('');
-  const curCat=cs.value||'パンツ';
-  cs.innerHTML=cats.map(c=>`<option${c===curCat?' selected':''}>${c}</option>`).join('');
-  onCategoryChange();
+// ══ SCREEN ══
+function showScr(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('scr-'+n).classList.add('on');
+  document.getElementById('nb-'+n).classList.add('on');
+  if(n==='work')renderWork();
+  if(n==='hist')renderHist();
+  window.scrollTo(0,0);
 }
 
 // ══ TYPE PILLS ══
-function renderTypePills(){
-  document.getElementById('type-pills').innerHTML=TYPES.map(t=>
-    `<button class="tpill${currentType===t.id?' '+t.cls:''}" onclick="selType('${t.id}')">${t.label}</button>`
+function buildTypes(){
+  document.getElementById('type-wrap').innerHTML=TYPES.map(t=>
+    `<button class="tpill${curType===t.id?' '+t.cls:''}" onclick="selType('${t.id}')">${t.label}</button>`
   ).join('');
 }
-function selType(id){ currentType=currentType===id?null:id; renderTypePills(); }
+function selType(id){curType=curType===id?null:id;buildTypes();}
+
+// ══ TOGGLE BTNS ══
+function togStaff(){
+  stfOn=!stfOn;
+  const b=document.getElementById('btn-staff');
+  const i=document.getElementById('f-client');
+  b.className='tog'+(stfOn?' on-b':'');
+  i.placeholder=stfOn?'スタッフ名':'';
+  i.style.borderColor=stfOn?'var(--blue)':'';
+}
+function togSpm(){
+  spmOn=!spmOn;
+  document.getElementById('btn-spm').className='tog'+(spmOn?' on-a':'');
+}
 
 // ══ COLOR ══
-function buildColorSwatches(){
-  const el=document.getElementById('color-swatches');
-  el.innerHTML=COLORS.map(c=>
-    `<div style="text-align:center">
-      <div class="color-swatch${currentColor.hex===c.hex?' selected':''}" style="background:${c.hex};${c.hex==='#ffffff'?'border-color:#555':''}" onclick="selColor('${c.hex}','${c.name}')"></div>
-      <div class="color-label">${c.name}</div>
-    </div>`
-  ).join('');
+function buildColors(){
+  document.getElementById('color-wrap').innerHTML=COLORS.map(c=>`
+    <div style="text-align:center">
+      <div class="csw${curClr.h===c.h?' on':''}" style="background:${c.h};${c.h==='#ffffff'?'border-color:#555':''}"
+        onclick="selClr('${c.h}','${c.n}')"></div>
+      <div class="clb">${c.n}</div>
+    </div>`).join('');
 }
-function selColor(hex,name){
-  currentColor={hex,name};
-  document.getElementById('color-custom-picker').value=hex;
-  document.getElementById('color-custom-text').value='';
-  buildColorSwatches();
+function selClr(h,n){
+  curClr={h,n};
+  document.getElementById('color-picker').value=h;
+  document.getElementById('color-text').value='';
+  buildColors();
 }
 function onCustomColor(){
-  const hex=document.getElementById('color-custom-picker').value;
-  currentColor={hex,name:document.getElementById('color-custom-text').value||hex};
-  buildColorSwatches();
+  curClr={h:document.getElementById('color-picker').value,n:document.getElementById('color-text').value};
+  buildColors();
 }
-
-// ══ PATTERN ══
-function buildPatternPills(){
-  document.getElementById('pattern-pills').innerHTML=PATTERNS.map(p=>
-    `<button class="ppill${currentPattern===p?' active':''}" onclick="selPattern('${p}')">${p}</button>`
+function buildPats(){
+  document.getElementById('pat-wrap').innerHTML=PATS.map(p=>
+    `<button class="ppill${curPat===p?' on':''}" onclick="selPat('${p}')">${p}</button>`
   ).join('');
 }
-function selPattern(p){ currentPattern=currentPattern===p?'':p; buildPatternPills(); }
+function selPat(p){curPat=curPat===p?'':p;buildPats();}
 
-// ══ CATEGORY / ALT ITEMS ══
-function onCategoryChange(){
-  const cat=document.getElementById('f-category').value;
-  renderAltItems('alt-items', cat);
-  renderAltItems('work-items', cat);
+// ══ ALT ITEMS ══
+function onCatChange(){
+  const cat=document.getElementById('f-cat').value;
+  buildAlts('alt-client',cat,false);
+  buildAlts('alt-work',cat,true);
 }
-
-function renderAltItems(containerId, cat, prefill=null){
-  const isWorkSection = containerId==='work-items';
-  const items=ALT_MAP[cat]||[];
-  const el=document.getElementById(containerId);
-  if(!items.length){
-    el.innerHTML='<div style="padding:10px 0;font-size:13px;color:var(--text3)">補正項目なし</div>';
-    return;
-  }
+function buildAlts(cid,cat,isW){
+  const items=ALT[cat]||[];
+  const el=document.getElementById(cid);
+  if(!items.length){el.innerHTML='<div style="padding:6px 0;font-size:13px;color:var(--tx3)">補正項目なし</div>';return;}
   el.innerHTML=items.map((a,i)=>{
-    const uid=`${containerId}-${i}`;
-    const isLength = a.dim_type==='length';
-    const isNone = a.dim_type==='none';
-    const pf = prefill?.[i]||null;
-    return `
-    <div class="alt-item">
-      <div class="alt-item-head" onclick="toggleAlt('${uid}')">
-        <input type="checkbox" id="chk-${uid}" ${pf?'checked':''} onclick="event.stopPropagation();toggleAlt('${uid}')">
-        <span class="alt-item-name">${a.name}</span>
+    const uid=cid+'-'+i;
+    return `<div class="ai">
+      <div class="ah" onclick="togAlt('${uid}')">
+        <input type="checkbox" id="chk-${uid}" onclick="event.stopPropagation();togAlt('${uid}')">
+        <span class="an">${a.n}</span>
       </div>
-      <div class="alt-item-body${pf?' open':''}" id="body-${uid}" data-altname="${a.name}"
-        data-processes="${pf&&pf.processes?JSON.stringify(pf.processes).replace(/"/g,'&quot;'):'[]'}"
-        data-processsubs="${pf&&pf.processSubs?JSON.stringify(pf.processSubs).replace(/"/g,'&quot;'):'{}'}">
-        ${a.dir==='none'?'':`
-        <div class="dir-btns">
-          ${a.dir==='both'?`
-            <button class="dir-btn${pf&&pf.dir==='詰め'?' active-tsume':''}" id="dir-tsume-${uid}" onclick="setDir('${uid}','tsume')">詰め</button>
-            <button class="dir-btn${pf&&pf.dir==='出し'?' active-dashi':''}" id="dir-dashi-${uid}" onclick="setDir('${uid}','dashi')">出し</button>
-            <button class="dir-btn${!pf||pf.dir===''?' active-none':''}" id="dir-none-${uid}" onclick="setDir('${uid}','none-sel')">未定</button>
-          `:a.dir==='tsume'?`
-            <button class="dir-btn${pf&&pf.dir==='詰め'?' active-tsume':''}" id="dir-tsume-${uid}" onclick="setDir('${uid}','tsume')">詰め</button>
-          `:`
-            <button class="dir-btn${pf&&pf.dir==='出し'?' active-dashi':''}" id="dir-dashi-${uid}" onclick="setDir('${uid}','dashi')">出し</button>
-          `}
-        </div>`}
-        ${isWorkSection?`
-        <div style="margin-bottom:6px;" id="proc-container-${uid}" data-altname="${a.name}">
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;" id="proc-wrap-${uid}">
-            ${((PROCESS_MAP[a.name]||{}).methods||[]).map(m=>{
-              const isActive=pf&&pf.processes&&pf.processes.includes(m.label);
-              return `<button onclick="toggleProcess('${uid}','${m.label}','${m.group||''}','${(m.exclusive||[]).join(',')}','${a.name}')"
-                id="proc-${uid}-${m.id}"
-                class="ppill${isActive?' active':''}"
-                style="${m.group==='finish'?'font-size:11px;background:var(--s4);':''}${m.group==='note'?'font-size:11px;color:var(--amber);border-color:var(--amber);':''}"
-              >${m.label}</button>`;
-            }).join('')}
-          </div>
-          <div id="proc-sub-${uid}" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;">
-            ${(()=>{
-              if(!pf||!pf.processes) return '';
-              const subs=(PROCESS_MAP[a.name]||{}).sub||{};
-              const activeProcs=pf.processes||[];
-              return activeProcs.flatMap(p=>( subs[p]||[]).map(s=>`
-                <button onclick="toggleSubProcess('${uid}','${p}','${s}')"
-                  id="procsub-${uid}-${(p+s).replace(/[^a-zA-Z0-9]/g,'_')}"
-                  class="ppill${pf.processSubs&&pf.processSubs[p]&&pf.processSubs[p].includes(s)?' active':''}"
-                  style="font-size:11px;background:var(--s4);">${s}</button>
-              `)).join('');
-            })()}
-          </div>
-          <input class="alt-memo-input" type="text" id="proc-custom-${uid}" placeholder="その他・詳細メモ" value="${pf&&pf.processMemo?pf.processMemo:''}">
-        </div>`
-        :isLength?`
-        <div style="margin-bottom:8px;">
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-            ${['股下','カット寸法','総丈'].map(t=>`
-              <button onclick="setDimType('${uid}','${t}')" id="dt-${uid}-${t.replace(' ','')}"
-                style="padding:5px 11px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;
-                border:1px solid var(--border2);
-                background:${pf&&pf.dimLabel===t?'var(--gold)':'var(--s3)'};
-                color:${pf&&pf.dimLabel===t?'#0a0a0f':'var(--text2)'};">${t}</button>
-            `).join('')}
-          </div>
-          <div class="dim-row">
-            <input class="dim-input" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0" value="${pf&&pf.dim?pf.dim:''}">
-            <span class="dim-unit">cm</span>
-          </div>
-        </div>`
-        :isNone?'':`
-        <div class="dim-row">
-          <input class="dim-input" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0" value="${pf&&pf.dim?pf.dim:''}">
-          <span class="dim-unit">cm</span>
-        </div>`}
-        ${isWorkSection?'':`<input class="alt-memo-input" type="text" id="memo-${uid}" placeholder="メモ（任意）" value="${pf&&pf.memo?pf.memo:''}">`}
+      <div class="ab" id="body-${uid}" data-name="${a.n}" data-dm="${a.dm}" data-dir="${a.d}" data-isw="${isW}">
+        ${buildAB(a,uid,isW)}
       </div>
     </div>`;
   }).join('');
 }
 
-function toggleProcess(uid, label, group, exclusiveStr, altName){
-  const body=document.getElementById('body-'+uid);
-  if(!body) return;
-  let procs=JSON.parse(body.dataset.processes||'[]');
-  const exclusives=exclusiveStr?exclusiveStr.split(',').filter(Boolean):[];
-
-  if(procs.includes(label)){
-    // 選択解除
-    procs=procs.filter(p=>p!==label);
-    // このラベルのサブも解除
-    let subs=JSON.parse(body.dataset.processSubs||'{}');
-    delete subs[label];
-    body.dataset.processSubs=JSON.stringify(subs);
-  } else {
-    // exclusive処理：排他グループを解除
-    if(exclusives.length){
-      const methods=(PROCESS_MAP[altName]||{}).methods||[];
-      exclusives.forEach(exId=>{
-        const exMethod=methods.find(m=>m.id===exId);
-        if(exMethod) procs=procs.filter(p=>p!==exMethod.label);
-      });
-    }
-    procs.push(label);
+function buildAB(a,uid,isW){
+  let h='';
+  if(a.d!=='none'){
+    h+=`<div class="dr">`;
+    if(a.d==='both'||a.d==='tsume')h+=`<button class="db" id="db-t-${uid}" onclick="setDir('${uid}','t')">詰め</button>`;
+    if(a.d==='both'||a.d==='dashi')h+=`<button class="db" id="db-d-${uid}" onclick="setDir('${uid}','d')">出し</button>`;
+    if(a.d==='both')h+=`<button class="db" id="db-n-${uid}" onclick="setDir('${uid}','n')">未定</button>`;
+    h+=`</div>`;
   }
-  body.dataset.processes=JSON.stringify(procs);
-
-  // ボタン表示更新
-  const methods=(PROCESS_MAP[altName]||{}).methods||[];
-  methods.forEach(m=>{
-    const btn=document.getElementById('proc-'+uid+'-'+m.id);
-    if(!btn) return;
-    btn.classList.toggle('active', procs.includes(m.label));
-  });
-
-  // サブオプション更新
-  updateSubOptions(uid, altName, procs);
+  if(a.dm==='len'){
+    h+=`<div class="dtrow">
+      ${['股下','カット寸法','総丈'].map(t=>`<button class="dtb" id="dtb-${uid}-${t.replace(' ','_')}" onclick="setDT('${uid}','${t}')">${t}</button>`).join('')}
+    </div>
+    <div class="dmrow">
+      <input class="dmi" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0">
+      <span class="dmu">cm</span>
+    </div>`;
+  }else if(a.dm==='cm'){
+    h+=`<div class="dmrow">
+      <input class="dmi" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0">
+      <span class="dmu">cm</span>
+    </div>`;
+  }
+  if(isW){
+    const pm=PROC[a.n];
+    if(pm){
+      h+=`<div class="pw" id="pw-${uid}">`;
+      pm.m.forEach(m=>{
+        h+=`<button class="pb${m.fin?' fin':''}" id="pb-${uid}-${m.id}" data-ex="${m.ex||''}" onclick="togProc('${uid}','${m.id}','${a.n}')">${m.l}</button>`;
+      });
+      h+=`</div><div class="sw" id="sw-${uid}"></div>`;
+    }
+  }
+  h+=`<input class="pm" type="text" id="memo-${uid}" placeholder="メモ（任意）">`;
+  return h;
 }
 
-function updateSubOptions(uid, altName, procs){
-  const subWrap=document.getElementById('proc-sub-'+uid);
-  if(!subWrap) return;
-  const subs=(PROCESS_MAP[altName]||{}).sub||{};
-  const body=document.getElementById('body-'+uid);
-  const processSubs=JSON.parse(body?.dataset?.processSubs||'{}');
-
-  let subHTML='';
-  procs.forEach(p=>{
-    const subOpts=subs[p]||[];
-    subOpts.forEach(s=>{
-      const isActive=processSubs[p]&&processSubs[p].includes(s);
-      subHTML+=`<button onclick="toggleSubProcess('${uid}','${p}','${s}')"
-        id="procsub-${uid}-${(p+s).replace(/[^a-zA-Z0-9]/g,'_')}"
-        class="ppill${isActive?' active':''}"
-        style="font-size:11px;background:var(--s4);">${s}</button>`;
-    });
-  });
-  subWrap.innerHTML=subHTML;
-}
-
-function toggleSubProcess(uid, procLabel, subVal){
-  const body=document.getElementById('body-'+uid);
-  if(!body) return;
-  let subs=JSON.parse(body.dataset.processSubs||'{}');
-  if(!subs[procLabel]) subs[procLabel]=[];
-  const idx=subs[procLabel].indexOf(subVal);
-  if(idx>=0) subs[procLabel].splice(idx,1);
-  else subs[procLabel].push(subVal);
-  body.dataset.processSubs=JSON.stringify(subs);
-
-  const btn=document.getElementById('procsub-'+uid+'-'+(procLabel+subVal).replace(/[^a-zA-Z0-9]/g,'_'));
-  if(btn) btn.classList.toggle('active', idx<0);
-}
-
-function getProcesses(uid){
-  return JSON.parse(document.getElementById('body-'+uid)?.dataset?.processes||'[]');
-}
-function getProcessSubs(uid){
-  return JSON.parse(document.getElementById('body-'+uid)?.dataset?.processSubs||'{}');
-}
-// 後方互換
-function getProcess(uid){ return getProcesses(uid).join(','); }
-function getProcessSub(uid){ return ''; }
-
-
-function setDimType(uid, label){
-  ['股下','カット寸法','総丈'].forEach(t=>{
-    const btn=document.getElementById('dt-'+uid+'-'+t.replace(' ',''));
-    if(!btn) return;
-    const active=t===label;
-    btn.style.background=active?'var(--gold)':'var(--s3)';
-    btn.style.color=active?'#0a0a0f':'var(--text2)';
-    btn.style.borderColor=active?'var(--gold)':'var(--border2)';
-  });
-  const body=document.getElementById('body-'+uid);
-  if(body) body.dataset.dimLabel=label;
-}
-
-function getDimLabel(uid){
-  const body=document.getElementById('body-'+uid);
-  return body?.dataset?.dimLabel||'';
-}
-
-function toggleAlt(uid){
+function togAlt(uid){
   const chk=document.getElementById('chk-'+uid);
   const body=document.getElementById('body-'+uid);
   chk.checked=!chk.checked;
-  body.classList.toggle('open', chk.checked);
+  body.classList.toggle('on',chk.checked);
 }
-
-function setDir(uid, dir){
-  ['tsume','dashi','none'].forEach(d=>{
-    const btn=document.getElementById(`dir-${d}-${uid}`);
-    if(!btn) return;
-    if(dir==='tsume') btn.className='dir-btn'+(d==='tsume'?' active-tsume':'');
-    else if(dir==='dashi') btn.className='dir-btn'+(d==='dashi'?' active-dashi':'');
-    else btn.className='dir-btn'+(d==='none'?' active-none':'');
+function setDir(uid,d){
+  ['t','d','n'].forEach(x=>{
+    const b=document.getElementById(`db-${x}-${uid}`);
+    if(b)b.className='db'+(d===x?' '+d:'');
   });
+  document.getElementById('body-'+uid).dataset.dv=d;
 }
-
-function collectAltItems(containerId, cat){
-  const items=ALT_MAP[cat]||[];
-  const isWork=containerId==='work-items';
-  const result=[];
-  items.forEach((a,i)=>{
-    const uid=`${containerId}-${i}`;
-    const chk=document.getElementById('chk-'+uid);
-    if(!chk||!chk.checked) return;
-    let dir='';
-    if(document.getElementById(`dir-tsume-${uid}`)?.classList.contains('active-tsume')) dir='詰め';
-    else if(document.getElementById(`dir-dashi-${uid}`)?.classList.contains('active-dashi')) dir='出し';
-    else if(document.getElementById(`dir-none-${uid}`)?.classList.contains('active-none')) dir='未定';
-    if(isWork){
-      const processes=getProcesses(uid);
-      const processSubs=getProcessSubs(uid);
-      const processMemo=document.getElementById('proc-custom-'+uid)?.value?.trim()||'';
-      result.push({name:a.name, dir, processes, processSubs, processMemo});
-    } else {
-      const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
-      if(a.dim_type==='length'){
-        const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
-        const dimLabel=getDimLabel(uid);
-        result.push({name:a.name, dir, dim, dimLabel, memo, dim_type:'length'});
-      } else {
-        const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
-        result.push({name:a.name, dir, dim, memo, dim_type:'cm'});
-      }
+function setDT(uid,t){
+  ['股下','カット寸法','総丈'].forEach(x=>{
+    const b=document.getElementById(`dtb-${uid}-${x.replace(' ','_')}`);
+    if(b)b.className='dtb'+(t===x?' on':'');
+  });
+  document.getElementById('body-'+uid).dataset.dl=t;
+}
+function togProc(uid,mid,nm){
+  const body=document.getElementById('body-'+uid);
+  const pm=PROC[nm];if(!pm)return;
+  const m=pm.m.find(x=>x.id===mid);if(!m)return;
+  let procs=JSON.parse(body.dataset.procs||'[]');
+  if(procs.includes(m.l)){
+    procs=procs.filter(p=>p!==m.l);
+    let subs=JSON.parse(body.dataset.subs||'{}');
+    delete subs[m.l];body.dataset.subs=JSON.stringify(subs);
+  }else{
+    if(m.ex){
+      pm.m.filter(x=>x.ex===m.ex&&x.id!==mid).forEach(x=>{
+        procs=procs.filter(p=>p!==x.l);
+        const b=document.getElementById(`pb-${uid}-${x.id}`);
+        if(b)b.classList.remove('on');
+      });
     }
+    procs.push(m.l);
+  }
+  body.dataset.procs=JSON.stringify(procs);
+  pm.m.forEach(x=>{
+    const b=document.getElementById(`pb-${uid}-${x.id}`);
+    if(b)b.classList.toggle('on',procs.includes(x.l));
   });
-  return result;
+  updSubs(uid,nm,procs);
+}
+function updSubs(uid,nm,procs){
+  const sw=document.getElementById('sw-'+uid);if(!sw)return;
+  const pm=PROC[nm];if(!pm)return;
+  const body=document.getElementById('body-'+uid);
+  const subs=JSON.parse(body.dataset.subs||'{}');
+  let h='';
+  procs.forEach(l=>{
+    const m=pm.m.find(x=>x.l===l);
+    if(m&&m.sub)m.sub.forEach(s=>{
+      const on=subs[l]&&subs[l].includes(s);
+      h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
+    });
+  });
+  sw.innerHTML=h;
+}
+function togSub(uid,pl,sv){
+  const body=document.getElementById('body-'+uid);
+  let subs=JSON.parse(body.dataset.subs||'{}');
+  if(!subs[pl])subs[pl]=[];
+  const i=subs[pl].indexOf(sv);
+  if(i>=0)subs[pl].splice(i,1);else subs[pl].push(sv);
+  body.dataset.subs=JSON.stringify(subs);
+  const procs=JSON.parse(body.dataset.procs||'[]');
+  updSubs(uid,pl,procs);
+}
+
+// ══ COLLECT ══
+function colAlts(cid,cat){
+  const items=ALT[cat]||[];
+  const isW=cid==='alt-work';
+  return items.map((a,i)=>{
+    const uid=cid+'-'+i;
+    const chk=document.getElementById('chk-'+uid);
+    if(!chk||!chk.checked)return null;
+    const body=document.getElementById('body-'+uid);
+    const dv=body.dataset.dv||'';
+    const dir=dv==='t'?'詰め':dv==='d'?'出し':dv==='n'?'未定':'';
+    const dimEl=document.getElementById('dim-'+uid);
+    const dim=dimEl?(parseFloat(dimEl.value)||null):null;
+    const dl=body.dataset.dl||'';
+    const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
+    if(isW){
+      const procs=JSON.parse(body.dataset.procs||'[]');
+      const subs=JSON.parse(body.dataset.subs||'{}');
+      return{n:a.n,dir,procs,subs,memo};
+    }
+    return{n:a.n,dir,dim,dl,memo};
+  }).filter(Boolean);
 }
 
 // ══ TIME ══
-function adjTime(d){ currentTime=Math.max(0,currentTime+d); document.getElementById('tdisp').textContent=currentTime; document.getElementById('f-time').value=currentTime||''; }
-function syncTime(){ const v=parseInt(document.getElementById('f-time').value||0,10); currentTime=isNaN(v)?0:Math.max(0,v); document.getElementById('tdisp').textContent=currentTime; }
+function adjT(d){
+  curTime=Math.max(0,curTime+d);
+  document.getElementById('t-disp').textContent=curTime;
+  document.getElementById('f-time').value=curTime||'';
+}
+function syncT(){
+  const v=parseInt(document.getElementById('f-time').value||0,10);
+  curTime=isNaN(v)?0:Math.max(0,v);
+  document.getElementById('t-disp').textContent=curTime;
+}
 
 // ══ SAVE ══
-function saveRecord(){
+function saveRec(){
   const ticket=document.getElementById('f-ticket').value.trim();
   const client=document.getElementById('f-client').value.trim();
   if(!ticket&&!client){alert('伝票No. または客名を入力してください');return;}
-  const cat=document.getElementById('f-category').value;
+  const cat=document.getElementById('f-cat').value;
+  const tp=TYPES.find(t=>t.id===curType);
   const rec={
     id:Date.now().toString(),
-    createdAt:new Date().toISOString(),
-    type:currentType,
-    typeLabel:TYPES.find(t=>t.id===currentType)?.label||'—',
+    type:curType,typeLbl:tp?.label||'',typeCls:tp?.cls||'o',
     store:document.getElementById('f-store').value,
     inDate:document.getElementById('f-in-date').value,
     inTime:document.getElementById('f-in-time').value,
     outDate:document.getElementById('f-out-date').value,
-    ticket,client,
-    isStaff:window._isStaff||false,
+    ticket,client,isStaff:stfOn,
     staff:document.getElementById('f-staff').value.trim(),
     item:document.getElementById('f-item').value.trim(),
-    category:cat,
-    colorHex:currentColor.hex,
-    colorName:currentColor.name,
-    pattern:currentPattern,
-    material:document.getElementById('f-material').value.trim(),
-    specialMat:window._isSpecialMat||false,
-    clientAlts:collectAltItems('alt-items',cat),
-    clientAltMemo:document.getElementById('f-client-alt-memo').value.trim(),
-    workAlts:collectAltItems('work-items',cat),
-    workAltMemo:document.getElementById('f-work-alt-memo').value.trim(),
+    cat,
+    clrH:curClr.h,clrN:curClr.n,
+    pat:curPat,
+    mat:document.getElementById('f-material').value.trim(),
+    isSpm:spmOn,
+    cAlts:colAlts('alt-client',cat),
+    cMemo:document.getElementById('f-cmemo').value.trim(),
+    wAlts:colAlts('alt-work',cat),
+    wMemo:document.getElementById('f-wmemo').value.trim(),
     special:document.getElementById('f-special').value.trim(),
     machine:document.getElementById('m-machine').value.trim(),
     needle:document.getElementById('m-needle').value.trim(),
     thread:document.getElementById('m-thread').value.trim(),
-    threadColor:document.getElementById('m-thread-color').value.trim(),
+    tcolor:document.getElementById('m-tcolor').value.trim(),
     foot:document.getElementById('m-foot').value.trim(),
-    machineMemo:document.getElementById('m-memo').value.trim(),
-    time:currentTime,
+    mmemo:document.getElementById('m-memo').value.trim(),
+    time:curTime,
     materials:document.getElementById('f-materials').value.trim(),
-    price:parseInt(document.getElementById('f-price').value||0,10),
+    price:parseInt(document.getElementById('f-price').value||0,10)||0,
     note:document.getElementById('f-note').value.trim(),
-    status:'received',
+    status:'recv',
   };
-  const recs=gR(); recs.unshift(rec); sR(recs);
+  const rs=gR();rs.unshift(rec);sR(rs);
   resetForm();
-  showScreen('work');
+  showScr('work');
 }
 
 function resetForm(){
-  ['f-ticket','f-client','f-staff','f-item','f-client-alt-memo','f-work-alt-memo',
-   'f-special','m-needle','m-thread','m-thread-color','m-foot','m-memo',
+  ['f-ticket','f-client','f-staff','f-item','f-cmemo','f-wmemo',
+   'f-special','m-needle','m-thread','m-tcolor','m-foot','m-memo',
    'f-materials','f-price','f-note'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value='';
+    const el=document.getElementById(id);if(el)el.value='';
   });
   document.getElementById('m-machine').value='JUKI DDL-8300c';
-  window._isStaff=false; window._isSpecialMat=false;
-  const _bsm=document.getElementById('btn-special-mat'); if(_bsm){_bsm.style.background='var(--s3)';_bsm.style.color='var(--text2)';_bsm.style.borderColor='';}
-  const _bst=document.getElementById('btn-staff'); if(_bst){_bst.style.background='var(--s3)';_bst.style.color='var(--text2)';_bst.style.borderColor='';}
-  const _fc=document.getElementById('f-client'); if(_fc){_fc.placeholder='';_fc.style.borderColor='';}
-  currentType=null; currentColor={hex:'',name:''}; currentPattern=''; currentTime=0;
-  document.getElementById('tdisp').textContent='0';
+  curType=null;curClr={h:'',n:''};curPat='';curTime=0;
+  stfOn=false;spmOn=false;
+  document.getElementById('t-disp').textContent='0';
   document.getElementById('f-time').value='';
-  renderTypePills(); buildColorSwatches(); buildPatternPills();
-  populateSelects(); setDefaults();
+  document.getElementById('btn-staff').className='tog';
+  document.getElementById('btn-spm').className='tog';
+  document.getElementById('f-client').placeholder='';
+  document.getElementById('f-client').style.borderColor='';
+  buildTypes();buildColors();buildPats();populateSels();setDefaults();
 }
 
-// ══ WORK LIST ══
+// ══ WORK ══
 function renderWork(){
-  const all=gR().filter(r=>r.status!=='returned');
-  document.getElementById('work-count').textContent=all.length?`${all.length}件進行中`:'案件なし';
-  const sts=[{id:'all',label:'全て'},{id:'received',label:'受付済'},{id:'working',label:'作業中'},{id:'done',label:'完成'}];
-  document.getElementById('work-filter').innerHTML=sts.map(s=>
-    `<button class="fpill${workFilter===s.id?' active':''}" onclick="setWF('${s.id}')">${s.label}</button>`
+  const all=gR().filter(r=>r.status!=='ret');
+  document.getElementById('wc').textContent=all.length?all.length+'件進行中':'案件なし';
+  const fs=[{id:'all',l:'全て'},{id:'recv',l:'受付済'},{id:'work',l:'作業中'},{id:'done',l:'完成'}];
+  document.getElementById('wf').innerHTML=fs.map(f=>
+    `<button class="fp${wkFil===f.id?' on':''}" onclick="setWF('${f.id}')">${f.l}</button>`
   ).join('');
-  const filtered=workFilter==='all'?all:all.filter(r=>r.status===workFilter);
-  const el=document.getElementById('work-list');
-  el.innerHTML=filtered.length?filtered.map(renderCard).join(''):`<div class="empty"><div class="empty-icon">✂️</div>該当する案件はありません</div>`;
+  const list=wkFil==='all'?all:all.filter(r=>r.status===wkFil);
+  const el=document.getElementById('wl');
+  el.innerHTML=list.length?list.map(rCard).join(''):`<div class="empty"><div class="ei">✂️</div>該当する案件はありません</div>`;
 }
-function setWF(f){workFilter=f;renderWork();}
+function setWF(f){wkFil=f;renderWork();}
 
 // ══ HISTORY ══
-function altStr(alts){
-  return (alts||[]).map(a=>{
-    let s=a.name+(a.dir?' '+a.dir:'');
-    if(a.dim_type==='length'){
-      if(a.dimLabel) s+=' ['+a.dimLabel+']';
-      if(a.dim) s+=' '+a.dim+'cm';
-    } else if(a.dim){ s+=' '+a.dim+'cm'; }
-    if(a.memo) s+=' ('+a.memo+')';
-    return s;
-  }).join('\n');
-}
-function workStr(alts){
-  return (alts||[]).map(a=>{
-    let s=a.name+(a.dir?' '+a.dir:'');
-    const procs=a.processes||[];
-    if(procs.length){
-      const subs=a.processSubs||{};
-      const procStrs=procs.map(p=>{
-        const subList=subs[p]||[];
-        return p+(subList.length?' ('+subList.join('/')+')'  :'');
-      });
-      s+=' ['+procStrs.join(' / ')+']';
-    }
-    if(a.processMemo) s+=' ('+a.processMemo+')';
-    return s;
-  }).join('\n');
-}
-const workStr2=alts=>(alts||[]).map(a=>{
-  let s=a.name+(a.dir?' '+a.dir:'');
-  const procs=a.processes||[];
-  if(procs.length){
-    const subs=a.processSubs||{};
-    const procStrs=procs.map(p=>{
-      const subList=subs[p]||[];
-      return p+(subList.length?' ('+subList.join('/')+')'  :'');
-    });
-    s+=' ['+procStrs.join(' / ')+']';
-  }
-  if(a.processMemo) s+=' ('+a.processMemo+')';
-  return s;
-}).join(' / ');
-
-function exportExcel(){
-  const q=(document.getElementById('search-input')?.value||'').toLowerCase();
-  const dateFrom=document.getElementById('hist-date-from')?.value||'';
-  const dateTo=document.getElementById('hist-date-to')?.value||'';
+function renderHist(){
+  const q=(document.getElementById('srch')?.value||'').toLowerCase();
+  const df=document.getElementById('hf')?.value||'';
+  const dt=document.getElementById('ht2')?.value||'';
   let all=gR();
-  if(q) all=all.filter(r=>[r.client,r.ticket,r.item,r.material,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
-  if(dateFrom) all=all.filter(r=>r.inDate&&r.inDate>=dateFrom);
-  if(dateTo) all=all.filter(r=>r.inDate&&r.inDate<=dateTo);
-  if(histFilter!=='all') all=all.filter(r=>r.type===histFilter);
-
-  if(!all.length){alert('出力するデータがありません');return;}
-
-  const altSummary=alts=>altStr(alts).replace(/\n/g,' / ');
-  const tpLabel=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
-  const stLabel=id=>(STATUS_LIST.find(s=>s.id===id)||{label:''}).label;
-
-  const esc=v=>{
-    const s=String(v||'');
-    if(s.includes(',')|| s.includes('"')|| s.includes('\n')) return '"'+s.replace(/"/g,'""')+'"';
-    return s;
-  };
-
-  const headers=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','担当者','品名','カテゴリー','色','柄','素材','客様指定補正','指定メモ','実行工程','工程メモ','特殊','ミシン','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス'];
-
-  const rows=all.map(r=>[
-    r.inDate,r.inTime,r.outDate,
-    r.ticket?'#'+r.ticket:'',
-    tpLabel(r.type),r.store,r.client,r.staff,
-    r.item,r.category,r.colorName||r.colorHex,r.pattern,r.material,
-    altSummary(r.clientAlts),r.clientAltMemo,
-    workStr2(r.workAlts),r.workAltMemo,r.special,
-    r.machine,r.needle,r.thread,r.threadColor,r.foot,r.machineMemo,
-    r.time||'',r.materials,r.price||'',r.note,
-    stLabel(r.status)
-  ].map(esc).join(','));
-
-  const bom='\uFEFF';
-  const csv=bom+[headers.map(esc).join(','),...rows].join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  const today=new Date().toISOString().split('T')[0];
-  a.download=`補正記録_${today}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function clearDateFilter(){
-  document.getElementById('hist-date-from').value='';
-  document.getElementById('hist-date-to').value='';
-  renderHistory();
-}
-function renderHistory(){
-  const q=(document.getElementById('search-input')?.value||'').toLowerCase();
-  const dateFrom=document.getElementById('hist-date-from')?.value||'';
-  const dateTo=document.getElementById('hist-date-to')?.value||'';
-  let all=gR();
-  if(q) all=all.filter(r=>[r.client,r.ticket,r.item,r.material,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
-  if(dateFrom) all=all.filter(r=>r.inDate&&r.inDate>=dateFrom);
-  if(dateTo) all=all.filter(r=>r.inDate&&r.inDate<=dateTo);
-  const types=[{id:'all',label:'全て'},...TYPES];
-  document.getElementById('hist-filter').innerHTML=types.map(t=>
-    `<button class="fpill${histFilter===t.id?' active':''}" onclick="setHF('${t.id}')">${t.label}</button>`
+  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(df)all=all.filter(r=>r.inDate&&r.inDate>=df);
+  if(dt)all=all.filter(r=>r.inDate&&r.inDate<=dt);
+  document.getElementById('hf2').innerHTML=[{id:'all',label:'全て'},...TYPES].map(t=>
+    `<button class="fp${hiFil===t.id?' on':''}" onclick="setHF('${t.id}')">${t.label}</button>`
   ).join('');
-  if(histFilter!=='all') all=all.filter(r=>r.type===histFilter);
-  const el=document.getElementById('history-list');
-  if(!all.length){
-    el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div>記録がありません</div>`;
-    return;
-  }
-  const stLabel=id=>(STATUS_LIST.find(s=>s.id===id)||{label:'—'}).label;
-  const tpLabel=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
-  const altSummary=alts=>altStr(alts).replace(/\n/g,' / ');
-  el.innerHTML=`<table class="hist-table">
-    <thead><tr>
-      <th>持込日</th>
-      <th>納品日</th>
-      <th>伝票No.</th>
-      <th>案件</th>
-      <th>店名</th>
-      <th>客名</th>
-      <th>担当者</th>
-      <th>品名</th>
-      <th>カテゴリー</th>
-      <th>素材</th>
-      <th>補正内容</th>
-      <th>金額</th>
-      <th>状態</th>
-    </tr></thead>
-    <tbody>
-    ${all.map(r=>`<tr onclick="openDetail('${r.id}')">
-      <td>${r.inDate||'—'}</td>
-      <td>${r.outDate||'—'}</td>
-      <td class="td-no">${r.ticket?'#'+r.ticket:''}</td>
-      <td>${tpLabel(r.type)}</td>
-      <td>${r.store||'—'}</td>
-      <td>${r.client||'—'}</td>
-      <td>${r.staff||'—'}</td>
-      <td>${r.item||'—'}</td>
-      <td>${r.category||'—'}</td>
-      <td>${r.material||'—'}</td>
-      <td class="wrap">${altSummary(r.clientAlts)||'—'}</td>
-      <td class="td-price">${r.price?'¥'+r.price.toLocaleString():''}</td>
-      <td class="td-status">${stLabel(r.status)}</td>
-    </tr>`).join('')}
-    </tbody>
-  </table>`;
+  if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
+  const el=document.getElementById('hl');
+  if(!all.length){el.innerHTML=`<div class="empty"><div class="ei">📋</div>記録がありません</div>`;return;}
+  const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
+  const tpL=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
+  el.innerHTML=`<table class="ht"><thead><tr>
+    <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
+    <th>客名</th><th>担当者</th><th>品名</th><th>カテゴリー</th><th>素材</th>
+    <th>補正内容</th><th>金額</th><th>状態</th>
+  </tr></thead><tbody>
+  ${all.map(r=>`<tr onclick="openDet('${r.id}')">
+    <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
+    <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+r.ticket:''}</td>
+    <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
+    <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
+    <td>${r.staff||'—'}</td><td>${r.item||'—'}</td>
+    <td>${r.cat||'—'}</td>
+    <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
+    <td>${aSum(r.cAlts)}</td>
+    <td style="font-family:var(--fm);color:var(--gold);text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
+    <td>${stL(r.status)}</td>
+  </tr>`).join('')}
+  </tbody></table>`;
 }
-function setHF(f){histFilter=f;renderHistory();}
+function setHF(f){hiFil=f;renderHist();}
+function clrDate(){document.getElementById('hf').value='';document.getElementById('ht2').value='';renderHist();}
 
 // ══ CARD ══
-function renderCard(r){
-  const st=STATUS_LIST.find(s=>s.id===r.status)||STATUS_LIST[0];
-  const tp=TYPES.find(t=>t.id===r.type);
-  const tCls=tp?'t-'+tp.id:'t-other';
-  const tLbl=tp?tp.label:'—';
+function rCard(r){
+  const st=STATUS.find(s=>s.id===r.status)||STATUS[0];
   const inD=r.inDate?r.inDate.slice(5).replace('-','/'):'—';
   const outD=r.outDate?r.outDate.slice(5).replace('-','/'):'—';
-  const altTags=(r.clientAlts||[]).slice(0,4).map(a=>`<span class="rtag">${a.name}${a.dir?' '+a.dir:''}${a.dim?' '+a.dim+'cm':''}</span>`).join('');
-  const colorDot=r.colorHex?`<span class="color-dot" style="background:${r.colorHex}"></span>`:'';
-  const tags=[r.category,r.material].filter(Boolean).map(t=>`<span class="rtag">${t}</span>`).join('');
-  return `
-    <div class="rcard" onclick="openDetail('${r.id}')">
-      <div class="rcard-head">
-        <div class="rcard-meta">
-          <div class="rcard-top">
-            <span class="rcard-no">${r.ticket?'#'+r.ticket:''}</span>
-            <span class="tbadge ${tCls}">${tLbl}</span>
-          </div>
-          <div class="rcard-name">${colorDot}${r.client||r.item||'—'}</div>
-          <div class="rcard-sub">${r.store||''}　${r.item||''}</div>
+  const tags=[r.cat,r.mat].filter(Boolean).map(t=>`<span class="rtg">${t}</span>`).join('');
+  return `<div class="rc" onclick="openDet('${r.id}')">
+    <div class="rh">
+      <div class="rm">
+        <div class="rt">
+          <span class="rno">${r.ticket?'#'+r.ticket:''}</span>
+          ${r.typeCls?`<span class="tbg ${r.typeCls}">${r.typeLbl}</span>`:''}
         </div>
-        <span class="sbadge ${st.cls}">${st.label}</span>
+        <div class="rn">${r.client||r.item||'—'}${r.isStaff?' 👤':''}</div>
+        <div class="rs">${r.store||''} ${r.item||''}</div>
       </div>
-      ${tags||altTags?`<div class="rcard-body">${tags}${altTags}</div>`:''}
-      <div class="rcard-foot">
-        <span class="rdate">持込 ${inD}　→　納品 ${outD}</span>
-        <span class="rprice">${r.price?'¥'+r.price.toLocaleString():''}</span>
-      </div>
-    </div>`;
+      <span class="sbg s-${st.id}">${st.label}</span>
+    </div>
+    ${tags?`<div class="rb">${tags}</div>`:''}
+    <div class="rf">
+      <span class="rd">持込 ${inD} → 納品 ${outD}</span>
+      <span class="rp">${r.price?'¥'+r.price.toLocaleString():''}</span>
+    </div>
+  </div>`;
+}
+
+// ══ STRING HELPERS ══
+function aSum(alts){
+  return (alts||[]).map(a=>{
+    let s=a.n+(a.dir?' '+a.dir:'');
+    if(a.dl)s+=' ['+a.dl+']';
+    if(a.dim)s+=' '+a.dim+'cm';
+    return s;
+  }).join(' / ');
+}
+function wStr(alts){
+  return (alts||[]).map(a=>{
+    let s=a.n+(a.dir?' '+a.dir:'');
+    const ps=a.procs||[];
+    if(ps.length){
+      const sb=a.subs||{};
+      s+=' ['+ps.map(p=>{const sl=sb[p]||[];return p+(sl.length?'('+sl.join('/')+')'  :'');}).join('/')+']';
+    }
+    if(a.memo)s+=' ('+a.memo+')';
+    return s;
+  }).join('\n');
+}
+function dw(k,v,pre=false){
+  if(v===null||v===undefined||v==='')return'';
+  return `<div class="dw"><span class="dk">${k}</span><span class="${pre?'dvp':'dv'}">${v}</span></div>`;
 }
 
 // ══ DETAIL ══
-function openDetail(id){
-  const r=gR().find(r=>r.id===id); if(!r) return;
-  currentRecordId=id;
-  document.getElementById('detail-title').textContent=(r.client||r.ticket||'詳細')+(r.store?' '+r.store:'');
-  document.getElementById('detail-stepper').innerHTML=STATUS_LIST.map(s=>
-    `<button class="stepbtn ${s.cls}${r.status===s.id?' on':''}" onclick="updateStatus('${id}','${s.id}')">${s.label}</button>`
+function openDet(id){
+  const r=gR().find(r=>r.id===id);if(!r)return;
+  curId=id;
+  document.getElementById('det-title').textContent=(r.client||r.ticket||'詳細')+(r.store?' '+r.store:'');
+  document.getElementById('det-step').innerHTML=STATUS.map(s=>
+    `<button class="stb${r.status===s.id?' '+s.id:''}" onclick="updSt('${id}','${s.id}')">${s.label}</button>`
   ).join('');
-
-  const row=(k,v,pre=false)=>v?`<div class="drow"><span class="dkey">${k}</span><span class="${pre?'dval-pre':'dval'}">${v}</span></div>`:'';
-
-
-  document.getElementById('detail-body').innerHTML=
-    row('案件種別',r.typeLabel)+
-    row('店名',r.store)+
-    row('持ち込み',(r.inDate||'')+(r.inTime?' '+r.inTime:''))+
-    row('納品予定',r.outDate)+
-    row('伝票No.',r.ticket?'#'+r.ticket:'')+
-    row('客名',r.client)+
-    row('担当者',r.staff)+
-    row('品名',r.item)+
-    row('カテゴリー',r.category)+
-    (r.colorHex?`<div class="drow"><span class="dkey">色</span><span class="dval"><span class="color-dot" style="background:${r.colorHex}"></span>${r.colorName||r.colorHex}</span></div>`:'')+
-    row('柄',r.pattern)+
-    row('素材',r.material+(r.specialMat?' ⚡特殊素材':''))+
-    row('客様指定補正',altStr(r.clientAlts),true)+
-    row('指定メモ',r.clientAltMemo,true)+
-    row('実行工程',workStr(r.workAlts),true)+
-    row('工程メモ',r.workAltMemo,true)+
-    row('特殊',r.special,true)+
-    row('ミシン',r.machine)+
-    row('針番手',r.needle)+
-    row('糸番手',r.thread)+
-    row('糸色番号',r.threadColor)+
-    row('押さえ',r.foot)+
-    row('機材メモ',r.machineMemo,true)+
-    row('所要時間',r.time?r.time+'分':null)+
-    row('使用資材',r.materials,true)+
-    row('金額',r.price?'¥'+r.price.toLocaleString():null)+
-    row('備考',r.note,true);
-
-  document.getElementById('detail-overlay').classList.add('open');
+  document.getElementById('det-body').innerHTML=
+    dw('案件種別',r.typeLbl)+dw('店名',r.store)+
+    dw('持ち込み',(r.inDate||'')+(r.inTime?' '+r.inTime:''))+dw('納品予定',r.outDate)+
+    dw('伝票No.',r.ticket?'#'+r.ticket:'')+
+    dw('客名',r.client+(r.isStaff?' 👤スタッフ':''))+dw('担当者',r.staff)+
+    dw('品名',r.item)+dw('カテゴリー',r.cat)+
+    (r.clrH?`<div class="dw"><span class="dk">色</span><span class="dv"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${r.clrH};border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:4px"></span>${r.clrN||r.clrH}</span></div>`:'')+
+    dw('柄',r.pat)+dw('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))+
+    dw('客様指定',aSum(r.cAlts),true)+dw('指定メモ',r.cMemo,true)+
+    dw('実行工程',wStr(r.wAlts),true)+dw('工程メモ',r.wMemo,true)+
+    dw('特殊',r.special,true)+
+    dw('ミシン',r.machine)+dw('針番手',r.needle)+dw('糸番手',r.thread)+
+    dw('糸色番号',r.tcolor)+dw('押さえ',r.foot)+dw('機材メモ',r.mmemo,true)+
+    dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
+    dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true);
+  openOv('ov-det');
+}
+function updSt(id,st){
+  const rs=gR();const i=rs.findIndex(r=>r.id===id);if(i<0)return;
+  rs[i].status=st;sR(rs);openDet(id);renderWork();renderHist();
 }
 
-function updateStatus(id,status){
-  const recs=gR(); const idx=recs.findIndex(r=>r.id===id);
-  if(idx<0) return; recs[idx].status=status; sR(recs);
-  openDetail(id); renderWork(); renderHistory();
-}
-
-function closeDetailOvl(e){if(e.target===document.getElementById('detail-overlay'))closeDetail();}
-function closeDetail(){document.getElementById('detail-overlay').classList.remove('open');currentRecordId=null;}
-function deleteRecord(){
-  if(!currentRecordId||!confirm('この記録を削除しますか？'))return;
-  sR(gR().filter(r=>r.id!==currentRecordId));
-  closeDetail(); renderWork(); renderHistory();
-}
-
-// ══ MASTER ══
-function openMaster(){
-  renderMaster();
-  document.getElementById('master-overlay').classList.add('open');
-}
-function closeMasterOvl(e){if(e.target===document.getElementById('master-overlay'))closeMaster();}
-function closeMaster(){
-  document.getElementById('master-overlay').classList.remove('open');
-  document.getElementById('export-area').style.display='none';
-  document.getElementById('import-area').style.display='none';
-  populateSelects();
-}
-
-function exportMaster(){
-  const data={
-    stores: gSt(),
-    cats: gCt(),
-    exported: new Date().toISOString()
-  };
-  const text=JSON.stringify(data, null, 2);
-  document.getElementById('export-text').value=text;
-  document.getElementById('export-area').style.display='block';
-  document.getElementById('import-area').style.display='none';
-  document.getElementById('copy-btn').textContent='コピー';
-}
-
-function copyExport(){
-  const el=document.getElementById('export-text');
-  el.select();
-  try{
-    navigator.clipboard.writeText(el.value).then(()=>{
-      document.getElementById('copy-btn').textContent='✅ コピーしました';
-      setTimeout(()=>document.getElementById('copy-btn').textContent='コピー',2000);
-    });
-  }catch(e){
-    document.execCommand('copy');
-    document.getElementById('copy-btn').textContent='✅ コピーしました';
-    setTimeout(()=>document.getElementById('copy-btn').textContent='コピー',2000);
-  }
-}
-
-function showImport(){
-  document.getElementById('import-area').style.display='block';
-  document.getElementById('export-area').style.display='none';
-  document.getElementById('import-text').value='';
-  document.getElementById('import-text').focus();
-}
-
-function importMaster(){
-  const text=document.getElementById('import-text').value.trim();
-  if(!text){alert('テキストを貼り付けてください');return;}
-  try{
-    const data=JSON.parse(text);
-    if(!data.stores||!data.cats){
-      alert('形式が正しくありません。エクスポートしたテキストを貼り付けてください。');
-      return;
-    }
-    if(!confirm(`店名${data.stores.length}件・カテゴリー${data.cats.length}件を復元します。現在の設定は上書きされます。よろしいですか？`)) return;
-    sSt(data.stores);
-    sCt(data.cats);
-    document.getElementById('import-area').style.display='none';
-    renderMaster();
-    populateSelects();
-    alert('✅ 復元しました');
-  }catch(e){
-    alert('テキストの読み込みに失敗しました。正しいエクスポートデータか確認してください。');
-  }
-}
-
-function renderMaster(){
-  document.getElementById('store-list').innerHTML=gSt().map((s,i)=>
-    `<div class="mitem"><span class="mitem-name">${s}</span><button class="mdel" onclick="delStore(${i})">×</button></div>`
-  ).join('');
-  document.getElementById('cat-list').innerHTML=gCt().map((c,i)=>
-    `<div class="mitem"><span class="mitem-name">${c}</span><button class="mdel" onclick="delCat(${i})">×</button></div>`
-  ).join('');
-}
-function addStore(){const v=document.getElementById('store-input').value.trim();if(!v)return;const s=gSt();s.push(v);sSt(s);document.getElementById('store-input').value='';renderMaster();}
-function delStore(i){const s=gSt();s.splice(i,1);sSt(s);renderMaster();}
-function addCat(){const v=document.getElementById('cat-input').value.trim();if(!v)return;const c=gCt();c.push(v);sCt(c);document.getElementById('cat-input').value='';renderMaster();}
-function delCat(i){const c=gCt();c.splice(i,1);sCt(c);renderMaster();}
-
-// ══ NAV ══
-function showScreen(name){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('screen-'+name).classList.add('active');
-  document.getElementById('nav-'+name).classList.add('active');
-  if(name==='work')renderWork();
-  if(name==='history')renderHistory();
-  window.scrollTo(0,0);
-}
-
+// ══ EDIT ══
 function openEdit(){
-  const r=gR().find(r=>r.id===currentRecordId);
-  if(!r) return;
-  const tp=TYPES.find(t=>t.id===r.type);
-
-  // カラースウォッチHTML
-  const colorOpts=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-    ${[{hex:'#1a1a1a',name:'ブラック'},{hex:'#888888',name:'グレー'},{hex:'#ffffff',name:'ホワイト'},
-       {hex:'#c8a878',name:'ベージュ'},{hex:'#8b6914',name:'キャメル'},{hex:'#5c3a1e',name:'ブラウン'},
-       {hex:'#1a3a5c',name:'ネイビー'},{hex:'#8b1a1a',name:'バーガンディ'}]
-    .map(c=>`<div onclick="editSelColor('${c.hex}','${c.name}')" id="esw-${c.hex.replace('#','')}"
-      style="width:28px;height:28px;border-radius:50%;background:${c.hex};cursor:pointer;
-      border:2px solid ${r.colorHex===c.hex?'#fff':'transparent'};${c.hex==='#ffffff'?'border-color:#555':''};
-      transition:all .15s;"></div>`).join('')}
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;">
-    <input type="color" id="edit-color-picker" value="${r.colorHex||'#888888'}" onchange="editCustomColor()" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:50%;">
-    <input type="text" id="edit-color-text" value="${r.colorName||''}" placeholder="カラー名・色番号" style="flex:1;background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:14px;font-family:var(--font);">
+  const r=gR().find(r=>r.id===curId);if(!r)return;
+  const ef=(l,id,v,t='text')=>`<div style="margin-bottom:10px">
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">${l}</div>
+    <input type="${t}" id="${id}" value="${v||''}" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none">
   </div>`;
-
-  // 柄ピル
-  const patterns=['無地','ストライプ','チェック','ヘリンボーン','ツイード','プリント','ジャカード','その他'];
-  const patternPills=patterns.map(p=>`<button onclick="editSelPattern('${p}')" id="epat-${p}"
-    class="ppill${r.pattern===p?' active':''}" style="margin:3px 3px 0 0;">${p}</button>`).join('');
-
-  // ステータス
-  const statusBtns=STATUS_LIST.map(s=>`<button onclick="editSelStatus('${s.id}')" id="est-${s.id}"
-    class="step-btn ${s.cls}${r.status===s.id?' on':''}">${s.label}</button>`).join('');
-
-  // 案件種別
-  const typePills=TYPES.map(t=>`<button onclick="editSelType('${t.id}')" id="etp-${t.id}"
+  const efa=(l,id,v)=>`<div style="margin-bottom:10px">
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">${l}</div>
+    <textarea id="${id}" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${v||''}</textarea>
+  </div>`;
+  const stB=STATUS.map(s=>`<button onclick="eStB('${s.id}')" id="est-${s.id}"
+    class="stb${r.status===s.id?' '+s.id:''}">${s.label}</button>`).join('');
+  const tpB=TYPES.map(t=>`<button onclick="eTpB('${t.id}','${t.cls}')" id="etp-${t.id}"
     class="tpill${r.type===t.id?' '+t.cls:''}">${t.label}</button>`).join('');
-
-  document.getElementById('edit-body').innerHTML=`
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">案件種別</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">${typePills}</div>
-
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">ステータス</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${statusBtns}</div>
-
-    ${ef('店名','edit-store',r.store)}
-    ${ef('持込日','edit-in-date',r.inDate,'date')}
-    ${ef('持込時刻','edit-in-time',r.inTime,'time')}
-    ${ef('納品日','edit-out-date',r.outDate,'date')}
-    ${ef('伝票No.','edit-ticket',r.ticket)}
-    ${ef('客名','edit-client',r.client)}
-    ${ef('担当者','edit-staff',r.staff)}
-    ${ef('品名','edit-item',r.item)}
-    ${ef('カテゴリー','edit-category',r.category)}
-
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:10px 0 6px;">色</div>
-    ${colorOpts}
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:10px 0 6px;">柄</div>
-    <div style="margin-bottom:10px;">${patternPills}</div>
-
-    ${ef('素材','edit-material',r.material)}
-    ${efa('客様指定補正メモ','edit-client-alt-memo',r.clientAltMemo)}
-    ${efa('実行工程メモ','edit-work-alt-memo',r.workAltMemo)}
-    ${efa('特殊','edit-special',r.special)}
-    ${ef('ミシン','edit-machine',r.machine)}
-    ${ef('針番手','edit-needle',r.needle)}
-    ${ef('糸番手','edit-thread',r.thread)}
-    ${ef('糸色番号','edit-thread-color',r.threadColor)}
-    ${ef('押さえ','edit-foot',r.foot)}
-    ${efa('機材メモ','edit-machine-memo',r.machineMemo)}
-    ${ef('所要時間(分)','edit-time',r.time,'number')}
-    ${efa('使用資材','edit-materials',r.materials)}
-    ${ef('金額(円)','edit-price',r.price,'number')}
-    ${efa('備考','edit-note',r.note)}
-  `;
-
-  // 初期値セット
-  editState={colorHex:r.colorHex||'',colorName:r.colorName||'',pattern:r.pattern||'',type:r.type||null,status:r.status||'received'};
-  document.getElementById('edit-overlay').classList.add('open');
+  const eb=document.getElementById('edit-body');
+  eb.dataset.est=r.status||'recv';
+  eb.dataset.etp=r.type||'';
+  eb.innerHTML=`
+    <div style="margin-bottom:12px"><div style="font-size:10px;color:var(--tx3);margin-bottom:6px">案件種別</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${tpB}</div></div>
+    <div style="margin-bottom:12px"><div style="font-size:10px;color:var(--tx3);margin-bottom:6px">ステータス</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${stB}</div></div>
+    ${ef('店名','e-store',r.store)}${ef('持込日','e-indate',r.inDate,'date')}
+    ${ef('持込時刻','e-intime',r.inTime,'time')}${ef('納品日','e-outdate',r.outDate,'date')}
+    ${ef('伝票No.','e-ticket',r.ticket)}${ef('客名','e-client',r.client)}
+    ${ef('担当者','e-staff',r.staff)}${ef('品名','e-item',r.item)}
+    ${ef('カテゴリー','e-cat',r.cat)}${ef('素材','e-mat',r.mat)}
+    ${efa('指定メモ','e-cmemo',r.cMemo)}${efa('工程メモ','e-wmemo',r.wMemo)}
+    ${efa('特殊','e-special',r.special)}
+    ${ef('ミシン','e-machine',r.machine)}${ef('針番手','e-needle',r.needle)}
+    ${ef('糸番手','e-thread',r.thread)}${ef('糸色番号','e-tcolor',r.tcolor)}
+    ${ef('押さえ','e-foot',r.foot)}${efa('機材メモ','e-mmemo',r.mmemo)}
+    ${ef('所要時間(分)','e-time',r.time,'number')}
+    ${efa('使用資材','e-materials',r.materials)}
+    ${ef('金額(円)','e-price',r.price,'number')}${efa('備考','e-note',r.note)}`;
+  openOv('ov-edit');
 }
-
-// ヘルパー
-const ef=(label,id,val,type='text')=>`
-  <div style="margin-bottom:10px;">
-    <div style="font-size:10px;color:var(--text3);margin-bottom:4px;letter-spacing:.06em;">${label}</div>
-    <input type="${type}" id="${id}" value="${val||''}" style="width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-size:15px;font-family:var(--font);">
-  </div>`;
-const efa=(label,id,val)=>`
-  <div style="margin-bottom:10px;">
-    <div style="font-size:10px;color:var(--text3);margin-bottom:4px;letter-spacing:.06em;">${label}</div>
-    <textarea id="${id}" style="width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-size:14px;font-family:var(--font);min-height:64px;resize:vertical;line-height:1.6;">${val||''}</textarea>
-  </div>`;
-
-let editState={colorHex:'',colorName:'',pattern:'',type:null,status:'received'};
-
-function editSelColor(hex,name){
-  editState.colorHex=hex; editState.colorName=name;
-  document.getElementById('edit-color-picker').value=hex;
-  document.getElementById('edit-color-text').value='';
-  document.querySelectorAll('[id^="esw-"]').forEach(el=>{
-    el.style.borderColor=el.id===`esw-${hex.replace('#','')}`?'#fff':'transparent';
-  });
+function eStB(id){
+  document.getElementById('edit-body').dataset.est=id;
+  STATUS.forEach(s=>{const b=document.getElementById('est-'+s.id);if(b)b.className='stb'+(id===s.id?' '+s.id:'');});
 }
-function editCustomColor(){
-  editState.colorHex=document.getElementById('edit-color-picker').value;
-  editState.colorName=document.getElementById('edit-color-text').value;
+function eTpB(id,cls){
+  const eb=document.getElementById('edit-body');
+  const cur=eb.dataset.etp;const next=cur===id?'':id;
+  eb.dataset.etp=next;
+  TYPES.forEach(t=>{const b=document.getElementById('etp-'+t.id);if(b)b.className='tpill'+(next===t.id?' '+t.cls:'');});
 }
-function editSelPattern(p){
-  editState.pattern=editState.pattern===p?'':p;
-  document.querySelectorAll('[id^="epat-"]').forEach(el=>el.classList.remove('active'));
-  if(editState.pattern) document.getElementById('epat-'+editState.pattern)?.classList.add('active');
-}
-function editSelType(id){
-  editState.type=editState.type===id?null:id;
-  document.querySelectorAll('[id^="etp-"]').forEach(el=>{
-    const t=TYPES.find(t=>t.id===el.id.replace('etp-',''));
-    el.className='tpill'+(editState.type===t?.id?' '+t.cls:'');
-  });
-}
-function editSelStatus(id){
-  editState.status=id;
-  document.querySelectorAll('[id^="est-"]').forEach(el=>{
-    const s=STATUS_LIST.find(s=>s.id===el.id.replace('est-',''));
-    el.className=`step-btn ${s.cls}`+(editState.status===id&&s.id===id?' on':'');
-  });
-}
-
 function saveEdit(){
-  if(!currentRecordId) return;
-  const recs=gR();
-  const idx=recs.findIndex(r=>r.id===currentRecordId);
-  if(idx<0) return;
-  const r=recs[idx];
+  if(!curId)return;
+  const rs=gR();const i=rs.findIndex(r=>r.id===curId);if(i<0)return;
+  const eb=document.getElementById('edit-body');
   const gv=id=>document.getElementById(id)?.value||'';
-  const colorName=document.getElementById('edit-color-text')?.value?.trim()||editState.colorName;
-
-  recs[idx]={...r,
-    type:editState.type,
-    typeLabel:TYPES.find(t=>t.id===editState.type)?.label||'—',
-    status:editState.status,
-    store:gv('edit-store'),
-    inDate:gv('edit-in-date'),
-    inTime:gv('edit-in-time'),
-    outDate:gv('edit-out-date'),
-    ticket:gv('edit-ticket'),
-    client:gv('edit-client'),
-    staff:gv('edit-staff'),
-    item:gv('edit-item'),
-    category:gv('edit-category'),
-    colorHex:editState.colorHex,
-    colorName,
-    pattern:editState.pattern,
-    material:gv('edit-material'),
-    clientAltMemo:gv('edit-client-alt-memo'),
-    workAltMemo:gv('edit-work-alt-memo'),
-    special:gv('edit-special'),
-    machine:gv('edit-machine'),
-    needle:gv('edit-needle'),
-    thread:gv('edit-thread'),
-    threadColor:gv('edit-thread-color'),
-    foot:gv('edit-foot'),
-    machineMemo:gv('edit-machine-memo'),
-    time:parseInt(gv('edit-time')||0,10)||0,
-    materials:gv('edit-materials'),
-    price:parseInt(gv('edit-price')||0,10)||0,
-    note:gv('edit-note'),
+  const tp=TYPES.find(t=>t.id===eb.dataset.etp);
+  rs[i]={...rs[i],
+    type:eb.dataset.etp,typeLbl:tp?.label||'',typeCls:tp?.cls||'o',
+    status:eb.dataset.est,
+    store:gv('e-store'),inDate:gv('e-indate'),inTime:gv('e-intime'),
+    outDate:gv('e-outdate'),ticket:gv('e-ticket'),client:gv('e-client'),
+    staff:gv('e-staff'),item:gv('e-item'),cat:gv('e-cat'),mat:gv('e-mat'),
+    cMemo:gv('e-cmemo'),wMemo:gv('e-wmemo'),special:gv('e-special'),
+    machine:gv('e-machine'),needle:gv('e-needle'),thread:gv('e-thread'),
+    tcolor:gv('e-tcolor'),foot:gv('e-foot'),mmemo:gv('e-mmemo'),
+    time:parseInt(gv('e-time')||0,10)||0,
+    materials:gv('e-materials'),price:parseInt(gv('e-price')||0,10)||0,
+    note:gv('e-note'),
   };
-  sR(recs);
-  closeEdit();
-  openDetail(currentRecordId);
-  renderWork();
-  renderHistory();
+  sR(rs);closeOvBtn('ov-edit');openDet(curId);renderWork();renderHist();
 }
 
-function closeEditOvl(e){if(e.target===document.getElementById('edit-overlay'))closeEdit();}
-function closeEdit(){document.getElementById('edit-overlay').classList.remove('open');}
-
-function printRecord(){
-  const r=gR().find(r=>r.id===currentRecordId);
-  if(!r) return;
-
-  // Remove existing print area
-  const old=document.getElementById('print-area');
-  if(old) old.remove();
-
-  const tp=TYPES.find(t=>t.id===r.type);
-  const st=STATUS_LIST.find(s=>s.id===r.status);
-
-  const row=(k,v,pre=false)=>v?`<div class="print-row"><span class="print-key">${k}</span><span class="${pre?'print-val-pre':'print-val'}">${v}</span></div>`:'';
-
-  const div=document.createElement('div');
-  div.id='print-area';
-  div.className='print-area';
-  div.innerHTML=`
-    <div class="print-header">
-      <div>
-        <div class="print-title">補正伝票</div>
-        <div class="print-no">${r.ticket?'#'+r.ticket:''} ${r.store||''}</div>
-      </div>
-      <div style="text-align:right;font-size:12px;color:#444;">
-        <div>持込：${r.inDate||'—'} ${r.inTime||''}</div>
-        <div>納品：${r.outDate||'—'}</div>
+// ══ DELETE & PRINT ══
+function doDel(){
+  if(!curId||!confirm('この記録を削除しますか？'))return;
+  sR(gR().filter(r=>r.id!==curId));
+  closeOvBtn('ov-det');curId=null;renderWork();renderHist();
+}
+function doPrint(){
+  const r=gR().find(r=>r.id===curId);if(!r)return;
+  const pr=(k,v,pre=false)=>v?`<div class="pr"><span class="pk">${k}</span><span class="${pre?'pvp':'pv'}">${v}</span></div>`:'';
+  document.getElementById('print-area').innerHTML=`
+    <div class="ph">
+      <div><div class="pt">補正伝票</div><div class="pn">${r.ticket?'#'+r.ticket:''} ${r.store||''}</div></div>
+      <div style="text-align:right;font-size:12px;color:#444">
+        <div>持込：${r.inDate||'—'} ${r.inTime||''}</div><div>納品：${r.outDate||'—'}</div>
       </div>
     </div>
-    <div class="print-section">顧客・商品</div>
-    ${row('客名',r.client)}
-    ${row('担当者',r.staff)}
-    ${row('品名',r.item)}
-    ${row('カテゴリー',r.category)}
-    ${r.colorHex?`<div class="print-row"><span class="print-key">色</span><span class="print-val">${r.colorName||r.colorHex}</span></div>`:''}
-    ${row('柄',r.pattern)}
-    ${row('素材',r.material)}
-    <div class="print-section">補正内容</div>
-    ${row('客様指定',altStr(r.clientAlts),true)}
-    ${row('指定メモ',r.clientAltMemo,true)}
-    ${row('実行工程',workStr(r.workAlts),true)}
-    ${row('工程メモ',r.workAltMemo,true)}
-    ${row('特殊',r.special,true)}
-    <div class="print-section">機材・作業</div>
-    ${row('ミシン',r.machine)}
-    ${row('針番手',r.needle)}
-    ${row('糸番手',r.thread)}
-    ${row('糸色番号',r.threadColor)}
-    ${row('押さえ',r.foot)}
-    ${row('機材メモ',r.machineMemo,true)}
-    ${row('所要時間',r.time?r.time+'分':null)}
-    ${row('使用資材',r.materials,true)}
-    ${row('金額',r.price?'¥'+r.price.toLocaleString():null)}
-    ${row('案件種別',tp?.label)}
-    ${row('ステータス',st?.label)}
-    ${row('備考',r.note,true)}
-    <div class="print-footer">Lis 補正記録 / 出力日時：${new Date().toLocaleString('ja-JP')}</div>
-  `;
-  document.body.appendChild(div);
+    <div class="ps">顧客・商品</div>
+    ${pr('客名',r.client+(r.isStaff?' 👤スタッフ':''))}${pr('担当者',r.staff)}
+    ${pr('品名',r.item)}${pr('カテゴリー',r.cat)}
+    ${r.clrH?`<div class="pr"><span class="pk">色</span><span class="pv">${r.clrN||r.clrH}</span></div>`:''}
+    ${pr('柄',r.pat)}${pr('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))}
+    <div class="ps">補正内容</div>
+    ${pr('客様指定',aSum(r.cAlts),true)}${pr('指定メモ',r.cMemo,true)}
+    ${pr('実行工程',wStr(r.wAlts),true)}${pr('工程メモ',r.wMemo,true)}
+    ${pr('特殊',r.special,true)}
+    <div class="ps">機材・作業</div>
+    ${pr('ミシン',r.machine)}${pr('針番手',r.needle)}${pr('糸番手',r.thread)}
+    ${pr('糸色番号',r.tcolor)}${pr('押さえ',r.foot)}${pr('機材メモ',r.mmemo,true)}
+    ${pr('所要時間',r.time?r.time+'分':null)}${pr('使用資材',r.materials,true)}
+    ${pr('金額',r.price?'¥'+r.price.toLocaleString():null)}
+    ${pr('備考',r.note,true)}
+    <div class="pf">Lis 補正記録 / 出力：${new Date().toLocaleString('ja-JP')}</div>`;
   window.print();
-  setTimeout(()=>div.remove(), 1000);
+  setTimeout(()=>document.getElementById('print-area').innerHTML='',1200);
 }
 
-window._isStaff=false;
-window._isSpecialMat=false;
-
-function toggleStaff(){
-  window._isStaff=!window._isStaff;
-  const btn=document.getElementById('btn-staff');
-  const inp=document.getElementById('f-client');
-  if(btn){btn.style.background=window._isStaff?'var(--blue-bg)':'var(--s3)';btn.style.color=window._isStaff?'var(--blue)':'var(--text2)';btn.style.borderColor=window._isStaff?'var(--blue)':'';}
-  if(inp){inp.placeholder=window._isStaff?'スタッフ名':'';inp.style.borderColor=window._isStaff?'var(--blue)':'';}
+// ══ CSV ══
+function doCSV(){
+  const q=(document.getElementById('srch')?.value||'').toLowerCase();
+  const df=document.getElementById('hf')?.value||'';
+  const dt=document.getElementById('ht2')?.value||'';
+  let all=gR();
+  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(df)all=all.filter(r=>r.inDate&&r.inDate>=df);
+  if(dt)all=all.filter(r=>r.inDate&&r.inDate<=dt);
+  if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
+  if(!all.length){alert('出力するデータがありません');return;}
+  const e=v=>{const s=String(v||'');return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;};
+  const stL=id=>(STATUS.find(s=>s.id===id)||{label:''}).label;
+  const tpL=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
+  const hd=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','担当者','品名','カテゴリー','色','柄','素材','客様指定補正','実行工程','機材','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス'];
+  const rows=all.map(r=>[
+    r.inDate,r.inTime,r.outDate,r.ticket?'#'+r.ticket:'',
+    tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.staff,
+    r.item,r.cat,r.clrN||r.clrH,r.pat,r.mat+(r.isSpm?' [特殊素材]':''),
+    aSum(r.cAlts),wStr(r.wAlts).replace(/\n/g,' / '),
+    r.machine,r.needle,r.thread,r.tcolor,r.foot,r.mmemo,
+    r.time||'',r.materials,r.price||'',r.note,stL(r.status)
+  ].map(e).join(','));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+[hd.map(e).join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'}));
+  a.download='補正記録_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
 }
 
-function toggleSpecialMat(){
-  window._isSpecialMat=!window._isSpecialMat;
-  const btn=document.getElementById('btn-special-mat');
-  if(btn){btn.style.background=window._isSpecialMat?'var(--amber-bg)':'var(--s3)';btn.style.color=window._isSpecialMat?'var(--amber)':'var(--text2)';btn.style.borderColor=window._isSpecialMat?'var(--amber)':'';}
+// ══ OVERLAY ══
+function openOv(id){document.getElementById(id).classList.add('on');}
+function closeOvBtn(id){document.getElementById(id).classList.remove('on');}
+function closeOv(id,e){if(e.target===document.getElementById(id))closeOvBtn(id);}
+
+// ══ MASTER ══
+function openMaster(){renderMaster();openOv('ov-master');}
+function closeMaster(){
+  closeOvBtn('ov-master');
+  document.getElementById('exp-area').style.display='none';
+  document.getElementById('imp-area').style.display='none';
+  populateSels();
+}
+function renderMaster(){
+  document.getElementById('store-list').innerHTML=gSt().map((s,i)=>
+    `<div class="mit"><span class="mn">${s}</span><button class="mdl" onclick="delStore(${i})">×</button></div>`
+  ).join('');
+  document.getElementById('cat-list').innerHTML=gCt().map((c,i)=>
+    `<div class="mit"><span class="mn">${c}</span><button class="mdl" onclick="delCat(${i})">×</button></div>`
+  ).join('');
+}
+function addStore(){
+  const v=document.getElementById('store-inp').value.trim();
+  if(!v)return;const st=gSt();st.push(v);sSt(st);
+  document.getElementById('store-inp').value='';renderMaster();
+}
+function delStore(i){const st=gSt();st.splice(i,1);sSt(st);renderMaster();}
+function addCat(){
+  const v=document.getElementById('cat-inp').value.trim();
+  if(!v)return;const ct=gCt();ct.push(v);sCt(ct);
+  document.getElementById('cat-inp').value='';renderMaster();
+}
+function delCat(i){const ct=gCt();ct.splice(i,1);sCt(ct);renderMaster();}
+
+function doExport(){
+  const data={stores:gSt(),cats:gCt(),exported:new Date().toISOString()};
+  document.getElementById('exp-text').value=JSON.stringify(data,null,2);
+  document.getElementById('exp-area').style.display='block';
+  document.getElementById('imp-area').style.display='none';
+  document.getElementById('cpb').textContent='コピー';
+}
+function doCopy(){
+  const el=document.getElementById('exp-text');el.select();
+  navigator.clipboard?.writeText(el.value).then(()=>{
+    document.getElementById('cpb').textContent='✅ コピーしました';
+    setTimeout(()=>document.getElementById('cpb').textContent='コピー',2000);
+  }).catch(()=>{document.execCommand('copy');});
+}
+function showImport(){
+  document.getElementById('imp-area').style.display='block';
+  document.getElementById('exp-area').style.display='none';
+  document.getElementById('imp-text').value='';
+}
+function doImport(){
+  try{
+    const d=JSON.parse(document.getElementById('imp-text').value.trim());
+    if(!d.stores||!d.cats){alert('形式が正しくありません');return;}
+    if(!confirm('店名'+d.stores.length+'件・カテゴリー'+d.cats.length+'件を復元します。現在の設定は上書きされます。'))return;
+    sSt(d.stores);sCt(d.cats);
+    document.getElementById('imp-area').style.display='none';
+    renderMaster();alert('✅ 復元しました');
+  }catch(e){alert('テキストの読み込みに失敗しました');}
 }
 
+// ══ START ══
 init();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
 </script>
 </body>
 </html>
