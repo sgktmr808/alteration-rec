@@ -92,6 +92,7 @@ select option{background:#1a1a24;}
 .dir-btns{display:flex;gap:6px;margin-bottom:8px;}
 .dir-btn{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
 .dir-btn.active-tsume{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
+.dir-btn.active-none{background:var(--s4);color:var(--text2);border-color:var(--border2);}
 .dir-btn.active-dashi{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
 .dim-row{display:flex;align-items:center;gap:8px;}
 .dim-input{flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:15px;font-family:var(--mono);text-align:right;}
@@ -367,7 +368,13 @@ select option{background:#1a1a24;}
         <div class="pattern-wrap" id="pattern-pills"></div>
       </div>
       <div class="field">
-        <div class="flabel">素材</div>
+        <div class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
+          素材
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--amber);cursor:pointer;">
+            <input type="checkbox" id="f-special-btn" style="width:14px;height:14px;accent-color:var(--amber);">
+            特殊ボタン
+          </label>
+        </div>
         <input type="text" id="f-material" placeholder="ウール100%">
       </div>
     </div>
@@ -600,28 +607,20 @@ const PATTERNS=['無地','ストライプ','チェック','ヘリンボーン','
 // 実行工程：補正項目ごとの加工方法
 const PROCESS_MAP = {
   '裾上げ':       ['シングル','ダブル(糸止め)','ダブル(スナップ)','モーニング','Gカット','まつり縫い'],
-  '裾出し':       ['そのまま出し','縫い代不足'],
-  '裾詰め':       ['まつり縫い','千鳥掛け','ミシン','ロック処理','三つ折り','リブ付け'],
-  '袖丈詰め':     ['シングル','アキあり','アキなし','本切羽','飾りボタンあり','カフスあり','カフスなし','まつり縫い','ロック処理','リブ付け'],
-  '袖丈出し':     ['そのまま出し','縫い代不足'],
-  'ウエスト詰め': ['内側ベルト','ダーツ','脇縫い'],
-  'ウエスト出し': ['内側ベルト','脇縫い','限界あり'],
+  '裾':           ['シングル','ダブル(糸止め)','ダブル(スナップ)','モーニング','Gカット','まつり縫い','千鳥掛け','ミシン','ロック処理','三つ折り','リブ付け'],
+  '袖丈':         ['シングル','アキあり','アキなし','本切羽','飾りボタンあり','カフスあり','カフスなし','まつり縫い','ロック処理','リブ付け'],
+  '身幅':         ['脇縫い','背縫い','限界あり'],
+  'ウエスト':     ['内側ベルト','ダーツ','脇縫い','限界あり'],
   'ウエスト絞り': ['脇縫い','背縫い','両方'],
-  '身幅詰め':     ['脇縫い','背縫い'],
-  '身幅出し':     ['脇縫い','背縫い','限界あり'],
-  'ヒップ詰め':   ['脇縫い'],
-  'ヒップ出し':   ['脇縫い','限界あり'],
-  'バスト詰め':   ['脇縫い','ダーツ'],
-  'バスト出し':   ['脇縫い','限界あり'],
-  'わたり詰め':   ['脇縫い','内股縫い'],
-  'わたり出し':   ['脇縫い','内股縫い','限界あり'],
-  '股上詰め':     ['前股上','後股上','両方'],
-  '股上出し':     ['前股上','後股上','限界あり'],
+  'わたり':       ['脇縫い','内股縫い','限界あり'],
+  '股上':         ['前股上','後股上','両方','限界あり'],
+  'ヒップ':       ['脇縫い','限界あり'],
+  'バスト':       ['脇縫い','ダーツ','限界あり'],
+  '肩幅':         ['肩線','袖付け'],
+  '袖口':         ['縫い代詰め','折り返し'],
+  '肩ひも調整':   ['縫い縮め','ホック付け'],
   'テーパード加工':['細め','標準'],
   '裾ダブル加工': ['3cm幅','3.5cm幅','4cm幅','指定'],
-  '肩幅詰め':     ['肩線','袖付け'],
-  '袖口詰め':     ['縫い代詰め','折り返し'],
-  '肩ひも調整':   ['縫い縮め','ホック付け'],
   'スリット加工': ['あき止め','縫い閉じ'],
   '裏地修理':     ['部分補修','全取替'],
   '襟修理':       ['縫い直し','付け直し'],
@@ -629,136 +628,121 @@ const PROCESS_MAP = {
   'ほつれ補修':   ['かがり縫い','ミシン'],
   '穴修理':       ['かがり縫い','当て布'],
   'タグ付け':     ['ミシン','まつり縫い'],
-  'ボタン補強':   ['通常','特殊（革当て）','特殊（当て布）','特殊（金具）'],
+  'ボタン補強':   ['特殊（革当て）','特殊（当て布）','特殊（金具）'],
+  'プレス':       ['全体','部分','スチームのみ','ドライ'],
 };
 const ALT_MAP={
   'パンツ':[
-    {name:'裾上げ',dir:'tsume',dim_type:'length'},
-    {name:'裾出し',dir:'dashi',dim_type:'length'},
-    {name:'ウエスト詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト出し',dir:'dashi',dim_type:'cm'},
-    {name:'わたり詰め',dir:'tsume',dim_type:'cm'},
-    {name:'わたり出し',dir:'dashi',dim_type:'cm'},
-    {name:'股上詰め',dir:'tsume',dim_type:'cm'},
-    {name:'股上出し',dir:'dashi',dim_type:'cm'},
-    {name:'ヒップ詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
-    {name:'テーパード加工',dir:'none',dim_type:'none'},
-    {name:'裾ダブル加工',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾上げ',     dir:'both', dim_type:'length'},
+    {name:'ウエスト',   dir:'both', dim_type:'cm'},
+    {name:'わたり',     dir:'both', dim_type:'cm'},
+    {name:'股上',       dir:'both', dim_type:'cm'},
+    {name:'ヒップ',     dir:'both', dim_type:'cm'},
+    {name:'テーパード加工', dir:'none', dim_type:'none'},
+    {name:'裾ダブル加工',   dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'スカート':[
-    {name:'裾上げ',dir:'tsume',dim_type:'length'},
-    {name:'裾出し',dir:'dashi',dim_type:'length'},
-    {name:'ウエスト詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト出し',dir:'dashi',dim_type:'cm'},
-    {name:'ヒップ詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
-    {name:'スリット加工',dir:'none',dim_type:'none'},
-    {name:'裏地修理',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾上げ',     dir:'both', dim_type:'length'},
+    {name:'ウエスト',   dir:'both', dim_type:'cm'},
+    {name:'ヒップ',     dir:'both', dim_type:'cm'},
+    {name:'スリット加工',   dir:'none', dim_type:'none'},
+    {name:'裏地修理',   dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'ジャケット':[
-    {name:'裾詰め',dir:'tsume',dim_type:'length'},
-    {name:'裾出し',dir:'dashi',dim_type:'length'},
-    {name:'袖丈詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈出し',dir:'dashi',dim_type:'length'},
-    {name:'身幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'身幅出し',dir:'dashi',dim_type:'cm'},
-    {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
-    {name:'肩幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'袖口詰め',dir:'tsume',dim_type:'cm'},
-    {name:'裏地修理',dir:'none',dim_type:'none'},
-    {name:'ボタン付け替え',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾',         dir:'both', dim_type:'length'},
+    {name:'袖丈',       dir:'both', dim_type:'length'},
+    {name:'身幅',       dir:'both', dim_type:'cm'},
+    {name:'ウエスト絞り',   dir:'tsume', dim_type:'cm'},
+    {name:'肩幅',       dir:'tsume', dim_type:'cm'},
+    {name:'袖口',       dir:'tsume', dim_type:'cm'},
+    {name:'裏地修理',   dir:'none', dim_type:'none'},
+    {name:'ボタン付け替え', dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'コート':[
-    {name:'裾詰め',dir:'tsume',dim_type:'length'},
-    {name:'裾出し',dir:'dashi',dim_type:'length'},
-    {name:'袖丈詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈出し',dir:'dashi',dim_type:'length'},
-    {name:'身幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'身幅出し',dir:'dashi',dim_type:'cm'},
-    {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
-    {name:'肩幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'裏地修理',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾',         dir:'both', dim_type:'length'},
+    {name:'袖丈',       dir:'both', dim_type:'length'},
+    {name:'身幅',       dir:'both', dim_type:'cm'},
+    {name:'ウエスト絞り',   dir:'tsume', dim_type:'cm'},
+    {name:'肩幅',       dir:'tsume', dim_type:'cm'},
+    {name:'裏地修理',   dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'シャツ':[
-    {name:'裾詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈出し',dir:'dashi',dim_type:'length'},
-    {name:'身幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'身幅出し',dir:'dashi',dim_type:'cm'},
-    {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
-    {name:'肩幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'襟修理',dir:'none',dim_type:'none'},
-    {name:'ボタン付け替え',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾',         dir:'tsume', dim_type:'length'},
+    {name:'袖丈',       dir:'both', dim_type:'length'},
+    {name:'身幅',       dir:'both', dim_type:'cm'},
+    {name:'ウエスト絞り',   dir:'tsume', dim_type:'cm'},
+    {name:'肩幅',       dir:'tsume', dim_type:'cm'},
+    {name:'襟修理',     dir:'none', dim_type:'none'},
+    {name:'ボタン付け替え', dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'ブラウス':[
-    {name:'裾詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈出し',dir:'dashi',dim_type:'length'},
-    {name:'身幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'身幅出し',dir:'dashi',dim_type:'cm'},
-    {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
-    {name:'肩幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ボタン付け替え',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾',         dir:'tsume', dim_type:'length'},
+    {name:'袖丈',       dir:'both', dim_type:'length'},
+    {name:'身幅',       dir:'both', dim_type:'cm'},
+    {name:'ウエスト絞り',   dir:'tsume', dim_type:'cm'},
+    {name:'肩幅',       dir:'tsume', dim_type:'cm'},
+    {name:'ボタン付け替え', dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'ニット':[
-    {name:'裾詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈詰め',dir:'tsume',dim_type:'length'},
-    {name:'身幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
-    {name:'ほつれ補修',dir:'none',dim_type:'none'},
-    {name:'穴修理',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾',         dir:'tsume', dim_type:'length'},
+    {name:'袖丈',       dir:'tsume', dim_type:'length'},
+    {name:'身幅',       dir:'tsume', dim_type:'cm'},
+    {name:'ウエスト絞り',   dir:'tsume', dim_type:'cm'},
+    {name:'ほつれ補修', dir:'none', dim_type:'none'},
+    {name:'穴修理',     dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'カットソー':[
-    {name:'裾詰め',dir:'tsume',dim_type:'length'},
-    {name:'袖丈詰め',dir:'tsume',dim_type:'length'},
-    {name:'身幅詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
-    {name:'ほつれ補修',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾',         dir:'tsume', dim_type:'length'},
+    {name:'袖丈',       dir:'tsume', dim_type:'length'},
+    {name:'身幅',       dir:'tsume', dim_type:'cm'},
+    {name:'ウエスト絞り',   dir:'tsume', dim_type:'cm'},
+    {name:'ほつれ補修', dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'ドレス':[
-    {name:'裾上げ',dir:'tsume',dim_type:'length'},
-    {name:'裾出し',dir:'dashi',dim_type:'length'},
-    {name:'ウエスト詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト出し',dir:'dashi',dim_type:'cm'},
-    {name:'バスト詰め',dir:'tsume',dim_type:'cm'},
-    {name:'バスト出し',dir:'dashi',dim_type:'cm'},
-    {name:'ヒップ詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
-    {name:'肩ひも調整',dir:'none',dim_type:'none'},
-    {name:'裏地修理',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾上げ',     dir:'both', dim_type:'length'},
+    {name:'ウエスト',   dir:'both', dim_type:'cm'},
+    {name:'バスト',     dir:'both', dim_type:'cm'},
+    {name:'ヒップ',     dir:'both', dim_type:'cm'},
+    {name:'肩ひも調整', dir:'none', dim_type:'none'},
+    {name:'裏地修理',   dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
   'ワンピース':[
-    {name:'裾上げ',dir:'tsume',dim_type:'length'},
-    {name:'裾出し',dir:'dashi',dim_type:'length'},
-    {name:'ウエスト詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ウエスト出し',dir:'dashi',dim_type:'cm'},
-    {name:'バスト詰め',dir:'tsume',dim_type:'cm'},
-    {name:'バスト出し',dir:'dashi',dim_type:'cm'},
-    {name:'ヒップ詰め',dir:'tsume',dim_type:'cm'},
-    {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
-    {name:'肩ひも調整',dir:'none',dim_type:'none'},
-    {name:'裏地修理',dir:'none',dim_type:'none'},
-    {name:'タグ付け',dir:'none',dim_type:'none'},
-    {name:'ボタン補強',dir:'none',dim_type:'none'},
+    {name:'裾上げ',     dir:'both', dim_type:'length'},
+    {name:'ウエスト',   dir:'both', dim_type:'cm'},
+    {name:'バスト',     dir:'both', dim_type:'cm'},
+    {name:'ヒップ',     dir:'both', dim_type:'cm'},
+    {name:'肩ひも調整', dir:'none', dim_type:'none'},
+    {name:'裏地修理',   dir:'none', dim_type:'none'},
+    {name:'タグ付け',   dir:'none', dim_type:'none'},
+    {name:'ボタン補強', dir:'none', dim_type:'none'},
+    {name:'プレス',     dir:'none', dim_type:'none'},
   ],
 };
 const DEFAULT_CATS=Object.keys(ALT_MAP).concat(['その他']);
@@ -877,8 +861,15 @@ function renderAltItems(containerId, cat, prefill=null){
       <div class="alt-item-body${pf?' open':''}" id="body-${uid}">
         ${a.dir==='none'?'':`
         <div class="dir-btns">
-          ${a.dir==='both'||a.dir==='tsume'?`<button class="dir-btn${pf&&pf.dir==='詰め'?' active-tsume':''}" id="dir-tsume-${uid}" onclick="setDir('${uid}','tsume')">詰め</button>`:''}
-          ${a.dir==='both'||a.dir==='dashi'?`<button class="dir-btn${pf&&pf.dir==='出し'?' active-dashi':''}" id="dir-dashi-${uid}" onclick="setDir('${uid}','dashi')">出し</button>`:''}
+          ${a.dir==='both'?`
+            <button class="dir-btn${pf&&pf.dir==='詰め'?' active-tsume':''}" id="dir-tsume-${uid}" onclick="setDir('${uid}','tsume')">詰め</button>
+            <button class="dir-btn${pf&&pf.dir==='出し'?' active-dashi':''}" id="dir-dashi-${uid}" onclick="setDir('${uid}','dashi')">出し</button>
+            <button class="dir-btn${!pf||pf.dir===''?' active-none':''}" id="dir-none-${uid}" onclick="setDir('${uid}','none-sel')">未定</button>
+          `:a.dir==='tsume'?`
+            <button class="dir-btn${pf&&pf.dir==='詰め'?' active-tsume':''}" id="dir-tsume-${uid}" onclick="setDir('${uid}','tsume')">詰め</button>
+          `:`
+            <button class="dir-btn${pf&&pf.dir==='出し'?' active-dashi':''}" id="dir-dashi-${uid}" onclick="setDir('${uid}','dashi')">出し</button>
+          `}
         </div>`}
         ${isWorkSection?`
         <div style="margin-bottom:6px;">
@@ -960,9 +951,12 @@ function toggleAlt(uid){
 }
 
 function setDir(uid, dir){
-  ['tsume','dashi'].forEach(d=>{
+  ['tsume','dashi','none'].forEach(d=>{
     const btn=document.getElementById(`dir-${d}-${uid}`);
-    if(btn) btn.className='dir-btn'+(dir===d?` active-${d}`:'');
+    if(!btn) return;
+    if(dir==='tsume') btn.className='dir-btn'+(d==='tsume'?' active-tsume':'');
+    else if(dir==='dashi') btn.className='dir-btn'+(d==='dashi'?' active-dashi':'');
+    else btn.className='dir-btn'+(d==='none'?' active-none':'');
   });
 }
 
@@ -977,6 +971,7 @@ function collectAltItems(containerId, cat){
     let dir='';
     if(document.getElementById(`dir-tsume-${uid}`)?.classList.contains('active-tsume')) dir='詰め';
     else if(document.getElementById(`dir-dashi-${uid}`)?.classList.contains('active-dashi')) dir='出し';
+    else if(document.getElementById(`dir-none-${uid}`)?.classList.contains('active-none')) dir='未定';
     if(isWork){
       const process=getProcess(uid);
       const processMemo=document.getElementById('proc-custom-'+uid)?.value?.trim()||'';
@@ -1023,6 +1018,7 @@ function saveRecord(){
     colorName:currentColor.name,
     pattern:currentPattern,
     material:document.getElementById('f-material').value.trim(),
+    specialBtn:document.getElementById('f-special-btn')?.checked||false,
     clientAlts:collectAltItems('alt-items',cat),
     clientAltMemo:document.getElementById('f-client-alt-memo').value.trim(),
     workAlts:collectAltItems('work-items',cat),
@@ -1052,6 +1048,7 @@ function resetForm(){
     const el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('m-machine').value='JUKI DDL-8300c';
+  const sBtn=document.getElementById('f-special-btn'); if(sBtn) sBtn.checked=false;
   currentType=null; currentColor={hex:'',name:''}; currentPattern=''; currentTime=0;
   document.getElementById('tdisp').textContent='0';
   document.getElementById('f-time').value='';
@@ -1267,7 +1264,7 @@ function openDetail(id){
     row('カテゴリー',r.category)+
     (r.colorHex?`<div class="drow"><span class="dkey">色</span><span class="dval"><span class="color-dot" style="background:${r.colorHex}"></span>${r.colorName||r.colorHex}</span></div>`:'')+
     row('柄',r.pattern)+
-    row('素材',r.material)+
+    row('素材',r.material+(r.specialBtn?' ⚡特殊ボタン':''))+
     row('客様指定補正',altStr(r.clientAlts),true)+
     row('指定メモ',r.clientAltMemo,true)+
     row('実行工程',workStr(r.workAlts),true)+
