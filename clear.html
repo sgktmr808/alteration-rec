@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>キャッシュクリア</title>
+<style>
+body{font-family:sans-serif;background:#0a0a0f;color:#eee;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;}
+h1{font-size:20px;margin-bottom:12px;}
+p{font-size:14px;color:#888;line-height:1.8;margin-bottom:24px;}
+.btn{padding:14px 28px;border-radius:12px;border:none;background:#c8a84a;color:#000;font-size:16px;font-weight:700;cursor:pointer;}
+.status{margin-top:20px;font-size:13px;color:#5aac7a;min-height:24px;}
+</style>
+</head>
+<body>
+<h1>🗑 キャッシュクリア</h1>
+<p>古いService Workerとキャッシュを<br>完全に削除します</p>
+<button class="btn" onclick="clearAll()">クリア実行</button>
+<div class="status" id="status"></div>
+
+<script>
+async function clearAll(){
+  const el = document.getElementById('status');
+  el.textContent = '処理中…';
+  try {
+    // Service Workerのキャッシュのみ削除（localStorageは一切触らない）
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+
+    // Service Worker登録解除（localStorageは保持）
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+
+    // localStorageのデータは完全に保持されていることを確認
+    const recCount = JSON.parse(localStorage.getItem('alt3_rec') || '[]').length;
+    const storeCount = JSON.parse(localStorage.getItem('alt3_stores') || '[]').length;
+    const catCount = JSON.parse(localStorage.getItem('alt3_cats') || '[]').length;
+
+    el.textContent = `✅ 完了 — 登録データ${recCount}件・店名${storeCount}件・カテゴリー${catCount}件は保持されています`;
+    setTimeout(()=>{
+      window.location.href = './index.html';
+    }, 2500);
+  } catch(e) {
+    el.textContent = 'エラー: ' + e.message;
+  }
+}
+</script>
+</body>
+</html>
