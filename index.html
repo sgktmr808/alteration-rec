@@ -582,6 +582,39 @@ const PATTERNS=['無地','ストライプ','チェック','ヘリンボーン','
 
 // カテゴリー別補正サブカテゴリー
 // dir: 'both'=詰め/出し両方, 'tsume'=詰めのみ, 'dashi'=出しのみ, 'none'=方向なし
+
+// 実行工程：補正項目ごとの加工方法
+const PROCESS_MAP = {
+  '裾上げ':       ['シングル','ダブル(糸止め)','ダブル(スナップ)','モーニング','Gカット','まつり縫い'],
+  '裾出し':       ['そのまま出し','縫い代不足'],
+  '裾詰め':       ['まつり縫い','千鳥掛け','ミシン','ロック処理','三つ折り','リブ付け'],
+  '袖丈詰め':     ['シングル','アキあり','アキなし','本切羽','飾りボタンあり','カフスあり','カフスなし','まつり縫い','ロック処理','リブ付け'],
+  '袖丈出し':     ['そのまま出し','縫い代不足'],
+  'ウエスト詰め': ['内側ベルト','ダーツ','脇縫い'],
+  'ウエスト出し': ['内側ベルト','脇縫い','限界あり'],
+  'ウエスト絞り': ['脇縫い','背縫い','両方'],
+  '身幅詰め':     ['脇縫い','背縫い'],
+  '身幅出し':     ['脇縫い','背縫い','限界あり'],
+  'ヒップ詰め':   ['脇縫い'],
+  'ヒップ出し':   ['脇縫い','限界あり'],
+  'バスト詰め':   ['脇縫い','ダーツ'],
+  'バスト出し':   ['脇縫い','限界あり'],
+  'わたり詰め':   ['脇縫い','内股縫い'],
+  'わたり出し':   ['脇縫い','内股縫い','限界あり'],
+  '股上詰め':     ['前股上','後股上','両方'],
+  '股上出し':     ['前股上','後股上','限界あり'],
+  'テーパード加工':['細め','標準'],
+  '裾ダブル加工': ['3cm幅','3.5cm幅','4cm幅','指定'],
+  '肩幅詰め':     ['肩線','袖付け'],
+  '袖口詰め':     ['縫い代詰め','折り返し'],
+  '肩ひも調整':   ['縫い縮め','ホック付け'],
+  'スリット加工': ['あき止め','縫い閉じ'],
+  '裏地修理':     ['部分補修','全取替'],
+  '襟修理':       ['縫い直し','付け直し'],
+  'ボタン付け替え':['同位置','移動あり'],
+  'ほつれ補修':   ['かがり縫い','ミシン'],
+  '穴修理':       ['かがり縫い','当て布'],
+};
 const ALT_MAP={
   'パンツ':[
     {name:'裾上げ',dir:'tsume',dim_type:'length'},
@@ -787,6 +820,7 @@ function onCategoryChange(){
 }
 
 function renderAltItems(containerId, cat, prefill=null){
+  const isWorkSection = containerId==='work-items';
   const items=ALT_MAP[cat]||[];
   const el=document.getElementById(containerId);
   if(!items.length){
@@ -810,7 +844,17 @@ function renderAltItems(containerId, cat, prefill=null){
           ${a.dir==='both'||a.dir==='tsume'?`<button class="dir-btn${pf&&pf.dir==='詰め'?' active-tsume':''}" id="dir-tsume-${uid}" onclick="setDir('${uid}','tsume')">詰め</button>`:''}
           ${a.dir==='both'||a.dir==='dashi'?`<button class="dir-btn${pf&&pf.dir==='出し'?' active-dashi':''}" id="dir-dashi-${uid}" onclick="setDir('${uid}','dashi')">出し</button>`:''}
         </div>`}
-        ${isLength?`
+        ${isWorkSection?`
+        <div style="margin-bottom:6px;">
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;" id="proc-wrap-${uid}">
+            ${(PROCESS_MAP[a.name]||[]).map(p=>`
+              <button onclick="selProcess('${uid}','${p}')" id="proc-${uid}-${p.replace(/[^a-zA-Z0-9]/g,'_')}"
+                class="ppill${pf&&pf.process===p?' active':''}">${p}</button>
+            `).join('')}
+          </div>
+          <input class="alt-memo-input" type="text" id="proc-custom-${uid}" placeholder="その他・詳細メモ" value="${pf&&pf.processMemo?pf.processMemo:''}">
+        </div>`
+        :isLength?`
         <div style="margin-bottom:8px;">
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
             ${['股下','カット寸法','総丈'].map(t=>`
@@ -831,10 +875,27 @@ function renderAltItems(containerId, cat, prefill=null){
           <input class="dim-input" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0" value="${pf&&pf.dim?pf.dim:''}">
           <span class="dim-unit">cm</span>
         </div>`}
-        <input class="alt-memo-input" type="text" id="memo-${uid}" placeholder="メモ（任意）" value="${pf&&pf.memo?pf.memo:''}">
+        ${isWorkSection?'':`<input class="alt-memo-input" type="text" id="memo-${uid}" placeholder="メモ（任意）" value="${pf&&pf.memo?pf.memo:''}">`}
       </div>
     </div>`;
   }).join('');
+}
+
+function selProcess(uid, val){
+  // 現在の選択を取得
+  const body=document.getElementById('body-'+uid);
+  const cur=body?.dataset?.process||'';
+  const next=cur===val?'':val;
+  body.dataset.process=next;
+  // ボタン更新
+  document.querySelectorAll(`[id^="proc-${uid}-"]`).forEach(btn=>{
+    const active=btn.id===`proc-${uid}-${val.replace(/[^a-zA-Z0-9]/g,'_')}`&&next===val;
+    btn.classList.toggle('active',active);
+  });
+}
+
+function getProcess(uid){
+  return document.getElementById('body-'+uid)?.dataset?.process||'';
 }
 
 function setDimType(uid, label){
@@ -871,6 +932,7 @@ function setDir(uid, dir){
 
 function collectAltItems(containerId, cat){
   const items=ALT_MAP[cat]||[];
+  const isWork=containerId==='work-items';
   const result=[];
   items.forEach((a,i)=>{
     const uid=`${containerId}-${i}`;
@@ -879,14 +941,20 @@ function collectAltItems(containerId, cat){
     let dir='';
     if(document.getElementById(`dir-tsume-${uid}`)?.classList.contains('active-tsume')) dir='詰め';
     else if(document.getElementById(`dir-dashi-${uid}`)?.classList.contains('active-dashi')) dir='出し';
-    const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
-    if(a.dim_type==='length'){
-      const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
-      const dimLabel=getDimLabel(uid);
-      result.push({name:a.name, dir, dim, dimLabel, memo, dim_type:'length'});
+    if(isWork){
+      const process=getProcess(uid);
+      const processMemo=document.getElementById('proc-custom-'+uid)?.value?.trim()||'';
+      result.push({name:a.name, dir, process, processMemo});
     } else {
-      const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
-      result.push({name:a.name, dir, dim, memo, dim_type:'cm'});
+      const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
+      if(a.dim_type==='length'){
+        const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
+        const dimLabel=getDimLabel(uid);
+        result.push({name:a.name, dir, dim, dimLabel, memo, dim_type:'length'});
+      } else {
+        const dim=parseFloat(document.getElementById('dim-'+uid)?.value||0)||null;
+        result.push({name:a.name, dir, dim, memo, dim_type:'cm'});
+      }
     }
   });
   return result;
@@ -970,6 +1038,32 @@ function renderWork(){
 function setWF(f){workFilter=f;renderWork();}
 
 // ══ HISTORY ══
+function altStr(alts){
+  return (alts||[]).map(a=>{
+    let s=a.name+(a.dir?' '+a.dir:'');
+    if(a.dim_type==='length'){
+      if(a.dimLabel) s+=' ['+a.dimLabel+']';
+      if(a.dim) s+=' '+a.dim+'cm';
+    } else if(a.dim){ s+=' '+a.dim+'cm'; }
+    if(a.memo) s+=' ('+a.memo+')';
+    return s;
+  }).join('\n');
+}
+function workStr(alts){
+  return (alts||[]).map(a=>{
+    let s=a.name+(a.dir?' '+a.dir:'');
+    if(a.process) s+=' ['+a.process+']';
+    if(a.processMemo) s+=' ('+a.processMemo+')';
+    return s;
+  }).join('\n');
+}
+const workStr2=alts=>(alts||[]).map(a=>{
+  let s=a.name+(a.dir?' '+a.dir:'');
+  if(a.process) s+=' ['+a.process+']';
+  if(a.processMemo) s+=' ('+a.processMemo+')';
+  return s;
+}).join(' / ');
+
 function exportExcel(){
   const q=(document.getElementById('search-input')?.value||'').toLowerCase();
   const dateFrom=document.getElementById('hist-date-from')?.value||'';
@@ -982,16 +1076,7 @@ function exportExcel(){
 
   if(!all.length){alert('出力するデータがありません');return;}
 
-  const altSummary=alts=>(alts||[]).map(a=>{
-    let s=a.name+(a.dir?' '+a.dir:'');
-    if(a.dim_type==='length'){
-      if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dim) s+=` ${a.dim}cm`;
-    } else if(a.dim){
-      s+=` ${a.dim}cm`;
-    }
-    return s;
-  }).join(' / ');
+  const altSummary=alts=>altStr(alts).replace(/\n/g,' / ');
   const tpLabel=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
   const stLabel=id=>(STATUS_LIST.find(s=>s.id===id)||{label:''}).label;
 
@@ -1009,7 +1094,7 @@ function exportExcel(){
     tpLabel(r.type),r.store,r.client,r.staff,
     r.item,r.category,r.colorName||r.colorHex,r.pattern,r.material,
     altSummary(r.clientAlts),r.clientAltMemo,
-    altSummary(r.workAlts),r.workAltMemo,r.special,
+    workStr2(r.workAlts),r.workAltMemo,r.special,
     r.machine,r.needle,r.thread,r.threadColor,r.foot,r.machineMemo,
     r.time||'',r.materials,r.price||'',r.note,
     stLabel(r.status)
@@ -1052,16 +1137,7 @@ function renderHistory(){
   }
   const stLabel=id=>(STATUS_LIST.find(s=>s.id===id)||{label:'—'}).label;
   const tpLabel=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
-  const altSummary=alts=>(alts||[]).map(a=>{
-    let s=a.name+(a.dir?' '+a.dir:'');
-    if(a.dim_type==='length'){
-      if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dim) s+=` ${a.dim}cm`;
-    } else if(a.dim){
-      s+=` ${a.dim}cm`;
-    }
-    return s;
-  }).join(' / ');
+  const altSummary=alts=>altStr(alts).replace(/\n/g,' / ');
   el.innerHTML=`<table class="hist-table">
     <thead><tr>
       <th>持込日</th>
@@ -1141,15 +1217,7 @@ function openDetail(id){
   ).join('');
 
   const row=(k,v,pre=false)=>v?`<div class="drow"><span class="dkey">${k}</span><span class="${pre?'dval-pre':'dval'}">${v}</span></div>`:'';
-  const altStr=alts=>(alts||[]).map(a=>{
-    let s=a.name+(a.dir?' '+a.dir:'');
-    if(a.dim_type==='length'){
-      if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dim) s+=` ${a.dim}cm`;
-    } else if(a.dim){ s+=` ${a.dim}cm`; }
-    if(a.memo) s+=` (${a.memo})`;
-    return s;
-  }).join('\n');
+
 
   document.getElementById('detail-body').innerHTML=
     row('案件種別',r.typeLabel)+
@@ -1166,7 +1234,7 @@ function openDetail(id){
     row('素材',r.material)+
     row('客様指定補正',altStr(r.clientAlts),true)+
     row('指定メモ',r.clientAltMemo,true)+
-    row('実行工程',altStr(r.workAlts),true)+
+    row('実行工程',workStr(r.workAlts),true)+
     row('工程メモ',r.workAltMemo,true)+
     row('特殊',r.special,true)+
     row('ミシン',r.machine)+
@@ -1411,15 +1479,7 @@ function printRecord(){
 
   const tp=TYPES.find(t=>t.id===r.type);
   const st=STATUS_LIST.find(s=>s.id===r.status);
-  const altStr=alts=>(alts||[]).map(a=>{
-    let s=a.name+(a.dir?' '+a.dir:'');
-    if(a.dim_type==='length'){
-      if(a.dimLabel) s+=` [${a.dimLabel}]`;
-      if(a.dim) s+=` ${a.dim}cm`;
-    } else if(a.dim){ s+=` ${a.dim}cm`; }
-    if(a.memo) s+=` (${a.memo})`;
-    return s;
-  }).join('\n');
+
   const row=(k,v,pre=false)=>v?`<div class="print-row"><span class="print-key">${k}</span><span class="${pre?'print-val-pre':'print-val'}">${v}</span></div>`:'';
 
   const div=document.createElement('div');
@@ -1447,7 +1507,7 @@ function printRecord(){
     <div class="print-section">補正内容</div>
     ${row('客様指定',altStr(r.clientAlts),true)}
     ${row('指定メモ',r.clientAltMemo,true)}
-    ${row('実行工程',altStr(r.workAlts),true)}
+    ${row('実行工程',workStr(r.workAlts),true)}
     ${row('工程メモ',r.workAltMemo,true)}
     ${row('特殊',r.special,true)}
     <div class="print-section">機材・作業</div>
