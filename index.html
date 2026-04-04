@@ -223,7 +223,7 @@ select option{background:#1a1a24;}
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
 }
-.modal-body{padding:14px 16px;}
+.modal-body{padding:14px 16px;overflow-x:hidden;}
 .modal-close-btn{
   flex-shrink:0;
   display:block;
@@ -333,13 +333,7 @@ select option{background:#1a1a24;}
         <input type="text" id="f-ticket" placeholder="00001" maxlength="5" pattern="[0-9]{5}" autocomplete="off" inputmode="numeric">
       </div>
       <div class="field">
-        <div class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
-          客名
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 10px;border-radius:12px;border:1px solid var(--blue);background:var(--blue-bg);">
-            <input type="checkbox" id="f-is-staff" style="width:14px;height:14px;accent-color:var(--blue);" onchange="toggleStaffMode()">
-            <span style="font-size:11px;color:var(--blue);font-weight:600;">スタッフ</span>
-          </label>
-        </div>
+        <div class="flabel">客名</div>
         <input type="text" id="f-client" placeholder="" autocomplete="off">
       </div>
       <div class="field">
@@ -376,13 +370,11 @@ select option{background:#1a1a24;}
       <div class="field">
         <div class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
           素材
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 10px;border-radius:12px;border:1px solid var(--amber);background:rgba(196,132,58,0.08);">
-            <input type="checkbox" id="f-special-mat" style="width:15px;height:15px;accent-color:var(--amber);">
-            <span style="font-size:12px;color:var(--amber);font-weight:600;">特殊素材</span>
-          </label>
+          <button id="btn-special-mat" onclick="toggleSpecialMat()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border2);background:var(--s3);color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;">特殊素材</button>
         </div>
         <input type="text" id="f-material" placeholder="">
-      </div>    </div>
+      </div>
+div>
 
     <!-- 補正内容 -->
     <div class="sec">
@@ -438,7 +430,7 @@ select option{background:#1a1a24;}
       </div>
       <div class="field" style="border-top:1px solid var(--border)">
         <div class="flabel">使用資材</div>
-        <textarea id="f-materials" placeholder="" style="min-height:56px;"></textarea>
+        <textarea id="f-materials" placeholder="接着芯・補強テープ等" style="min-height:56px;"></textarea>
       </div>
     </div>
 
@@ -451,7 +443,7 @@ select option{background:#1a1a24;}
       </div>
       <div class="field">
         <div class="flabel">備考</div>
-        <textarea id="f-note" placeholder=""></textarea>
+        <textarea id="f-note" placeholder="その他特記事項"></textarea>
       </div>
     </div>
 
@@ -838,10 +830,6 @@ const PROCESS_MAP = {
     methods:[{id:'ykk',label:'YKK',group:'pos'},{id:'brand',label:'ブランド純正',group:'pos'},{id:'gen',label:'汎用',group:'pos'}],
     sub:{},
   },
-  'ネーム刺繍': {
-    methods:[{id:'new',label:'新規',group:'pos'},{id:'remove',label:'取り外し',group:'pos'},{id:'replace',label:'付け替え',group:'pos'}],
-    sub:{},
-  },
 };
 const ALT_MAP={
   'パンツ':[
@@ -969,6 +957,16 @@ const ALT_MAP={
     {name:'ボタン補強',   dir:'none', dim_type:'none'},
     {name:'プレス',       dir:'none', dim_type:'none'},
   ],
+  'スウェット/フーディ':[
+    {name:'着丈',         dir:'tsume',dim_type:'length'},
+    {name:'袖丈',         dir:'tsume',dim_type:'length'},
+    {name:'身幅',         dir:'tsume',dim_type:'cm'},
+    {name:'ウエスト絞り', dir:'tsume',dim_type:'cm'},
+    {name:'ほつれ補修',   dir:'none', dim_type:'none'},
+    {name:'タグ付け',     dir:'none', dim_type:'none'},
+    {name:'ボタン補強',   dir:'none', dim_type:'none'},
+    {name:'プレス',       dir:'none', dim_type:'none'},
+  ],
   'デニムダメージ残し':[
     {name:'デニムダメージ残し加工',dir:'none',dim_type:'length'},
     {name:'タグ付け',     dir:'none', dim_type:'none'},
@@ -979,18 +977,6 @@ const ALT_MAP={
     {name:'ドローコードチップ補強',dir:'none',dim_type:'none'},
     {name:'ファスナー交換',        dir:'none',dim_type:'none'},
     {name:'ボタン付け替え',        dir:'none',dim_type:'none'},
-  ],
-  'ユニフォーム':[
-    {name:'着丈',           dir:'both', dim_type:'length'},
-    {name:'袖丈',           dir:'both', dim_type:'length'},
-    {name:'身幅',           dir:'both', dim_type:'cm'},
-    {name:'ウエスト',       dir:'both', dim_type:'cm'},
-    {name:'ヒップ',         dir:'both', dim_type:'cm'},
-    {name:'裾上げ',         dir:'none', dim_type:'length'},
-    {name:'ネーム刺繍',     dir:'none', dim_type:'none'},
-    {name:'タグ付け',       dir:'none', dim_type:'none'},
-    {name:'ボタン補強',     dir:'none', dim_type:'none'},
-    {name:'プレス',         dir:'none', dim_type:'none'},
   ],
 };
 const DEFAULT_CATS=Object.keys(ALT_MAP);
@@ -1347,14 +1333,13 @@ function saveRecord(){
     outDate:document.getElementById('f-out-date').value,
     ticket,client,
     staff:document.getElementById('f-staff').value.trim(),
-    isStaff:document.getElementById('f-is-staff')?.checked||false,
     item:document.getElementById('f-item').value.trim(),
     category:cat,
     colorHex:currentColor.hex,
     colorName:currentColor.name,
     pattern:currentPattern,
     material:document.getElementById('f-material').value.trim(),
-    specialMat:document.getElementById('f-special-mat')?.checked||false,
+    specialMat:window._isSpecialMat||false,
     clientAlts:collectAltItems('alt-items',cat),
     clientAltMemo:document.getElementById('f-client-alt-memo').value.trim(),
     workAlts:collectAltItems('work-items',cat),
@@ -1384,8 +1369,10 @@ function resetForm(){
     const el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('m-machine').value='JUKI DDL-8300c';
-  const sm=document.getElementById('f-special-mat'); if(sm) sm.checked=false;
-  const isst=document.getElementById('f-is-staff'); if(isst){isst.checked=false; toggleStaffMode();}
+  window._isStaff=false; window._isSpecialMat=false;
+  const _bsm=document.getElementById('btn-special-mat'); if(_bsm){_bsm.style.background='var(--s3)';_bsm.style.color='var(--text2)';_bsm.style.borderColor='';}
+  const _bst=document.getElementById('btn-staff'); if(_bst){_bst.style.background='var(--s3)';_bst.style.color='var(--text2)';_bst.style.borderColor='';}
+  const _fc=document.getElementById('f-client'); if(_fc){_fc.placeholder='';_fc.style.borderColor='';}
   currentType=null; currentColor={hex:'',name:''}; currentPattern=''; currentTime=0;
   document.getElementById('tdisp').textContent='0';
   document.getElementById('f-time').value='';
@@ -1611,7 +1598,7 @@ function openDetail(id){
     row('持ち込み',(r.inDate||'')+(r.inTime?' '+r.inTime:''))+
     row('納品予定',r.outDate)+
     row('伝票No.',r.ticket?'#'+r.ticket:'')+
-    row('客名',r.client+(r.isStaff?' 👤スタッフ':''))+
+    row('客名',r.client)+
     row('担当者',r.staff)+
     row('品名',r.item)+
     row('カテゴリー',r.category)+
@@ -1977,12 +1964,21 @@ function printRecord(){
   setTimeout(()=>div.remove(), 1000);
 }
 
-function toggleStaffMode(){
-  const chk=document.getElementById('f-is-staff');
+window._isStaff=false;
+window._isSpecialMat=false;
+
+function toggleStaff(){
+  window._isStaff=!window._isStaff;
+  const btn=document.getElementById('btn-staff');
   const inp=document.getElementById('f-client');
-  if(!chk||!inp) return;
-  inp.placeholder=chk.checked?'スタッフ名':'';
-  inp.style.borderColor=chk.checked?'var(--blue)':'';
+  if(btn){btn.style.background=window._isStaff?'var(--blue-bg)':'var(--s3)';btn.style.color=window._isStaff?'var(--blue)':'var(--text2)';btn.style.borderColor=window._isStaff?'var(--blue)':'';}
+  if(inp){inp.placeholder=window._isStaff?'スタッフ名':'';inp.style.borderColor=window._isStaff?'var(--blue)':'';}
+}
+
+function toggleSpecialMat(){
+  window._isSpecialMat=!window._isSpecialMat;
+  const btn=document.getElementById('btn-special-mat');
+  if(btn){btn.style.background=window._isSpecialMat?'var(--amber-bg)':'var(--s3)';btn.style.color=window._isSpecialMat?'var(--amber)':'var(--text2)';btn.style.borderColor=window._isSpecialMat?'var(--amber)':'';}
 }
 
 init();
