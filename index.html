@@ -507,6 +507,20 @@ select option{background:#1a1a24;}
     <div class="modal-hdr">マスター管理</div>
     <div class="modal-inner">
       <div class="modal-body">
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button onclick="exportMaster()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;">📤 エクスポート</button>
+          <button onclick="showImport()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--green-bg);color:var(--green);border:1px solid rgba(90,172,122,.3);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;">📥 インポート</button>
+        </div>
+        <div id="export-area" style="display:none;margin-bottom:16px;">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">以下のテキストをコピーして保存してください</div>
+          <textarea id="export-text" readonly style="width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:10px;color:var(--text);font-size:12px;font-family:var(--mono);min-height:80px;resize:none;line-height:1.5;" onclick="this.select()"></textarea>
+          <button onclick="copyExport()" style="width:100%;margin-top:6px;padding:9px;border-radius:9px;border:1px solid var(--border2);background:var(--s3);color:var(--text2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;" id="copy-btn">コピー</button>
+        </div>
+        <div id="import-area" style="display:none;margin-bottom:16px;">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">エクスポートしたテキストを貼り付けてください</div>
+          <textarea id="import-text" style="width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:10px;color:var(--text);font-size:12px;font-family:var(--mono);min-height:80px;resize:none;line-height:1.5;" placeholder="ここにテキストを貼り付け…"></textarea>
+          <button onclick="importMaster()" style="width:100%;margin-top:6px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;">復元する</button>
+        </div>
         <div class="msection-title">店名</div>
         <div class="mlist" id="store-list"></div>
         <div class="madd-row">
@@ -1271,7 +1285,68 @@ function openMaster(){
   document.getElementById('master-overlay').classList.add('open');
 }
 function closeMasterOvl(e){if(e.target===document.getElementById('master-overlay'))closeMaster();}
-function closeMaster(){document.getElementById('master-overlay').classList.remove('open');populateSelects();}
+function closeMaster(){
+  document.getElementById('master-overlay').classList.remove('open');
+  document.getElementById('export-area').style.display='none';
+  document.getElementById('import-area').style.display='none';
+  populateSelects();
+}
+
+function exportMaster(){
+  const data={
+    stores: gSt(),
+    cats: gCt(),
+    exported: new Date().toISOString()
+  };
+  const text=JSON.stringify(data, null, 2);
+  document.getElementById('export-text').value=text;
+  document.getElementById('export-area').style.display='block';
+  document.getElementById('import-area').style.display='none';
+  document.getElementById('copy-btn').textContent='コピー';
+}
+
+function copyExport(){
+  const el=document.getElementById('export-text');
+  el.select();
+  try{
+    navigator.clipboard.writeText(el.value).then(()=>{
+      document.getElementById('copy-btn').textContent='✅ コピーしました';
+      setTimeout(()=>document.getElementById('copy-btn').textContent='コピー',2000);
+    });
+  }catch(e){
+    document.execCommand('copy');
+    document.getElementById('copy-btn').textContent='✅ コピーしました';
+    setTimeout(()=>document.getElementById('copy-btn').textContent='コピー',2000);
+  }
+}
+
+function showImport(){
+  document.getElementById('import-area').style.display='block';
+  document.getElementById('export-area').style.display='none';
+  document.getElementById('import-text').value='';
+  document.getElementById('import-text').focus();
+}
+
+function importMaster(){
+  const text=document.getElementById('import-text').value.trim();
+  if(!text){alert('テキストを貼り付けてください');return;}
+  try{
+    const data=JSON.parse(text);
+    if(!data.stores||!data.cats){
+      alert('形式が正しくありません。エクスポートしたテキストを貼り付けてください。');
+      return;
+    }
+    if(!confirm(`店名${data.stores.length}件・カテゴリー${data.cats.length}件を復元します。現在の設定は上書きされます。よろしいですか？`)) return;
+    sSt(data.stores);
+    sCt(data.cats);
+    document.getElementById('import-area').style.display='none';
+    renderMaster();
+    populateSelects();
+    alert('✅ 復元しました');
+  }catch(e){
+    alert('テキストの読み込みに失敗しました。正しいエクスポートデータか確認してください。');
+  }
+}
 
 function renderMaster(){
   document.getElementById('store-list').innerHTML=gSt().map((s,i)=>
