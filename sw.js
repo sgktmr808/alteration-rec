@@ -1,4 +1,4 @@
-const CACHE = 'alt3-v15';
+const CACHE = 'alt3-v15b';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
