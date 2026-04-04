@@ -628,6 +628,8 @@ const PROCESS_MAP = {
   'ボタン付け替え':['同位置','移動あり'],
   'ほつれ補修':   ['かがり縫い','ミシン'],
   '穴修理':       ['かがり縫い','当て布'],
+  'タグ付け':     ['ミシン','まつり縫い'],
+  'ボタン補強':   ['通常','特殊（革当て）','特殊（当て布）','特殊（金具）'],
 };
 const ALT_MAP={
   'パンツ':[
@@ -643,6 +645,8 @@ const ALT_MAP={
     {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
     {name:'テーパード加工',dir:'none',dim_type:'none'},
     {name:'裾ダブル加工',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'スカート':[
     {name:'裾上げ',dir:'tsume',dim_type:'length'},
@@ -653,6 +657,8 @@ const ALT_MAP={
     {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
     {name:'スリット加工',dir:'none',dim_type:'none'},
     {name:'裏地修理',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'ジャケット':[
     {name:'裾詰め',dir:'tsume',dim_type:'length'},
@@ -666,6 +672,8 @@ const ALT_MAP={
     {name:'袖口詰め',dir:'tsume',dim_type:'cm'},
     {name:'裏地修理',dir:'none',dim_type:'none'},
     {name:'ボタン付け替え',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'コート':[
     {name:'裾詰め',dir:'tsume',dim_type:'length'},
@@ -677,6 +685,8 @@ const ALT_MAP={
     {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
     {name:'肩幅詰め',dir:'tsume',dim_type:'cm'},
     {name:'裏地修理',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'シャツ':[
     {name:'裾詰め',dir:'tsume',dim_type:'length'},
@@ -688,6 +698,8 @@ const ALT_MAP={
     {name:'肩幅詰め',dir:'tsume',dim_type:'cm'},
     {name:'襟修理',dir:'none',dim_type:'none'},
     {name:'ボタン付け替え',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'ブラウス':[
     {name:'裾詰め',dir:'tsume',dim_type:'length'},
@@ -698,6 +710,8 @@ const ALT_MAP={
     {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
     {name:'肩幅詰め',dir:'tsume',dim_type:'cm'},
     {name:'ボタン付け替え',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'ニット':[
     {name:'裾詰め',dir:'tsume',dim_type:'length'},
@@ -706,6 +720,8 @@ const ALT_MAP={
     {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
     {name:'ほつれ補修',dir:'none',dim_type:'none'},
     {name:'穴修理',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'カットソー':[
     {name:'裾詰め',dir:'tsume',dim_type:'length'},
@@ -713,6 +729,8 @@ const ALT_MAP={
     {name:'身幅詰め',dir:'tsume',dim_type:'cm'},
     {name:'ウエスト絞り',dir:'tsume',dim_type:'cm'},
     {name:'ほつれ補修',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'ドレス':[
     {name:'裾上げ',dir:'tsume',dim_type:'length'},
@@ -725,6 +743,8 @@ const ALT_MAP={
     {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
     {name:'肩ひも調整',dir:'none',dim_type:'none'},
     {name:'裏地修理',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
   'ワンピース':[
     {name:'裾上げ',dir:'tsume',dim_type:'length'},
@@ -737,6 +757,8 @@ const ALT_MAP={
     {name:'ヒップ出し',dir:'dashi',dim_type:'cm'},
     {name:'肩ひも調整',dir:'none',dim_type:'none'},
     {name:'裏地修理',dir:'none',dim_type:'none'},
+    {name:'タグ付け',dir:'none',dim_type:'none'},
+    {name:'ボタン補強',dir:'none',dim_type:'none'},
   ],
 };
 const DEFAULT_CATS=Object.keys(ALT_MAP).concat(['その他']);
