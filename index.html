@@ -236,12 +236,33 @@ select option{background:#1a1a24;}
 .color-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:3px;}
 
 @media print{
-  .nav,.hdr,.modal-actions,.stepper-wrap{display:none!important;}
-  .overlay{display:block!important;position:static;background:none;padding:0;}
-  .modal{border:none;max-width:100%;}
-  body,.modal,.modal-body{background:#fff!important;color:#000!important;}
-  .dkey{color:#666!important;}.dval,.dval-pre{color:#000!important;}
-  .modal-hdr{background:#f0f0f0!important;}
+  body *{visibility:hidden;}
+  .print-area, .print-area *{visibility:visible;}
+  .print-area{
+    position:fixed;inset:0;
+    background:#fff;color:#000;
+    font-family:'Noto Sans JP',sans-serif;
+    padding:16px;
+    overflow:visible;
+  }
+  .print-header{
+    border-bottom:2px solid #000;
+    padding-bottom:10px;
+    margin-bottom:14px;
+    display:flex;justify-content:space-between;align-items:flex-end;
+  }
+  .print-title{font-size:18px;font-weight:700;}
+  .print-no{font-size:13px;color:#444;}
+  .print-row{
+    display:flex;justify-content:space-between;
+    padding:6px 0;border-bottom:1px solid #ddd;
+    font-size:13px;gap:12px;
+  }
+  .print-key{color:#666;flex-shrink:0;min-width:90px;}
+  .print-val{color:#000;font-weight:500;text-align:right;word-break:break-all;}
+  .print-val-pre{color:#000;white-space:pre-wrap;text-align:right;font-size:12px;line-height:1.6;}
+  .print-section{font-size:10px;font-weight:700;letter-spacing:.1em;color:#888;text-transform:uppercase;margin:12px 0 4px;}
+  .print-footer{margin-top:16px;font-size:11px;color:#888;text-align:right;}
 }
 </style>
 </head>
@@ -292,6 +313,10 @@ select option{background:#1a1a24;}
       <div class="field">
         <div class="flabel">客名</div>
         <input type="text" id="f-client" placeholder="" autocomplete="off">
+      </div>
+      <div class="field">
+        <div class="flabel">担当者名</div>
+        <input type="text" id="f-staff" placeholder="" autocomplete="off">
       </div>
     </div>
 
@@ -414,6 +439,19 @@ select option{background:#1a1a24;}
 <div class="screen" id="screen-history">
   <div class="hdr"><div><div class="hdr-title">履歴</div></div></div>
   <div class="search-wrap"><input class="sinput" type="search" placeholder="客名・伝票No・品名・素材で検索…" id="search-input" oninput="renderHistory()"></div>
+  <div style="padding:6px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;letter-spacing:.06em;">持込日 FROM</div>
+      <input type="date" id="hist-date-from" onchange="renderHistory()" style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-family:var(--font);-webkit-appearance:none;">
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;letter-spacing:.06em;">持込日 TO</div>
+      <input type="date" id="hist-date-to" onchange="renderHistory()" style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-family:var(--font);-webkit-appearance:none;">
+    </div>
+  </div>
+  <div style="padding:6px 16px 0;text-align:right;">
+    <button onclick="clearDateFilter()" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:4px 0;">日付フィルターをクリア</button>
+  </div>
   <div class="filter-bar" id="hist-filter"></div>
   <div class="card-list" id="history-list" style="margin-top:8px"></div>
 </div>
@@ -430,7 +468,7 @@ select option{background:#1a1a24;}
       </div>
       <div class="modal-body" id="detail-body"></div>
       <div class="modal-actions">
-        <button class="maction ma-print" onclick="window.print()">🖨 印刷</button>
+        <button class="maction ma-print" onclick="printRecord()">🖨 PDF出力</button>
         <button class="maction ma-del" onclick="deleteRecord()">削除</button>
       </div>
       <button class="modal-close-btn" onclick="closeDetail()">✕ 閉じる</button>
@@ -752,6 +790,7 @@ function saveRecord(){
     inTime:document.getElementById('f-in-time').value,
     outDate:document.getElementById('f-out-date').value,
     ticket,client,
+    staff:document.getElementById('f-staff').value.trim(),
     item:document.getElementById('f-item').value.trim(),
     category:cat,
     colorHex:currentColor.hex,
@@ -781,7 +820,7 @@ function saveRecord(){
 }
 
 function resetForm(){
-  ['f-ticket','f-client','f-item','f-client-alt-memo','f-work-alt-memo',
+  ['f-ticket','f-client','f-staff','f-item','f-client-alt-memo','f-work-alt-memo',
    'f-special','m-needle','m-thread','m-thread-color','m-foot','m-memo',
    'f-materials','f-price','f-note'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
@@ -809,10 +848,19 @@ function renderWork(){
 function setWF(f){workFilter=f;renderWork();}
 
 // ══ HISTORY ══
+function clearDateFilter(){
+  document.getElementById('hist-date-from').value='';
+  document.getElementById('hist-date-to').value='';
+  renderHistory();
+}
 function renderHistory(){
   const q=(document.getElementById('search-input')?.value||'').toLowerCase();
+  const dateFrom=document.getElementById('hist-date-from')?.value||'';
+  const dateTo=document.getElementById('hist-date-to')?.value||'';
   let all=gR();
-  if(q) all=all.filter(r=>[r.client,r.ticket,r.item,r.material,r.store].some(v=>(v||'').toLowerCase().includes(q)));
+  if(q) all=all.filter(r=>[r.client,r.ticket,r.item,r.material,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(dateFrom) all=all.filter(r=>r.inDate&&r.inDate>=dateFrom);
+  if(dateTo) all=all.filter(r=>r.inDate&&r.inDate<=dateTo);
   const types=[{id:'all',label:'全て'},...TYPES];
   document.getElementById('hist-filter').innerHTML=types.map(t=>
     `<button class="fpill${histFilter===t.id?' active':''}" onclick="setHF('${t.id}')">${t.label}</button>`
@@ -874,6 +922,7 @@ function openDetail(id){
     row('納品予定',r.outDate)+
     row('伝票No.',r.ticket?'#'+r.ticket:'')+
     row('客名',r.client)+
+    row('担当者',r.staff)+
     row('品名',r.item)+
     row('カテゴリー',r.category)+
     (r.colorHex?`<div class="drow"><span class="dkey">色</span><span class="dval"><span class="color-dot" style="background:${r.colorHex}"></span>${r.colorName||r.colorHex}</span></div>`:'')+
@@ -942,6 +991,67 @@ function showScreen(name){
   if(name==='work')renderWork();
   if(name==='history')renderHistory();
   window.scrollTo(0,0);
+}
+
+function printRecord(){
+  const r=gR().find(r=>r.id===currentRecordId);
+  if(!r) return;
+
+  // Remove existing print area
+  const old=document.getElementById('print-area');
+  if(old) old.remove();
+
+  const tp=TYPES.find(t=>t.id===r.type);
+  const st=STATUS_LIST.find(s=>s.id===r.status);
+  const altStr=alts=>(alts||[]).map(a=>`${a.name}${a.dir?' '+a.dir:''}${a.dim?' '+a.dim+'cm':''}${a.memo?' ('+a.memo+')':''}`).join('\n');
+  const row=(k,v,pre=false)=>v?`<div class="print-row"><span class="print-key">${k}</span><span class="${pre?'print-val-pre':'print-val'}">${v}</span></div>`:'';
+
+  const div=document.createElement('div');
+  div.id='print-area';
+  div.className='print-area';
+  div.innerHTML=`
+    <div class="print-header">
+      <div>
+        <div class="print-title">補正伝票</div>
+        <div class="print-no">${r.ticket?'#'+r.ticket:''} ${r.store||''}</div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:#444;">
+        <div>持込：${r.inDate||'—'} ${r.inTime||''}</div>
+        <div>納品：${r.outDate||'—'}</div>
+      </div>
+    </div>
+    <div class="print-section">顧客・商品</div>
+    ${row('客名',r.client)}
+    ${row('担当者',r.staff)}
+    ${row('品名',r.item)}
+    ${row('カテゴリー',r.category)}
+    ${r.colorHex?`<div class="print-row"><span class="print-key">色</span><span class="print-val">${r.colorName||r.colorHex}</span></div>`:''}
+    ${row('柄',r.pattern)}
+    ${row('素材',r.material)}
+    <div class="print-section">補正内容</div>
+    ${row('客様指定',altStr(r.clientAlts),true)}
+    ${row('指定メモ',r.clientAltMemo,true)}
+    ${row('実行工程',altStr(r.workAlts),true)}
+    ${row('工程メモ',r.workAltMemo,true)}
+    ${row('特殊',r.special,true)}
+    <div class="print-section">機材・作業</div>
+    ${row('ミシン',r.machine)}
+    ${row('針番手',r.needle)}
+    ${row('糸番手',r.thread)}
+    ${row('糸色番号',r.threadColor)}
+    ${row('押さえ',r.foot)}
+    ${row('機材メモ',r.machineMemo,true)}
+    ${row('所要時間',r.time?r.time+'分':null)}
+    ${row('使用資材',r.materials,true)}
+    ${row('金額',r.price?'¥'+r.price.toLocaleString():null)}
+    ${row('案件種別',tp?.label)}
+    ${row('ステータス',st?.label)}
+    ${row('備考',r.note,true)}
+    <div class="print-footer">Lis 補正記録 / 出力日時：${new Date().toLocaleString('ja-JP')}</div>
+  `;
+  document.body.appendChild(div);
+  window.print();
+  setTimeout(()=>div.remove(), 1000);
 }
 
 init();
