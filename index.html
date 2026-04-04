@@ -335,7 +335,7 @@ select option{background:#1a1a24;}
       <div class="field">
         <div class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
           客名
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 10px;border-radius:12px;border:1px solid var(--blue);background:var(--blue-bg);">
             <input type="checkbox" id="f-is-staff" style="width:14px;height:14px;accent-color:var(--blue);" onchange="toggleStaffMode()">
             <span style="font-size:11px;color:var(--blue);font-weight:600;">スタッフ</span>
           </label>
@@ -372,414 +372,17 @@ select option{background:#1a1a24;}
       <div>
         <div class="flabel" style="padding:4px 14px 6px;">柄</div>
         <div class="pattern-wrap" id="pattern-pills"></div>
-      </div>
-      <div class="field">
-        <div class="flabel">素材</div>
-        <input type="text" id="f-material" placeholder="ウール100%">
       </div>
       <div class="field">
         <div class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
           素材
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 10px;border-radius:12px;border:1px solid var(--amber);background:rgba(196,132,58,0.08);">
             <input type="checkbox" id="f-special-mat" style="width:15px;height:15px;accent-color:var(--amber);">
             <span style="font-size:12px;color:var(--amber);font-weight:600;">特殊素材</span>
           </label>
         </div>
-        <input type="text" id="f-material" placeholder="ウール100%">
-      </div>YPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="補正記録">
-<meta name="theme-color" content="#0a0a0f">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>補正記録</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
-:root{
-  --bg:#0a0a0f;--s1:#13131a;--s2:#1a1a24;--s3:#22222e;--s4:#2a2a38;
-  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
-  --gold:#c8a84a;--gold2:#e2c46a;--gold-bg:rgba(200,168,74,0.1);
-  --blue:#5b9bd5;--blue-bg:rgba(91,155,213,0.1);
-  --green:#5aac7a;--green-bg:rgba(90,172,122,0.1);
-  --red:#c05a5a;--red-bg:rgba(192,90,90,0.1);
-  --amber:#c4843a;--amber-bg:rgba(196,132,58,0.1);
-  --purple:#9b72cf;--purple-bg:rgba(155,114,207,0.1);
-  --text:#efefef;--text2:#8888a0;--text3:#55556a;
-  --font:'Noto Sans JP',sans-serif;--mono:'DM Mono',monospace;
-  --safe-t:env(safe-area-inset-top);--safe-b:env(safe-area-inset-bottom);
-}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);}
-
-/* NAV */
-.nav{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,0.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;padding-bottom:calc(var(--safe-b) + 4px);z-index:300;}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 6px;border:none;background:none;color:var(--text3);font-size:10px;font-family:var(--font);cursor:pointer;transition:color .15s;letter-spacing:.04em;}
-.nav-btn.active{color:var(--gold);}
-.nav-icon{font-size:19px;line-height:1;}
-
-/* SCREENS */
-.screen{display:none;min-height:100dvh;padding-top:calc(var(--safe-t));padding-bottom:calc(var(--safe-b) + 96px);overflow-y:auto;}
-.screen.active{display:block;}
-
-/* HEADER */
-.hdr{padding:calc(var(--safe-t)+12px) 16px 11px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.93);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
-.hdr-title{font-size:17px;font-weight:700;letter-spacing:.03em;}
-.hdr-sub{font-size:11px;color:var(--text3);font-family:var(--mono);}
-.hdr-ghost{padding:7px 14px;border-radius:20px;border:1px solid var(--border2);background:none;color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer;}
-
-/* FORM */
-.form-scroll{padding:14px 16px 8px;}
-.sec{background:var(--s1);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden;}
-.sec-hdr{padding:9px 14px;background:var(--s2);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;}
-.field{padding:11px 14px;border-bottom:1px solid var(--border);}
-.field:last-child{border-bottom:none;}
-.flabel{font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:500;letter-spacing:.07em;}
-.field input,.field select,.field textarea{width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-size:15px;font-family:var(--font);-webkit-appearance:none;transition:border-color .15s;}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--gold);}
-.field textarea{min-height:72px;resize:vertical;line-height:1.6;}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-select option{background:#1a1a24;}
-
-/* TYPE PILLS */
-.type-wrap{padding:10px 14px 12px;display:flex;flex-wrap:wrap;gap:6px;}
-.tpill{padding:6px 11px;border-radius:20px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.tpill.aq{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
-.tpill.as{background:var(--green-bg);color:var(--green);border-color:var(--green);}
-.tpill.ac{background:var(--gold-bg);color:var(--gold);border-color:var(--gold);}
-.tpill.ar{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
-.tpill.acl{background:var(--red-bg);color:var(--red);border-color:var(--red);}
-.tpill.aos{background:var(--purple-bg);color:var(--purple);border-color:var(--purple);}
-.tpill.ao{background:var(--s4);color:var(--text2);border-color:var(--border2);}
-
-/* COLOR/PATTERN PICKER */
-.color-grid{padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-.color-swatch{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s;flex-shrink:0;}
-.color-swatch.selected{border-color:#fff;transform:scale(1.15);}
-.color-label{font-size:11px;color:var(--text3);margin-top:4px;text-align:center;}
-.pattern-wrap{padding:6px 14px 12px;display:flex;flex-wrap:wrap;gap:6px;}
-.ppill{padding:5px 11px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;}
-.ppill.active{background:var(--gold-bg);color:var(--gold);border-color:var(--gold);}
-.color-custom-row{padding:0 14px 12px;display:flex;align-items:center;gap:8px;}
-.color-custom-row input[type=color]{width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:50%;padding:0;}
-.color-custom-row input[type=text]{flex:1;background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:14px;font-family:var(--font);}
-.color-custom-row input[type=text]:focus{outline:none;border-color:var(--gold);}
-
-/* ALT ITEMS */
-.alt-items{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
-.alt-item{background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
-.alt-item-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;}
-.alt-item-head input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;}
-.alt-item-name{font-size:14px;flex:1;}
-.alt-item-body{display:none;padding:8px 12px 10px;border-top:1px solid var(--border);background:var(--s3);}
-.alt-item-body.open{display:block;}
-.dir-btns{display:flex;gap:6px;margin-bottom:8px;}
-.dir-btn{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
-.dir-btn.active-tsume{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
-.dir-btn.active-none{background:var(--s4);color:var(--text2);border-color:var(--border2);}
-.dir-btn.active-dashi{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
-.dim-row{display:flex;align-items:center;gap:8px;}
-.dim-input{flex:1;background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:15px;font-family:var(--mono);text-align:right;}
-.dim-input:focus{outline:none;border-color:var(--gold);}
-.dim-unit{font-size:13px;color:var(--text3);}
-.alt-memo-input{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;color:var(--text);font-size:13px;font-family:var(--font);margin-top:6px;}
-.alt-memo-input:focus{outline:none;border-color:var(--gold);}
-
-/* MACHINE */
-.machine-grid{padding:10px 14px;display:flex;flex-direction:column;gap:8px;}
-.mrow{display:grid;grid-template-columns:88px 1fr;align-items:center;gap:10px;}
-.mlabel{font-size:12px;color:var(--text3);}
-.minput{background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:14px;font-family:var(--mono);width:100%;}
-.minput:focus{outline:none;border-color:var(--gold);}
-
-/* TIME */
-.time-row{display:flex;align-items:center;gap:8px;padding:10px 14px;}
-.tbtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);background:var(--s3);color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.tval{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--gold);min-width:52px;text-align:center;}
-.tunit{font-size:12px;color:var(--text3);}
-.tcustom{width:80px;background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;color:var(--text);font-size:14px;font-family:var(--mono);}
-.tcustom:focus{outline:none;border-color:var(--gold);}
-
-/* SAVE */
-.save-btn{display:block;width:calc(100%-32px);margin:4px 16px 16px;padding:15px;border-radius:14px;border:none;background:var(--gold);color:#0a0a0f;font-size:16px;font-weight:700;font-family:var(--font);cursor:pointer;letter-spacing:.06em;}
-
-/* CARDS */
-.filter-bar{padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
-.filter-bar::-webkit-scrollbar{display:none;}
-.fpill{flex-shrink:0;padding:6px 12px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;}
-.fpill.active{background:var(--gold);color:#0a0a0f;border-color:var(--gold);font-weight:700;}
-.card-list{padding:0 16px;display:flex;flex-direction:column;gap:10px;}
-.rcard{background:var(--s1);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s;}
-.rcard:active{border-color:var(--gold);}
-.rcard-head{padding:11px 14px;background:var(--s2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-.rcard-meta{flex:1;min-width:0;}
-.rcard-top{display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;}
-.rcard-no{font-size:11px;font-family:var(--mono);color:var(--text3);}
-.rcard-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rcard-sub{font-size:12px;color:var(--text2);margin-top:2px;}
-.rcard-body{padding:9px 14px;display:flex;flex-wrap:wrap;gap:5px;}
-.rtag{font-size:11px;padding:2px 8px;border-radius:5px;background:var(--s3);color:var(--text2);border:1px solid var(--border);}
-.rcard-foot{padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-.rdate{font-size:11px;color:var(--text3);}
-.rprice{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--gold);}
-
-/* BADGES */
-.sbadge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0;}
-.s-received{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3);}
-.s-working{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(196,132,58,.3);}
-.s-done{background:var(--green-bg);color:var(--green);border:1px solid rgba(90,172,122,.3);}
-.s-returned{background:var(--s3);color:var(--text3);border:1px solid var(--border);}
-.tbadge{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:600;}
-.t-quick{background:var(--blue-bg);color:var(--blue);}
-.t-shop{background:var(--green-bg);color:var(--green);}
-.t-customer{background:var(--gold-bg);color:var(--gold);}
-.t-redo{background:var(--amber-bg);color:var(--amber);}
-.t-claim{background:var(--red-bg);color:var(--red);}
-.t-other-store{background:var(--purple-bg);color:var(--purple);}
-.t-other{background:var(--s3);color:var(--text3);}
-
-/* SEARCH */
-.search-wrap{padding:10px 16px 4px;}
-.sinput{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:9px 13px;color:var(--text);font-size:15px;font-family:var(--font);}
-.sinput:focus{outline:none;border-color:var(--gold);}
-
-/* HISTORY TABLE */
-.hist-table{width:100%;border-collapse:collapse;font-size:12px;min-width:640px;}
-.hist-table th{
-  background:var(--s2);color:var(--text3);
-  font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-  padding:8px 10px;text-align:left;border-bottom:2px solid var(--border2);
-  white-space:nowrap;position:sticky;top:0;z-index:10;
-}
-.hist-table td{
-  padding:9px 10px;border-bottom:1px solid var(--border);
-  color:var(--text);vertical-align:top;white-space:nowrap;
-  max-width:160px;overflow:hidden;text-overflow:ellipsis;
-}
-.hist-table tr{cursor:pointer;transition:background .12s;}
-.hist-table tr:hover td{background:var(--s2);}
-.hist-table tr:active td{background:var(--s3);}
-.hist-table td.wrap{white-space:normal;max-width:200px;}
-.hist-table .td-no{font-family:var(--mono);color:var(--text3);font-size:11px;}
-.hist-table .td-price{font-family:var(--mono);font-weight:700;color:var(--gold);text-align:right;}
-.hist-table .td-status{text-align:center;}
-
-/* EMPTY */
-.empty{text-align:center;padding:60px 20px;color:var(--text3);font-size:14px;line-height:2.2;}
-.empty-icon{font-size:36px;margin-bottom:10px;}
-
-/* MODAL */
-.overlay{
-  display:none;position:fixed;inset:0;z-index:400;
-  background:rgba(0,0,0,0.75);
-  align-items:flex-end;
-  -webkit-overflow-scrolling:touch;
-}
-.overlay.open{display:flex;}
-.modal{
-  background:var(--s1);
-  border-radius:20px 20px 0 0;
-  width:100%;
-  max-height:82vh;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  padding-bottom:calc(var(--safe-b) + 8px);
-}
-.modal-pull{
-  flex-shrink:0;
-  display:flex;justify-content:center;
-  padding:10px 0 6px;
-}
-.modal-pull-bar{
-  width:36px;height:4px;border-radius:2px;
-  background:rgba(255,255,255,0.15);
-}
-.modal-hdr{
-  flex-shrink:0;
-  padding:8px 16px 12px;
-  background:var(--s2);
-  border-bottom:1px solid var(--border);
-  font-size:16px;font-weight:700;
-}
-.modal-inner{
-  flex:1;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-}
-.modal-body{padding:14px 16px;}
-.modal-close-btn{
-  flex-shrink:0;
-  display:block;
-  width:calc(100% - 32px);
-  margin:8px 16px 12px;
-  padding:14px;
-  border-radius:12px;border:none;
-  background:var(--gold);color:#0a0a0f;
-  font-size:15px;font-weight:700;
-  font-family:var(--font);cursor:pointer;
-}
-/* STEPPER */
-.stepper{display:flex;gap:6px;padding:12px 14px;flex-wrap:wrap;}
-.stepbtn{flex:1;min-width:76px;padding:8px 4px;border-radius:10px;border:1px solid var(--border2);background:var(--s2);color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;}
-.stepbtn.s-received.on{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
-.stepbtn.s-working.on{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
-.stepbtn.s-done.on{background:var(--green-bg);color:var(--green);border-color:var(--green);}
-.stepbtn.s-returned.on{background:var(--s4);color:var(--text2);border-color:var(--border2);}
-
-/* MASTER */
-.mlist{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
-.mitem{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--s2);border-radius:9px;border:1px solid var(--border);}
-.mitem-name{font-size:14px;}
-.mdel{width:26px;height:26px;border-radius:50%;border:none;background:var(--red-bg);color:var(--red);font-size:14px;cursor:pointer;}
-.madd-row{display:flex;gap:8px;}
-.madd-input{flex:1;background:var(--s3);border:1px solid var(--border2);border-radius:9px;padding:9px 12px;color:var(--text);font-size:15px;font-family:var(--font);}
-.madd-input:focus{outline:none;border-color:var(--gold);}
-.madd-btn{padding:9px 16px;border-radius:9px;border:none;background:var(--gold);color:#0a0a0f;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;}
-.msection-title{font-size:11px;color:var(--text3);margin:16px 0 8px;letter-spacing:.08em;text-transform:uppercase;}
-
-/* COLOR DOT in card */
-.color-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:3px;}
-
-@media print{
-  body *{visibility:hidden;}
-  .print-area, .print-area *{visibility:visible;}
-  .print-area{
-    position:fixed;inset:0;
-    background:#fff;color:#000;
-    font-family:'Noto Sans JP',sans-serif;
-    padding:16px;
-    overflow:visible;
-  }
-  .print-header{
-    border-bottom:2px solid #000;
-    padding-bottom:10px;
-    margin-bottom:14px;
-    display:flex;justify-content:space-between;align-items:flex-end;
-  }
-  .print-title{font-size:18px;font-weight:700;}
-  .print-no{font-size:13px;color:#444;}
-  .print-row{
-    display:flex;justify-content:space-between;
-    padding:6px 0;border-bottom:1px solid #ddd;
-    font-size:13px;gap:12px;
-  }
-  .print-key{color:#666;flex-shrink:0;min-width:90px;}
-  .print-val{color:#000;font-weight:500;text-align:right;word-break:break-all;}
-  .print-val-pre{color:#000;white-space:pre-wrap;text-align:right;font-size:12px;line-height:1.6;}
-  .print-section{font-size:10px;font-weight:700;letter-spacing:.1em;color:#888;text-transform:uppercase;margin:12px 0 4px;}
-  .print-footer{margin-top:16px;font-size:11px;color:#888;text-align:right;}
-}
-</style>
-</head>
-<body>
-
-<!-- ══ 受付 ══ -->
-<div class="screen active" id="screen-new">
-  <div class="hdr">
-    <div><div class="hdr-title">新規受付</div></div>
-    <button class="hdr-ghost" onclick="openMaster()">マスター管理</button>
-  </div>
-  <div class="form-scroll">
-
-    <!-- 受付情報 -->
-    <div class="sec">
-      <div class="sec-hdr">📋 受付情報</div>
-      <div class="field">
-        <div class="flabel">案件種別</div>
-        <div class="type-wrap" id="type-pills"></div>
-      </div>
-      <div class="field">
-        <div class="flabel">店名</div>
-        <select id="f-store"></select>
-      </div>
-      <div class="field field-row">
-        <div>
-          <div class="flabel">持ち込み日</div>
-          <input type="date" id="f-in-date">
-        </div>
-        <div>
-          <div class="flabel">持ち込み時刻</div>
-          <input type="time" id="f-in-time">
-        </div>
-      </div>
-      <div class="field">
-        <div class="flabel">納品日</div>
-        <input type="date" id="f-out-date">
-      </div>
-    </div>
-
-    <!-- 伝票・顧客 -->
-    <div class="sec">
-      <div class="sec-hdr">🏷 伝票・顧客</div>
-      <div class="field">
-        <div class="flabel">伝票No.（下5桁）</div>
-        <input type="text" id="f-ticket" placeholder="00001" maxlength="5" pattern="[0-9]{5}" autocomplete="off" inputmode="numeric">
-      </div>
-      <div class="field">
-        <div class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
-          客名
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-            <input type="checkbox" id="f-is-staff" style="width:14px;height:14px;accent-color:var(--blue);" onchange="toggleStaffMode()">
-            <span style="font-size:11px;color:var(--blue);font-weight:600;">スタッフ</span>
-          </label>
-        </div>
-        <input type="text" id="f-client" placeholder="" autocomplete="off">
-      </div>
-      <div class="field">
-        <div class="flabel">担当者名</div>
-        <input type="text" id="f-staff" placeholder="" autocomplete="off">
-      </div>
-    </div>
-
-    <!-- 商品情報 -->
-    <div class="sec">
-      <div class="sec-hdr">👔 商品情報</div>
-      <div class="field">
-        <div class="flabel">品名</div>
-        <input type="text" id="f-item" placeholder="" autocomplete="off">
-      </div>
-      <div class="field">
-        <div class="flabel">カテゴリー</div>
-        <select id="f-category" onchange="onCategoryChange()"></select>
-      </div>
-      <!-- 色選択 -->
-      <div>
-        <div class="flabel" style="padding:10px 14px 6px;">色</div>
-        <div class="color-grid" id="color-swatches"></div>
-        <div class="color-custom-row">
-          <input type="color" id="color-custom-picker" value="#888888" onchange="onCustomColor()">
-          <input type="text" id="color-custom-text" placeholder="カラー名・色番号（任意）">
-        </div>
-      </div>
-      <!-- 柄選択 -->
-      <div>
-        <div class="flabel" style="padding:4px 14px 6px;">柄</div>
-        <div class="pattern-wrap" id="pattern-pills"></div>
-      </div>
-      <div class="field">
-        <div class="flabel">素材</div>
-        <input type="text" id="f-material" placeholder="ウール100%">
-      </div>
-      <div class="field">
-        <div class="flabel">特殊素材（複数選択可）</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;" id="special-material-wrap">
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="レース" style="width:13px;height:13px;accent-color:var(--gold);">レース</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="シアー" style="width:13px;height:13px;accent-color:var(--gold);">シアー</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="ベルベット" style="width:13px;height:13px;accent-color:var(--gold);">ベルベット</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="サテン" style="width:13px;height:13px;accent-color:var(--gold);">サテン</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="繊細素材" style="width:13px;height:13px;accent-color:var(--gold);">繊細素材</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="レザー" style="width:13px;height:13px;accent-color:var(--gold);">レザー</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="スエード" style="width:13px;height:13px;accent-color:var(--gold);">スエード</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="ビニール" style="width:13px;height:13px;accent-color:var(--gold);">ビニール</label>
-          <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:16px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:12px;color:var(--text2);"><input type="checkbox" class="smc" value="コーティング" style="width:13px;height:13px;accent-color:var(--gold);">コーティング</label>
-        </div>
-      </div>
-    </div>
+        <input type="text" id="f-material" placeholder="">
+      </div>    </div>
 
     <!-- 補正内容 -->
     <div class="sec">
@@ -1378,16 +981,16 @@ const ALT_MAP={
     {name:'ボタン付け替え',        dir:'none',dim_type:'none'},
   ],
   'ユニフォーム':[
-    {name:'着丈',         dir:'both', dim_type:'length'},
-    {name:'袖丈',         dir:'both', dim_type:'length'},
-    {name:'身幅',         dir:'both', dim_type:'cm'},
-    {name:'ウエスト',     dir:'both', dim_type:'cm'},
-    {name:'ヒップ',       dir:'both', dim_type:'cm'},
-    {name:'裾上げ',       dir:'none', dim_type:'length'},
-    {name:'ネーム刺繍',   dir:'none', dim_type:'none'},
-    {name:'タグ付け',     dir:'none', dim_type:'none'},
-    {name:'ボタン補強',   dir:'none', dim_type:'none'},
-    {name:'プレス',       dir:'none', dim_type:'none'},
+    {name:'着丈',           dir:'both', dim_type:'length'},
+    {name:'袖丈',           dir:'both', dim_type:'length'},
+    {name:'身幅',           dir:'both', dim_type:'cm'},
+    {name:'ウエスト',       dir:'both', dim_type:'cm'},
+    {name:'ヒップ',         dir:'both', dim_type:'cm'},
+    {name:'裾上げ',         dir:'none', dim_type:'length'},
+    {name:'ネーム刺繍',     dir:'none', dim_type:'none'},
+    {name:'タグ付け',       dir:'none', dim_type:'none'},
+    {name:'ボタン補強',     dir:'none', dim_type:'none'},
+    {name:'プレス',         dir:'none', dim_type:'none'},
   ],
 };
 const DEFAULT_CATS=Object.keys(ALT_MAP);
@@ -1783,6 +1386,7 @@ function resetForm(){
   document.getElementById('m-machine').value='JUKI DDL-8300c';
   const sm=document.getElementById('f-special-mat'); if(sm) sm.checked=false;
   const isst=document.getElementById('f-is-staff'); if(isst){isst.checked=false; toggleStaffMode();}
+  const sm=document.getElementById('f-special-mat'); if(sm) sm.checked=false;
   currentType=null; currentColor={hex:'',name:''}; currentPattern=''; currentTime=0;
   document.getElementById('tdisp').textContent='0';
   document.getElementById('f-time').value='';
@@ -2378,13 +1982,8 @@ function toggleStaffMode(){
   const chk=document.getElementById('f-is-staff');
   const inp=document.getElementById('f-client');
   if(!chk||!inp) return;
-  if(chk.checked){
-    inp.placeholder='スタッフ名';
-    inp.style.borderColor='var(--blue)';
-  } else {
-    inp.placeholder='';
-    inp.style.borderColor='';
-  }
+  inp.placeholder=chk.checked?'スタッフ名':'';
+  inp.style.borderColor=chk.checked?'var(--blue)':'';
 }
 
 init();
