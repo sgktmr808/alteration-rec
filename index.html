@@ -186,6 +186,10 @@ select option{background:#1a1a24}
 .imb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
 @media print{
   /* 履歴PDF用スタイルはインライン定義 */
+  html,body{background:#fff!important;color:#000!important}
+  body *:not(#print-area):not(#print-area *){display:none!important}
+  #print-area{display:block!important;position:fixed;inset:0;background:#fff;color:#000}
+  html,body{background:#fff!important}
   body *{visibility:hidden}
   #print-area,#print-area *{visibility:visible}
   #print-area{position:fixed;inset:0;background:#fff;color:#000;font-family:var(--f);padding:16px;overflow:visible}
@@ -390,6 +394,13 @@ select option{background:#1a1a24}
 <div id="print-area"></div>
 
 <script>
+// ══ VERSION ══
+const APP_VERSION = 'v16n';
+document.addEventListener('DOMContentLoaded',()=>{
+  const el=document.querySelector('.hv');
+  if(el) el.textContent=APP_VERSION;
+});
+
 // ══ DATA ══
 const TYPES=[
   {id:'quick',label:'クイック',cls:'q'},
