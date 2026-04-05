@@ -395,7 +395,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16r';
+const APP_VERSION = 'v16s';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -1293,59 +1293,47 @@ function doHistPDF(){
     <td>${stL(r.status)}</td>
   </tr>`).join('');
 
-  const doc=`<!DOCTYPE html><html lang="ja"><head>
-  <meta charset="UTF-8">
-  <title>AlteREC 補正履歴</title>
-  <style>
-    @page{size:297mm 210mm;margin:8mm 10mm 8mm 8mm}
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;font-size:7.5pt;color:#000;background:#fff;width:297mm}
-    .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5pt solid #222;padding-bottom:4pt;margin-bottom:6pt}
-    .hd-t{font-size:13pt;font-weight:700}
-    .hd-s{font-size:7.5pt;color:#555;margin-top:2pt}
-    table{width:100%;border-collapse:collapse;table-layout:fixed}
-    th{background:#ddd;padding:3pt 3pt;text-align:left;border:0.5pt solid #aaa;font-size:6.5pt;font-weight:700;white-space:nowrap;overflow:hidden}
-    td{padding:2.5pt 3pt;border:0.5pt solid #ccc;font-size:7pt;line-height:1.25;overflow:hidden;word-break:break-all}
-    tr:nth-child(even) td{background:#f5f5f5}
-    .no{color:#777;font-size:6.5pt}
-    .pr{text-align:right}
-    col.cd{width:7%}col.cn{width:5%}col.ct{width:5%}
-    col.cs{width:7.5%}col.cc{width:7%}col.ci{width:7.5%}
-    col.ck{width:7%}col.cm{width:7%}col.ca{width:24%}
-    col.cp{width:5.5%}col.cst{width:5%}
-    .ft{margin-top:5pt;font-size:6.5pt;color:#888;display:flex;justify-content:space-between}
-  </style>
-  </head><body>
-  <div class="hd">
-    <div><div class="hd-t">AlteREC 補正履歴</div>
-    <div class="hd-s">${df?df+' 〜 ':''}${dt||''} 全${all.length}件</div></div>
-    <div style="font-size:7.5pt;color:#555">${new Date().toLocaleDateString('ja-JP')}</div>
-  </div>
-  <table>
-    <colgroup>
-      <col class="cd"><col class="cd"><col class="cn"><col class="ct">
-      <col class="cs"><col class="cc"><col class="ci"><col class="ck">
-      <col class="cm"><col class="ca"><col class="cp"><col class="cst">
-    </colgroup>
-    <thead><tr>
-      <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
-      <th>客名</th><th>品名</th><th>カテゴリー</th><th>素材</th>
-      <th>実行補正内容</th><th class="pr">金額</th><th>状態</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="ft"><span>AlteREC 補正履歴</span><span>出力：${new Date().toLocaleString('ja-JP')}</span></div>
-  </body></html>`;
-
-  const w=window.open('','_blank','width=900,height=650');
-  if(!w){alert('ポップアップをブロックされました。Safariの設定でポップアップを許可してください');return;}
-  w.document.write(doc);
-  w.document.close();
-  w.onload=()=>{
-    w.focus();
-    w.print();
-    setTimeout(()=>{try{w.close();}catch(e){}},500);
-  }
+  const pa=document.getElementById('print-area');
+  pa.innerHTML=`
+    <style>
+      @page{size:297mm 210mm;margin:8mm 10mm 8mm 8mm}
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;font-size:7.5pt;color:#000;background:#fff}
+      .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5pt solid #222;padding-bottom:4pt;margin-bottom:6pt}
+      .hd-t{font-size:13pt;font-weight:700}
+      .hd-s{font-size:7.5pt;color:#555;margin-top:2pt}
+      table{width:100%;border-collapse:collapse;table-layout:fixed}
+      col.cd{width:7%}col.cn{width:5%}col.ct{width:5%}
+      col.cs{width:7.5%}col.cc{width:7%}col.ci{width:7.5%}
+      col.ck{width:7%}col.cm{width:7%}col.ca{width:24%}
+      col.cp{width:5.5%}col.cst{width:5%}
+      th{background:#ddd;padding:3pt 3pt;text-align:left;border:0.5pt solid #aaa;font-size:6.5pt;font-weight:700;white-space:nowrap;overflow:hidden}
+      td{padding:2.5pt 3pt;border:0.5pt solid #ccc;font-size:7pt;line-height:1.25;overflow:hidden;word-break:break-all}
+      tr:nth-child(even) td{background:#f5f5f5}
+      .no{color:#777;font-size:6.5pt}.pr{text-align:right}
+      .ft{margin-top:5pt;font-size:6.5pt;color:#888;display:flex;justify-content:space-between}
+    </style>
+    <div class="hd">
+      <div><div class="hd-t">AlteREC 補正履歴</div>
+      <div class="hd-s">${df?df+' 〜 ':''}${dt||''} 全${all.length}件</div></div>
+      <div style="font-size:7.5pt;color:#555">${new Date().toLocaleDateString('ja-JP')}</div>
+    </div>
+    <table>
+      <colgroup>
+        <col class="cd"><col class="cd"><col class="cn"><col class="ct">
+        <col class="cs"><col class="cc"><col class="ci"><col class="ck">
+        <col class="cm"><col class="ca"><col class="cp"><col class="cst">
+      </colgroup>
+      <thead><tr>
+        <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
+        <th>客名</th><th>品名</th><th>カテゴリー</th><th>素材</th>
+        <th>実行補正内容</th><th class="pr">金額</th><th>状態</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="ft"><span>AlteREC 補正履歴</span><span>出力：${new Date().toLocaleString('ja-JP')}</span></div>`;
+  window.print();
+  setTimeout(()=>pa.innerHTML='', 1500);
 }
 
 function doCSV(){
