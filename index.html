@@ -395,7 +395,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16n';
+const APP_VERSION = 'v16o';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -1277,77 +1277,71 @@ function doHistPDF(){
   if(!all.length){alert('出力するデータがありません');return;}
   const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
   const tpL=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
-  const pa=document.getElementById('print-area');
-  pa.innerHTML=`
-    <style>
-      @page{size:A4 landscape;margin:10mm 8mm}
-      *{box-sizing:border-box}
-      body{font-family:'Noto Sans JP',sans-serif;font-size:8pt;color:#000}
-      .ph{border-bottom:1.5pt solid #000;padding-bottom:5pt;margin-bottom:8pt;
-          display:flex;justify-content:space-between;align-items:flex-end}
-      .pt{font-size:13pt;font-weight:700}
-      .pn{font-size:8pt;color:#555;margin-top:2pt}
-      table{width:100%;border-collapse:collapse;table-layout:fixed}
-      col.c-date{width:7%}
-      col.c-no{width:6%}
-      col.c-type{width:6%}
-      col.c-store{width:9%}
-      col.c-client{width:8%}
-      col.c-item{width:8%}
-      col.c-cat{width:8%}
-      col.c-mat{width:8%}
-      col.c-alt{width:22%}
-      col.c-price{width:6%}
-      col.c-status{width:6%}
-      th{background:#e8e8e8;padding:3pt 4pt;text-align:left;
-         border:0.5pt solid #bbb;font-size:7pt;font-weight:700;white-space:nowrap}
-      td{padding:3pt 4pt;border:0.5pt solid #ccc;vertical-align:top;
-         font-size:7.5pt;word-break:break-all;line-height:1.3}
-      tr:nth-child(even) td{background:#f9f9f9}
-      .td-r{text-align:right}
-      .td-no{font-size:7pt;color:#555}
-      .pf{margin-top:6pt;font-size:7pt;color:#888;text-align:right}
-    </style>
-    <div class="ph">
-      <div>
-        <div class="pt">AlteREC 補正履歴</div>
-        <div class="pn">${df?df+'〜':''}${dt||''} &nbsp;全${all.length}件</div>
-      </div>
-      <div style="font-size:8pt;color:#555">${new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'})}</div>
-    </div>
-    <table>
-      <colgroup>
-        <col class="c-date"><col class="c-date">
-        <col class="c-no"><col class="c-type"><col class="c-store">
-        <col class="c-client"><col class="c-item"><col class="c-cat">
-        <col class="c-mat"><col class="c-alt">
-        <col class="c-price"><col class="c-status">
-      </colgroup>
-      <thead><tr>
-        <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
-        <th>客名</th><th>品名</th><th>カテゴリー</th><th>素材</th>
-        <th>実行補正内容</th><th class="td-r">金額</th><th>状態</th>
-      </tr></thead>
-      <tbody>
-      ${all.map(r=>`<tr>
-        <td>${r.inDate||'—'}</td>
-        <td>${r.outDate||'—'}</td>
-        <td class="td-no">${r.ticket?'#'+r.ticket:''}</td>
-        <td>${tpL(r.type)}</td>
-        <td>${r.store||'—'}</td>
-        <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
-        <td>${r.item||'—'}</td>
-        <td>${r.cat||'—'}</td>
-        <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
-        <td>${wStr(r.wAlts).replace(/\n/g,'<br>')}</td>
-        <td class="td-r">${r.price?'¥'+r.price.toLocaleString():''}</td>
-        <td>${stL(r.status)}</td>
-      </tr>`).join('')}
-      </tbody>
-    </table>
-    <div class="pf">AlteREC 補正記録 / 出力：${new Date().toLocaleString('ja-JP')}</div>`;
-  window.print();
-  setTimeout(()=>pa.innerHTML='',1500);
+
+  const rows=all.map(r=>`<tr>
+    <td>${r.inDate||'—'}</td>
+    <td>${r.outDate||'—'}</td>
+    <td class="no">${r.ticket?'#'+r.ticket:''}</td>
+    <td>${tpL(r.type)}</td>
+    <td>${r.store||'—'}</td>
+    <td>${r.client||'—'}${r.isStaff?' ★':''}</td>
+    <td>${r.item||'—'}</td>
+    <td>${r.cat||'—'}</td>
+    <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
+    <td>${wStr(r.wAlts).replace(/\n/g,' / ')}</td>
+    <td class="pr">${r.price?'¥'+r.price.toLocaleString():''}</td>
+    <td>${stL(r.status)}</td>
+  </tr>`).join('');
+
+  const doc=`<!DOCTYPE html><html lang="ja"><head>
+  <meta charset="UTF-8">
+  <title>AlteREC 補正履歴</title>
+  <style>
+    @page{size:297mm 210mm;margin:8mm 7mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;font-size:7.5pt;color:#000;background:#fff;width:297mm}
+    .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5pt solid #222;padding-bottom:4pt;margin-bottom:6pt}
+    .hd-t{font-size:13pt;font-weight:700}
+    .hd-s{font-size:7.5pt;color:#555;margin-top:2pt}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th{background:#ddd;padding:3pt 3pt;text-align:left;border:0.5pt solid #aaa;font-size:6.5pt;font-weight:700;white-space:nowrap;overflow:hidden}
+    td{padding:2.5pt 3pt;border:0.5pt solid #ccc;font-size:7pt;line-height:1.25;overflow:hidden;word-break:break-all}
+    tr:nth-child(even) td{background:#f5f5f5}
+    .no{color:#777;font-size:6.5pt}
+    .pr{text-align:right}
+    col.cd{width:7.5%}col.cn{width:5.5%}col.ct{width:5.5%}
+    col.cs{width:8%}col.cc{width:7.5%}col.ci{width:8%}
+    col.ck{width:7.5%}col.cm{width:7.5%}col.ca{width:22%}
+    col.cp{width:6%}col.cst{width:5.5%}
+    .ft{margin-top:5pt;font-size:6.5pt;color:#888;text-align:right}
+  </style>
+  </head><body>
+  <div class="hd">
+    <div><div class="hd-t">AlteREC 補正履歴</div>
+    <div class="hd-s">${df?df+' 〜 ':''}${dt||''} 全${all.length}件</div></div>
+    <div style="font-size:7.5pt;color:#555">${new Date().toLocaleDateString('ja-JP')}</div>
+  </div>
+  <table>
+    <colgroup>
+      <col class="cd"><col class="cd"><col class="cn"><col class="ct">
+      <col class="cs"><col class="cc"><col class="ci"><col class="ck">
+      <col class="cm"><col class="ca"><col class="cp"><col class="cst">
+    </colgroup>
+    <thead><tr>
+      <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
+      <th>客名</th><th>品名</th><th>カテゴリー</th><th>素材</th>
+      <th>実行補正内容</th><th class="pr">金額</th><th>状態</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="ft">AlteREC / 出力：${new Date().toLocaleString('ja-JP')}</div>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=650');
+  if(!w){alert('ポップアップをブロックされました。Safariの設定でポップアップを許可してください');return;}
+  w.document.write(doc);
+  w.document.close();
+  w.onload=()=>{w.focus();w.print();}
 }
 
 function doCSV(){
