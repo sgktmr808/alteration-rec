@@ -185,6 +185,7 @@ select option{background:#1a1a24}
 .cpb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer}
 .imb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
 @media print{
+  /* 履歴PDF用スタイルはインライン定義 */
   body *{visibility:hidden}
   #print-area,#print-area *{visibility:visible}
   #print-area{position:fixed;inset:0;background:#fff;color:#000;font-family:var(--f);padding:16px;overflow:visible}
@@ -293,7 +294,7 @@ select option{background:#1a1a24}
 </div>
 
 <div class="screen" id="scr-work">
-  <div class="hdr"><div><div class="ht">作業中</div><div class="hv" id="wc"></div></div></div>
+  <div class="hdr"><div><div class="ht">登録済</div><div class="hv" id="wc"></div></div></div>
   <div class="fbar" id="wf"></div>
   <div class="cl" id="wl"></div>
 </div>
@@ -301,7 +302,10 @@ select option{background:#1a1a24}
 <div class="screen" id="scr-hist">
   <div class="hdr">
     <div><div class="ht">履歴</div></div>
-    <button class="btn-g" onclick="doCSV()">📊 Excel出力</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn-g" onclick="doHistPDF()" title="PDF出力">🖨</button>
+      <button class="btn-g" onclick="doCSV()" title="Excel出力">📊</button>
+    </div>
   </div>
   <div class="sw2"><input class="si" type="search" placeholder="客名・伝票No・品名…" id="srch" oninput="renderHist()"></div>
   <div class="df">
@@ -1058,6 +1062,11 @@ function rCard(r){
   const inD=r.inDate?r.inDate.slice(5).replace('-','/'):'—';
   const outD=r.outDate?r.outDate.slice(5).replace('-','/'):'—';
   const tags=[r.cat,r.mat].filter(Boolean).map(t=>`<span class="rtg">${t}</span>`).join('');
+  const altTags=(r.cAlts||[]).slice(0,4).map(a=>{
+    let s=a.n+(a.dir?' '+a.dir:'');
+    if(a.dim)s+=' '+a.dim+'cm';
+    return `<span class="rtg" style="color:var(--gold);border-color:rgba(200,168,74,.3)">${s}</span>`;
+  }).join('');
   return `<div class="rc" onclick="openDet('${r.id}')">
     <div class="rh">
       <div class="rm">
@@ -1071,6 +1080,7 @@ function rCard(r){
       <span class="sbg s-${st.id}">${st.label}</span>
     </div>
     ${tags?`<div class="rb">${tags}</div>`:''}
+    ${altTags?`<div class="rb">${altTags}</div>`:''}
     <div class="rf">
       <span class="rd">持込 ${inD} → 納品 ${outD}</span>
       <span class="rp">${r.price?'¥'+r.price.toLocaleString():''}</span>
@@ -1241,6 +1251,58 @@ function doPrint(){
 }
 
 // ══ CSV ══
+function doHistPDF(){
+  const q=(document.getElementById('srch')?.value||'').toLowerCase();
+  const df=document.getElementById('hf')?.value||'';
+  const dt=document.getElementById('ht2')?.value||'';
+  let all=gR();
+  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(df)all=all.filter(r=>r.inDate&&r.inDate>=df);
+  if(dt)all=all.filter(r=>r.inDate&&r.inDate<=dt);
+  if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
+  if(!all.length){alert('出力するデータがありません');return;}
+  const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
+  const tpL=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
+  const pa=document.getElementById('print-area');
+  pa.innerHTML=`
+    <style>
+      .ph{border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-end}
+      .pt{font-size:16px;font-weight:700}.pn{font-size:11px;color:#666}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th{background:#f0f0f0;padding:5px 7px;text-align:left;border:1px solid #ddd;font-weight:600;white-space:nowrap}
+      td{padding:5px 7px;border:1px solid #ddd;vertical-align:top;max-width:120px;word-break:break-all}
+      .pf{margin-top:10px;font-size:10px;color:#888;text-align:right}
+    </style>
+    <div class="ph">
+      <div><div class="pt">AlteREC 補正履歴</div>
+      <div class="pn">${df||'—'} 〜 ${dt||'—'} / ${all.length}件</div></div>
+      <div style="font-size:11px;color:#666">${new Date().toLocaleDateString('ja-JP')}</div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
+        <th>客名</th><th>品名</th><th>カテゴリー</th><th>素材</th>
+        <th>補正内容</th><th>金額</th><th>状態</th>
+      </tr></thead>
+      <tbody>
+      ${all.map(r=>`<tr>
+        <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
+        <td>${r.ticket?'#'+r.ticket:''}</td>
+        <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
+        <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
+        <td>${r.item||'—'}</td><td>${r.cat||'—'}</td>
+        <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
+        <td>${aSum(r.cAlts)}</td>
+        <td style="text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
+        <td>${stL(r.status)}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="pf">AlteREC / 出力：${new Date().toLocaleString('ja-JP')}</div>`;
+  window.print();
+  setTimeout(()=>pa.innerHTML='',1200);
+}
+
 function doCSV(){
   const q=(document.getElementById('srch')?.value||'').toLowerCase();
   const df=document.getElementById('hf')?.value||'';
