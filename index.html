@@ -32,10 +32,10 @@ html,body{height:100%;width:100%;max-width:100vw;overflow-x:hidden;background:va
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 5px;border:none;background:none;color:var(--tx3);font-size:10px;font-family:var(--f);cursor:pointer}
 .nb.on{color:var(--gold)}
 .ni{font-size:20px;line-height:1}
-.hdr{padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;width:100%;background:rgba(10,10,15,.93);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--bd)}
+.hdr{padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;z-index:100;width:100%;background:rgba(10,10,15,.93);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--bd)}
 .ht{font-size:17px;font-weight:700}
 .hv{font-size:10px;color:var(--tx3);font-family:var(--fm);margin-top:1px}
-.btn-g{padding:7px 13px;border-radius:18px;border:1px solid var(--bd2);background:none;color:var(--tx2);font-size:12px;font-family:var(--f);cursor:pointer}
+.btn-g{padding:7px 13px;border-radius:18px;border:1px solid var(--bd2);background:none;color:var(--tx2);font-size:12px;font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0}
 .btn-gold{padding:8px 16px;border-radius:18px;border:none;background:var(--gold);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
 .fb{padding:12px 16px 0}
 .sec{background:var(--s1);border:1px solid var(--bd);border-radius:14px;margin-bottom:12px;overflow:hidden}
@@ -200,7 +200,7 @@ select option{background:#1a1a24}
 <div class="screen on" id="scr-new">
   <div class="hdr">
     <div><div class="ht">新規受付</div><div class="hv">v16</div></div>
-    <button class="btn-g" onclick="openMaster()">管理画面</button>
+    <button class="btn-g" onclick="openMaster()">⚙️ 設定</button>
   </div>
   <div class="fb">
     <div class="sec">
@@ -343,7 +343,7 @@ select option{background:#1a1a24}
 <div class="ov" id="ov-master" onclick="closeOv('ov-master',event)">
   <div class="md">
     <div class="mp"><div class="mpb"></div></div>
-    <div class="mh">管理画面</div>
+    <div class="mh">⚙️ 設定</div>
     <div class="ms">
       <div class="mb">
         <div style="display:flex;gap:8px;margin-bottom:14px">
