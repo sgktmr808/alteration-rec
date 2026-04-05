@@ -1269,41 +1269,74 @@ function doHistPDF(){
   const pa=document.getElementById('print-area');
   pa.innerHTML=`
     <style>
-      .ph{border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-end}
-      .pt{font-size:16px;font-weight:700}.pn{font-size:11px;color:#666}
-      table{width:100%;border-collapse:collapse;font-size:11px}
-      th{background:#f0f0f0;padding:5px 7px;text-align:left;border:1px solid #ddd;font-weight:600;white-space:nowrap}
-      td{padding:5px 7px;border:1px solid #ddd;vertical-align:top;max-width:120px;word-break:break-all}
-      .pf{margin-top:10px;font-size:10px;color:#888;text-align:right}
+      @page{size:A4 landscape;margin:10mm 8mm}
+      *{box-sizing:border-box}
+      body{font-family:'Noto Sans JP',sans-serif;font-size:8pt;color:#000}
+      .ph{border-bottom:1.5pt solid #000;padding-bottom:5pt;margin-bottom:8pt;
+          display:flex;justify-content:space-between;align-items:flex-end}
+      .pt{font-size:13pt;font-weight:700}
+      .pn{font-size:8pt;color:#555;margin-top:2pt}
+      table{width:100%;border-collapse:collapse;table-layout:fixed}
+      col.c-date{width:7%}
+      col.c-no{width:6%}
+      col.c-type{width:6%}
+      col.c-store{width:9%}
+      col.c-client{width:8%}
+      col.c-item{width:8%}
+      col.c-cat{width:8%}
+      col.c-mat{width:8%}
+      col.c-alt{width:22%}
+      col.c-price{width:6%}
+      col.c-status{width:6%}
+      th{background:#e8e8e8;padding:3pt 4pt;text-align:left;
+         border:0.5pt solid #bbb;font-size:7pt;font-weight:700;white-space:nowrap}
+      td{padding:3pt 4pt;border:0.5pt solid #ccc;vertical-align:top;
+         font-size:7.5pt;word-break:break-all;line-height:1.3}
+      tr:nth-child(even) td{background:#f9f9f9}
+      .td-r{text-align:right}
+      .td-no{font-size:7pt;color:#555}
+      .pf{margin-top:6pt;font-size:7pt;color:#888;text-align:right}
     </style>
     <div class="ph">
-      <div><div class="pt">AlteREC 補正履歴</div>
-      <div class="pn">${df||'—'} 〜 ${dt||'—'} / ${all.length}件</div></div>
-      <div style="font-size:11px;color:#666">${new Date().toLocaleDateString('ja-JP')}</div>
+      <div>
+        <div class="pt">AlteREC 補正履歴</div>
+        <div class="pn">${df?df+'〜':''}${dt||''} &nbsp;全${all.length}件</div>
+      </div>
+      <div style="font-size:8pt;color:#555">${new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'})}</div>
     </div>
     <table>
+      <colgroup>
+        <col class="c-date"><col class="c-date">
+        <col class="c-no"><col class="c-type"><col class="c-store">
+        <col class="c-client"><col class="c-item"><col class="c-cat">
+        <col class="c-mat"><col class="c-alt">
+        <col class="c-price"><col class="c-status">
+      </colgroup>
       <thead><tr>
         <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
         <th>客名</th><th>品名</th><th>カテゴリー</th><th>素材</th>
-        <th>補正内容</th><th>金額</th><th>状態</th>
+        <th>実行補正内容</th><th class="td-r">金額</th><th>状態</th>
       </tr></thead>
       <tbody>
       ${all.map(r=>`<tr>
-        <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
-        <td>${r.ticket?'#'+r.ticket:''}</td>
-        <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
+        <td>${r.inDate||'—'}</td>
+        <td>${r.outDate||'—'}</td>
+        <td class="td-no">${r.ticket?'#'+r.ticket:''}</td>
+        <td>${tpL(r.type)}</td>
+        <td>${r.store||'—'}</td>
         <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
-        <td>${r.item||'—'}</td><td>${r.cat||'—'}</td>
+        <td>${r.item||'—'}</td>
+        <td>${r.cat||'—'}</td>
         <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
-        <td>${aSum(r.cAlts)}</td>
-        <td style="text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
+        <td>${wStr(r.wAlts).replace(/\n/g,'<br>')}</td>
+        <td class="td-r">${r.price?'¥'+r.price.toLocaleString():''}</td>
         <td>${stL(r.status)}</td>
       </tr>`).join('')}
       </tbody>
     </table>
-    <div class="pf">AlteREC / 出力：${new Date().toLocaleString('ja-JP')}</div>`;
+    <div class="pf">AlteREC 補正記録 / 出力：${new Date().toLocaleString('ja-JP')}</div>`;
   window.print();
-  setTimeout(()=>pa.innerHTML='',1200);
+  setTimeout(()=>pa.innerHTML='',1500);
 }
 
 function doCSV(){
