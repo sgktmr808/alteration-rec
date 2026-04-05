@@ -185,10 +185,15 @@ select option{background:#1a1a24}
 .cpb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer}
 .imb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
 @media print{
-  /* 履歴PDF用スタイルはインライン定義 */
-  html,body{background:#fff!important;color:#000!important}
-  body *:not(#print-area):not(#print-area *){display:none!important}
-  #print-area{display:block!important;position:fixed;inset:0;background:#fff;color:#000}
+  /* 全要素を非表示にしてprint-areaのみ表示 */
+  html{background:#fff!important}
+  body{background:#fff!important;color:#000!important}
+  body > *:not(#print-area){display:none!important;visibility:hidden!important}
+  #print-area{display:block!important;visibility:visible!important;
+    position:fixed!important;inset:0!important;
+    background:#fff!important;color:#000!important;
+    z-index:99999!important}
+  #print-area *{visibility:visible!important;color:inherit!important;background:inherit!important}
   html,body{background:#fff!important}
   body *{visibility:hidden}
   #print-area,#print-area *{visibility:visible}
@@ -261,15 +266,33 @@ select option{background:#1a1a24}
       <div class="fld"><div class="fl">特殊</div><textarea id="f-special" style="min-height:52px"></textarea></div>
     </div>
     <div class="sec">
-      <div class="sh">⚙️ 機材設定</div>
-      <div class="mg">
-        <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine" value="JUKI DDL-8300c"></div>
-        <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle"></div>
-        <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread"></div>
-        <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor"></div>
-        <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot"></div>
+      <div class="sh" onclick="togMachine()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <span>⚙️ 機材設定</span>
+        <span id="machine-arrow" style="font-size:12px;color:var(--tx3)">▼ 開く</span>
       </div>
-      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">機材メモ</div><textarea id="m-memo" style="min-height:52px"></textarea></div>
+      <div id="machine-body" style="display:none">
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);overflow-x:auto">
+          ${['本縫い','ロック','まつり縫い','その他'].map((t,i)=>
+            `<button onclick="selMachineTab(${i})" id="mtab-${i}"
+              style="flex:1;padding:8px 4px;border:none;background:${i===0?'var(--s1)':'var(--s2)'};
+              color:${i===0?'var(--gold)':'var(--tx3)'};font-size:11px;font-weight:600;
+              font-family:var(--f);cursor:pointer;white-space:nowrap;border-bottom:2px solid ${i===0?'var(--gold)':'transparent'}">${t}</button>`
+          ).join('')}
+        </div>
+        <div id="machine-tabs">
+          ${['本縫い','ロック','まつり縫い','その他'].map((t,i)=>`
+          <div id="mtab-body-${i}" style="display:${i===0?'block':'none'}">
+            <div class="mg">
+              <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-${i}" ${i===0?'value="JUKI DDL-8300c"':''}></div>
+              <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-${i}"></div>
+              <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-${i}"></div>
+              <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-${i}"></div>
+              <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-${i}"></div>
+            </div>
+            <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-${i}" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6"></textarea></div>
+          </div>`).join('')}
+        </div>
+      </div>
     </div>
     <div class="sec">
       <div class="sh">⏱ 作業情報</div>
@@ -399,7 +422,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16v';
+const APP_VERSION = 'v16w';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -982,6 +1005,49 @@ function colAlts(cid,cat){
 }
 
 // ══ TIME ══
+let curMachineTab=0;
+
+function togMachine(){
+  const body=document.getElementById('machine-body');
+  const arrow=document.getElementById('machine-arrow');
+  const open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  arrow.textContent=open?'▲ 閉じる':'▼ 開く';
+}
+
+function selMachineTab(i){
+  curMachineTab=i;
+  [0,1,2,3].forEach(j=>{
+    const tab=document.getElementById('mtab-'+j);
+    const body=document.getElementById('mtab-body-'+j);
+    if(tab){tab.style.background=j===i?'var(--s1)':'var(--s2)';tab.style.color=j===i?'var(--gold)':'var(--tx3)';tab.style.borderBottom=j===i?'2px solid var(--gold)':'2px solid transparent';}
+    if(body) body.style.display=j===i?'block':'none';
+  });
+}
+
+function getMachineData(){
+  const tabs=['本縫い','ロック','まつり縫い','その他'];
+  return tabs.map((t,i)=>({
+    tabName:t,
+    machine:document.getElementById('m-machine-'+i)?.value?.trim()||'',
+    needle:document.getElementById('m-needle-'+i)?.value?.trim()||'',
+    thread:document.getElementById('m-thread-'+i)?.value?.trim()||'',
+    tcolor:document.getElementById('m-tcolor-'+i)?.value?.trim()||'',
+    foot:document.getElementById('m-foot-'+i)?.value?.trim()||'',
+    memo:document.getElementById('m-memo-'+i)?.value?.trim()||'',
+  })).filter(d=>d.machine||d.needle||d.thread||d.tcolor||d.foot||d.memo);
+}
+
+function resetMachine(){
+  [0,1,2,3].forEach(i=>{
+    ['m-machine','m-needle','m-thread','m-tcolor','m-foot'].forEach(id=>{
+      const el=document.getElementById(id+'-'+i);if(el)el.value='';
+    });
+    const memo=document.getElementById('m-memo-'+i);if(memo)memo.value='';
+  });
+  document.getElementById('m-machine-0').value='JUKI DDL-8300c';
+}
+
 function adjT(d){
   curTime=Math.max(0,curTime+d);
   document.getElementById('t-disp').textContent=curTime;
@@ -1020,12 +1086,7 @@ function saveRec(){
     cMemo:document.getElementById('f-cmemo').value.trim(),
     wMemo:document.getElementById('f-wmemo').value.trim(),
     special:document.getElementById('f-special').value.trim(),
-    machine:document.getElementById('m-machine').value.trim(),
-    needle:document.getElementById('m-needle').value.trim(),
-    thread:document.getElementById('m-thread').value.trim(),
-    tcolor:document.getElementById('m-tcolor').value.trim(),
-    foot:document.getElementById('m-foot').value.trim(),
-    mmemo:document.getElementById('m-memo').value.trim(),
+    machineData:getMachineData(),
     time:curTime,
     materials:document.getElementById('f-materials').value.trim(),
     price:parseInt(document.getElementById('f-price').value||0,10)||0,
@@ -1039,11 +1100,10 @@ function saveRec(){
 
 function resetForm(){
   ['f-ticket','f-client','f-staff','f-item','f-cmemo','f-wmemo',
-   'f-special','m-needle','m-thread','m-tcolor','m-foot','m-memo',
-   'f-materials','f-price','f-note'].forEach(id=>{
+   'f-special','f-materials','f-price','f-note'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
-  document.getElementById('m-machine').value='JUKI DDL-8300c';
+  resetMachine();
   curType=null;curClr={h:'',n:''};curPat='';curTime=0;
   stfOn=false;spmOn=false;
   document.getElementById('t-disp').textContent='0';
@@ -1152,6 +1212,20 @@ function aSum(alts){
     return s;
   }).join(' / ');
 }
+function machineStr(machineData){
+  if(!machineData||!machineData.length) return '';
+  return machineData.map(d=>{
+    const parts=[];
+    if(d.machine) parts.push('ミシン:'+d.machine);
+    if(d.needle) parts.push('針:'+d.needle);
+    if(d.thread) parts.push('糸:'+d.thread);
+    if(d.tcolor) parts.push('糸色:'+d.tcolor);
+    if(d.foot) parts.push('押さえ:'+d.foot);
+    if(d.memo) parts.push('メモ:'+d.memo);
+    return '['+d.tabName+'] '+parts.join(' / ');
+  }).join('\n');
+}
+
 function wStr(alts){
   return (alts||[]).map(a=>{
     let s=a.n+(a.dir?' '+a.dir:'');
@@ -1188,8 +1262,7 @@ function openDet(id){
     dw('客様指定',aSum(r.cAlts),true)+dw('指定メモ',r.cMemo,true)+
     dw('実行工程',wStr(r.wAlts),true)+dw('工程メモ',r.wMemo,true)+
     dw('特殊',r.special,true)+
-    dw('ミシン',r.machine)+dw('針番手',r.needle)+dw('糸番手',r.thread)+
-    dw('糸色番号',r.tcolor)+dw('押さえ',r.foot)+dw('機材メモ',r.mmemo,true)+
+    dw('機材設定',machineStr(r.machineData),true)+
     dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
     dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true);
   openOv('ov-det');
@@ -1295,8 +1368,7 @@ function doPrint(){
     ${pr('実行工程',wStr(r.wAlts),true)}${pr('工程メモ',r.wMemo,true)}
     ${pr('特殊',r.special,true)}
     <div class="ps">機材・作業</div>
-    ${pr('ミシン',r.machine)}${pr('針番手',r.needle)}${pr('糸番手',r.thread)}
-    ${pr('糸色番号',r.tcolor)}${pr('押さえ',r.foot)}${pr('機材メモ',r.mmemo,true)}
+    ${pr('機材設定',machineStr(r.machineData),true)}
     ${pr('所要時間',r.time?r.time+'分':null)}${pr('使用資材',r.materials,true)}
     ${pr('金額',r.price?'¥'+r.price.toLocaleString():null)}
     ${pr('備考',r.note,true)}
@@ -1396,7 +1468,7 @@ function doCSV(){
     tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.staff,
     r.item,r.cat,r.clrN||r.clrH,r.pat,r.mat+(r.isSpm?' [特殊素材]':''),
     aSum(r.cAlts),wStr(r.wAlts).replace(/\n/g,' / '),
-    r.machine,r.needle,r.thread,r.tcolor,r.foot,r.mmemo,
+    machineStr(r.machineData).replace(/\n/g,' / '),'','','','','',
     r.time||'',r.materials,r.price||'',r.note,stL(r.status)
   ].map(e).join(','));
   const a=document.createElement('a');
@@ -1500,13 +1572,37 @@ function showImport(){
 }
 function doImport(){
   try{
-    const d=JSON.parse(document.getElementById('imp-text').value.trim());
-    if(!d.stores||!d.cats){alert('形式が正しくありません');return;}
-    if(!confirm('店名'+d.stores.length+'件・カテゴリー'+d.cats.length+'件を復元します。現在の設定は上書きされます。'))return;
-    sSt(d.stores);sCt(d.cats);
+    const raw=document.getElementById('imp-text').value.trim();
+    const d=JSON.parse(raw);
+    const msgs=[];
+    // 店名（マッチするもののみ）
+    if(Array.isArray(d.stores)){
+      const valid=d.stores.filter(s=>typeof s==='string'&&s.trim());
+      if(valid.length){sSt(valid);msgs.push('店名 '+valid.length+'件');}
+    }
+    // カテゴリー（マッチするもののみ）
+    if(Array.isArray(d.cats)){
+      const valid=d.cats.filter(c=>typeof c==='string'&&c.trim());
+      if(valid.length){sCt(valid);msgs.push('カテゴリー '+valid.length+'件');}
+    }
+    // 記録データ（recs）
+    if(Array.isArray(d.recs)&&d.recs.length){
+      if(confirm('記録データ '+d.recs.length+'件もインポートしますか？
+現在のデータに追加されます。')){
+        const cur=gR();
+        // 既存IDと重複しないものだけ追加
+        const existIds=new Set(cur.map(r=>r.id));
+        const newRecs=d.recs.filter(r=>r&&r.id&&!existIds.has(r.id));
+        sR([...newRecs,...cur]);
+        msgs.push('記録 '+newRecs.length+'件（重複除外）');
+      }
+    }
+    if(!msgs.length){alert('インポートできるデータが見つかりませんでした');return;}
     document.getElementById('imp-area').style.display='none';
-    renderMaster();alert('✅ 復元しました');
-  }catch(e){alert('テキストの読み込みに失敗しました');}
+    renderMaster();renderWork();renderHist();
+    alert('✅ インポート完了：'+msgs.join('・'));
+  }catch(e){alert('データの読み込みに失敗しました。
+JSON形式のファイルか確認してください。');}
 }
 
 // ══ START ══
