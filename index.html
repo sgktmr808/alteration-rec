@@ -1076,7 +1076,7 @@ function rCard(r){
         </div>
         <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
           <div class="rn">${r.client||r.item||'—'}${r.isStaff?' 👤':''}</div>
-          <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.cAlts||[]).slice(0,2).map(a=>a.n+(a.dir?' '+a.dir:'')).join(' · ')}</div>
+          <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>a.n+(a.dir?' '+a.dir:'')).join(' · ')}</div>
         </div>
         <div class="rs">${r.store||''} ${r.item||''}</div>
       </div>
