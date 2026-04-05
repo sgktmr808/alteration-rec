@@ -395,7 +395,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16s';
+const APP_VERSION = 'v16t';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -705,6 +705,19 @@ let stfOn=false,spmOn=false,wkFil='all',hiFil='all',curId=null;
 
 // ══ INIT ══
 function init(){
+  // 旧バージョン(v15以前)のデータを自動移行
+  const oldData=localStorage.getItem('ar_recs');
+  const newData=localStorage.getItem('ar2_recs');
+  if(oldData&&(!newData||newData==='[]')){
+    localStorage.setItem('ar2_recs',oldData);
+    console.log('旧データを移行しました');
+  }
+  // 旧マスターデータも移行
+  const oldSt=localStorage.getItem('ar_stores')||localStorage.getItem('alt3_stores');
+  const oldCt=localStorage.getItem('ar_cats')||localStorage.getItem('alt3_cats');
+  if(oldSt&&!localStorage.getItem('ar2_st')) localStorage.setItem('ar2_st',oldSt);
+  if(oldCt&&!localStorage.getItem('ar2_ct')) localStorage.setItem('ar2_ct',oldCt);
+
   buildTypes();buildColors();buildPats();populateSels();setDefaults();
   renderWork();renderHist();
 }
