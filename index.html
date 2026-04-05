@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="補正記録">
 <meta name="theme-color" content="#0a0a0f">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>AlteREC</title>
@@ -447,7 +450,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16x';
+const APP_VERSION = 'v16y';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -1633,7 +1636,12 @@ JSON形式のファイルか確認してください。');}
 // ══ START ══
 init();
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  // 既存のSWを全て解除してから再登録
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    Promise.all(regs.map(r => r.unregister())).then(() => {
+      navigator.serviceWorker.register('sw.js?v=16x').catch(()=>{});
+    });
+  });
 }
 </script>
 </body>
