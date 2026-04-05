@@ -271,26 +271,51 @@ select option{background:#1a1a24}
         <span id="machine-arrow" style="font-size:12px;color:var(--tx3)">▼ 開く</span>
       </div>
       <div id="machine-body" style="display:none">
-        <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);overflow-x:auto">
-          ${['本縫い','ロック','まつり縫い','その他'].map((t,i)=>
-            `<button onclick="selMachineTab(${i})" id="mtab-${i}"
-              style="flex:1;padding:8px 4px;border:none;background:${i===0?'var(--s1)':'var(--s2)'};
-              color:${i===0?'var(--gold)':'var(--tx3)'};font-size:11px;font-weight:600;
-              font-family:var(--f);cursor:pointer;white-space:nowrap;border-bottom:2px solid ${i===0?'var(--gold)':'transparent'}">${t}</button>`
-          ).join('')}
+        <div style="display:flex;border-bottom:1px solid var(--bd)">
+          <button onclick="selMachineTab(0)" id="mtab-0" style="flex:1;padding:8px 4px;border:none;background:var(--s1);color:var(--gold);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid var(--gold)">本縫い</button>
+          <button onclick="selMachineTab(1)" id="mtab-1" style="flex:1;padding:8px 4px;border:none;background:var(--s2);color:var(--tx3);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid transparent">ロック</button>
+          <button onclick="selMachineTab(2)" id="mtab-2" style="flex:1;padding:8px 4px;border:none;background:var(--s2);color:var(--tx3);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid transparent">まつり縫い</button>
+          <button onclick="selMachineTab(3)" id="mtab-3" style="flex:1;padding:8px 4px;border:none;background:var(--s2);color:var(--tx3);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid transparent">その他</button>
         </div>
-        <div id="machine-tabs">
-          ${['本縫い','ロック','まつり縫い','その他'].map((t,i)=>`
-          <div id="mtab-body-${i}" style="display:${i===0?'block':'none'}">
-            <div class="mg">
-              <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-${i}" ${i===0?'value="JUKI DDL-8300c"':''}></div>
-              <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-${i}"></div>
-              <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-${i}"></div>
-              <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-${i}"></div>
-              <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-${i}"></div>
-            </div>
-            <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-${i}" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6"></textarea></div>
-          </div>`).join('')}
+        <div id="mtab-body-0">
+          <div class="mg">
+            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-0" value="JUKI DDL-8300c"></div>
+            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-0"></div>
+            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-0"></div>
+            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-0"></div>
+            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-0"></div>
+          </div>
+          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-0" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
+        </div>
+        <div id="mtab-body-1" style="display:none">
+          <div class="mg">
+            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-1"></div>
+            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-1"></div>
+            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-1"></div>
+            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-1"></div>
+            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-1"></div>
+          </div>
+          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-1" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
+        </div>
+        <div id="mtab-body-2" style="display:none">
+          <div class="mg">
+            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-2"></div>
+            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-2"></div>
+            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-2"></div>
+            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-2"></div>
+            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-2"></div>
+          </div>
+          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-2" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
+        </div>
+        <div id="mtab-body-3" style="display:none">
+          <div class="mg">
+            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-3"></div>
+            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-3"></div>
+            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-3"></div>
+            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-3"></div>
+            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-3"></div>
+          </div>
+          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-3" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
         </div>
       </div>
     </div>
@@ -422,7 +447,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16w';
+const APP_VERSION = 'v16x';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;

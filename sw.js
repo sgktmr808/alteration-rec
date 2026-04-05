@@ -1,4 +1,4 @@
-const CACHE = 'alterec-v16w';
+const CACHE = 'alterec-v16x';
 const ASSETS = ['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
