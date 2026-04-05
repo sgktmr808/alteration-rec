@@ -359,9 +359,17 @@ select option{background:#1a1a24}
     <div class="mh">⚙️</div>
     <div class="ms">
       <div class="mb">
+        <div style="margin-bottom:10px;padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px">
+          <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:6px">💾 データバックアップ</div>
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">最終バックアップ：<span id="bk-ts">—</span></div>
+          <div style="display:flex;gap:6px">
+            <button onclick="exportJSON()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--amber);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📥 JSONで保存</button>
+            <button onclick="restoreBackup()" style="flex:1;padding:9px;border-radius:9px;border:1px solid rgba(196,132,58,.3);background:var(--s3);color:var(--amber);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">🔄 直前に戻す</button>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button onclick="doExport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📤 エクスポート</button>
-          <button onclick="showImport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(90,172,122,.3);background:var(--green-bg);color:var(--green);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📥 インポート</button>
+          <button onclick="doExport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📤 マスター書出</button>
+          <button onclick="showImport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(90,172,122,.3);background:var(--green-bg);color:var(--green);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📥 マスター読込</button>
         </div>
         <div class="ea" id="exp-area">
           <div style="font-size:11px;color:var(--tx3);margin-bottom:5px">テキストをコピーして保存</div>
@@ -395,7 +403,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16t';
+const APP_VERSION = 'v16u';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -693,7 +701,16 @@ const DEF_ST=['本店'];
 
 // ══ STORAGE ══
 const gR =()=>JSON.parse(localStorage.getItem('ar2_recs')||'[]');
-const sR =v=>localStorage.setItem('ar2_recs',JSON.stringify(v));
+const sR =v=>{
+  localStorage.setItem('ar2_recs',JSON.stringify(v));
+  // 保存のたびにバックアップも更新
+  try{
+    if(v&&v.length>0){
+      localStorage.setItem('ar2_bk_recs',JSON.stringify(v));
+      localStorage.setItem('ar2_bk_ts',new Date().toISOString().slice(0,10));
+    }
+  }catch(e){}
+};
 const gSt=()=>JSON.parse(localStorage.getItem('ar2_st')||JSON.stringify(DEF_ST));
 const sSt=v=>localStorage.setItem('ar2_st',JSON.stringify(v));
 const gCt=()=>JSON.parse(localStorage.getItem('ar2_ct')||JSON.stringify(DEF_CATS));
@@ -705,21 +722,37 @@ let stfOn=false,spmOn=false,wkFil='all',hiFil='all',curId=null;
 
 // ══ INIT ══
 function init(){
-  // 旧バージョン(v15以前)のデータを自動移行
+  // 旧バージョンのデータを自動移行
   const oldData=localStorage.getItem('ar_recs');
   const newData=localStorage.getItem('ar2_recs');
   if(oldData&&(!newData||newData==='[]')){
     localStorage.setItem('ar2_recs',oldData);
-    console.log('旧データを移行しました');
   }
-  // 旧マスターデータも移行
   const oldSt=localStorage.getItem('ar_stores')||localStorage.getItem('alt3_stores');
   const oldCt=localStorage.getItem('ar_cats')||localStorage.getItem('alt3_cats');
   if(oldSt&&!localStorage.getItem('ar2_st')) localStorage.setItem('ar2_st',oldSt);
   if(oldCt&&!localStorage.getItem('ar2_ct')) localStorage.setItem('ar2_ct',oldCt);
 
+  // 自動バックアップ（起動のたびに別キーに保存）
+  autoBackup();
+
   buildTypes();buildColors();buildPats();populateSels();setDefaults();
   renderWork();renderHist();
+}
+
+function autoBackup(){
+  try{
+    const recs=localStorage.getItem('ar2_recs');
+    const st=localStorage.getItem('ar2_st');
+    const ct=localStorage.getItem('ar2_ct');
+    if(recs&&recs!=='[]'){
+      const ts=new Date().toISOString().slice(0,10);
+      localStorage.setItem('ar2_bk_recs',recs);
+      localStorage.setItem('ar2_bk_st',st||'');
+      localStorage.setItem('ar2_bk_ct',ct||'');
+      localStorage.setItem('ar2_bk_ts',ts);
+    }
+  }catch(e){}
 }
 function setDefaults(){
   const n=new Date();
@@ -1383,13 +1416,53 @@ function closeOvBtn(id){document.getElementById(id).classList.remove('on');}
 function closeOv(id,e){if(e.target===document.getElementById(id))closeOvBtn(id);}
 
 // ══ MASTER ══
-function openMaster(){renderMaster();openOv('ov-master');}
+function openMaster(){renderMaster();openMasterUpdate();openOv('ov-master');}
 function closeMaster(){
   closeOvBtn('ov-master');
   document.getElementById('exp-area').style.display='none';
   document.getElementById('imp-area').style.display='none';
   populateSels();
 }
+function openMasterUpdate(){
+  const ts=localStorage.getItem('ar2_bk_ts')||'なし';
+  const el=document.getElementById('bk-ts');
+  if(el) el.textContent=ts;
+}
+
+function exportJSON(){
+  const data={
+    recs: gR(),
+    stores: gSt(),
+    cats: gCt(),
+    exported: new Date().toISOString(),
+    version: APP_VERSION,
+  };
+  const json=JSON.stringify(data,null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='AlteREC_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function restoreBackup(){
+  const bk=localStorage.getItem('ar2_bk_recs');
+  const ts=localStorage.getItem('ar2_bk_ts')||'不明';
+  if(!bk){alert('バックアップデータがありません');return;}
+  let count=0;
+  try{count=JSON.parse(bk).length;}catch(e){}
+  if(!confirm(ts+'のバックアップ（'+count+'件）に戻しますか？\n現在のデータは上書きされます。'))return;
+  localStorage.setItem('ar2_recs',bk);
+  const st=localStorage.getItem('ar2_bk_st');
+  const ct=localStorage.getItem('ar2_bk_ct');
+  if(st) localStorage.setItem('ar2_st',st);
+  if(ct) localStorage.setItem('ar2_ct',ct);
+  alert('✅ 復元しました（'+count+'件）');
+  renderWork();renderHist();
+}
+
 function renderMaster(){
   document.getElementById('store-list').innerHTML=gSt().map((s,i)=>
     `<div class="mit"><span class="mn">${s}</span><button class="mdl" onclick="delStore(${i})">×</button></div>`
