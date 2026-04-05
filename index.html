@@ -254,13 +254,9 @@ select option{background:#1a1a24}
       </div>
     </div>
     <div class="sec">
-      <div class="sh">✂️ お客様指定 補正箇所</div>
+      <div class="sh">✂️ 補正箇所</div>
       <div class="alt-list" id="alt-client"></div>
       <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="f-cmemo"></textarea></div>
-    </div>
-    <div class="sec">
-      <div class="sh">🔧 実行工程箇所</div>
-      <div class="alt-list" id="alt-work"></div>
       <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="f-wmemo"></textarea></div>
       <div class="fld"><div class="fl">特殊</div><textarea id="f-special" style="min-height:52px"></textarea></div>
     </div>
@@ -403,7 +399,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16u';
+const APP_VERSION = 'v16v';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -832,8 +828,7 @@ function selPat(p){curPat=curPat===p?'':p;buildPats();}
 // ══ ALT ITEMS ══
 function onCatChange(){
   const cat=document.getElementById('f-cat').value;
-  buildAlts('alt-client',cat,false);
-  buildAlts('alt-work',cat,true);
+  buildAlts('alt-client',cat,true);
 }
 function buildAlts(cid,cat,isW){
   const items=ALT[cat]||[];
@@ -965,7 +960,7 @@ function togSub(uid,pl,sv){
 // ══ COLLECT ══
 function colAlts(cid,cat){
   const items=ALT[cat]||[];
-  const isW=cid==='alt-work';
+  const isW=true; // 統合後は常に加工方法を表示
   return items.map((a,i)=>{
     const uid=cid+'-'+i;
     const chk=document.getElementById('chk-'+uid);
@@ -1021,8 +1016,8 @@ function saveRec(){
     mat:document.getElementById('f-material').value.trim(),
     isSpm:spmOn,
     cAlts:colAlts('alt-client',cat),
+    wAlts:colAlts('alt-client',cat),
     cMemo:document.getElementById('f-cmemo').value.trim(),
-    wAlts:colAlts('alt-work',cat),
     wMemo:document.getElementById('f-wmemo').value.trim(),
     special:document.getElementById('f-special').value.trim(),
     machine:document.getElementById('m-machine').value.trim(),
