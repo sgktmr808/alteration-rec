@@ -1,9 +1,10 @@
+// AlteREC SW - Network First
 const CACHE = 'alterec-v16y';
-const ASSETS = ['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
+
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
+
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -12,8 +13,17 @@ self.addEventListener('activate', e => {
   );
   self.clients.claim();
 });
+
+// Network First: 常にネットワークから取得、失敗時のみキャッシュ
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        // 成功したらキャッシュにも保存
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
