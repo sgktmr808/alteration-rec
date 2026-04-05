@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>データ復元</title>
+<style>
+body{background:#0a0a0f;color:#efefef;font-family:sans-serif;padding:20px;max-width:600px;margin:0 auto}
+h1{font-size:18px;margin-bottom:16px;color:#c8a84a}
+.sec{background:#13131a;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px}
+.key{font-size:12px;color:#8888a0;margin-bottom:4px}
+.val{font-size:14px;color:#5aac7a;font-weight:700}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;background:#c8a84a;color:#0a0a0f;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px}
+.btn-b{background:#5b9bd5;color:#fff}
+.btn-r{background:#c05a5a;color:#fff}
+#log{font-size:12px;color:#5aac7a;margin-top:12px;line-height:1.8}
+</style>
+</head>
+<body>
+<h1>🔧 AlteREC データ復元ツール</h1>
+
+<div class="sec">
+  <div class="key">ストレージ内のデータ確認</div>
+  <div id="status">確認中…</div>
+</div>
+
+<button class="btn" onclick="doRecover()">旧データを新バージョンに復元</button>
+<button class="btn btn-b" onclick="checkAll()">全キーを再確認</button>
+
+<div id="log"></div>
+
+<script>
+const KEYS = [
+  'ar_recs','ar2_recs',
+  'ar_stores','ar2_st',
+  'ar_cats','ar2_ct',
+  'alt3_recs','alt3_stores','alt3_cats',
+];
+
+function log(msg){ document.getElementById('log').innerHTML += msg + '<br>'; }
+
+function checkAll(){
+  const el = document.getElementById('status');
+  let html = '';
+  KEYS.forEach(k=>{
+    const v = localStorage.getItem(k);
+    if(v){
+      let count = '';
+      try{ const p=JSON.parse(v); count = Array.isArray(p)?` (${p.length}件)`:''; }catch(e){}
+      html += `<div style="margin-bottom:6px"><span style="color:#8888a0;font-size:11px">${k}</span><br><span style="color:#5aac7a;font-weight:700">✅ データあり${count}</span></div>`;
+    } else {
+      html += `<div style="margin-bottom:6px"><span style="color:#8888a0;font-size:11px">${k}</span><br><span style="color:#55556a">— なし</span></div>`;
+    }
+  });
+  el.innerHTML = html || '全キー空です';
+}
+
+function doRecover(){
+  document.getElementById('log').innerHTML = '';
+  let recovered = false;
+
+  // 記録データの移行
+  const targets = ['ar_recs','alt3_recs'];
+  for(const key of targets){
+    const old = localStorage.getItem(key);
+    if(old && old !== '[]'){
+      localStorage.setItem('ar2_recs', old);
+      log(`✅ ${key} → ar2_recs に復元 (${JSON.parse(old).length}件)`);
+      recovered = true;
+      break;
+    }
+  }
+
+  // 店名マスター
+  const stKeys = ['ar_stores','alt3_stores'];
+  for(const key of stKeys){
+    const old = localStorage.getItem(key);
+    if(old){
+      localStorage.setItem('ar2_st', old);
+      log(`✅ ${key} → ar2_st に復元`);
+      break;
+    }
+  }
+
+  // カテゴリーマスター
+  const ctKeys = ['ar_cats','alt3_cats'];
+  for(const key of ctKeys){
+    const old = localStorage.getItem(key);
+    if(old){
+      localStorage.setItem('ar2_ct', old);
+      log(`✅ ${key} → ar2_ct に復元`);
+      break;
+    }
+  }
+
+  if(!recovered){
+    log('⚠️ 復元できる旧データが見つかりませんでした');
+    log('以下のキーを確認してください：');
+    KEYS.forEach(k=>{
+      const v=localStorage.getItem(k);
+      if(v) log(`　${k}: ${v.length}文字`);
+    });
+  } else {
+    log('');
+    log('✅ 復元完了！AlteRECアプリを開き直してください。');
+  }
+
+  checkAll();
+}
+
+checkAll();
+</script>
+</body>
+</html>
