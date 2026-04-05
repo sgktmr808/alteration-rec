@@ -1615,8 +1615,7 @@ function doImport(){
     }
     // 記録データ（recs）
     if(Array.isArray(d.recs)&&d.recs.length){
-      if(confirm('記録データ '+d.recs.length+'件もインポートしますか？
-現在のデータに追加されます。')){
+      if(confirm('記録データ '+d.recs.length+'件もインポートしますか？\n現在のデータに追加されます。')){
         const cur=gR();
         // 既存IDと重複しないものだけ追加
         const existIds=new Set(cur.map(r=>r.id));
@@ -1629,8 +1628,7 @@ function doImport(){
     document.getElementById('imp-area').style.display='none';
     renderMaster();renderWork();renderHist();
     alert('✅ インポート完了：'+msgs.join('・'));
-  }catch(e){alert('データの読み込みに失敗しました。
-JSON形式のファイルか確認してください。');}
+  }catch(e){alert('データの読み込みに失敗しました。\nJSON形式のファイルか確認してください。');}
 }
 
 // ══ START ══
