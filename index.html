@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y24';
+const APP_VERSION = 'v16y25';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -1084,18 +1084,6 @@ function setSWSub(uid,val){
 }
 function setSWDim(uid,d,val){
   document.getElementById('body-'+uid).dataset['swdim_'+d]=val;
-}
-function setSWPos(uid,d,val){
-  const body=document.getElementById('body-'+uid);
-  body.dataset['swpos_'+d]=val;
-  ['sk','hn'].forEach(k=>{
-    const b=document.getElementById('sw'+d+'-'+k+'-'+uid);
-    if(b) b.className='sb'+(val===(k==='sk'?'裾から':'膝上')?' on':'');
-  });
-  const row=document.getElementById('sw-'+d+'pos-dim-'+uid);
-  const lbl=document.getElementById('sw-'+d+'pos-lbl-'+uid);
-  if(row) row.style.display='flex';
-  if(lbl) lbl.textContent=val;
 }
 function setSWPosDim(uid,d,val){
   document.getElementById('body-'+uid).dataset['swposdim_'+d]=val;
