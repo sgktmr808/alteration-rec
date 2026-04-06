@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y10';
+const APP_VERSION = 'v16y11';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -654,13 +654,12 @@ const ALT={
 
 const PROC={
   '裾上げ':{m:[
-    {id:'sg', l:'シングル',   ex:'sty'},
+    {id:'sg', l:'シングル',   ex:'sty',sub:[{l:'手まつり',ex:'sg_f'},{l:'ミシン',ex:'sg_f'}]},
     {id:'di', l:'ダブル',     ex:'sty',sub:[{l:'糸止め',ex:'ds'},{l:'スナップ',ex:'ds'},{l:'TomFord使用',ex:'ds'}]},
-    {id:'mo', l:'モーニング', ex:'sty'},
+    {id:'mo', l:'モーニング', ex:'sty',sub:[{l:'手まつり',ex:'mo_f'},{l:'ミシン',ex:'mo_f'}]},
     {id:'gc', l:'Gカット',    ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
-    {id:'tm', l:'手まつり'},
-    {id:'ls', l:'ロックステッチ'},
-    {id:'gm', l:'ゴム補正'},
+    {id:'ls', l:'ロックステッチ', ex:'fin'},
+    {id:'gm', l:'ゴム補正',       ex:'fin'},
   ]},
   '着丈':{m:[
     {id:'sg',l:'シングル',ex:'sty'},{id:'tm',l:'手まつり',ex:'sty'},
