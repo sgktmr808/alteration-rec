@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y7';
+const APP_VERSION = 'v16y8';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -655,7 +655,7 @@ const ALT={
 const PROC={
   '裾上げ':{m:[
     {id:'sg', l:'シングル',   ex:'sty'},
-    {id:'di', l:'ダブル',     ex:'sty',sub:['糸止め','スナップ','TomFord使用','W幅指定']},
+    {id:'di', l:'ダブル',     ex:'sty',sub:['糸止め','スナップ','TomFord使用']},
     {id:'mo', l:'モーニング', ex:'sty'},
     {id:'gc', l:'Gカット',    ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
     {id:'tm', l:'手まつり'},
@@ -925,6 +925,14 @@ function buildAB(a,uid,isW){
         h+=`<button class="pb${m.fin?' fin':''}" id="pb-${uid}-${m.id}" data-ex="${m.ex||''}" onclick="togProc('${uid}','${m.id}','${a.n}')">${m.l}</button>`;
       });
       h+=`</div><div class="sw" id="sw-${uid}"></div>`;
+      // ダブル専用：W幅常時入力欄
+      if(a.n==='裾上げ'){
+        h+=`<div class="dmrow" id="wwidth-${uid}" style="display:none">
+          <span style="font-size:11px;color:var(--tx3);margin-right:4px">W幅</span>
+          <input class="dmi" type="number" id="ww-${uid}" placeholder="cm" step="0.5" min="0" oninput="setWW('${uid}',this.value)">
+          <span class="dmu">cm</span>
+        </div>`;
+      }
     }
   }
   h+=`<input class="pm" type="text" id="memo-${uid}" placeholder="メモ（任意）">`;
@@ -976,6 +984,9 @@ function togProc(uid,mid,nm){
     if(b)b.classList.toggle('on',procs.includes(x.l));
   });
   updSubs(uid,nm,procs);
+  // ダブル選択時にW幅入力欄を表示
+  const wwEl=document.getElementById('wwidth-'+uid);
+  if(wwEl) wwEl.style.display=procs.includes('ダブル')?'flex':'none';
 }
 function updSubs(uid,nm,procs){
   const sw=document.getElementById('sw-'+uid);if(!sw)return;
@@ -987,25 +998,15 @@ function updSubs(uid,nm,procs){
     const m=pm.m.find(x=>x.l===l);
     if(m&&m.sub)m.sub.forEach(s=>{
       const on=subs[l]&&subs[l].includes(s);
-      if(s==='W幅指定'){
-        h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
-        if(on){
-          const wval=(subs[l+'_W']||'');
-          h+=`<input class="dmi" type="number" id="wsub-${uid}" placeholder="cm" step="0.5" min="0" value="${wval}" oninput="setWSub('${uid}','${l}',this.value)" style="width:68px;margin-left:4px">`;
-        }
-      } else {
-        h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
-      }
+      h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
     });
   });
   sw.innerHTML=h;
 }
 
-function setWSub(uid,pl,val){
+function setWW(uid,val){
   const body=document.getElementById('body-'+uid);
-  let subs=JSON.parse(body.dataset.subs||'{}');
-  subs[pl+'_W']=val;
-  body.dataset.subs=JSON.stringify(subs);
+  body.dataset.ww=val;
 }
 function togSub(uid,pl,sv){
   const body=document.getElementById('body-'+uid);
@@ -1036,7 +1037,8 @@ function colAlts(cid,cat){
     if(isW){
       const procs=JSON.parse(body.dataset.procs||'[]');
       const subs=JSON.parse(body.dataset.subs||'{}');
-      return{n:a.n,dir,procs,subs,memo};
+      const ww=body.dataset.ww||'';
+      return{n:a.n,dir,procs,subs,ww,memo};
     }
     return{n:a.n,dir,dim,dl,memo};
   }).filter(Boolean);
@@ -1270,7 +1272,8 @@ function wStr(alts){
     const ps=a.procs||[];
     if(ps.length){
       const sb=a.subs||{};
-      s+=' ['+ps.map(p=>{const sl=sb[p]||[];const wv=sb[p+'_W'];const wlabel=sl.map(x=>x==='W幅指定'&&wv?'W幅'+wv+'cm':x);return p+(wlabel.length?'('+wlabel.join('/')+')'  :'');}).join('/')+']';
+      s+=' ['+ps.map(p=>{const sl=sb[p]||[];return p+(sl.length?'('+sl.join('/')+')'  :'');}).join('/')+']';
+    if(a.ww) s+=' W幅'+a.ww+'cm';
     }
     if(a.memo)s+=' ('+a.memo+')';
     return s;
