@@ -7,9 +7,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="補正記録">
 <meta name="theme-color" content="#0a0a0f">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>AlteREC</title>
@@ -188,14 +185,10 @@ select option{background:#1a1a24}
 .cpb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer}
 .imb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
 @media print{
-  /* 全要素を非表示にしてprint-areaのみ表示 */
-  html{background:#fff!important}
-  body{background:#fff!important;color:#000!important}
-  body > *:not(#print-area){display:none!important}
-  #print-area{display:block!important;position:static!important;
-    background:#fff!important;color:#000!important;
-    z-index:99999!important}
-  #print-area *{visibility:visible!important;color:inherit!important;background:inherit!important}
+  /* 履歴PDF用スタイルはインライン定義 */
+  html,body{background:#fff!important;color:#000!important}
+  body *:not(#print-area):not(#print-area *){display:none!important}
+  #print-area{display:block!important;position:fixed;inset:0;background:#fff;color:#000}
   html,body{background:#fff!important}
   body *{visibility:hidden}
   #print-area,#print-area *{visibility:visible}
@@ -216,7 +209,7 @@ select option{background:#1a1a24}
 
 <div class="screen on" id="scr-new">
   <div class="hdr">
-    <div><div class="ht">AlteREC</div><div class="hv">v16y</div></div>
+    <div><div class="ht">AlteREC</div><div class="hv">v16m</div></div>
     <button class="btn-g" onclick="openMaster()">⚙️</button>
   </div>
   <div class="fb">
@@ -268,58 +261,15 @@ select option{background:#1a1a24}
       <div class="fld"><div class="fl">特殊</div><textarea id="f-special" style="min-height:52px"></textarea></div>
     </div>
     <div class="sec">
-      <div class="sh" onclick="togMachine()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-        <span>⚙️ 機材設定</span>
-        <span id="machine-arrow" style="font-size:12px;color:var(--tx3)">▼ 開く</span>
+      <div class="sh">⚙️ 機材設定</div>
+      <div class="mg">
+        <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine" value="JUKI DDL-8300c"></div>
+        <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle"></div>
+        <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread"></div>
+        <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor"></div>
+        <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot"></div>
       </div>
-      <div id="machine-body" style="display:none">
-        <div style="display:flex;border-bottom:1px solid var(--bd)">
-          <button onclick="selMachineTab(0)" id="mtab-0" style="flex:1;padding:8px 4px;border:none;background:var(--s1);color:var(--gold);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid var(--gold)">本縫い</button>
-          <button onclick="selMachineTab(1)" id="mtab-1" style="flex:1;padding:8px 4px;border:none;background:var(--s2);color:var(--tx3);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid transparent">ロック</button>
-          <button onclick="selMachineTab(2)" id="mtab-2" style="flex:1;padding:8px 4px;border:none;background:var(--s2);color:var(--tx3);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid transparent">まつり縫い</button>
-          <button onclick="selMachineTab(3)" id="mtab-3" style="flex:1;padding:8px 4px;border:none;background:var(--s2);color:var(--tx3);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;border-bottom:2px solid transparent">その他</button>
-        </div>
-        <div id="mtab-body-0">
-          <div class="mg">
-            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-0" value="JUKI DDL-8300c"></div>
-            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-0"></div>
-            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-0"></div>
-            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-0"></div>
-            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-0"></div>
-          </div>
-          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-0" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
-        </div>
-        <div id="mtab-body-1" style="display:none">
-          <div class="mg">
-            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-1"></div>
-            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-1"></div>
-            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-1"></div>
-            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-1"></div>
-            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-1"></div>
-          </div>
-          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-1" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
-        </div>
-        <div id="mtab-body-2" style="display:none">
-          <div class="mg">
-            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-2"></div>
-            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-2"></div>
-            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-2"></div>
-            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-2"></div>
-            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-2"></div>
-          </div>
-          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-2" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
-        </div>
-        <div id="mtab-body-3" style="display:none">
-          <div class="mg">
-            <div class="mr"><span class="ml">ミシン</span><input class="mi" id="m-machine-3"></div>
-            <div class="mr"><span class="ml">針番手</span><input class="mi" id="m-needle-3"></div>
-            <div class="mr"><span class="ml">糸番手</span><input class="mi" id="m-thread-3"></div>
-            <div class="mr"><span class="ml">糸色番号</span><input class="mi" id="m-tcolor-3"></div>
-            <div class="mr"><span class="ml">押さえ</span><input class="mi" id="m-foot-3"></div>
-          </div>
-          <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">メモ</div><textarea class="mi" id="m-memo-3" style="min-height:52px;border-radius:9px;padding:9px 10px;line-height:1.6;width:100%"></textarea></div>
-        </div>
-      </div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">機材メモ</div><textarea id="m-memo" style="min-height:52px"></textarea></div>
     </div>
     <div class="sec">
       <div class="sh">⏱ 作業情報</div>
@@ -352,7 +302,10 @@ select option{background:#1a1a24}
 <div class="screen" id="scr-hist">
   <div class="hdr">
     <div><div class="ht">履歴</div></div>
-    <button class="btn-g" onclick="doCSV()" title="Excel出力" style="padding:6px 8px;font-size:16px">📊</button>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="btn-g" onclick="doHistPDF()" title="PDF出力" style="padding:6px 8px;font-size:16px">🖨</button>
+      <button class="btn-g" onclick="doCSV()" title="Excel出力" style="padding:6px 8px;font-size:16px">📊</button>
+    </div>
   </div>
   <div class="sw2"><input class="si" type="search" placeholder="客名・伝票No・品名…" id="srch" oninput="renderHist()"></div>
   <div class="df">
@@ -446,7 +399,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y26';
+const APP_VERSION = 'v16v';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -654,12 +607,14 @@ const ALT={
 
 const PROC={
   '裾上げ':{m:[
-    {id:'sg', l:'シングル',       ex:'sty',sub:[{l:'手まつり',ex:'sg_f'},{l:'ミシン',ex:'sg_f'}]},
-    {id:'di', l:'ダブル',         ex:'sty',sub:[{l:'糸止め',ex:'ds'},{l:'スナップ',ex:'ds'},{l:'TomFord使用',ex:'ds'}]},
-    {id:'mo', l:'モーニング',     ex:'sty',sub:[{l:'手まつり',ex:'mo_f'},{l:'ミシン',ex:'mo_f'}]},
-    {id:'gc', l:'Gカット',        ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
-    {id:'ls', l:'ロックステッチ', ex:'sty'},
-    {id:'gm', l:'ゴム補正',       ex:'sty'},
+    {id:'sg', l:'シングル',   ex:'sty'},
+    {id:'di', l:'ダブル(糸止め)',ex:'sty',sub:['3cm','3.5cm','4cm','4.5cm','5cm','指定']},
+    {id:'ds', l:'ダブル(スナップ)',ex:'sty',sub:['3cm','3.5cm','4cm','4.5cm','5cm','指定']},
+    {id:'mo', l:'モーニング', ex:'sty'},
+    {id:'gc', l:'Gカット',    ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
+    {id:'tm', l:'手まつり'},
+    {id:'ls', l:'ロックステッチ'},
+    {id:'gm', l:'ゴム補正'},
   ]},
   '着丈':{m:[
     {id:'sg',l:'シングル',ex:'sty'},{id:'tm',l:'手まつり',ex:'sty'},
@@ -682,20 +637,15 @@ const PROC={
   'ウエスト絞り':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
   'ウエスト':{m:[
     {id:'s3',l:'3方詰め'},{id:'ib',l:'インベルさわり'},
-    {id:'lp',l:'ループ移動',sub:[{l:'ループ本数',ex:null,input:'number',placeholder:'本',label:'ループ本数'}]},
-    {id:'st',l:'ステッチ入れ直し',sub:[{l:'ステッチ本数',ex:null,input:'number',placeholder:'本',label:'ステッチ本数'}]},
+    {id:'lp',l:'ループ移動',sub:['1本','2本','3本','4本','5本','6本','7本']},
+    {id:'st',l:'ステッチ入れ直し',sub:['1本','2本']},
     {id:'tg',l:'タグ移動'},{id:'aj',l:'アジャスター移動'},
     {id:'gm',l:'ゴム補正'},{id:'il',l:'インベルループ下切替'},
     {id:'mi',l:'マチ入れ'},
-    {id:'vs',l:'Vスリット'},
-    {id:'kn',l:'かんぬき入れ直し'},
   ]},
   '裾幅':{m:[
-    {id:'ui',l:'内のみ',   ex:'sw'},
-    {id:'so',l:'外のみ',   ex:'sw'},
-    {id:'ry',l:'両脇',     ex:'sw'},
-    {id:'fs',l:'折り伏せ'},
-    {id:'fk',l:'袋縫い'},
+    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
+    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},
   ]},
   'わたり':{m:[
     {id:'ui',l:'内のみ',ex:'wr'},{id:'so',l:'外のみ',ex:'wr'},
@@ -904,19 +854,15 @@ function buildAB(a,uid,isW){
     h+=`<div class="dr">`;
     if(a.d==='both'||a.d==='tsume')h+=`<button class="db" id="db-t-${uid}" onclick="setDir('${uid}','t')">詰め</button>`;
     if(a.d==='both'||a.d==='dashi')h+=`<button class="db" id="db-d-${uid}" onclick="setDir('${uid}','d')">出し</button>`;
-    // 未定ボタンは使用しない
+    if(a.d==='both')h+=`<button class="db" id="db-n-${uid}" onclick="setDir('${uid}','n')">未定</button>`;
     h+=`</div>`;
   }
   if(a.dm==='len'){
     h+=`<div class="dtrow">
       ${['股下','カット寸法','総丈'].map(t=>`<button class="dtb" id="dtb-${uid}-${t.replace(' ','_')}" onclick="setDT('${uid}','${t}')">${t}</button>`).join('')}
     </div>
-    <div class="dmrow" style="gap:4px">
-      <span style="font-size:11px;color:var(--tx3)">左</span>
-      <input class="dmi" type="number" id="dim-L-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
-      <span class="dmu">cm</span>
-      <span style="font-size:11px;color:var(--tx3);margin-left:4px">右</span>
-      <input class="dmi" type="number" id="dim-R-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
+    <div class="dmrow">
+      <input class="dmi" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0">
       <span class="dmu">cm</span>
     </div>`;
   }else if(a.dm==='cm'){
@@ -924,26 +870,6 @@ function buildAB(a,uid,isW){
       <input class="dmi" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0">
       <span class="dmu">cm</span>
     </div>`;
-    // 裾幅専用：cm入力の下にサブ選択を表示
-    if(a.n==='裾幅'){
-    sw-dirsub-${uid}" style="display:none;margin-top:6px">
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
-          <button class="sb" id="sw-hk-${uid}" onclick="setSWSub('${uid}','平置き')">平置き</button>
-          <button class="sb" id="sw-gr-${uid}" onclick="setSWSub('${uid}','ぐるり')">ぐるり</button>
-          <button class="sb" id="sw-ag-${uid}" onclick="setSWSub('${uid}','仕上がり寸法')">仕上がり寸法</button>
-        </div>
-        <div style="font-size:10px;color:var(--tx3);margin-bottom:3px">位置指定（排他）</div>
-        <div style="display:flex;gap:4px;margin-bottom:6px">
-          <button class="sb" id="sw-sk-${uid}" onclick="setSWPos('${uid}','裾から')">裾から</button>
-          <button class="sb" id="sw-hn-${uid}" onclick="setSWPos('${uid}','膝上')">膝上</button>
-        </div>
-        <div class="dmrow" id="sw-pos-${uid}" style="gap:4px;display:none">
-          <span style="font-size:11px;color:var(--tx3)" id="sw-poslbl-${uid}"></span>
-          <input class="dmi" type="number" id="sw-posdim-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setSWPosDim('${uid}',this.value)" style="flex:1">
-          <span class="dmu">cm</span>
-        </div>
-      </div>`;
-    }
   }
   if(isW){
     const pm=PROC[a.n];
@@ -953,22 +879,8 @@ function buildAB(a,uid,isW){
         h+=`<button class="pb${m.fin?' fin':''}" id="pb-${uid}-${m.id}" data-ex="${m.ex||''}" onclick="togProc('${uid}','${m.id}','${a.n}')">${m.l}</button>`;
       });
       h+=`</div><div class="sw" id="sw-${uid}"></div>`;
-      // ダブル専用：W幅常時入力欄
-      if(a.n==='裾上げ'){
-        h+=`<div class="dmrow" id="wwidth-${uid}" style="display:none">
-          <span style="font-size:11px;color:var(--tx3);margin-right:4px">W幅</span>
-          <input class="dmi" type="number" id="ww-${uid}" placeholder="cm" step="0.5" min="0" oninput="setWW('${uid}',this.value)">
-          <span class="dmu">cm</span>
-        </div>
-        <div class="dmrow" id="morning-diff-${uid}" style="display:none;gap:4px">
-          <span style="font-size:11px;color:var(--tx3)">前後差</span>
-          <input class="dmi" type="number" id="mae-${uid}" placeholder="cm" step="0.5" oninput="setMae('${uid}',this.value)" style="flex:1">
-          <span class="dmu">cm</span>
-        </div>`;
-      }
     }
   }
-
   h+=`<input class="pm" type="text" id="memo-${uid}" placeholder="メモ（任意）">`;
   return h;
 }
@@ -982,12 +894,9 @@ function togAlt(uid){
 function setDir(uid,d){
   ['t','d','n'].forEach(x=>{
     const b=document.getElementById(`db-${x}-${uid}`);
-    if(b)b.className='db'+(d===x?' '+x:'');
+    if(b)b.className='db'+(d===x?' '+d:'');
   });
   document.getElementById('body-'+uid).dataset.dv=d;
-  // 裾幅：詰め/出し選択時にサブ選択を表示
-  const subEl=document.getElementById('sw-dirsub-'+uid);
-  if(subEl) subEl.style.display=(d==='t'||d==='d')?'flex':'none';
 }
 function setDT(uid,t){
   ['股下','カット寸法','総丈'].forEach(x=>{
@@ -1021,12 +930,6 @@ function togProc(uid,mid,nm){
     if(b)b.classList.toggle('on',procs.includes(x.l));
   });
   updSubs(uid,nm,procs);
-  // ダブル選択時にW幅入力欄を表示
-  const wwEl=document.getElementById('wwidth-'+uid);
-  if(wwEl) wwEl.style.display=procs.includes('ダブル')?'flex':'none';
-  // モーニング選択時に前後差入力欄を表示
-  const moEl=document.getElementById('morning-diff-'+uid);
-  if(moEl) moEl.style.display=procs.includes('モーニング')?'flex':'none';
 }
 function updSubs(uid,nm,procs){
   const sw=document.getElementById('sw-'+uid);if(!sw)return;
@@ -1036,76 +939,13 @@ function updSubs(uid,nm,procs){
   let h='';
   procs.forEach(l=>{
     const m=pm.m.find(x=>x.l===l);
-    if(m&&m.sub){
-      const subList=m.sub.map(s=>typeof s==='object'?s:{l:s,ex:null});
-      subList.forEach(s=>{
-        const on=subs[l]&&subs[l].includes(s.l);
-        if(s.input){
-          const cur=subs[l+'_'+s.l]||'';
-          h+=`<div class="dmrow" style="gap:4px;margin-bottom:2px"><span style="font-size:11px;color:var(--tx3)">${s.label||s.l}</span><input class="dmi" type="${s.input}" placeholder="${s.placeholder||''}" min="0" value="${cur}" oninput="setSubInp('${uid}','${l}','${s.l}',this.value)" style="flex:1;max-width:80px"><span class="dmu">${s.placeholder||''}</span></div>`;
-        } else {
-          h+=`<button class="sb${on?' on':''}" onclick="togSubEx('${uid}','${l}','${s.l}','${s.ex||''}')">${s.l}</button>`;
-        }
-      });
-    }
+    if(m&&m.sub)m.sub.forEach(s=>{
+      const on=subs[l]&&subs[l].includes(s);
+      h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
+    });
   });
   sw.innerHTML=h;
 }
-
-function togSubEx(uid,pl,sv,exGroup){
-  const body=document.getElementById('body-'+uid);
-  let subs=JSON.parse(body.dataset.subs||'{}');
-  if(!subs[pl])subs[pl]=[];
-  const already=subs[pl].includes(sv);
-  if(already){
-    subs[pl]=subs[pl].filter(x=>x!==sv);
-  } else {
-    if(exGroup){
-      // 同じ排他グループの選択を外す
-      const pm=PROC[body.dataset.name||''];
-      if(pm){
-        const m=pm.m.find(x=>x.l===pl);
-        if(m&&m.sub){
-          const subList=m.sub.map(s=>typeof s==='object'?s:{l:s,ex:null});
-          const exItems=subList.filter(s=>s.ex===exGroup).map(s=>s.l);
-          subs[pl]=subs[pl].filter(x=>!exItems.includes(x));
-        }
-      }
-    }
-    subs[pl].push(sv);
-  }
-  body.dataset.subs=JSON.stringify(subs);
-  const procs=JSON.parse(body.dataset.procs||'[]');
-  updSubs(uid,body.dataset.name,procs);
-}
-
-function setWW(uid,val){
-  const body=document.getElementById('body-'+uid);
-  body.dataset.ww=val;
-}
-function setSWSub(uid,val){
-  const body=document.getElementById('body-'+uid);
-  body.dataset.swsub=val;
-  ['hk','gr','ag'].forEach(k=>{
-    const b=document.getElementById('sw-'+k+'-'+uid);
-    const map={hk:'平置き',gr:'ぐるり',ag:'仕上がり寸法'};
-    if(b) b.className='sb'+(val===map[k]?' on':'');
-  });
-}
-function setSWDim(uid,d,val){
-  document.getElementById('body-'+uid).dataset['swdim_'+d]=val;
-}
-function setSWPosDim(uid,d,val){
-  document.getElementById('body-'+uid).dataset['swposdim_'+d]=val;
-}
-function setMae(uid,val){document.getElementById('body-'+uid).dataset.mae=val;}
-function setSubInp(uid,pl,sl,val){
-  const body=document.getElementById('body-'+uid);
-  let subs=JSON.parse(body.dataset.subs||'{}');
-  subs[pl+'_'+sl]=val;
-  body.dataset.subs=JSON.stringify(subs);
-}
-function setAto(uid,val){document.getElementById('body-'+uid).dataset.ato=val;}
 function togSub(uid,pl,sv){
   const body=document.getElementById('body-'+uid);
   let subs=JSON.parse(body.dataset.subs||'{}');
@@ -1114,7 +954,7 @@ function togSub(uid,pl,sv){
   if(i>=0)subs[pl].splice(i,1);else subs[pl].push(sv);
   body.dataset.subs=JSON.stringify(subs);
   const procs=JSON.parse(body.dataset.procs||'[]');
-  updSubs(uid,body.dataset.name,procs);
+  updSubs(uid,pl,procs);
 }
 
 // ══ COLLECT ══
@@ -1127,71 +967,21 @@ function colAlts(cid,cat){
     if(!chk||!chk.checked)return null;
     const body=document.getElementById('body-'+uid);
     const dv=body.dataset.dv||'';
-    const swsub=body.dataset.swsub||'';
-    const swpos=body.dataset.swpos||'';
-    const swposdim=body.dataset.swposdim||'';
     const dir=dv==='t'?'詰め':dv==='d'?'出し':dv==='n'?'未定':'';
-    const dimElL=document.getElementById('dim-L-'+uid);
-    const dimElR=document.getElementById('dim-R-'+uid);
-    const dimL=dimElL?(parseFloat(dimElL.value)||null):null;
-    const dimR=dimElR?(parseFloat(dimElR.value)||null):null;
-    const dim=dimL||dimR?{L:dimL,R:dimR}:null;
+    const dimEl=document.getElementById('dim-'+uid);
+    const dim=dimEl?(parseFloat(dimEl.value)||null):null;
     const dl=body.dataset.dl||'';
     const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
     if(isW){
       const procs=JSON.parse(body.dataset.procs||'[]');
       const subs=JSON.parse(body.dataset.subs||'{}');
-      const ww=body.dataset.ww||'';
-      const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,memo};
+      return{n:a.n,dir,procs,subs,memo};
     }
-    return{n:a.n,dir,dim,dl,swsub,swpos,swposdim,memo};
+    return{n:a.n,dir,dim,dl,memo};
   }).filter(Boolean);
 }
 
 // ══ TIME ══
-let curMachineTab=0;
-
-function togMachine(){
-  const body=document.getElementById('machine-body');
-  const arrow=document.getElementById('machine-arrow');
-  const open=body.style.display==='none';
-  body.style.display=open?'block':'none';
-  arrow.textContent=open?'▲ 閉じる':'▼ 開く';
-}
-
-function selMachineTab(i){
-  curMachineTab=i;
-  [0,1,2,3].forEach(j=>{
-    const tab=document.getElementById('mtab-'+j);
-    const body=document.getElementById('mtab-body-'+j);
-    if(tab){tab.style.background=j===i?'var(--s1)':'var(--s2)';tab.style.color=j===i?'var(--gold)':'var(--tx3)';tab.style.borderBottom=j===i?'2px solid var(--gold)':'2px solid transparent';}
-    if(body) body.style.display=j===i?'block':'none';
-  });
-}
-
-function getMachineData(){
-  const tabs=['本縫い','ロック','まつり縫い','その他'];
-  return tabs.map((t,i)=>({
-    tabName:t,
-    machine:document.getElementById('m-machine-'+i)?.value?.trim()||'',
-    needle:document.getElementById('m-needle-'+i)?.value?.trim()||'',
-    thread:document.getElementById('m-thread-'+i)?.value?.trim()||'',
-    tcolor:document.getElementById('m-tcolor-'+i)?.value?.trim()||'',
-    foot:document.getElementById('m-foot-'+i)?.value?.trim()||'',
-    memo:document.getElementById('m-memo-'+i)?.value?.trim()||'',
-  })).filter(d=>d.machine||d.needle||d.thread||d.tcolor||d.foot||d.memo);
-}
-
-function resetMachine(){
-  [0,1,2,3].forEach(i=>{
-    ['m-machine','m-needle','m-thread','m-tcolor','m-foot'].forEach(id=>{
-      const el=document.getElementById(id+'-'+i);if(el)el.value='';
-    });
-    const memo=document.getElementById('m-memo-'+i);if(memo)memo.value='';
-  });
-  document.getElementById('m-machine-0').value='JUKI DDL-8300c';
-}
-
 function adjT(d){
   curTime=Math.max(0,curTime+d);
   document.getElementById('t-disp').textContent=curTime;
@@ -1230,7 +1020,12 @@ function saveRec(){
     cMemo:document.getElementById('f-cmemo').value.trim(),
     wMemo:document.getElementById('f-wmemo').value.trim(),
     special:document.getElementById('f-special').value.trim(),
-    machineData:getMachineData(),
+    machine:document.getElementById('m-machine').value.trim(),
+    needle:document.getElementById('m-needle').value.trim(),
+    thread:document.getElementById('m-thread').value.trim(),
+    tcolor:document.getElementById('m-tcolor').value.trim(),
+    foot:document.getElementById('m-foot').value.trim(),
+    mmemo:document.getElementById('m-memo').value.trim(),
     time:curTime,
     materials:document.getElementById('f-materials').value.trim(),
     price:parseInt(document.getElementById('f-price').value||0,10)||0,
@@ -1244,10 +1039,11 @@ function saveRec(){
 
 function resetForm(){
   ['f-ticket','f-client','f-staff','f-item','f-cmemo','f-wmemo',
-   'f-special','f-materials','f-price','f-note'].forEach(id=>{
+   'f-special','m-needle','m-thread','m-tcolor','m-foot','m-memo',
+   'f-materials','f-price','f-note'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
-  resetMachine();
+  document.getElementById('m-machine').value='JUKI DDL-8300c';
   curType=null;curClr={h:'',n:''};curPat='';curTime=0;
   stfOn=false;spmOn=false;
   document.getElementById('t-disp').textContent='0';
@@ -1352,48 +1148,17 @@ function aSum(alts){
   return (alts||[]).map(a=>{
     let s=a.n+(a.dir?' '+a.dir:'');
     if(a.dl)s+=' ['+a.dl+']';
-    if(a.dim){
-      if(typeof a.dim==='object'){
-        if(a.dim.L&&a.dim.R&&a.dim.L!==a.dim.R) s+=' 左'+a.dim.L+'cm/右'+a.dim.R+'cm';
-        else if(a.dim.L) s+=' '+a.dim.L+'cm';
-        else if(a.dim.R) s+=' '+a.dim.R+'cm';
-      } else { s+=' '+a.dim+'cm'; }
-    }
-    if(a.swsub) s+=' ['+a.swsub+']';
-    if(a.swpos) s+=' '+a.swpos+(a.swposdim?' '+a.swposdim+'cm':'');
+    if(a.dim)s+=' '+a.dim+'cm';
     return s;
   }).join(' / ');
 }
-function machineStr(machineData){
-  if(!machineData||!machineData.length) return '';
-  return machineData.map(d=>{
-    const parts=[];
-    if(d.machine) parts.push('ミシン:'+d.machine);
-    if(d.needle) parts.push('針:'+d.needle);
-    if(d.thread) parts.push('糸:'+d.thread);
-    if(d.tcolor) parts.push('糸色:'+d.tcolor);
-    if(d.foot) parts.push('押さえ:'+d.foot);
-    if(d.memo) parts.push('メモ:'+d.memo);
-    return '['+d.tabName+'] '+parts.join(' / ');
-  }).join('\n');
-}
-
 function wStr(alts){
   return (alts||[]).map(a=>{
     let s=a.n+(a.dir?' '+a.dir:'');
     const ps=a.procs||[];
     if(ps.length){
       const sb=a.subs||{};
-      s+=' ['+ps.map(p=>{
-      const sl=sb[p]||[];
-      // 入力形式サブの値を取得
-      const inpKeys=Object.keys(sb).filter(k=>k.startsWith(p+'_'));
-      const inpVals=inpKeys.map(k=>{const v=sb[k];return v?k.replace(p+'_','').replace('入力','')+'：'+v:'';}).filter(Boolean);
-      const all=[...sl,...inpVals];
-      return p+(all.length?'('+all.join('/')+')'  :'');
-    }).join('/')+']';
-    if(a.ww) s+=' W幅'+a.ww+'cm';
-    if(a.mae||a.ato) s+=' 前'+(a.mae||'—')+'cm/後'+(a.ato||'—')+'cm';
+      s+=' ['+ps.map(p=>{const sl=sb[p]||[];return p+(sl.length?'('+sl.join('/')+')'  :'');}).join('/')+']';
     }
     if(a.memo)s+=' ('+a.memo+')';
     return s;
@@ -1423,7 +1188,8 @@ function openDet(id){
     dw('客様指定',aSum(r.cAlts),true)+dw('指定メモ',r.cMemo,true)+
     dw('実行工程',wStr(r.wAlts),true)+dw('工程メモ',r.wMemo,true)+
     dw('特殊',r.special,true)+
-    dw('機材設定',machineStr(r.machineData),true)+
+    dw('ミシン',r.machine)+dw('針番手',r.needle)+dw('糸番手',r.thread)+
+    dw('糸色番号',r.tcolor)+dw('押さえ',r.foot)+dw('機材メモ',r.mmemo,true)+
     dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
     dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true);
   openOv('ov-det');
@@ -1529,7 +1295,8 @@ function doPrint(){
     ${pr('実行工程',wStr(r.wAlts),true)}${pr('工程メモ',r.wMemo,true)}
     ${pr('特殊',r.special,true)}
     <div class="ps">機材・作業</div>
-    ${pr('機材設定',machineStr(r.machineData),true)}
+    ${pr('ミシン',r.machine)}${pr('針番手',r.needle)}${pr('糸番手',r.thread)}
+    ${pr('糸色番号',r.tcolor)}${pr('押さえ',r.foot)}${pr('機材メモ',r.mmemo,true)}
     ${pr('所要時間',r.time?r.time+'分':null)}${pr('使用資材',r.materials,true)}
     ${pr('金額',r.price?'¥'+r.price.toLocaleString():null)}
     ${pr('備考',r.note,true)}
@@ -1629,7 +1396,7 @@ function doCSV(){
     tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.staff,
     r.item,r.cat,r.clrN||r.clrH,r.pat,r.mat+(r.isSpm?' [特殊素材]':''),
     aSum(r.cAlts),wStr(r.wAlts).replace(/\n/g,' / '),
-    machineStr(r.machineData).replace(/\n/g,' / '),'','','','','',
+    r.machine,r.needle,r.thread,r.tcolor,r.foot,r.mmemo,
     r.time||'',r.materials,r.price||'',r.note,stL(r.status)
   ].map(e).join(','));
   const a=document.createElement('a');
@@ -1733,35 +1500,13 @@ function showImport(){
 }
 function doImport(){
   try{
-    const raw=document.getElementById('imp-text').value.trim();
-    const d=JSON.parse(raw);
-    const msgs=[];
-    // 店名（マッチするもののみ）
-    if(Array.isArray(d.stores)){
-      const valid=d.stores.filter(s=>typeof s==='string'&&s.trim());
-      if(valid.length){sSt(valid);msgs.push('店名 '+valid.length+'件');}
-    }
-    // カテゴリー（マッチするもののみ）
-    if(Array.isArray(d.cats)){
-      const valid=d.cats.filter(c=>typeof c==='string'&&c.trim());
-      if(valid.length){sCt(valid);msgs.push('カテゴリー '+valid.length+'件');}
-    }
-    // 記録データ（recs）
-    if(Array.isArray(d.recs)&&d.recs.length){
-      if(confirm('記録データ '+d.recs.length+'件もインポートしますか？\n現在のデータに追加されます。')){
-        const cur=gR();
-        // 既存IDと重複しないものだけ追加
-        const existIds=new Set(cur.map(r=>r.id));
-        const newRecs=d.recs.filter(r=>r&&r.id&&!existIds.has(r.id));
-        sR([...newRecs,...cur]);
-        msgs.push('記録 '+newRecs.length+'件（重複除外）');
-      }
-    }
-    if(!msgs.length){alert('インポートできるデータが見つかりませんでした');return;}
+    const d=JSON.parse(document.getElementById('imp-text').value.trim());
+    if(!d.stores||!d.cats){alert('形式が正しくありません');return;}
+    if(!confirm('店名'+d.stores.length+'件・カテゴリー'+d.cats.length+'件を復元します。現在の設定は上書きされます。'))return;
+    sSt(d.stores);sCt(d.cats);
     document.getElementById('imp-area').style.display='none';
-    renderMaster();renderWork();renderHist();
-    alert('✅ インポート完了：'+msgs.join('・'));
-  }catch(e){alert('データの読み込みに失敗しました。\nJSON形式のファイルか確認してください。');}
+    renderMaster();alert('✅ 復元しました');
+  }catch(e){alert('テキストの読み込みに失敗しました');}
 }
 
 // ══ START ══
