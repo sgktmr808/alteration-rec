@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y6';
+const APP_VERSION = 'v16y7';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -987,10 +987,25 @@ function updSubs(uid,nm,procs){
     const m=pm.m.find(x=>x.l===l);
     if(m&&m.sub)m.sub.forEach(s=>{
       const on=subs[l]&&subs[l].includes(s);
-      h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
+      if(s==='W幅指定'){
+        h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
+        if(on){
+          const wval=(subs[l+'_W']||'');
+          h+=`<input class="dmi" type="number" id="wsub-${uid}" placeholder="cm" step="0.5" min="0" value="${wval}" oninput="setWSub('${uid}','${l}',this.value)" style="width:68px;margin-left:4px">`;
+        }
+      } else {
+        h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
+      }
     });
   });
   sw.innerHTML=h;
+}
+
+function setWSub(uid,pl,val){
+  const body=document.getElementById('body-'+uid);
+  let subs=JSON.parse(body.dataset.subs||'{}');
+  subs[pl+'_W']=val;
+  body.dataset.subs=JSON.stringify(subs);
 }
 function togSub(uid,pl,sv){
   const body=document.getElementById('body-'+uid);
@@ -1255,7 +1270,7 @@ function wStr(alts){
     const ps=a.procs||[];
     if(ps.length){
       const sb=a.subs||{};
-      s+=' ['+ps.map(p=>{const sl=sb[p]||[];return p+(sl.length?'('+sl.join('/')+')'  :'');}).join('/')+']';
+      s+=' ['+ps.map(p=>{const sl=sb[p]||[];const wv=sb[p+'_W'];const wlabel=sl.map(x=>x==='W幅指定'&&wv?'W幅'+wv+'cm':x);return p+(wlabel.length?'('+wlabel.join('/')+')'  :'');}).join('/')+']';
     }
     if(a.memo)s+=' ('+a.memo+')';
     return s;
