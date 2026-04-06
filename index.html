@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y32';
+const APP_VERSION = 'v16y33';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -698,8 +698,9 @@ const PROC={
     {id:'fk',l:'袋縫い'},
   ]},
   'わたり':{m:[
-    {id:'ui',l:'内のみ',ex:'wr'},{id:'so',l:'外のみ',ex:'wr'},
-    {id:'bt',l:'内外',ex:'wr'},
+    {id:'ui',l:'内のみ',ex:'wr',sub:[{l:'シック触り',ex:'is'},{l:'くり直し',ex:'is'}]},
+    {id:'so',l:'外のみ',ex:'wr',sub:[{l:'ポケット触り',ex:'os'}]},
+    {id:'bt',l:'内外',  ex:'wr',sub:[{l:'シック触り',ex:'is'},{l:'くり直し',ex:'is'},{l:'ポケット触り',ex:'os'}]},
   ]},
   '股上':{m:[{id:'ma',l:'前股上'},{id:'us',l:'後股上'},{id:'bt',l:'両方'},{id:'lm',l:'限界あり',fin:true}]},
   'ヒップ':{m:[{id:'wk',l:'脇縫い'},{id:'lm',l:'限界あり',fin:true}]},
