@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y11';
+const APP_VERSION = 'v16y12';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -654,12 +654,12 @@ const ALT={
 
 const PROC={
   '裾上げ':{m:[
-    {id:'sg', l:'シングル',   ex:'sty',sub:[{l:'手まつり',ex:'sg_f'},{l:'ミシン',ex:'sg_f'}]},
-    {id:'di', l:'ダブル',     ex:'sty',sub:[{l:'糸止め',ex:'ds'},{l:'スナップ',ex:'ds'},{l:'TomFord使用',ex:'ds'}]},
-    {id:'mo', l:'モーニング', ex:'sty',sub:[{l:'手まつり',ex:'mo_f'},{l:'ミシン',ex:'mo_f'}]},
-    {id:'gc', l:'Gカット',    ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
-    {id:'ls', l:'ロックステッチ', ex:'fin'},
-    {id:'gm', l:'ゴム補正',       ex:'fin'},
+    {id:'sg', l:'シングル',       ex:'sty',sub:[{l:'手まつり',ex:'sg_f'},{l:'ミシン',ex:'sg_f'},{l:'前後差あり(cm入力)',ex:null}]},
+    {id:'di', l:'ダブル',         ex:'sty',sub:[{l:'糸止め',ex:'ds'},{l:'スナップ',ex:'ds'},{l:'TomFord使用',ex:'ds'}]},
+    {id:'mo', l:'モーニング',     ex:'sty',sub:[{l:'手まつり',ex:'mo_f'},{l:'ミシン',ex:'mo_f'},{l:'前後差あり(cm入力)',ex:null}]},
+    {id:'gc', l:'Gカット',        ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
+    {id:'ls', l:'ロックステッチ', ex:'sty'},
+    {id:'gm', l:'ゴム補正',       ex:'sty'},
   ]},
   '着丈':{m:[
     {id:'sg',l:'シングル',ex:'sty'},{id:'tm',l:'手まつり',ex:'sty'},
@@ -906,8 +906,12 @@ function buildAB(a,uid,isW){
     h+=`<div class="dtrow">
       ${['股下','カット寸法','総丈'].map(t=>`<button class="dtb" id="dtb-${uid}-${t.replace(' ','_')}" onclick="setDT('${uid}','${t}')">${t}</button>`).join('')}
     </div>
-    <div class="dmrow">
-      <input class="dmi" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0">
+    <div class="dmrow" style="gap:4px">
+      <span style="font-size:11px;color:var(--tx3)">左</span>
+      <input class="dmi" type="number" id="dim-L-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
+      <span class="dmu">cm</span>
+      <span style="font-size:11px;color:var(--tx3);margin-left:4px">右</span>
+      <input class="dmi" type="number" id="dim-R-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
       <span class="dmu">cm</span>
     </div>`;
   }else if(a.dm==='cm'){
@@ -1037,6 +1041,8 @@ function setWW(uid,val){
   const body=document.getElementById('body-'+uid);
   body.dataset.ww=val;
 }
+function setMae(uid,val){document.getElementById('body-'+uid).dataset.mae=val;}
+function setAto(uid,val){document.getElementById('body-'+uid).dataset.ato=val;}
 function togSub(uid,pl,sv){
   const body=document.getElementById('body-'+uid);
   let subs=JSON.parse(body.dataset.subs||'{}');
@@ -1059,15 +1065,18 @@ function colAlts(cid,cat){
     const body=document.getElementById('body-'+uid);
     const dv=body.dataset.dv||'';
     const dir=dv==='t'?'詰め':dv==='d'?'出し':dv==='n'?'未定':'';
-    const dimEl=document.getElementById('dim-'+uid);
-    const dim=dimEl?(parseFloat(dimEl.value)||null):null;
+    const dimElL=document.getElementById('dim-L-'+uid);
+    const dimElR=document.getElementById('dim-R-'+uid);
+    const dimL=dimElL?(parseFloat(dimElL.value)||null):null;
+    const dimR=dimElR?(parseFloat(dimElR.value)||null):null;
+    const dim=dimL||dimR?{L:dimL,R:dimR}:null;
     const dl=body.dataset.dl||'';
     const memo=document.getElementById('memo-'+uid)?.value?.trim()||'';
     if(isW){
       const procs=JSON.parse(body.dataset.procs||'[]');
       const subs=JSON.parse(body.dataset.subs||'{}');
       const ww=body.dataset.ww||'';
-      return{n:a.n,dir,procs,subs,ww,memo};
+      const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,memo};
     }
     return{n:a.n,dir,dim,dl,memo};
   }).filter(Boolean);
@@ -1277,7 +1286,13 @@ function aSum(alts){
   return (alts||[]).map(a=>{
     let s=a.n+(a.dir?' '+a.dir:'');
     if(a.dl)s+=' ['+a.dl+']';
-    if(a.dim)s+=' '+a.dim+'cm';
+    if(a.dim){
+      if(typeof a.dim==='object'){
+        if(a.dim.L&&a.dim.R&&a.dim.L!==a.dim.R) s+=' 左'+a.dim.L+'cm/右'+a.dim.R+'cm';
+        else if(a.dim.L) s+=' '+a.dim.L+'cm';
+        else if(a.dim.R) s+=' '+a.dim.R+'cm';
+      } else { s+=' '+a.dim+'cm'; }
+    }
     return s;
   }).join(' / ');
 }
@@ -1303,6 +1318,7 @@ function wStr(alts){
       const sb=a.subs||{};
       s+=' ['+ps.map(p=>{const sl=sb[p]||[];return p+(sl.length?'('+sl.join('/')+')'  :'');}).join('/')+']';
     if(a.ww) s+=' W幅'+a.ww+'cm';
+    if(a.mae||a.ato) s+=' 前'+(a.mae||'—')+'cm/後'+(a.ato||'—')+'cm';
     }
     if(a.memo)s+=' ('+a.memo+')';
     return s;
