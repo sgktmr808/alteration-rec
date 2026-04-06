@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y14';
+const APP_VERSION = 'v16y15';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -936,11 +936,8 @@ function buildAB(a,uid,isW){
           <span class="dmu">cm</span>
         </div>
         <div class="dmrow" id="morning-diff-${uid}" style="display:none;gap:4px">
-          <span style="font-size:11px;color:var(--tx3)">前後差 前</span>
+          <span style="font-size:11px;color:var(--tx3)">前後差</span>
           <input class="dmi" type="number" id="mae-${uid}" placeholder="cm" step="0.5" oninput="setMae('${uid}',this.value)" style="flex:1">
-          <span class="dmu">cm</span>
-          <span style="font-size:11px;color:var(--tx3);margin-left:4px">後</span>
-          <input class="dmi" type="number" id="ato-${uid}" placeholder="cm" step="0.5" oninput="setAto('${uid}',this.value)" style="flex:1">
           <span class="dmu">cm</span>
         </div>`;
       }
