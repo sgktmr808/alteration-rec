@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y33';
+const APP_VERSION = 'v16y34';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -486,7 +486,7 @@ const ALT={
     {n:'ウエスト', d:'both',dm:'cm'},
     {n:'裾幅',     d:'both',dm:'cm'},
     {n:'わたり',   d:'both',dm:'cm'},
-    {n:'股上',     d:'both',dm:'cm'},
+    {n:'股上',     d:'none',dm:'none'},
     {n:'ヒップ',   d:'both',dm:'cm'},
     {n:'スリット移動',d:'none',dm:'none'},
     {n:'ファスナー交換',d:'none',dm:'none'},
@@ -698,11 +698,13 @@ const PROC={
     {id:'fk',l:'袋縫い'},
   ]},
   'わたり':{m:[
-    {id:'ui',l:'内のみ',ex:'wr',sub:[{l:'シック触り',ex:'is'},{l:'くり直し',ex:'is'}]},
-    {id:'so',l:'外のみ',ex:'wr',sub:[{l:'ポケット触り',ex:'os'}]},
-    {id:'bt',l:'内外',  ex:'wr',sub:[{l:'シック触り',ex:'is'},{l:'くり直し',ex:'is'},{l:'ポケット触り',ex:'os'}]},
+    {id:'ui',l:'内のみ',ex:'wr',sub:['シック触り','くり直し']},
+    {id:'so',l:'外のみ',ex:'wr',sub:['ポケット触り']},
+    {id:'bt',l:'内外',  ex:'wr',sub:['シック触り','くり直し','ポケット触り']},
   ]},
-  '股上':{m:[{id:'ma',l:'前股上'},{id:'us',l:'後股上'},{id:'bt',l:'両方'},{id:'lm',l:'限界あり',fin:true}]},
+  '股上':{m:[
+    {id:'wd',l:'ウエストダウン補正'},
+  ]},
   'ヒップ':{m:[{id:'wk',l:'脇縫い'},{id:'lm',l:'限界あり',fin:true}]},
   'バスト':{m:[{id:'wk',l:'脇縫い'},{id:'dt',l:'ダーツ'},{id:'lm',l:'限界あり',fin:true}]},
   '肩幅':{m:[{id:'kt',l:'肩線'},{id:'sd',l:'袖付け'}]},
@@ -971,6 +973,22 @@ function buildAB(a,uid,isW){
     }
   }
 
+  // 股上専用：ウエストダウン補正の前後cm入力
+  if(a.n==='股上'){
+    h+=`<div id="koko-wd-${uid}" style="display:none;margin:6px 0;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd)">
+      <div style="font-size:10px;color:var(--gold);font-weight:700;margin-bottom:8px">ウエストダウン補正</div>
+      <div class="dmrow" style="gap:4px;margin-bottom:6px">
+        <span style="font-size:11px;color:var(--tx3)">前</span>
+        <input class="dmi" type="number" id="koko-mae-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setKokoMae('${uid}',this.value)" style="flex:1">
+        <span class="dmu">cm</span>
+      </div>
+      <div class="dmrow" style="gap:4px">
+        <span style="font-size:11px;color:var(--tx3)">後ろ</span>
+        <input class="dmi" type="number" id="koko-ato-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setKokoAto('${uid}',this.value)" style="flex:1">
+        <span class="dmu">cm</span>
+      </div>
+    </div>`;
+  }
   h+=`<input class="pm" type="text" id="memo-${uid}" placeholder="メモ（任意）">`;
   return h;
 }
@@ -1031,6 +1049,9 @@ function togProc(uid,mid,nm){
   // ダブル選択時にW幅入力欄を表示
   const wwEl=document.getElementById('wwidth-'+uid);
   if(wwEl) wwEl.style.display=procs.includes('ダブル')?'flex':'none';
+  // 股上：ウエストダウン補正選択時に前後入力欄を表示
+  const wdEl=document.getElementById('koko-wd-'+uid);
+  if(wdEl) wdEl.style.display=procs.includes('ウエストダウン補正')?'block':'none';
   // モーニング選択時に前後差入力欄を表示
   const moEl=document.getElementById('morning-diff-'+uid);
   if(moEl) moEl.style.display=procs.includes('モーニング')?'flex':'none';
@@ -1128,6 +1149,8 @@ function setSWPosDim(uid,val){
   document.getElementById('body-'+uid).dataset.swposdim=val;
 }
 function setMae(uid,val){document.getElementById('body-'+uid).dataset.mae=val;}
+function setKokoMae(uid,val){document.getElementById('body-'+uid).dataset.kokomae=val;}
+function setKokoAto(uid,val){document.getElementById('body-'+uid).dataset.kokoato=val;}
 function setSubInp(uid,pl,sl,val){
   const body=document.getElementById('body-'+uid);
   let subs=JSON.parse(body.dataset.subs||'{}');
@@ -1171,7 +1194,7 @@ function colAlts(cid,cat){
       const procs=JSON.parse(body.dataset.procs||'[]');
       const subs=JSON.parse(body.dataset.subs||'{}');
       const ww=body.dataset.ww||'';
-      const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,memo};
+      const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';const kokomae=body.dataset.kokomae||'';const kokoato=body.dataset.kokoato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,kokomae,kokoato,memo};
     }
     return{n:a.n,dir,dim,dl,swsub,swpos,swposdim,memo};
   }).filter(Boolean);
@@ -1423,6 +1446,7 @@ function wStr(alts){
     }).join('/')+']';
     if(a.ww) s+=' W幅'+a.ww+'cm';
     if(a.mae||a.ato) s+=' 前'+(a.mae||'—')+'cm/後'+(a.ato||'—')+'cm';
+    if(a.kokomae||a.kokoato) s+=' [前'+(a.kokomae||'—')+'cm/後'+(a.kokoato||'—')+'cm]';
     }
     if(a.memo)s+=' ('+a.memo+')';
     return s;
