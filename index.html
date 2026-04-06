@@ -188,28 +188,27 @@ select option{background:#1a1a24}
 .cpb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer}
 .imb{width:100%;margin-top:5px;padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
 @media print{
-  /* 全要素を非表示にしてprint-areaのみ表示 */
-  html{background:#fff!important}
-  body{background:#fff!important;color:#000!important}
+  @page{size:A4 portrait;margin:12mm 14mm}
+  html,body{background:#fff!important;color:#000!important}
   body > *:not(#print-area){display:none!important;visibility:hidden!important}
   #print-area{display:block!important;visibility:visible!important;
     position:fixed!important;inset:0!important;
     background:#fff!important;color:#000!important;
-    z-index:99999!important}
-  #print-area *{visibility:visible!important;color:inherit!important;background:inherit!important}
-  html,body{background:#fff!important}
-  body *{visibility:hidden}
-  #print-area,#print-area *{visibility:visible}
-  #print-area{position:fixed;inset:0;background:#fff;color:#000;font-family:var(--f);padding:16px;overflow:visible}
-  .ph{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end}
-  .pt{font-size:18px;font-weight:700}
-  .pn{font-size:12px;color:#444}
-  .pr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #ddd;font-size:13px;gap:10px}
-  .pk{color:#666;flex-shrink:0;min-width:90px}
+    z-index:99999!important;padding:0!important}
+  #print-area *{visibility:visible!important}
+  .ph{border-bottom:2pt solid #000;padding-bottom:8pt;margin-bottom:10pt;
+      display:flex;justify-content:space-between;align-items:flex-end}
+  .pt{font-size:16pt;font-weight:700;font-family:'Hiragino Sans',sans-serif}
+  .pn{font-size:9pt;color:#444;margin-top:2pt}
+  .pr{display:flex;justify-content:space-between;padding:4pt 0;
+      border-bottom:0.5pt solid #ddd;font-size:9pt;gap:10pt}
+  .pk{color:#666;flex-shrink:0;min-width:80pt;font-size:8pt}
   .pv{color:#000;font-weight:500;text-align:right;word-break:break-all}
-  .pvp{color:#000;white-space:pre-wrap;text-align:right;font-size:12px;line-height:1.6}
-  .ps{font-size:10px;font-weight:700;letter-spacing:.1em;color:#888;text-transform:uppercase;margin:10px 0 4px}
-  .pf{margin-top:14px;font-size:11px;color:#888;text-align:right}
+  .pvp{color:#000;white-space:pre-wrap;text-align:right;font-size:8.5pt;line-height:1.5}
+  .ps{font-size:7pt;font-weight:700;letter-spacing:.1em;color:#888;
+      text-transform:uppercase;margin:8pt 0 3pt;border-top:0.5pt solid #eee;padding-top:6pt}
+  .pf{margin-top:10pt;font-size:7.5pt;color:#888;text-align:right;
+      border-top:0.5pt solid #eee;padding-top:6pt}
 }
 </style>
 </head>
