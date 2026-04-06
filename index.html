@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y19';
+const APP_VERSION = 'v16y20';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -696,8 +696,6 @@ const PROC={
     {id:'ry',l:'両脇',     ex:'sw'},
     {id:'fs',l:'折り伏せ'},
     {id:'fk',l:'袋縫い'},
-    {id:'ts',l:'詰め寸法', sub:[{l:'平置き',ex:'ms'},{l:'ぐるり',ex:'ms'},{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'寸法'}]},
-    {id:'ag',l:'仕上がり寸法',sub:[{l:'平置き',ex:'fs'},{l:'ぐるり',ex:'fs'},{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'寸法'}]},
     {id:'sk',l:'裾から',   ex:'pos',sub:[{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'裾から'}]},
     {id:'hn',l:'膝上',     ex:'pos',sub:[{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'膝上'}]},
   ]},
@@ -968,6 +966,11 @@ function setDir(uid,d){
     if(b)b.className='db'+(d===x?' '+d:'');
   });
   document.getElementById('body-'+uid).dataset.dv=d;
+  // 裾幅の詰め/出しサブ入力欄の表示切替
+  const tsEl=document.getElementById('dir-tsub-'+uid);
+  const dsEl=document.getElementById('dir-dsub-'+uid);
+  if(tsEl) tsEl.style.display=d==='t'?'block':'none';
+  if(dsEl) dsEl.style.display=d==='d'?'block':'none';
 }
 function setDT(uid,t){
   ['股下','カット寸法','総丈'].forEach(x=>{
@@ -1063,6 +1066,21 @@ function setWW(uid,val){
   const body=document.getElementById('body-'+uid);
   body.dataset.ww=val;
 }
+function setDirSub(uid,d,val){
+  const body=document.getElementById('body-'+uid);
+  body.dataset['dsub_'+d]=val;
+  // 排他ボタン更新
+  const map={t:['hk','gr'],d:[]};
+  if(d==='t'){
+    ['hk','gr'].forEach(k=>{
+      const b=document.getElementById('tsub-'+k+'-'+uid);
+      if(b) b.className='sb'+(val===(k==='hk'?'平置き':'ぐるり')?' on':'');
+    });
+  }
+}
+function setDirDim(uid,d,val){
+  document.getElementById('body-'+uid).dataset['ddim_'+d]=val;
+}
 function setMae(uid,val){document.getElementById('body-'+uid).dataset.mae=val;}
 function setSubInp(uid,pl,sl,val){
   const body=document.getElementById('body-'+uid);
@@ -1092,6 +1110,9 @@ function colAlts(cid,cat){
     if(!chk||!chk.checked)return null;
     const body=document.getElementById('body-'+uid);
     const dv=body.dataset.dv||'';
+    const dsub_t=body.dataset.dsub_t||'';
+    const ddim_t=body.dataset.ddim_t||'';
+    const ddim_d=body.dataset.ddim_d||'';
     const dir=dv==='t'?'詰め':dv==='d'?'出し':dv==='n'?'未定':'';
     const dimElL=document.getElementById('dim-L-'+uid);
     const dimElR=document.getElementById('dim-R-'+uid);
@@ -1106,7 +1127,7 @@ function colAlts(cid,cat){
       const ww=body.dataset.ww||'';
       const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,memo};
     }
-    return{n:a.n,dir,dim,dl,memo};
+    return{n:a.n,dir,dim,dl,dirSub:dsub_t,dirDimT:ddim_t,dirDimD:ddim_d,memo};
   }).filter(Boolean);
 }
 
@@ -1321,6 +1342,8 @@ function aSum(alts){
         else if(a.dim.R) s+=' '+a.dim.R+'cm';
       } else { s+=' '+a.dim+'cm'; }
     }
+    if(a.dirDimT) s+=' 詰め寸法'+(a.dirSub?' ['+a.dirSub+']':'')+' '+a.dirDimT+'cm';
+    if(a.dirDimD) s+=' 仕上がり寸法 '+a.dirDimD+'cm';
     return s;
   }).join(' / ');
 }
