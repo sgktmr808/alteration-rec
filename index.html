@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y25';
+const APP_VERSION = 'v16y26';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -696,8 +696,6 @@ const PROC={
     {id:'ry',l:'両脇',     ex:'sw'},
     {id:'fs',l:'折り伏せ'},
     {id:'fk',l:'袋縫い'},
-    {id:'sk',l:'裾から',   ex:'pos'},
-    {id:'hn',l:'膝上',     ex:'pos'},
   ]},
   'わたり':{m:[
     {id:'ui',l:'内のみ',ex:'wr'},{id:'so',l:'外のみ',ex:'wr'},
@@ -928,10 +926,22 @@ function buildAB(a,uid,isW){
     </div>`;
     // 裾幅専用：cm入力の下にサブ選択を表示
     if(a.n==='裾幅'){
-      h+=`<div id="sw-dirsub-${uid}" style="display:none;flex-wrap:wrap;gap:4px;margin-top:6px">
-        <button class="sb" id="sw-hk-${uid}" onclick="setSWSub('${uid}','平置き')">平置き</button>
-        <button class="sb" id="sw-gr-${uid}" onclick="setSWSub('${uid}','ぐるり')">ぐるり</button>
-        <button class="sb" id="sw-ag-${uid}" onclick="setSWSub('${uid}','仕上がり寸法')">仕上がり寸法</button>
+    sw-dirsub-${uid}" style="display:none;margin-top:6px">
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+          <button class="sb" id="sw-hk-${uid}" onclick="setSWSub('${uid}','平置き')">平置き</button>
+          <button class="sb" id="sw-gr-${uid}" onclick="setSWSub('${uid}','ぐるり')">ぐるり</button>
+          <button class="sb" id="sw-ag-${uid}" onclick="setSWSub('${uid}','仕上がり寸法')">仕上がり寸法</button>
+        </div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:3px">位置指定（排他）</div>
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <button class="sb" id="sw-sk-${uid}" onclick="setSWPos('${uid}','裾から')">裾から</button>
+          <button class="sb" id="sw-hn-${uid}" onclick="setSWPos('${uid}','膝上')">膝上</button>
+        </div>
+        <div class="dmrow" id="sw-pos-${uid}" style="gap:4px;display:none">
+          <span style="font-size:11px;color:var(--tx3)" id="sw-poslbl-${uid}"></span>
+          <input class="dmi" type="number" id="sw-posdim-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setSWPosDim('${uid}',this.value)" style="flex:1">
+          <span class="dmu">cm</span>
+        </div>
       </div>`;
     }
   }
