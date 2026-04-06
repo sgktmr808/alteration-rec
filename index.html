@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y23';
+const APP_VERSION = 'v16y24';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -926,6 +926,14 @@ function buildAB(a,uid,isW){
       <input class="dmi" type="number" id="dim-${uid}" placeholder="0.0" step="0.5" min="0">
       <span class="dmu">cm</span>
     </div>`;
+    // 裾幅専用：cm入力の下にサブ選択を表示
+    if(a.n==='裾幅'){
+      h+=`<div id="sw-dirsub-${uid}" style="display:none;flex-wrap:wrap;gap:4px;margin-top:6px">
+        <button class="sb" id="sw-hk-${uid}" onclick="setSWSub('${uid}','平置き')">平置き</button>
+        <button class="sb" id="sw-gr-${uid}" onclick="setSWSub('${uid}','ぐるり')">ぐるり</button>
+        <button class="sb" id="sw-ag-${uid}" onclick="setSWSub('${uid}','仕上がり寸法')">仕上がり寸法</button>
+      </div>`;
+    }
   }
   if(isW){
     const pm=PROC[a.n];
@@ -950,37 +958,7 @@ function buildAB(a,uid,isW){
       }
     }
   }
-  // 裾幅専用：詰め/出しサブ（シンプル版）
-  if(a.n==='裾幅'){
-    ['t','d'].forEach(d=>{
-      const dlbl=d==='t'?'詰め':'出し';
-      h+=`<div id="sw-${d}sub-${uid}" style="display:none;margin:6px 0;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd)">
-        <div style="font-size:10px;color:var(--gold);font-weight:700;margin-bottom:6px">${dlbl}の詳細</div>
-        <div style="display:flex;gap:4px;margin-bottom:6px">
-          <button class="sb" id="sw${d}-hk-${uid}" onclick="setSWSub('${uid}','${d}','平置き')">平置き</button>
-          <button class="sb" id="sw${d}-gr-${uid}" onclick="setSWSub('${uid}','${d}','ぐるり')">ぐるり</button>
-          <button class="sb" id="sw${d}-ag-${uid}" onclick="setSWSub('${uid}','${d}','仕上がり寸法')">仕上がり寸法</button>
-        </div>
-        <div class="dmrow" style="gap:4px">
-          <span style="font-size:11px;color:var(--tx3)">寸法</span>
-          <input class="dmi" type="number" id="sw-${d}dim-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setSWDim('${uid}','${d}',this.value)" style="flex:1">
-          <span class="dmu">cm</span>
-        </div>
-      </div>`;
-    });
-    // 裾から・膝上（共通）
-    h+=`<div style="margin-top:4px">
-      <div style="display:flex;gap:4px;margin-bottom:4px">
-        <button class="sb" id="sw-sk-${uid}" onclick="setSWPos('${uid}','裾から')">裾から</button>
-        <button class="sb" id="sw-hn-${uid}" onclick="setSWPos('${uid}','膝上')">膝上</button>
-      </div>
-      <div class="dmrow" id="sw-pos-${uid}" style="gap:4px;display:none">
-        <span style="font-size:11px;color:var(--tx3)" id="sw-poslbl-${uid}"></span>
-        <input class="dmi" type="number" id="sw-posdim-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setSWPosDim('${uid}',this.value)" style="flex:1">
-        <span class="dmu">cm</span>
-      </div>
-    </div>`;
-  }
+
   h+=`<input class="pm" type="text" id="memo-${uid}" placeholder="メモ（任意）">`;
   return h;
 }
@@ -994,14 +972,12 @@ function togAlt(uid){
 function setDir(uid,d){
   ['t','d','n'].forEach(x=>{
     const b=document.getElementById(`db-${x}-${uid}`);
-    if(b)b.className='db'+(d===x?' '+d:'');
+    if(b)b.className='db'+(d===x?' '+x:'');
   });
   document.getElementById('body-'+uid).dataset.dv=d;
-  // 裾幅の詰め/出しサブ入力欄の表示切替
-  ['t','d'].forEach(x=>{
-    const el=document.getElementById('sw-'+x+'sub-'+uid);
-    if(el) el.style.display=d===x?'block':'none';
-  });
+  // 裾幅：詰め/出し選択時にサブ選択を表示
+  const subEl=document.getElementById('sw-dirsub-'+uid);
+  if(subEl) subEl.style.display=(d==='t'||d==='d')?'flex':'none';
 }
 function setDT(uid,t){
   ['股下','カット寸法','総丈'].forEach(x=>{
@@ -1097,11 +1073,11 @@ function setWW(uid,val){
   const body=document.getElementById('body-'+uid);
   body.dataset.ww=val;
 }
-function setSWSub(uid,d,val){
+function setSWSub(uid,val){
   const body=document.getElementById('body-'+uid);
-  body.dataset['swsub_'+d]=val;
+  body.dataset.swsub=val;
   ['hk','gr','ag'].forEach(k=>{
-    const b=document.getElementById('sw'+d+'-'+k+'-'+uid);
+    const b=document.getElementById('sw-'+k+'-'+uid);
     const map={hk:'平置き',gr:'ぐるり',ag:'仕上がり寸法'};
     if(b) b.className='sb'+(val===map[k]?' on':'');
   });
@@ -1153,8 +1129,7 @@ function colAlts(cid,cat){
     if(!chk||!chk.checked)return null;
     const body=document.getElementById('body-'+uid);
     const dv=body.dataset.dv||'';
-    const getSW=x=>({sub:body.dataset['swsub_'+x]||'',dim:body.dataset['swdim_'+x]||''});
-    const swT=getSW('t'),swD=getSW('d');
+    const swsub=body.dataset.swsub||'';
     const swpos=body.dataset.swpos||'';
     const swposdim=body.dataset.swposdim||'';
     const dir=dv==='t'?'詰め':dv==='d'?'出し':dv==='n'?'未定':'';
@@ -1171,7 +1146,7 @@ function colAlts(cid,cat){
       const ww=body.dataset.ww||'';
       const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,memo};
     }
-    return{n:a.n,dir,dim,dl,swT,swD,swpos,swposdim,memo};
+    return{n:a.n,dir,dim,dl,swsub,swpos,swposdim,memo};
   }).filter(Boolean);
 }
 
@@ -1386,8 +1361,7 @@ function aSum(alts){
         else if(a.dim.R) s+=' '+a.dim.R+'cm';
       } else { s+=' '+a.dim+'cm'; }
     }
-    if(a.swT&&a.swT.dim) s+=' 詰め:'+(a.swT.sub?'['+a.swT.sub+']':'')+a.swT.dim+'cm';
-    if(a.swD&&a.swD.dim) s+=' 出し:'+(a.swD.sub?'['+a.swD.sub+']':'')+a.swD.dim+'cm';
+    if(a.swsub) s+=' ['+a.swsub+']';
     if(a.swpos) s+=' '+a.swpos+(a.swposdim?' '+a.swposdim+'cm':'');
     return s;
   }).join(' / ');
