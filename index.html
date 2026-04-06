@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y9';
+const APP_VERSION = 'v16y10';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -1031,7 +1031,7 @@ function togSubEx(uid,pl,sv,exGroup){
   }
   body.dataset.subs=JSON.stringify(subs);
   const procs=JSON.parse(body.dataset.procs||'[]');
-  updSubs(uid,pl,procs);
+  updSubs(uid,body.dataset.name,procs);
 }
 
 function setWW(uid,val){
@@ -1046,7 +1046,7 @@ function togSub(uid,pl,sv){
   if(i>=0)subs[pl].splice(i,1);else subs[pl].push(sv);
   body.dataset.subs=JSON.stringify(subs);
   const procs=JSON.parse(body.dataset.procs||'[]');
-  updSubs(uid,pl,procs);
+  updSubs(uid,body.dataset.name,procs);
 }
 
 // ══ COLLECT ══
