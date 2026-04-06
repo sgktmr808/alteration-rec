@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y8';
+const APP_VERSION = 'v16y9';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -655,7 +655,7 @@ const ALT={
 const PROC={
   '裾上げ':{m:[
     {id:'sg', l:'シングル',   ex:'sty'},
-    {id:'di', l:'ダブル',     ex:'sty',sub:['糸止め','スナップ','TomFord使用']},
+    {id:'di', l:'ダブル',     ex:'sty',sub:[{l:'糸止め',ex:'ds'},{l:'スナップ',ex:'ds'},{l:'TomFord使用',ex:'ds'}]},
     {id:'mo', l:'モーニング', ex:'sty'},
     {id:'gc', l:'Gカット',    ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
     {id:'tm', l:'手まつり'},
@@ -996,12 +996,42 @@ function updSubs(uid,nm,procs){
   let h='';
   procs.forEach(l=>{
     const m=pm.m.find(x=>x.l===l);
-    if(m&&m.sub)m.sub.forEach(s=>{
-      const on=subs[l]&&subs[l].includes(s);
-      h+=`<button class="sb${on?' on':''}" onclick="togSub('${uid}','${l}','${s}')">${s}</button>`;
-    });
+    if(m&&m.sub){
+      const subList=m.sub.map(s=>typeof s==='object'?s:{l:s,ex:null});
+      subList.forEach(s=>{
+        const on=subs[l]&&subs[l].includes(s.l);
+        h+=`<button class="sb${on?' on':''}" onclick="togSubEx('${uid}','${l}','${s.l}','${s.ex||''}')">${s.l}</button>`;
+      });
+    }
   });
   sw.innerHTML=h;
+}
+
+function togSubEx(uid,pl,sv,exGroup){
+  const body=document.getElementById('body-'+uid);
+  let subs=JSON.parse(body.dataset.subs||'{}');
+  if(!subs[pl])subs[pl]=[];
+  const already=subs[pl].includes(sv);
+  if(already){
+    subs[pl]=subs[pl].filter(x=>x!==sv);
+  } else {
+    if(exGroup){
+      // 同じ排他グループの選択を外す
+      const pm=PROC[body.dataset.name||''];
+      if(pm){
+        const m=pm.m.find(x=>x.l===pl);
+        if(m&&m.sub){
+          const subList=m.sub.map(s=>typeof s==='object'?s:{l:s,ex:null});
+          const exItems=subList.filter(s=>s.ex===exGroup).map(s=>s.l);
+          subs[pl]=subs[pl].filter(x=>!exItems.includes(x));
+        }
+      }
+    }
+    subs[pl].push(sv);
+  }
+  body.dataset.subs=JSON.stringify(subs);
+  const procs=JSON.parse(body.dataset.procs||'[]');
+  updSubs(uid,pl,procs);
 }
 
 function setWW(uid,val){
