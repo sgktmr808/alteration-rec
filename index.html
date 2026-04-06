@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y27';
+const APP_VERSION = 'v16y28';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -987,7 +987,7 @@ function setDir(uid,d){
   document.getElementById('body-'+uid).dataset.dv=d;
   // 裾幅：詰め/出し選択時にサブ選択を表示
   const subEl=document.getElementById('sw-dirsub-'+uid);
-  if(subEl) subEl.style.display=(d==='t'||d==='d')?'flex':'none';
+  if(subEl) subEl.style.display=(d==='t'||d==='d')?'block':'none';
 }
 function setDT(uid,t){
   ['股下','カット寸法','総丈'].forEach(x=>{
@@ -1095,8 +1095,30 @@ function setSWSub(uid,val){
 function setSWDim(uid,d,val){
   document.getElementById('body-'+uid).dataset['swdim_'+d]=val;
 }
-function setSWPosDim(uid,d,val){
-  document.getElementById('body-'+uid).dataset['swposdim_'+d]=val;
+function setSWPos(uid,val){
+  const body=document.getElementById('body-'+uid);
+  if(body.dataset.swpos===val){
+    body.dataset.swpos='';
+    ['sk','hn'].forEach(k=>{
+      const b=document.getElementById('sw-'+k+'-'+uid);
+      if(b) b.className='sb';
+    });
+    const row=document.getElementById('sw-pos-'+uid);
+    if(row) row.style.display='none';
+    return;
+  }
+  body.dataset.swpos=val;
+  ['sk','hn'].forEach(k=>{
+    const b=document.getElementById('sw-'+k+'-'+uid);
+    if(b) b.className='sb'+(val===(k==='sk'?'裾から':'膝上')?' on':'');
+  });
+  const row=document.getElementById('sw-pos-'+uid);
+  const lbl=document.getElementById('sw-poslbl-'+uid);
+  if(row) row.style.display='flex';
+  if(lbl) lbl.textContent=val+'から';
+}
+function setSWPosDim(uid,val){
+  document.getElementById('body-'+uid).dataset.swposdim=val;
 }
 function setMae(uid,val){document.getElementById('body-'+uid).dataset.mae=val;}
 function setSubInp(uid,pl,sl,val){
