@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y21';
+const APP_VERSION = 'v16y22';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -950,6 +950,40 @@ function buildAB(a,uid,isW){
       }
     }
   }
+  // 裾幅専用：詰め/出し共通サブオプション
+  if(a.n==='裾幅'){
+    ['t','d'].forEach(d=>{
+      const dlbl=d==='t'?'詰め':'出し';
+      h+=`<div id="sw-${d}sub-${uid}" style="display:none;margin:6px 0;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd)">
+        <div style="font-size:10px;color:var(--gold);font-weight:700;margin-bottom:6px">${dlbl}の詳細</div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:3px">寸法種別（排他）</div>
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <button class="sb" id="sw${d}-ts-${uid}" onclick="setSWType('${uid}','${d}','詰め寸法')">詰め寸法</button>
+          <button class="sb" id="sw${d}-ag-${uid}" onclick="setSWType('${uid}','${d}','仕上がり寸法')">仕上がり寸法</button>
+        </div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:3px">測り方（排他）</div>
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <button class="sb" id="sw${d}-hk-${uid}" onclick="setSWMeasure('${uid}','${d}','平置き')">平置き</button>
+          <button class="sb" id="sw${d}-gr-${uid}" onclick="setSWMeasure('${uid}','${d}','ぐるり')">ぐるり</button>
+        </div>
+        <div class="dmrow" style="gap:4px;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--tx3)">寸法</span>
+          <input class="dmi" type="number" id="sw-${d}dim-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setSWDim('${uid}','${d}',this.value)" style="flex:1">
+          <span class="dmu">cm</span>
+        </div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:3px">位置指定（排他）</div>
+        <div style="display:flex;gap:4px;margin-bottom:4px">
+          <button class="sb" id="sw${d}-sk-${uid}" onclick="setSWPos('${uid}','${d}','裾から')">裾から</button>
+          <button class="sb" id="sw${d}-hn-${uid}" onclick="setSWPos('${uid}','${d}','膝上')">膝上</button>
+        </div>
+        <div class="dmrow" id="sw-${d}pos-${uid}" style="gap:4px;display:none">
+          <span style="font-size:11px;color:var(--tx3)" id="sw-${d}poslbl-${uid}"></span>
+          <input class="dmi" type="number" id="sw-${d}posdim-${uid}" placeholder="0.0" step="0.5" min="0" oninput="setSWPosDim('${uid}','${d}',this.value)" style="flex:1">
+          <span class="dmu">cm</span>
+        </div>
+      </div>`;
+    });
+  }
   h+=`<input class="pm" type="text" id="memo-${uid}" placeholder="メモ（任意）">`;
   return h;
 }
@@ -967,10 +1001,10 @@ function setDir(uid,d){
   });
   document.getElementById('body-'+uid).dataset.dv=d;
   // 裾幅の詰め/出しサブ入力欄の表示切替
-  const tsEl=document.getElementById('sw-tsub-'+uid);
-  const dsEl=document.getElementById('sw-dsub-'+uid);
-  if(tsEl) tsEl.style.display=d==='t'?'block':'none';
-  if(dsEl) dsEl.style.display=d==='d'?'block':'none';
+  ['t','d'].forEach(x=>{
+    const el=document.getElementById('sw-'+x+'sub-'+uid);
+    if(el) el.style.display=d===x?'block':'none';
+  });
 }
 function setDT(uid,t){
   ['股下','カット寸法','総丈'].forEach(x=>{
@@ -1066,9 +1100,17 @@ function setWW(uid,val){
   const body=document.getElementById('body-'+uid);
   body.dataset.ww=val;
 }
-function setSWDir(uid,d,val){
+function setSWType(uid,d,val){
   const body=document.getElementById('body-'+uid);
-  body.dataset['swdir_'+d]=val;
+  body.dataset['swtype_'+d]=val;
+  ['ts','ag'].forEach(k=>{
+    const b=document.getElementById('sw'+d+'-'+k+'-'+uid);
+    if(b) b.className='sb'+(val===(k==='ts'?'詰め寸法':'仕上がり寸法')?' on':'');
+  });
+}
+function setSWMeasure(uid,d,val){
+  const body=document.getElementById('body-'+uid);
+  body.dataset['swmsr_'+d]=val;
   ['hk','gr'].forEach(k=>{
     const b=document.getElementById('sw'+d+'-'+k+'-'+uid);
     if(b) b.className='sb'+(val===(k==='hk'?'平置き':'ぐるり')?' on':'');
@@ -1121,13 +1163,8 @@ function colAlts(cid,cat){
     if(!chk||!chk.checked)return null;
     const body=document.getElementById('body-'+uid);
     const dv=body.dataset.dv||'';
-    const swdir_t=body.dataset.swdir_t||'';
-    const swdim_t=body.dataset.swdim_t||'';
-    const swdim_d=body.dataset.swdim_d||'';
-    const swpos_t=body.dataset.swpos_t||'';
-    const swposdim_t=body.dataset.swposdim_t||'';
-    const swpos_d=body.dataset.swpos_d||'';
-    const swposdim_d=body.dataset.swposdim_d||'';
+    const getSW=x=>({type:body.dataset['swtype_'+x]||'',msr:body.dataset['swmsr_'+x]||'',dim:body.dataset['swdim_'+x]||'',pos:body.dataset['swpos_'+x]||'',posdim:body.dataset['swposdim_'+x]||''});
+    const swT=getSW('t'),swD=getSW('d');
     const dir=dv==='t'?'詰め':dv==='d'?'出し':dv==='n'?'未定':'';
     const dimElL=document.getElementById('dim-L-'+uid);
     const dimElR=document.getElementById('dim-R-'+uid);
@@ -1142,7 +1179,7 @@ function colAlts(cid,cat){
       const ww=body.dataset.ww||'';
       const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,memo};
     }
-    return{n:a.n,dir,dim,dl,swdirT:swdir_t,swdimT:swdim_t,swdimD:swdim_d,swposT:swpos_t,swposdimT:swposdim_t,swposD:swpos_d,swposdimD:swposdim_d,memo};
+    return{n:a.n,dir,dim,dl,swT,swD,memo};
   }).filter(Boolean);
 }
 
@@ -1357,8 +1394,10 @@ function aSum(alts){
         else if(a.dim.R) s+=' '+a.dim.R+'cm';
       } else { s+=' '+a.dim+'cm'; }
     }
-    if(a.swdimT) s+=' 詰め寸法'+(a.swdirT?' ['+a.swdirT+']':'')+' '+a.swdimT+'cm'+(a.swposT?' '+a.swposT+(a.swposdimT?' '+a.swposdimT+'cm':''):'');
-    if(a.swdimD) s+=' 仕上がり寸法(平置き) '+a.swdimD+'cm'+(a.swposD?' '+a.swposD+(a.swposdimD?' '+a.swposdimD+'cm':''):'');
+    const fmtSW=sw=>{if(!sw||!sw.dim) return '';let r=''+(sw.type||''+(sw.msr?' ['+sw.msr+']':''))+' '+sw.dim+'cm';if(sw.pos) r+=' '+sw.pos+(sw.posdim?' '+sw.posdim+'cm':'');return r;};
+    const stxt=fmtSW(a.swT);const dtxt=fmtSW(a.swD);
+    if(stxt) s+=' 詰め:'+stxt;
+    if(dtxt) s+=' 出し:'+dtxt;
     return s;
   }).join(' / ');
 }
