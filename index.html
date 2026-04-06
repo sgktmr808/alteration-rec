@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y18';
+const APP_VERSION = 'v16y19';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -484,7 +484,7 @@ const ALT={
   'パンツ':[
     {n:'裾上げ',   d:'none',dm:'len'},
     {n:'ウエスト', d:'both',dm:'cm'},
-    {n:'裾幅',     d:'both',dm:'cm'},
+    {n:'裾幅',     d:'both',dm:'none'},
     {n:'わたり',   d:'both',dm:'cm'},
     {n:'股上',     d:'both',dm:'cm'},
     {n:'ヒップ',   d:'both',dm:'cm'},
@@ -691,8 +691,15 @@ const PROC={
     {id:'kn',l:'かんぬき入れ直し'},
   ]},
   '裾幅':{m:[
-    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
-    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},
+    {id:'ui',l:'内のみ',   ex:'sw'},
+    {id:'so',l:'外のみ',   ex:'sw'},
+    {id:'ry',l:'両脇',     ex:'sw'},
+    {id:'fs',l:'折り伏せ'},
+    {id:'fk',l:'袋縫い'},
+    {id:'ts',l:'詰め寸法', sub:[{l:'平置き',ex:'ms'},{l:'ぐるり',ex:'ms'},{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'寸法'}]},
+    {id:'ag',l:'仕上がり寸法',sub:[{l:'平置き',ex:'fs'},{l:'ぐるり',ex:'fs'},{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'寸法'}]},
+    {id:'sk',l:'裾から',   ex:'pos',sub:[{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'裾から'}]},
+    {id:'hn',l:'膝上',     ex:'pos',sub:[{l:'寸法入力',ex:null,input:'number',placeholder:'cm',label:'膝上'}]},
   ]},
   'わたり':{m:[
     {id:'ui',l:'内のみ',ex:'wr'},{id:'so',l:'外のみ',ex:'wr'},
