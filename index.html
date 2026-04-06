@@ -446,7 +446,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y15';
+const APP_VERSION = 'v16y16';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -682,11 +682,13 @@ const PROC={
   'ウエスト絞り':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
   'ウエスト':{m:[
     {id:'s3',l:'3方詰め'},{id:'ib',l:'インベルさわり'},
-    {id:'lp',l:'ループ移動',sub:['1本','2本','3本','4本','5本','6本','7本']},
-    {id:'st',l:'ステッチ入れ直し',sub:['1本','2本']},
+    {id:'lp',l:'ループ移動',sub:[{l:'本数入力',ex:null,input:'number',placeholder:'本'}]},
+    {id:'st',l:'ステッチ入れ直し',sub:[{l:'本数入力',ex:null,input:'number',placeholder:'本'}]},
     {id:'tg',l:'タグ移動'},{id:'aj',l:'アジャスター移動'},
     {id:'gm',l:'ゴム補正'},{id:'il',l:'インベルループ下切替'},
     {id:'mi',l:'マチ入れ'},
+    {id:'vs',l:'Vスリット'},
+    {id:'kn',l:'かんぬき入れ直し'},
   ]},
   '裾幅':{m:[
     {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
@@ -1011,7 +1013,12 @@ function updSubs(uid,nm,procs){
       const subList=m.sub.map(s=>typeof s==='object'?s:{l:s,ex:null});
       subList.forEach(s=>{
         const on=subs[l]&&subs[l].includes(s.l);
-        h+=`<button class="sb${on?' on':''}" onclick="togSubEx('${uid}','${l}','${s.l}','${s.ex||''}')">${s.l}</button>`;
+        if(s.input){
+          const cur=subs[l+'_'+s.l]||'';
+          h+=`<div class="dmrow" style="gap:4px;margin-bottom:2px"><span style="font-size:11px;color:var(--tx3)">${s.placeholder||s.l}</span><input class="dmi" type="${s.input}" placeholder="${s.placeholder||''}" min="0" value="${cur}" oninput="setSubInp('${uid}','${l}','${s.l}',this.value)" style="flex:1;max-width:80px"><span class="dmu">${s.placeholder||''}</span></div>`;
+        } else {
+          h+=`<button class="sb${on?' on':''}" onclick="togSubEx('${uid}','${l}','${s.l}','${s.ex||''}')">${s.l}</button>`;
+        }
       });
     }
   });
@@ -1050,6 +1057,12 @@ function setWW(uid,val){
   body.dataset.ww=val;
 }
 function setMae(uid,val){document.getElementById('body-'+uid).dataset.mae=val;}
+function setSubInp(uid,pl,sl,val){
+  const body=document.getElementById('body-'+uid);
+  let subs=JSON.parse(body.dataset.subs||'{}');
+  subs[pl+'_'+sl]=val;
+  body.dataset.subs=JSON.stringify(subs);
+}
 function setAto(uid,val){document.getElementById('body-'+uid).dataset.ato=val;}
 function togSub(uid,pl,sv){
   const body=document.getElementById('body-'+uid);
@@ -1324,7 +1337,14 @@ function wStr(alts){
     const ps=a.procs||[];
     if(ps.length){
       const sb=a.subs||{};
-      s+=' ['+ps.map(p=>{const sl=sb[p]||[];return p+(sl.length?'('+sl.join('/')+')'  :'');}).join('/')+']';
+      s+=' ['+ps.map(p=>{
+      const sl=sb[p]||[];
+      // 入力形式サブの値を取得
+      const inpKeys=Object.keys(sb).filter(k=>k.startsWith(p+'_'));
+      const inpVals=inpKeys.map(k=>{const v=sb[k];return v?k.replace(p+'_','').replace('入力','')+'：'+v:'';}).filter(Boolean);
+      const all=[...sl,...inpVals];
+      return p+(all.length?'('+all.join('/')+')'  :'');
+    }).join('/')+']';
     if(a.ww) s+=' W幅'+a.ww+'cm';
     if(a.mae||a.ato) s+=' 前'+(a.mae||'—')+'cm/後'+(a.ato||'—')+'cm';
     }
