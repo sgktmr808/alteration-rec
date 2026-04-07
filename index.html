@@ -344,7 +344,17 @@ select option{background:#1a1a24}
 </div>
 
 <div class="screen" id="scr-work">
-  <div class="hdr"><div><div class="ht">登録済</div><div class="hv" id="wc"></div></div></div>
+  <div class="hdr"><div><div class="ht">登録済</div><div class="hv" id="wc"></div></div>
+    <button class="btn-g" id="btn-sel-mode" onclick="togSelMode()" style="font-size:13px;padding:6px 10px">選択</button>
+  </div>
+  <div id="bulk-bar" style="display:none;padding:8px 16px;background:var(--s2);border-bottom:1px solid var(--bd);position:sticky;top:52px;z-index:99">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:12px;color:var(--tx2)" id="sel-count">0件選択</span>
+      <button onclick="selAllWork()" style="margin-left:auto;padding:4px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:11px;cursor:pointer">全選択</button>
+      <button onclick="selNoneWork()" style="padding:4px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:11px;cursor:pointer">解除</button>
+    </div>
+    <div style="display:flex;gap:6px" id="bulk-btns"></div>
+  </div>
   <div class="fbar" id="wf"></div>
   <div class="cl" id="wl"></div>
 </div>
@@ -414,6 +424,10 @@ select option{background:#1a1a24}
           <button onclick="doExport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📤 マスター書出</button>
           <button onclick="showImport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(90,172,122,.3);background:var(--green-bg);color:var(--green);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📥 マスター読込</button>
         </div>
+        <div style="margin-bottom:14px">
+          <button onclick="trigCSVImport()" style="width:100%;padding:10px;border-radius:10px;border:1px solid rgba(155,114,207,.3);background:var(--purple-bg);color:var(--purple);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📊 CSV インポート</button>
+          <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+        </div>
         <div class="ea" id="exp-area">
           <div style="font-size:11px;color:var(--tx3);margin-bottom:5px">テキストをコピーして保存</div>
           <textarea class="eat" id="exp-text" readonly onclick="this.select()"></textarea>
@@ -446,7 +460,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y34';
+const APP_VERSION = 'v16y36';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -532,8 +546,8 @@ const ALT={
     {n:'プレス',   d:'none',dm:'none'},
   ],
   'シャツ':[
-    {n:'着丈',     d:'tsume',dm:'len'},
-    {n:'袖丈',     d:'both',dm:'len'},
+    {n:'着丈',     d:'tsume',dm:'kitake'},
+    {n:'袖丈',     d:'both',dm:'len',pk:'袖丈_シャツ'},
     {n:'身幅',     d:'both',dm:'cm'},
     {n:'ウエスト絞り',d:'tsume',dm:'cm'},
     {n:'肩幅',     d:'tsume',dm:'cm'},
@@ -675,6 +689,13 @@ const PROC={
     {id:'lk',l:'ロック処理'},{id:'rb',l:'リブ付け'},
     {id:'sy',l:'袖山から詰め'},
   ]},
+  '袖丈_シャツ':{m:[
+    {id:'aa',l:'アキあり',ex:'sty'},{id:'an',l:'アキなし',ex:'sty'},
+    {id:'kz',l:'飾りボタンあり'},{id:'ca',l:'カフスあり',ex:'cf'},
+    {id:'cn',l:'カフスなし',ex:'cf'},
+    {id:'rb',l:'リブ付け'},{id:'sy',l:'袖山から詰め'},
+    {id:'tz',l:'タンザク移動'},{id:'kr',l:'切り込み跡芯補強'},
+  ]},
   '身幅':{m:[
     {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
     {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},{id:'lm',l:'限界あり',fin:true},
@@ -714,14 +735,14 @@ const PROC={
   'スリット加工':{m:[{id:'ak',l:'あき止め'},{id:'tj',l:'縫い閉じ'}]},
   'スリット移動':{m:[
     {id:'zp',l:'ファスナー移動'},{id:'fs',l:'折り伏せ'},
-    {id:'st',l:'ステッチ',sub:['1本','2本','3本']},
+    {id:'st',l:'ステッチ',sub:[{l:'本数',ex:null,input:'number',placeholder:'本',label:'本数'}]},
   ]},
   '裏地修理':{m:[{id:'pt',l:'部分補修'},{id:'fl',l:'全取替'}]},
   '襟修理':{m:[{id:'nr',l:'縫い直し'},{id:'tk',l:'付け直し'}]},
   'ボタン付け替え':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
   'ほつれ補修':{m:[{id:'kg',l:'かがり縫い'},{id:'mc',l:'ミシン'}]},
   '穴修理':{m:[{id:'kg',l:'かがり縫い'},{id:'at',l:'当て布'}]},
-  'タグ付け':{m:[{id:'mc',l:'ミシン'},{id:'mt',l:'まつり縫い'}]},
+  'タグ付け':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
   'ボタン補強':{m:[{id:'sp',l:'特殊'}]},
   'プレス':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
   'デニムダメージ残し加工':{m:[
@@ -729,7 +750,7 @@ const PROC={
     {id:'rl',l:'ロールアップ',ex:'sty',sub:['幅広','幅合わせ(片側)','幅合わせ(両脇)']},
   ]},
   'ドローコードチップ補強':{m:[{id:'mt',l:'金属チップ'},{id:'rs',l:'樹脂チップ'},{id:'mu',l:'結び直し'}]},
-  'ファスナー交換':{m:[{id:'yk',l:'YKK'},{id:'br',l:'ブランド純正'},{id:'gn',l:'汎用'}]},
+  'ファスナー交換':{m:[]},
   'ネーム刺繍':{m:[{id:'nw',l:'新規'},{id:'rm',l:'取り外し'},{id:'rp',l:'付け替え'}]},
   '裾上げ・裾処理':{m:[
     {id:'hem',l:'三つ折り'},{id:'lok',l:'ロック処理'},{id:'fra',l:'フリンジ仕上げ'},
@@ -768,6 +789,7 @@ const sCt=v=>localStorage.setItem('ar2_ct',JSON.stringify(v));
 // ══ STATE ══
 let curType=null,curClr={h:'',n:''},curPat='',curTime=0;
 let stfOn=false,spmOn=false,wkFil='all',hiFil='all',curId=null;
+let selMode=false, selIds=new Set();
 
 // ══ INIT ══
 function init(){
@@ -894,7 +916,7 @@ function buildAlts(cid,cat,isW){
         <input type="checkbox" id="chk-${uid}" onclick="event.stopPropagation();togAlt('${uid}')">
         <span class="an">${a.n}</span>
       </div>
-      <div class="ab" id="body-${uid}" data-name="${a.n}" data-dm="${a.dm}" data-dir="${a.d}" data-isw="${isW}">
+      <div class="ab" id="body-${uid}" data-name="${a.pk||a.n}" data-dm="${a.dm}" data-dir="${a.d}" data-isw="${isW}">
         ${buildAB(a,uid,isW)}
       </div>
     </div>`;
@@ -920,6 +942,19 @@ function buildAB(a,uid,isW){
       <input class="dmi" type="number" id="dim-L-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
       <span class="dmu">cm</span>
       <span style="font-size:11px;color:var(--tx3);margin-left:4px">右</span>
+      <input class="dmi" type="number" id="dim-R-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
+      <span class="dmu">cm</span>
+    </div>`;
+  }else if(a.dm==='kitake'){
+    h+=`<div id="dtrow-${uid}" class="dtrow">
+      ${['カット寸法','仕上がり寸法','シャツテール'].map(t=>`<button class="dtb" id="dtb-${uid}-${t.replace(/ /g,'_')}" onclick="setDT('${uid}','${t}')">${t}</button>`).join('')}
+    </div>
+    <div id="dashi-lbl-${uid}" style="display:none;font-size:11px;color:var(--tx3);margin-bottom:4px">出し寸法</div>
+    <div class="dmrow" style="gap:4px">
+      <span style="font-size:11px;color:var(--tx3)">前</span>
+      <input class="dmi" type="number" id="dim-L-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
+      <span class="dmu">cm</span>
+      <span style="font-size:11px;color:var(--tx3);margin-left:4px">後</span>
       <input class="dmi" type="number" id="dim-R-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
       <span class="dmu">cm</span>
     </div>`;
@@ -950,11 +985,12 @@ function buildAB(a,uid,isW){
     }
   }
   if(isW){
-    const pm=PROC[a.n];
+    const procKey=a.pk||a.n;
+    const pm=PROC[procKey];
     if(pm){
       h+=`<div class="pw" id="pw-${uid}">`;
       pm.m.forEach(m=>{
-        h+=`<button class="pb${m.fin?' fin':''}" id="pb-${uid}-${m.id}" data-ex="${m.ex||''}" onclick="togProc('${uid}','${m.id}','${a.n}')">${m.l}</button>`;
+        h+=`<button class="pb${m.fin?' fin':''}" id="pb-${uid}-${m.id}" data-ex="${m.ex||''}" onclick="togProc('${uid}','${m.id}','${procKey}')">${m.l}</button>`;
       });
       h+=`</div><div class="sw" id="sw-${uid}"></div>`;
       // ダブル専用：W幅常時入力欄
@@ -1015,8 +1051,8 @@ function setDir(uid,d){
   if(subEl) subEl.style.display=(d==='t'||d==='d')?'block':'none';
 }
 function setDT(uid,t){
-  ['股下','カット寸法','総丈'].forEach(x=>{
-    const b=document.getElementById(`dtb-${uid}-${x.replace(' ','_')}`);
+  ['股下','カット寸法','総丈','仕上がり寸法','シャツテール'].forEach(x=>{
+    const b=document.getElementById(`dtb-${uid}-${x.replace(/ /g,'_')}`);
     if(b)b.className='dtb'+(t===x?' on':'');
   });
   document.getElementById('body-'+uid).dataset.dl=t;
@@ -1321,9 +1357,44 @@ function renderWork(){
   ).join('');
   const list=wkFil==='all'?all:all.filter(r=>r.status===wkFil);
   const el=document.getElementById('wl');
-  el.innerHTML=list.length?list.map(rCard).join(''):`<div class="empty"><div class="ei">✂️</div>該当する案件はありません</div>`;
+  el.innerHTML=list.length?list.map(r=>rCard(r,selMode)).join(''):`<div class="empty"><div class="ei">✂️</div>該当する案件はありません</div>`;
+  const bb=document.getElementById('bulk-btns');
+  if(bb) bb.innerHTML=STATUS.map(s=>`<button class="stb" onclick="bulkStatus('${s.id}')" style="flex:1">${s.label}</button>`).join('');
+  updSelCount();
 }
 function setWF(f){wkFil=f;renderWork();}
+function togSelMode(){
+  selMode=!selMode;selIds.clear();
+  const btn=document.getElementById('btn-sel-mode');
+  btn.textContent=selMode?'完了':'選択';
+  btn.style.color=selMode?'var(--gold)':'';
+  document.getElementById('bulk-bar').style.display=selMode?'block':'none';
+  renderWork();
+}
+function togSelCard(id,ev){
+  ev.stopPropagation();
+  if(selIds.has(id))selIds.delete(id);else selIds.add(id);
+  const cb=document.getElementById('wsel-'+id);
+  if(cb)cb.checked=selIds.has(id);
+  updSelCount();
+}
+function selAllWork(){
+  const all=gR().filter(r=>r.status!=='ret');
+  const list=wkFil==='all'?all:all.filter(r=>r.status===wkFil);
+  list.forEach(r=>selIds.add(r.id));renderWork();
+}
+function selNoneWork(){selIds.clear();renderWork();}
+function updSelCount(){
+  const el=document.getElementById('sel-count');
+  if(el)el.textContent=selIds.size+'件選択';
+}
+function bulkStatus(st){
+  if(!selIds.size){alert('案件を選択してください');return;}
+  if(!confirm(selIds.size+'件のステータスを「'+(STATUS.find(s=>s.id===st)||{}).label+'」に変更しますか？'))return;
+  const rs=gR();
+  rs.forEach(r=>{if(selIds.has(r.id))r.status=st;});
+  sR(rs);selIds.clear();renderWork();renderHist();
+}
 
 // ══ HISTORY ══
 function renderHist(){
@@ -1365,7 +1436,7 @@ function setHF(f){hiFil=f;renderHist();}
 function clrDate(){document.getElementById('hf').value='';document.getElementById('ht2').value='';renderHist();}
 
 // ══ CARD ══
-function rCard(r){
+function rCard(r,showSel){
   const st=STATUS.find(s=>s.id===r.status)||STATUS[0];
   const inD=r.inDate?r.inDate.slice(5).replace('-','/'):'—';
   const outD=r.outDate?r.outDate.slice(5).replace('-','/'):'—';
@@ -1375,18 +1446,22 @@ function rCard(r){
     if(a.dim)s+=' '+a.dim+'cm';
     return `<span class="rtg" style="color:var(--gold);border-color:rgba(200,168,74,.3)">${s}</span>`;
   }).join('');
-  return `<div class="rc" onclick="openDet('${r.id}')">
+  const selCb=showSel?`<input type="checkbox" id="wsel-${r.id}" ${selIds.has(r.id)?'checked':''} onclick="togSelCard('${r.id}',event)" style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0;margin-right:6px;cursor:pointer">`:'';
+  return `<div class="rc" onclick="${showSel?`togSelCard('${r.id}',event)`:`openDet('${r.id}')`}">
     <div class="rh">
-      <div class="rm">
-        <div class="rt">
-          <span class="rno">${r.ticket?'#'+r.ticket:''}</span>
-          ${r.typeCls?`<span class="tbg ${r.typeCls}">${r.typeLbl}</span>`:''}
+      <div class="rm" style="display:flex;align-items:flex-start">
+        ${selCb}
+        <div style="flex:1;min-width:0">
+          <div class="rt">
+            <span class="rno">${r.ticket?'#'+r.ticket:''}</span>
+            ${r.typeCls?`<span class="tbg ${r.typeCls}">${r.typeLbl}</span>`:''}
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+            <div class="rn">${r.client||r.item||'—'}${r.isStaff?' 👤':''}</div>
+            <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>a.n+(a.dir?' '+a.dir:'')).join(' · ')}</div>
+          </div>
+          <div class="rs">${r.store||''} ${r.item||''}</div>
         </div>
-        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
-          <div class="rn">${r.client||r.item||'—'}${r.isStaff?' 👤':''}</div>
-          <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>a.n+(a.dir?' '+a.dir:'')).join(' · ')}</div>
-        </div>
-        <div class="rs">${r.store||''} ${r.item||''}</div>
       </div>
       <span class="sbg s-${st.id}">${st.label}</span>
     </div>
@@ -1406,7 +1481,9 @@ function aSum(alts){
     if(a.dl)s+=' ['+a.dl+']';
     if(a.dim){
       if(typeof a.dim==='object'){
-        if(a.dim.L&&a.dim.R&&a.dim.L!==a.dim.R) s+=' 左'+a.dim.L+'cm/右'+a.dim.R+'cm';
+        const isKitake=a.n==='着丈';
+        const lbl1=isKitake?'前':'左', lbl2=isKitake?'後':'右';
+        if(a.dim.L&&a.dim.R&&a.dim.L!==a.dim.R) s+=' '+lbl1+a.dim.L+'cm/'+lbl2+a.dim.R+'cm';
         else if(a.dim.L) s+=' '+a.dim.L+'cm';
         else if(a.dim.R) s+=' '+a.dim.R+'cm';
       } else { s+=' '+a.dim+'cm'; }
@@ -1489,6 +1566,18 @@ function updSt(id,st){
 // ══ EDIT ══
 function openEdit(){
   const r=gR().find(r=>r.id===curId);if(!r)return;
+  closeOvBtn('ov-det');
+  const eb=document.getElementById('edit-body');
+  const stB=STATUS.map(s=>`<button onclick="eStB('${s.id}')" id="est-${s.id}"
+    class="stb${r.status===s.id?' '+s.id:''}">${s.label}</button>`).join('');
+  const tpB=TYPES.map(t=>`<button onclick="eTpB('${t.id}','${t.cls}')" id="etp-${t.id}"
+    class="tpill${r.type===t.id?' '+t.cls:''}">${t.label}</button>`).join('');
+  const cats=gCt();
+  const stores=gSt();
+  eb.dataset.est=r.status||'recv';
+  eb.dataset.etp=r.type||'';
+  eb.dataset.estf=r.isStaff?'1':'0';
+  eb.dataset.espm=r.isSpm?'1':'0';
   const ef=(l,id,v,t='text')=>`<div style="margin-bottom:10px">
     <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">${l}</div>
     <input type="${t}" id="${id}" value="${v||''}" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none">
@@ -1497,32 +1586,73 @@ function openEdit(){
     <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">${l}</div>
     <textarea id="${id}" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${v||''}</textarea>
   </div>`;
-  const stB=STATUS.map(s=>`<button onclick="eStB('${s.id}')" id="est-${s.id}"
-    class="stb${r.status===s.id?' '+s.id:''}">${s.label}</button>`).join('');
-  const tpB=TYPES.map(t=>`<button onclick="eTpB('${t.id}','${t.cls}')" id="etp-${t.id}"
-    class="tpill${r.type===t.id?' '+t.cls:''}">${t.label}</button>`).join('');
-  const eb=document.getElementById('edit-body');
-  eb.dataset.est=r.status||'recv';
-  eb.dataset.etp=r.type||'';
+  const selOpt=(arr,cur)=>arr.map(v=>`<option${v===cur?' selected':''}>${v}</option>`).join('');
   eb.innerHTML=`
     <div style="margin-bottom:12px"><div style="font-size:10px;color:var(--tx3);margin-bottom:6px">案件種別</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px">${tpB}</div></div>
     <div style="margin-bottom:12px"><div style="font-size:10px;color:var(--tx3);margin-bottom:6px">ステータス</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">${stB}</div></div>
-    ${ef('店名','e-store',r.store)}${ef('持込日','e-indate',r.inDate,'date')}
-    ${ef('持込時刻','e-intime',r.inTime,'time')}${ef('納品日','e-outdate',r.outDate,'date')}
-    ${ef('伝票No.','e-ticket',r.ticket)}${ef('客名','e-client',r.client)}
+    <div style="margin-bottom:10px"><div style="font-size:10px;color:var(--tx3);margin-bottom:4px">店名</div>
+    <select id="e-store" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none">${selOpt(stores,r.store)}</select></div>
+    ${ef('持込日','e-indate',r.inDate,'date')}${ef('持込時刻','e-intime',r.inTime,'time')}
+    ${ef('納品日','e-outdate',r.outDate,'date')}${ef('伝票No.','e-ticket',r.ticket)}
+    <div style="margin-bottom:10px"><div style="font-size:10px;color:var(--tx3);margin-bottom:4px">客名 <button class="tog${r.isStaff?' on-b':''}" onclick="this.classList.toggle('on-b');document.getElementById('edit-body').dataset.estf=this.classList.contains('on-b')?'1':'0'">スタッフ</button></div>
+    <input type="text" id="e-client" value="${r.client||''}" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none"></div>
     ${ef('担当者','e-staff',r.staff)}${ef('品名','e-item',r.item)}
-    ${ef('カテゴリー','e-cat',r.cat)}${ef('素材','e-mat',r.mat)}
-    ${efa('指定メモ','e-cmemo',r.cMemo)}${efa('工程メモ','e-wmemo',r.wMemo)}
+    <div style="margin-bottom:10px"><div style="font-size:10px;color:var(--tx3);margin-bottom:4px">カテゴリー</div>
+    <select id="e-cat" onchange="onEditCatChange()" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none">${selOpt(cats,r.cat)}</select></div>
+    <div style="margin-bottom:10px"><div style="font-size:10px;color:var(--tx3);margin-bottom:4px">素材 <button class="tog${r.isSpm?' on-a':''}" onclick="this.classList.toggle('on-a');document.getElementById('edit-body').dataset.espm=this.classList.contains('on-a')?'1':'0'">特殊素材</button></div>
+    <input type="text" id="e-mat" value="${r.mat||''}" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none"></div>
+    <div style="margin-bottom:12px"><div style="font-size:10px;color:var(--tx3);margin-bottom:6px">✂️ 補正箇所</div>
+    <div id="edit-alts" class="alt-list"></div></div>
+    ${efa('補足メモ','e-cmemo',r.cMemo)}${efa('工程メモ','e-wmemo',r.wMemo)}
     ${efa('特殊','e-special',r.special)}
-    ${ef('ミシン','e-machine',r.machine)}${ef('針番手','e-needle',r.needle)}
-    ${ef('糸番手','e-thread',r.thread)}${ef('糸色番号','e-tcolor',r.tcolor)}
-    ${ef('押さえ','e-foot',r.foot)}${efa('機材メモ','e-mmemo',r.mmemo)}
     ${ef('所要時間(分)','e-time',r.time,'number')}
     ${efa('使用資材','e-materials',r.materials)}
     ${ef('金額(円)','e-price',r.price,'number')}${efa('備考','e-note',r.note)}`;
+  buildAlts('edit-alts',r.cat,true);
+  restoreAlts('edit-alts',r.cat,r.wAlts||r.cAlts||[]);
   openOv('ov-edit');
+}
+function onEditCatChange(){
+  const cat=document.getElementById('e-cat').value;
+  buildAlts('edit-alts',cat,true);
+}
+function restoreAlts(cid,cat,saved){
+  const items=ALT[cat]||[];
+  saved.forEach(sa=>{
+    const idx=items.findIndex(a=>a.n===sa.n);
+    if(idx<0)return;
+    const uid=cid+'-'+idx;
+    const chk=document.getElementById('chk-'+uid);
+    const body=document.getElementById('body-'+uid);
+    if(!chk||!body)return;
+    chk.checked=true;body.classList.add('on');
+    if(sa.dir){
+      const d=sa.dir==='詰め'?'t':sa.dir==='出し'?'d':'';
+      if(d)setDir(uid,d);
+    }
+    if(sa.dl) setDT(uid,sa.dl);
+    if(sa.procs&&sa.procs.length){
+      const procKey=items[idx].pk||sa.n;
+      sa.procs.forEach(p=>{
+        const pm=PROC[procKey];if(!pm)return;
+        const m=pm.m.find(x=>x.l===p);
+        if(m)togProc(uid,m.id,procKey);
+      });
+      if(sa.subs){
+        body.dataset.subs=JSON.stringify(sa.subs);
+        const procs=JSON.parse(body.dataset.procs||'[]');
+        updSubs(uid,procKey,procs);
+      }
+    }
+    if(sa.ww){body.dataset.ww=sa.ww;const el=document.getElementById('ww-'+uid);if(el)el.value=sa.ww;}
+    if(sa.mae){body.dataset.mae=sa.mae;const el=document.getElementById('mae-'+uid);if(el)el.value=sa.mae;}
+    if(sa.ato){body.dataset.ato=sa.ato;}
+    if(sa.kokomae){body.dataset.kokomae=sa.kokomae;const el=document.getElementById('koko-mae-'+uid);if(el)el.value=sa.kokomae;}
+    if(sa.kokoato){body.dataset.kokoato=sa.kokoato;const el=document.getElementById('koko-ato-'+uid);if(el)el.value=sa.kokoato;}
+    if(sa.memo){const el=document.getElementById('memo-'+uid);if(el)el.value=sa.memo;}
+  });
 }
 function eStB(id){
   document.getElementById('edit-body').dataset.est=id;
@@ -1540,15 +1670,18 @@ function saveEdit(){
   const eb=document.getElementById('edit-body');
   const gv=id=>document.getElementById(id)?.value||'';
   const tp=TYPES.find(t=>t.id===eb.dataset.etp);
+  const cat=gv('e-cat');
+  const editAlts=colAlts('edit-alts',cat);
   rs[i]={...rs[i],
     type:eb.dataset.etp,typeLbl:tp?.label||'',typeCls:tp?.cls||'o',
     status:eb.dataset.est,
     store:gv('e-store'),inDate:gv('e-indate'),inTime:gv('e-intime'),
     outDate:gv('e-outdate'),ticket:gv('e-ticket'),client:gv('e-client'),
-    staff:gv('e-staff'),item:gv('e-item'),cat:gv('e-cat'),mat:gv('e-mat'),
+    isStaff:eb.dataset.estf==='1',
+    staff:gv('e-staff'),item:gv('e-item'),cat:cat,mat:gv('e-mat'),
+    isSpm:eb.dataset.espm==='1',
+    cAlts:editAlts,wAlts:editAlts,
     cMemo:gv('e-cmemo'),wMemo:gv('e-wmemo'),special:gv('e-special'),
-    machine:gv('e-machine'),needle:gv('e-needle'),thread:gv('e-thread'),
-    tcolor:gv('e-tcolor'),foot:gv('e-foot'),mmemo:gv('e-mmemo'),
     time:parseInt(gv('e-time')||0,10)||0,
     materials:gv('e-materials'),price:parseInt(gv('e-price')||0,10)||0,
     note:gv('e-note'),
@@ -1815,6 +1948,72 @@ function doImport(){
     renderMaster();renderWork();renderHist();
     alert('✅ インポート完了：'+msgs.join('・'));
   }catch(e){alert('データの読み込みに失敗しました。\nJSON形式のファイルか確認してください。');}
+}
+
+// ══ CSV IMPORT ══
+function trigCSVImport(){document.getElementById('csv-file-input').click();}
+function handleCSVImport(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const text=e.target.result;
+      const lines=parseCSVLines(text);
+      if(lines.length<2){alert('データが見つかりません');return;}
+      const stMap={'受付済':'recv','作業中':'work','完成':'done','返却済':'ret'};
+      const tpMap={};TYPES.forEach(t=>tpMap[t.label]=t);
+      const cur=gR();
+      let added=0;
+      for(let i=1;i<lines.length;i++){
+        const c=lines[i];if(c.length<10)continue;
+        const id='imp_'+Date.now()+'_'+i;
+        const tp=tpMap[c[4]]||null;
+        const rec={
+          id,type:tp?.id||'',typeLbl:tp?.label||c[4]||'',typeCls:tp?.cls||'o',
+          inDate:c[0]||'',inTime:c[1]||'',outDate:c[2]||'',
+          ticket:(c[3]||'').replace('#',''),
+          store:c[5]||'',
+          client:(c[6]||'').replace(' [スタッフ]',''),
+          isStaff:(c[6]||'').includes('[スタッフ]'),
+          staff:c[7]||'',item:c[8]||'',cat:c[9]||'',
+          clrH:'',clrN:c[10]||'',pat:c[11]||'',
+          mat:(c[12]||'').replace(' [特殊素材]',''),
+          isSpm:(c[12]||'').includes('[特殊素材]'),
+          cAlts:[],wAlts:[],cMemo:'',wMemo:'',special:'',
+          machineData:[],time:parseInt(c[21]||0,10)||0,
+          materials:c[22]||'',price:parseInt(c[23]||0,10)||0,
+          note:c[24]||'',
+          status:stMap[c[25]]||'recv',
+        };
+        cur.unshift(rec);added++;
+      }
+      sR(cur);renderWork();renderHist();
+      alert('✅ '+added+'件インポートしました');
+    }catch(err){alert('CSVの読み込みに失敗しました：'+err.message);}
+    ev.target.value='';
+  };
+  reader.readAsText(file,'UTF-8');
+}
+function parseCSVLines(text){
+  const lines=[];let cur=[];let val='';let inQ=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inQ){
+      if(ch==='"'&&text[i+1]==='"'){val+='"';i++;}
+      else if(ch==='"'){inQ=false;}
+      else{val+=ch;}
+    }else{
+      if(ch==='"'){inQ=true;}
+      else if(ch===','){cur.push(val);val='';}
+      else if(ch==='\n'||(ch==='\r'&&text[i+1]==='\n')){
+        cur.push(val);lines.push(cur);cur=[];val='';
+        if(ch==='\r')i++;
+      }else if(ch==='\r'){cur.push(val);lines.push(cur);cur=[];val='';}
+      else{val+=ch;}
+    }
+  }
+  if(val||cur.length){cur.push(val);lines.push(cur);}
+  return lines;
 }
 
 // ══ START ══
