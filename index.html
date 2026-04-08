@@ -269,7 +269,7 @@ select option{background:#1a1a24}
     </div>
     <div class="sec">
       <div class="sh" onclick="togMachine()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-        <span>⚙️ 機材設定</span>
+        <span>⚙️ 作業手順と設定の記録</span>
         <span id="machine-arrow" style="font-size:12px;color:var(--tx3)">▼ 開く</span>
       </div>
       <div id="machine-body" style="display:none">
@@ -492,18 +492,28 @@ const COLORS=[
   {h:'#1a3a5c',n:'ネイビー'},{h:'#1e5c1e',n:'グリーン'},
   {h:'#8b1a1a',n:'バーガンディ'},{h:'#c8a8c8',n:'ラベンダー'},
 ];
-const PATS=['無地','ストライプ','チェック','ヘリンボーン','ツイード','プリント','ジャカード','その他'];
+const PATS=[
+  {n:'無地', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".18"/></svg>`},
+  {n:'ストライプ', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".1"/><line x1="5" y1="0" x2="5" y2="20" stroke="currentColor" stroke-width="2.5"/><line x1="12" y1="0" x2="12" y2="20" stroke="currentColor" stroke-width="2.5"/><line x1="19" y1="0" x2="19" y2="20" stroke="currentColor" stroke-width="2.5"/><line x1="26" y1="0" x2="26" y2="20" stroke="currentColor" stroke-width="2.5"/></svg>`},
+  {n:'チェック', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".1"/><line x1="9" y1="0" x2="9" y2="20" stroke="currentColor" stroke-width="2"/><line x1="18" y1="0" x2="18" y2="20" stroke="currentColor" stroke-width="2"/><line x1="27" y1="0" x2="27" y2="20" stroke="currentColor" stroke-width="2"/><line x1="0" y1="7" x2="28" y2="7" stroke="currentColor" stroke-width="2"/><line x1="0" y1="14" x2="28" y2="14" stroke="currentColor" stroke-width="2"/></svg>`},
+  {n:'ヘリンボーン', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".1"/><polyline points="2,10 6,2 10,10" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="10,10 14,2 18,10" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="18,10 22,2 26,10" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="2,20 6,12 10,20" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="10,20 14,12 18,20" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="18,20 22,12 26,20" fill="none" stroke="currentColor" stroke-width="2"/></svg>`},
+  {n:'ツイード', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".1"/><circle cx="5" cy="4" r="1.5" fill="currentColor" opacity=".7"/><circle cx="12" cy="4" r="1.5" fill="currentColor" opacity=".5"/><circle cx="19" cy="4" r="1.5" fill="currentColor" opacity=".8"/><circle cx="26" cy="4" r="1.5" fill="currentColor" opacity=".5"/><circle cx="8" cy="10" r="1.5" fill="currentColor" opacity=".6"/><circle cx="15" cy="10" r="1.5" fill="currentColor" opacity=".9"/><circle cx="22" cy="10" r="1.5" fill="currentColor" opacity=".5"/><circle cx="3" cy="10" r="1" fill="currentColor" opacity=".4"/><circle cx="5" cy="16" r="1.5" fill="currentColor" opacity=".5"/><circle cx="13" cy="16" r="1.5" fill="currentColor" opacity=".7"/><circle cx="20" cy="16" r="1.5" fill="currentColor" opacity=".6"/><circle cx="26" cy="16" r="1.5" fill="currentColor" opacity=".4"/></svg>`},
+  {n:'プリント', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".1"/><circle cx="8" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="7" r="1.5" fill="currentColor" opacity=".6"/><circle cx="20" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="20" cy="13" r="1.5" fill="currentColor" opacity=".6"/></svg>`},
+  {n:'ジャカード', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".1"/><path d="M14,2 L20,8 L14,14 L8,8 Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14,6 L17,9 L14,12 L11,9 Z" fill="currentColor" opacity=".4"/><line x1="14" y1="14" x2="14" y2="19" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="8" x2="2" y2="8" stroke="currentColor" stroke-width="1.5"/><line x1="20" y1="8" x2="26" y2="8" stroke="currentColor" stroke-width="1.5"/></svg>`},
+  {n:'その他', svg:`<svg viewBox="0 0 28 20" width="28" height="20"><rect width="28" height="20" rx="3" fill="currentColor" opacity=".1"/><text x="14" y="14.5" text-anchor="middle" font-size="13" font-weight="bold" fill="currentColor" opacity=".7" font-family="sans-serif">?</text></svg>`},
+];
 
 const ALT={
   'パンツ':[
     {n:'裾上げ',   d:'both',dm:'len'},
-    {n:'ウエスト', d:'both',dm:'cm'},
+    {n:'ウエスト', d:'both',dm:'cm',pk:'ウエスト_パンツ'},
     {n:'裾幅',     d:'both',dm:'cm'},
-    {n:'わたり',   d:'both',dm:'cm'},
+    {n:'わたり',   d:'both',dm:'cm',pk:'わたり_パンツ'},
     {n:'股上',     d:'none',dm:'none'},
     {n:'ヒップ',   d:'both',dm:'cm'},
     {n:'スリット移動',d:'none',dm:'none'},
-    {n:'ファスナー交換',d:'none',dm:'none'},
+    {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_パンツ'},
+    {n:'デニムダメージ残し加工',d:'none',dm:'len'},
     {n:'タグ付け', d:'none',dm:'none'},
     {n:'ボタン補強',d:'none',dm:'none'},
     {n:'プレス',   d:'none',dm:'none'},
@@ -621,12 +631,6 @@ const ALT={
     {n:'ボタン補強',d:'none',dm:'none'},
     {n:'プレス',   d:'none',dm:'none'},
   ],
-  'デニムダメージ残し':[
-    {n:'デニムダメージ残し加工',d:'none',dm:'len'},
-    {n:'タグ付け', d:'none',dm:'none'},
-    {n:'ボタン補強',d:'none',dm:'none'},
-    {n:'プレス',   d:'none',dm:'none'},
-  ],
   '付属品補正':[
     {n:'ドローコードチップ補強',d:'none',dm:'none'},
     {n:'ファスナー交換',        d:'none',dm:'none'},
@@ -711,6 +715,17 @@ const PROC={
     {id:'vs',l:'Vスリット'},
     {id:'kn',l:'かんぬき入れ直し'},
   ]},
+  'ウエスト_パンツ':{m:[
+    {id:'s3',l:'3方詰め',ex:'side'},{id:'ry',l:'両脇',ex:'side'},
+    {id:'ib',l:'インベルさわり'},
+    {id:'lp',l:'ループ移動',sub:[{l:'ループ本数',ex:null,input:'number',placeholder:'本',label:'ループ本数'}]},
+    {id:'st',l:'ステッチ入れ直し',sub:[{l:'ステッチ本数',ex:null,input:'number',placeholder:'本',label:'ステッチ本数'}]},
+    {id:'tg',l:'タグ移動'},{id:'aj',l:'アジャスター移動'},
+    {id:'gm',l:'ゴム補正'},{id:'il',l:'インベルループ下切替'},
+    {id:'mi',l:'マチ入れ'},
+    {id:'vs',l:'Vスリット'},
+    {id:'kn',l:'かんぬき入れ直し'},
+  ]},
   '裾幅':{m:[
     {id:'ui',l:'内のみ',   ex:'sw'},
     {id:'so',l:'外のみ',   ex:'sw'},
@@ -722,6 +737,13 @@ const PROC={
     {id:'ui',l:'内のみ',ex:'wr',sub:['シック触り','くり直し']},
     {id:'so',l:'外のみ',ex:'wr',sub:['ポケット触り']},
     {id:'bt',l:'内外',  ex:'wr',sub:['シック触り','くり直し','ポケット触り']},
+  ]},
+  'わたり_パンツ':{m:[
+    {id:'ui',l:'内のみ',ex:'wr',sub:['ポケット触り']},
+    {id:'so',l:'外のみ',ex:'wr',sub:['ポケット触り']},
+    {id:'bt',l:'内外',  ex:'wr',sub:['ポケット触り']},
+    {id:'sc',l:'シックさわり'},
+    {id:'kr',l:'くり直し'},
   ]},
   '股上':{m:[
     {id:'wd',l:'ウエストダウン補正'},
@@ -751,6 +773,7 @@ const PROC={
   ]},
   'ドローコードチップ補強':{m:[{id:'mt',l:'金属チップ'},{id:'rs',l:'樹脂チップ'},{id:'mu',l:'結び直し'}]},
   'ファスナー交換':{m:[]},
+  'ファスナー交換_パンツ':{m:[{id:'hs',l:'前立てハンドステッチ'}]},
   'ネーム刺繍':{m:[{id:'nw',l:'新規'},{id:'rm',l:'取り外し'},{id:'rp',l:'付け替え'}]},
   '裾上げ・裾処理':{m:[
     {id:'hem',l:'三つ折り'},{id:'lok',l:'ロック処理'},{id:'fra',l:'フリンジ仕上げ'},
@@ -894,11 +917,25 @@ function onCustomColor(){
   buildColors();
 }
 function buildPats(){
-  document.getElementById('pat-wrap').innerHTML=PATS.map(p=>
-    `<button class="ppill${curPat===p?' on':''}" onclick="selPat('${p}')">${p}</button>`
-  ).join('');
+  const base=curPat.startsWith('その他:')?'その他':curPat;
+  document.getElementById('pat-wrap').innerHTML=
+    PATS.map(p=>`<button class="ppill${base===p.n?' on':''}" onclick="selPat('${p.n}')" style="display:flex;align-items:center;gap:5px;padding:5px 10px">${p.svg}<span>${p.n}</span></button>`).join('')+
+    `<div id="pat-other-wrap" style="display:${base==='その他'?'flex':'none'};width:100%;margin-top:4px">
+      <input id="pat-other-inp" type="text" placeholder="柄を入力" value="${curPat.startsWith('その他:')?curPat.slice(4):''}"
+        oninput="onPatOther()"
+        style="flex:1;background:var(--s3);border:1px solid var(--bd2);border-radius:8px;padding:8px 10px;color:var(--tx);font-size:14px;font-family:var(--f);outline:none">
+    </div>`;
 }
-function selPat(p){curPat=curPat===p?'':p;buildPats();}
+function selPat(p){
+  const base=curPat.startsWith('その他:')?'その他':curPat;
+  curPat=base===p?'':p;
+  buildPats();
+  if(p==='その他'){setTimeout(()=>{const el=document.getElementById('pat-other-inp');if(el)el.focus();},50);}
+}
+function onPatOther(){
+  const v=document.getElementById('pat-other-inp').value.trim();
+  curPat=v?'その他:'+v:'その他';
+}
 
 // ══ ALT ITEMS ══
 function onCatChange(){
@@ -1009,6 +1046,18 @@ function buildAB(a,uid,isW){
     }
   }
 
+  // ウエスト_パンツ専用：3方詰め・両脇の寸法入力
+  if(a.pk==='ウエスト_パンツ'){
+    const dimBox=(id,labels)=>`<div id="${id}" style="display:none;margin:6px 0;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd)">
+      ${labels.map(lb=>`<div class="dmrow" style="gap:4px;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--tx3);min-width:24px">${lb}</span>
+        <input class="dmi" type="number" id="wkdim-${uid}-${lb}" placeholder="0.0" step="0.5" min="0" oninput="setWkDim('${uid}','${lb}',this.value)" style="flex:1">
+        <span class="dmu">cm</span>
+      </div>`).join('')}
+    </div>`;
+    h+=dimBox(`wk-s3-${uid}`,['左','右','後ろ']);
+    h+=dimBox(`wk-ry-${uid}`,['左','右']);
+  }
   // 股上専用：ウエストダウン補正の前後cm入力
   if(a.n==='股上'){
     h+=`<div id="koko-wd-${uid}" style="display:none;margin:6px 0;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd)">
@@ -1091,6 +1140,11 @@ function togProc(uid,mid,nm){
   // モーニング選択時に前後差入力欄を表示
   const moEl=document.getElementById('morning-diff-'+uid);
   if(moEl) moEl.style.display=procs.includes('モーニング')?'flex':'none';
+  // ウエスト_パンツ：3方詰め/両脇の寸法入力表示
+  const wk3El=document.getElementById('wk-s3-'+uid);
+  if(wk3El) wk3El.style.display=procs.includes('3方詰め')?'block':'none';
+  const wkRyEl=document.getElementById('wk-ry-'+uid);
+  if(wkRyEl) wkRyEl.style.display=procs.includes('両脇')?'block':'none';
 }
 function updSubs(uid,nm,procs){
   const sw=document.getElementById('sw-'+uid);if(!sw)return;
@@ -1194,6 +1248,12 @@ function setSubInp(uid,pl,sl,val){
   body.dataset.subs=JSON.stringify(subs);
 }
 function setAto(uid,val){document.getElementById('body-'+uid).dataset.ato=val;}
+function setWkDim(uid,lb,val){
+  const body=document.getElementById('body-'+uid);
+  let wkdims=JSON.parse(body.dataset.wkdims||'{}');
+  wkdims[lb]=val;
+  body.dataset.wkdims=JSON.stringify(wkdims);
+}
 function togSub(uid,pl,sv){
   const body=document.getElementById('body-'+uid);
   let subs=JSON.parse(body.dataset.subs||'{}');
@@ -1230,7 +1290,9 @@ function colAlts(cid,cat){
       const procs=JSON.parse(body.dataset.procs||'[]');
       const subs=JSON.parse(body.dataset.subs||'{}');
       const ww=body.dataset.ww||'';
-      const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';const kokomae=body.dataset.kokomae||'';const kokoato=body.dataset.kokoato||'';return{n:a.n,dir,procs,subs,ww,mae,ato,kokomae,kokoato,memo};
+      const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';const kokomae=body.dataset.kokomae||'';const kokoato=body.dataset.kokoato||'';
+      const wkdims=JSON.parse(body.dataset.wkdims||'{}');
+      return{n:a.n,dir,procs,subs,ww,mae,ato,kokomae,kokoato,wkdims,memo};
     }
     return{n:a.n,dir,dim,dl,swsub,swpos,swposdim,memo};
   }).filter(Boolean);
@@ -1293,9 +1355,8 @@ function syncT(){
 
 // ══ SAVE ══
 function saveRec(){
-  const ticket=document.getElementById('f-ticket').value.trim();
-  const client=document.getElementById('f-client').value.trim();
-  if(!ticket&&!client){alert('伝票No. または客名を入力してください');return;}
+  const ticket=document.getElementById('f-ticket').value.trim()||'00000';
+  const client=document.getElementById('f-client').value.trim()||'—';
   const cat=document.getElementById('f-cat').value;
   const tp=TYPES.find(t=>t.id===curType);
   const rec={
@@ -1524,6 +1585,11 @@ function wStr(alts){
     if(a.ww) s+=' W幅'+a.ww+'cm';
     if(a.mae||a.ato) s+=' 前'+(a.mae||'—')+'cm/後'+(a.ato||'—')+'cm';
     if(a.kokomae||a.kokoato) s+=' [前'+(a.kokomae||'—')+'cm/後'+(a.kokoato||'—')+'cm]';
+    if(a.wkdims&&Object.keys(a.wkdims).length){
+      const wd=a.wkdims;
+      const parts=['左','右','後ろ'].filter(k=>wd[k]).map(k=>k+wd[k]+'cm');
+      if(parts.length) s+=' ['+parts.join('/')+']';
+    }
     }
     if(a.memo)s+=' ('+a.memo+')';
     return s;
@@ -1549,11 +1615,11 @@ function openDet(id){
     dw('客名',r.client+(r.isStaff?' 👤スタッフ':''))+dw('担当者',r.staff)+
     dw('品名',r.item)+dw('カテゴリー',r.cat)+
     (r.clrH?`<div class="dw"><span class="dk">色</span><span class="dv"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${r.clrH};border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:4px"></span>${r.clrN||r.clrH}</span></div>`:'')+
-    dw('柄',r.pat)+dw('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))+
+    dw('柄',r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'')+dw('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))+
     dw('客様指定',aSum(r.cAlts),true)+dw('指定メモ',r.cMemo,true)+
     dw('実行工程',wStr(r.wAlts),true)+dw('工程メモ',r.wMemo,true)+
     dw('特殊',r.special,true)+
-    dw('機材設定',machineStr(r.machineData),true)+
+    dw('作業手順と設定',machineStr(r.machineData),true)+
     dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
     dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true);
   openOv('ov-det');
@@ -1709,13 +1775,13 @@ function doPrint(){
     ${pr('客名',r.client+(r.isStaff?' 👤スタッフ':''))}${pr('担当者',r.staff)}
     ${pr('品名',r.item)}${pr('カテゴリー',r.cat)}
     ${r.clrH?`<div class="pr"><span class="pk">色</span><span class="pv">${r.clrN||r.clrH}</span></div>`:''}
-    ${pr('柄',r.pat)}${pr('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))}
+    ${pr('柄',r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'')}${pr('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))}
     <div class="ps">補正内容</div>
     ${pr('客様指定',aSum(r.cAlts),true)}${pr('指定メモ',r.cMemo,true)}
     ${pr('実行工程',wStr(r.wAlts),true)}${pr('工程メモ',r.wMemo,true)}
     ${pr('特殊',r.special,true)}
     <div class="ps">機材・作業</div>
-    ${pr('機材設定',machineStr(r.machineData),true)}
+    ${pr('作業手順と設定',machineStr(r.machineData),true)}
     ${pr('所要時間',r.time?r.time+'分':null)}${pr('使用資材',r.materials,true)}
     ${pr('金額',r.price?'¥'+r.price.toLocaleString():null)}
     ${pr('備考',r.note,true)}
@@ -1813,7 +1879,7 @@ function doCSV(){
   const rows=all.map(r=>[
     r.inDate,r.inTime,r.outDate,r.ticket?'#'+r.ticket:'',
     tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.staff,
-    r.item,r.cat,r.clrN||r.clrH,r.pat,r.mat+(r.isSpm?' [特殊素材]':''),
+    r.item,r.cat,r.clrN||r.clrH,(r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:''),r.mat+(r.isSpm?' [特殊素材]':''),
     aSum(r.cAlts),wStr(r.wAlts).replace(/\n/g,' / '),
     machineStr(r.machineData).replace(/\n/g,' / '),'','','','','',
     r.time||'',r.materials,r.price||'',r.note,stL(r.status)
