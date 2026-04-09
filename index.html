@@ -239,6 +239,7 @@ select option{background:#1a1a24}
         <input type="text" id="f-client" autocomplete="off">
       </div>
       <div class="fld"><div class="fl">担当者名</div><input type="text" id="f-staff" autocomplete="off"></div>
+      <div class="fld"><div class="fl">担当作業者</div><select id="f-worker" style="width:100%"><option value="">（選択）</option></select></div>
     </div>
     <div class="sec">
       <div class="sh">👔 商品情報</div>
@@ -478,6 +479,9 @@ select option{background:#1a1a24}
         <div class="mst">店名</div>
         <div class="mli" id="store-list"></div>
         <div class="mar"><input class="mai" id="store-inp" placeholder="店名を追加"><button class="mab" onclick="addStore()">追加</button></div>
+        <div class="mst">担当作業者</div>
+        <div class="mli" id="staff-list"></div>
+        <div class="mar"><input class="mai" id="staff-inp" placeholder="担当作業者名を追加"><button class="mab" onclick="addStaff()">追加</button></div>
         <div class="mst">カテゴリー</div>
         <div class="mli" id="cat-list"></div>
         <div class="mar"><input class="mai" id="cat-inp" placeholder="カテゴリーを追加"><button class="mab" onclick="addCat()">追加</button></div>
@@ -495,9 +499,22 @@ select option{background:#1a1a24}
 
 <div id="print-area"></div>
 
+<!-- 確認モーダル（PWA Safari の confirm 代替） -->
+<div class="ov" id="ov-confirm" style="z-index:600">
+  <div class="md" style="max-height:auto;border-radius:20px;margin:auto;width:calc(100% - 40px);max-width:360px;padding-bottom:16px">
+    <div class="mp"><div class="mpb"></div></div>
+    <div class="mh" id="confirm-title" style="font-size:15px"></div>
+    <div style="padding:4px 16px 16px;font-size:13px;color:var(--tx2);line-height:1.6" id="confirm-msg"></div>
+    <div style="display:flex;gap:8px;padding:0 16px">
+      <button id="confirm-cancel" onclick="closeConfirm()" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:14px;font-weight:600;font-family:var(--f);cursor:pointer">キャンセル</button>
+      <button id="confirm-ok" style="flex:1;padding:12px;border-radius:12px;border:none;font-size:14px;font-weight:700;font-family:var(--f);cursor:pointer">実行</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y36i';
+const APP_VERSION = 'v16y36n';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -561,24 +578,26 @@ const ALT={
     {n:'ヒップ',   d:'both',dm:'cm',     pk:'ヒップ_スカート'},
     {n:'スリット加工',d:'none',dm:'none',pk:'スリット加工_スカート'},
     {n:'スリット移動',d:'none',dm:'none',pk:'スリット移動_スカート'},
+    {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_スカート'},
     {n:'裏地修理', d:'none',dm:'none',   pk:'裏地修理_スカート'},
     {n:'タグ付け', d:'none',dm:'none',   pk:'タグ付け_スカート'},
     {n:'ボタン補強',d:'none',dm:'none',  pk:'ボタン補強_スカート'},
     {n:'プレス',   d:'none',dm:'none',   pk:'プレス_スカート'},
   ],
   'ジャケット':[
-    {n:'着丈',     d:'both',dm:'len_jk1', pk:'着丈_ジャケット'},
-    {n:'袖丈',     d:'both',dm:'len_jk', pk:'袖丈_ジャケット'},
-    {n:'身幅',     d:'both',dm:'cm',     pk:'身幅_ジャケット'},
-    {n:'ウエスト絞り',d:'tsume',dm:'cm', pk:'ウエスト絞り_ジャケット'},
-    {n:'肩幅',     d:'tsume',dm:'cm',    pk:'肩幅_ジャケット'},
-    {n:'袖口',     d:'tsume',dm:'cm',    pk:'袖口_ジャケット'},
-    {n:'ベントさわり',d:'none',dm:'none',pk:'ベントさわり_ジャケット'},
-    {n:'裏地修理', d:'none',dm:'none',   pk:'裏地修理_ジャケット'},
-    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_ジャケット'},
-    {n:'タグ付け', d:'none',dm:'none',   pk:'タグ付け_ジャケット'},
-    {n:'ボタン補強',d:'none',dm:'none',  pk:'ボタン補強_ジャケット'},
-    {n:'プレス',   d:'none',dm:'none',   pk:'プレス_ジャケット'},
+    {n:'着丈',       d:'both',  dm:'len_jk1',pk:'着丈_ジャケット'},
+    {n:'袖丈',       d:'both',  dm:'len_jk', pk:'袖丈_ジャケット'},
+    {n:'身幅',       d:'both',  dm:'cm',     pk:'身幅_ジャケット'},
+    {n:'ウエスト絞り',d:'tsume',dm:'cm',     pk:'ウエスト絞り_ジャケット'},
+    {n:'肩幅',       d:'tsume', dm:'cm',     pk:'肩幅_ジャケット'},
+    {n:'ベントさわり',d:'none',  dm:'none',   pk:'ベントさわり_ジャケット'},
+    {n:'ラペル補正', d:'none',  dm:'none',   pk:'ラペル補正_ジャケット'},
+    {n:'裏地修理',   d:'none',  dm:'none',   pk:'裏地修理_ジャケット'},
+    {n:'ボタン付け替え',d:'none',dm:'none',  pk:'ボタン付け替え_ジャケット'},
+    {n:'タグ付け',   d:'none',  dm:'none',   pk:'タグ付け_ジャケット'},
+    {n:'ボタン補強', d:'none',  dm:'none',   pk:'ボタン補強_ジャケット'},
+    {n:'その他',     d:'none',  dm:'none',   pk:'その他_ジャケット'},
+    {n:'プレス',     d:'none',  dm:'none',   pk:'プレス_ジャケット'},
   ],
   'コート':[
     {n:'着丈',     d:'both',dm:'len_jk1', pk:'着丈_コート'},
@@ -679,6 +698,8 @@ const PROC={
     {id:'ls',l:'ロックステッチ',ex:'sty'},
     {id:'gm',l:'ゴム補正',      ex:'sty'},
     {id:'hw',l:'巾広',          ex:'sty'},
+    {id:'pm',l:'柄合わせ'},
+    {id:'bm',l:'ボタン移動'},
   ]},
   'ウエスト_パンツ':{m:[
     {id:'s3',l:'3方詰め',ex:'side'},{id:'ry',l:'両脇',ex:'side'},
@@ -688,6 +709,7 @@ const PROC={
     {id:'tg',l:'タグ移動'},{id:'aj',l:'アジャスター移動'},
     {id:'gm',l:'ゴム補正'},{id:'il',l:'インベルループ下切替'},
     {id:'mi',l:'マチ入れ'},{id:'vs',l:'Vスリット'},{id:'kn',l:'かんぬき入れ直し'},
+    {id:'kr',l:'くり直し'},{id:'bm',l:'ボタン移動'},
   ]},
   '裾幅_パンツ':{m:[
     {id:'ui',l:'内のみ',ex:'sw'},{id:'so',l:'外のみ',ex:'sw'},{id:'ry',l:'両脇',ex:'sw'},
@@ -748,6 +770,13 @@ const PROC={
     {id:'li',l:'裏地あり'},
   ]},
   'ヒップ_スカート':{m:[{id:'wk',l:'脇縫い'},{id:'lm',l:'限界あり',fin:true}]},
+  'ファスナー交換_スカート':{m:[
+    {id:'cc',l:'コンシール',ex:'ftype'},
+    {id:'vs',l:'ビスロン',  ex:'ftype'},
+    {id:'li',l:'裏地あり'},
+    {id:'yk',l:'ヨーク'},
+    {id:'mk',l:'見返し'},
+  ]},
   'スリット加工_スカート':{m:[{id:'ak',l:'あき止め'},{id:'tj',l:'縫い閉じ'}]},
   'スリット移動_スカート':{m:[
     {id:'zp',l:'ファスナー移動'},{id:'fs',l:'折り伏せ'},
@@ -760,27 +789,49 @@ const PROC={
 
   // ── ジャケット ──
   '着丈_ジャケット':{m:[
-    {id:'ch',l:'千鳥掛け',ex:'sty'},{id:'mf',l:'三つ折り',ex:'sty'},
+    {id:'ch',l:'千鳥掛け',  ex:'sty'},
+    {id:'mf',l:'三つ折り',  ex:'sty'},
+    {id:'rd',l:'丸どんでん',ex:'sty'},
+    {id:'kd',l:'角どんでん',ex:'sty'},
   ]},
   '袖丈_ジャケット':{m:[
-    {id:'sg',l:'シングル',ex:'sty'},{id:'aa',l:'アキあり',ex:'sty'},
-    {id:'an',l:'アキなし',ex:'sty'},{id:'hk',l:'本切羽',ex:'sty'},
-    {id:'kz',l:'飾りボタンあり'},{id:'ca',l:'カフスあり',ex:'cf'},
-    {id:'cn',l:'カフスなし',ex:'cf'},{id:'mt',l:'まつり縫い'},
-    {id:'lk',l:'ロック処理'},{id:'sy',l:'袖山から詰め'},
+    {id:'ts',l:'筒袖',        ex:'sty'},
+    {id:'ak',l:'開き見せ',    ex:'sty'},
+    {id:'gk',l:'額縁',        ex:'sty'},
+    {id:'pp',l:'パイピング始末',ex:'sty'},
+    {id:'hk',l:'本切羽',      ex:'sty'},
+    {id:'kz',l:'飾りボタンあり'},
+    {id:'li',l:'裏地あり'},
+    {id:'sy',l:'袖山から詰め'},
   ]},
   '身幅_ジャケット':{m:[
-    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
-    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},{id:'lm',l:'限界あり',fin:true},
+    {id:'li',l:'裏地あり'},
+    {id:'pp',l:'パイピング始末'},
+    {id:'dt',l:'ダーツ操作'},
+    {id:'lm',l:'限界あり',fin:true},
   ]},
   'ウエスト絞り_ジャケット':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
-  '肩幅_ジャケット':{m:[{id:'kt',l:'肩線'},{id:'sd',l:'袖付け'}]},
-  '袖口_ジャケット':{m:[{id:'ts',l:'縫い代詰め'},{id:'or',l:'折り返し'}]},
+  '肩幅_ジャケット':{m:[
+    {id:'li',l:'裏地あり'},
+    {id:'pp',l:'パイピング始末'},
+    {id:'sp',l:'肩パット再調整'},
+    {id:'km',l:'肩線移動'},
+    {id:'sg',l:'袖ぐり調整'},
+    {id:'nm',l:'衿みつ操作'},
+  ]},
   'ベントさわり_ジャケット':{m:[{id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'}]},
+  'ラペル補正_ジャケット':{m:[
+    {id:'rr',l:'ラペル幅変更'},{id:'rb',l:'ラペル返り線調整'},
+    {id:'rc',l:'衿付け直し'}, {id:'rn',l:'衿形状変更'},
+  ]},
   '裏地修理_ジャケット':{m:[{id:'pt',l:'部分補修'},{id:'fl',l:'全取替'}]},
   'ボタン付け替え_ジャケット':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
   'タグ付け_ジャケット':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
   'ボタン補強_ジャケット':{m:[{id:'sp',l:'特殊'}]},
+  'その他_ジャケット':{m:[
+    {id:'bp',l:'箱ポケット作成'},
+    {id:'fh',l:'フラワーホール空け'},
+  ]},
   'プレス_ジャケット':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
 
   // ── コート ──
@@ -960,6 +1011,8 @@ const gSt=()=>JSON.parse(localStorage.getItem('ar2_st')||JSON.stringify(DEF_ST))
 const sSt=v=>localStorage.setItem('ar2_st',JSON.stringify(v));
 const gCt=()=>JSON.parse(localStorage.getItem('ar2_ct')||JSON.stringify(DEF_CATS));
 const sCt=v=>localStorage.setItem('ar2_ct',JSON.stringify(v));
+const gStaff=()=>JSON.parse(localStorage.getItem('ar2_staff')||'[]');
+const sStaff=v=>localStorage.setItem('ar2_staff',JSON.stringify(v));
 
 // ══ STATE ══
 let curType=null,curClr={h:'',n:''},curPat='',curTime=0;
@@ -1011,9 +1064,14 @@ function setDefaults(){
 function populateSels(){
   const ss=document.getElementById('f-store');
   const cs=document.getElementById('f-cat');
+  const wk=document.getElementById('f-worker');
   const cv=cs.value;
   ss.innerHTML=gSt().map(s=>`<option>${s}</option>`).join('');
   cs.innerHTML=gCt().map(c=>`<option${c===cv?' selected':''}>${c}</option>`).join('');
+  if(wk){
+    const wv=wk.value;
+    wk.innerHTML='<option value="">（選択）</option>'+gStaff().map(s=>`<option${s===wv?' selected':''}>${s}</option>`).join('');
+  }
   onCatChange();
 }
 
@@ -1566,6 +1624,7 @@ function saveRec(){
     outDate:document.getElementById('f-out-date').value,
     ticket,client,isStaff:stfOn,
     staff:document.getElementById('f-staff').value.trim(),
+    worker:document.getElementById('f-worker').value,
     item:document.getElementById('f-item').value.trim(),
     cat,
     clrH:curClr.h,clrN:curClr.n,
@@ -1594,6 +1653,7 @@ function resetForm(){
    'f-special','f-materials','f-price','f-note'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
+  const wk=document.getElementById('f-worker');if(wk)wk.value='';
   resetMachine();
   curType=null;curClr={h:'',n:''};curPat='';curTime=0;
   stfOn=false;spmOn=false;
@@ -1669,7 +1729,7 @@ function renderHist(){
   ).join('');
   if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
   // 現在のフィルター結果をキャッシュ（全選択に使用）
-  window._histFilteredIds=all.map(r=>r.id);
+  window._histFilteredIds=all.map(r=>String(r.id));
   const el=document.getElementById('hl');
   if(!all.length){el.innerHTML=`<div class="empty"><div class="ei">📋</div>記録がありません</div>`;updHistSelCount();return;}
   const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
@@ -1677,21 +1737,22 @@ function renderHist(){
   const selTh=histSelMode?`<th style="width:36px;padding:6px 8px"><input type="checkbox" id="hist-chk-all" onclick="histTogAllChk(this)" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer"></th>`:'';
   el.innerHTML=`<table class="ht"><thead><tr>
     ${selTh}<th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
-    <th>客名</th><th>担当者</th><th>品名</th><th>カテゴリー</th><th>素材</th>
+    <th>客名</th><th>担当者</th><th>担当作業者</th><th>品名</th><th>カテゴリー</th><th>素材</th>
     <th>補正内容</th><th>金額</th><th>状態</th>
   </tr></thead><tbody>
   ${all.map(r=>{
+    const sid=String(r.id);
     const selTd=histSelMode
-      ?`<td style="padding:6px 8px" onclick="event.stopPropagation();histTogRow('${r.id}')"><input type="checkbox" ${histSelIds.has(r.id)?'checked':''} onclick="event.stopPropagation();histTogRow('${r.id}')" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer"></td>`
+      ?`<td style="padding:6px 8px;width:36px" onclick="event.stopPropagation();histTogRow('${sid}')"><input type="checkbox" ${histSelIds.has(sid)?'checked':''} style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;pointer-events:none"></td>`
       :'';
-    const rowSel=histSelMode&&histSelIds.has(r.id)?'background:var(--gold-bg)':'';
-    return `<tr onclick="${histSelMode?`histTogRow('${r.id}')`:`openDet('${r.id}')`}" style="cursor:pointer;${rowSel}">
+    const rowSel=histSelMode&&histSelIds.has(sid)?'background:var(--gold-bg)':'';
+    return `<tr data-rid="${sid}" onclick="${histSelMode?`histTogRow('${sid}')`:`openDet('${r.id}')`}" style="cursor:pointer;${rowSel}">
       ${selTd}
       <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
       <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+r.ticket:''}</td>
       <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
       <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
-      <td>${r.staff||'—'}</td><td>${r.item||'—'}</td>
+      <td>${r.staff||'—'}</td><td>${r.worker||'—'}</td><td>${r.item||'—'}</td>
       <td>${r.cat||'—'}</td>
       <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
       <td>${aSum(r.cAlts)}</td>
@@ -1719,29 +1780,26 @@ function togHistSelMode(){
   renderHist();
 }
 function histTogRow(id){
-  if(histSelIds.has(id)) histSelIds.delete(id);
-  else histSelIds.add(id);
-  // チェックボックスとrow背景のみ更新（再renderなし）
-  const rows=document.querySelectorAll('#hl tbody tr');
-  rows.forEach(tr=>{
+  const sid=String(id);
+  if(histSelIds.has(sid)) histSelIds.delete(sid);
+  else histSelIds.add(sid);
+  document.querySelectorAll('#hl tbody tr').forEach(tr=>{
+    const rid=String(tr.dataset.rid||'');
+    if(!rid)return;
+    const on=histSelIds.has(rid);
     const chk=tr.querySelector('input[type=checkbox]');
-    if(!chk)return;
-    const rowId=chk.getAttribute('onclick')?.match(/'([^']+)'/)?.[1]||
-                tr.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
-    if(!rowId)return;
-    const on=histSelIds.has(rowId);
-    chk.checked=on;
+    if(chk)chk.checked=on;
     tr.style.background=on?'var(--gold-bg)':'';
   });
   updHistSelCount();
 }
 function histTogAllChk(chk){
-  if(chk.checked) (window._histFilteredIds||[]).forEach(id=>histSelIds.add(id));
+  if(chk.checked)(window._histFilteredIds||[]).forEach(id=>histSelIds.add(String(id)));
   else histSelIds.clear();
   renderHist();
 }
 function histSelAll(){
-  (window._histFilteredIds||[]).forEach(id=>histSelIds.add(id));
+  (window._histFilteredIds||[]).forEach(id=>histSelIds.add(String(id)));
   renderHist();
 }
 function histSelNone(){
@@ -1751,30 +1809,61 @@ function histSelNone(){
 function updHistSelCount(){
   const el=document.getElementById('hist-sel-count');
   if(el) el.textContent=histSelIds.size+'件選択';
-  // ヘッダーチェック状態を同期
   const allChk=document.getElementById('hist-chk-all');
   if(allChk){
-    const filtered=window._histFilteredIds||[];
+    const filtered=(window._histFilteredIds||[]).map(String);
     allChk.checked=filtered.length>0&&filtered.every(id=>histSelIds.has(id));
     allChk.indeterminate=!allChk.checked&&filtered.some(id=>histSelIds.has(id));
   }
 }
 function histBulkDel(){
   if(!histSelIds.size){alert('削除する記録を選択してください');return;}
-  if(!confirm(histSelIds.size+'件を削除しますか？\nこの操作は元に戻せません。'))return;
-  sR(gR().filter(r=>!histSelIds.has(r.id)));
-  histSelIds.clear();
-  renderWork();renderHist();
+  const n=histSelIds.size;
+  showConfirm(
+    '一括削除',
+    n+'件を削除しますか？\nこの操作は元に戻せません。',
+    'var(--red)','#fff',
+    ()=>{
+      sR(gR().filter(r=>!histSelIds.has(String(r.id))));
+      histSelIds.clear();
+      histSelMode=false;
+      const btn=document.getElementById('hist-sel-btn');
+      const bar=document.getElementById('hist-bulk-bar');
+      if(btn){btn.className='btn-g';btn.style.cssText='font-size:13px;padding:6px 10px';}
+      if(bar) bar.style.display='none';
+      renderWork();renderHist();
+    }
+  );
 }
 function histBulkStatus(st){
   if(!histSelIds.size){alert('変更する記録を選択してください');return;}
+  const n=histSelIds.size;
   const stL=(STATUS.find(s=>s.id===st)||{label:st}).label;
-  if(!confirm(histSelIds.size+'件を「'+stL+'」に変更しますか？'))return;
-  const rs=gR();
-  rs.forEach(r=>{if(histSelIds.has(r.id))r.status=st;});
-  sR(rs);
-  histSelIds.clear();
-  renderWork();renderHist();
+  showConfirm(
+    'ステータス一括変更',
+    n+'件を「'+stL+'」に変更しますか？',
+    'var(--blue)','#0a0a0f',
+    ()=>{
+      const rs=gR();
+      rs.forEach(r=>{if(histSelIds.has(String(r.id)))r.status=st;});
+      sR(rs);
+      histSelIds.clear();
+      renderWork();renderHist();
+    }
+  );
+}
+
+// ── カスタム確認モーダル ──
+function showConfirm(title,msg,btnBg,btnColor,onOk){
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  const ok=document.getElementById('confirm-ok');
+  ok.style.background=btnBg;ok.style.color=btnColor;
+  ok.onclick=()=>{closeConfirm();onOk();};
+  document.getElementById('ov-confirm').classList.add('on');
+}
+function closeConfirm(){
+  document.getElementById('ov-confirm').classList.remove('on');
 }
 
 // ══ CARD ══
@@ -1893,7 +1982,7 @@ function openDet(id){
     dw('案件種別',r.typeLbl)+dw('店名',r.store)+
     dw('持ち込み',(r.inDate||'')+(r.inTime?' '+r.inTime:''))+dw('納品予定',r.outDate)+
     dw('伝票No.',r.ticket?'#'+r.ticket:'')+
-    dw('客名',r.client+(r.isStaff?' 👤スタッフ':''))+dw('担当者',r.staff)+
+    dw('客名',r.client+(r.isStaff?' 👤スタッフ':''))+dw('担当者',r.staff)+dw('担当作業者',r.worker)+
     dw('品名',r.item)+dw('カテゴリー',r.cat)+
     (r.clrH?`<div class="dw"><span class="dk">色</span><span class="dv"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${r.clrH};border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:4px"></span>${r.clrN||r.clrH}</span></div>`:'')+
     dw('柄',r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'')+dw('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))+
@@ -1972,6 +2061,7 @@ function openEdit(){
         <input type="text" id="e-client" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.client||''}">
       </div>
       <div class="fld"><div class="fl">担当者名</div><input type="text" id="e-staff" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.staff||''}"></div>
+      <div class="fld"><div class="fl">担当作業者</div><select id="e-worker" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none"><option value="">（選択）</option>${gStaff().map(s=>`<option${s===r.worker?' selected':''}>${s}</option>`).join('')}</select></div>
     </div>
     <div class="sec">
       <div class="sh">👔 商品情報</div>
@@ -2185,7 +2275,7 @@ function saveEdit(){
     store:gv('e-store'),inDate:gv('e-indate'),inTime:gv('e-intime'),
     outDate:gv('e-outdate'),ticket:gv('e-ticket'),client:gv('e-client'),
     isStaff:eb.dataset.estf==='1',
-    staff:gv('e-staff'),item:gv('e-item'),cat:cat,
+    staff:gv('e-staff'),worker:gv('e-worker'),item:gv('e-item'),cat:cat,
     clrH:eClrState.h,clrN:eClrState.n,
     pat:ePatState,
     mat:gv('e-mat'),
@@ -2217,7 +2307,7 @@ function doPrint(){
       </div>
     </div>
     <div class="ps">顧客・商品</div>
-    ${pr('客名',r.client+(r.isStaff?' 👤スタッフ':''))}${pr('担当者',r.staff)}
+    ${pr('客名',r.client+(r.isStaff?' 👤スタッフ':''))}${pr('担当者',r.staff)}${pr('担当作業者',r.worker)}
     ${pr('品名',r.item)}${pr('カテゴリー',r.cat)}
     ${r.clrH?`<div class="pr"><span class="pk">色</span><span class="pv">${r.clrN||r.clrH}</span></div>`:''}
     ${pr('柄',r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'')}${pr('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))}
@@ -2390,6 +2480,9 @@ function renderMaster(){
   document.getElementById('store-list').innerHTML=gSt().map((s,i)=>
     `<div class="mit"><span class="mn">${s}</span><button class="mdl" onclick="delStore(${i})">×</button></div>`
   ).join('');
+  document.getElementById('staff-list').innerHTML=gStaff().map((s,i)=>
+    `<div class="mit"><span class="mn">${s}</span><button class="mdl" onclick="delStaff(${i})">×</button></div>`
+  ).join('');
   document.getElementById('cat-list').innerHTML=gCt().map((c,i)=>
     `<div class="mit"><span class="mn">${c}</span><button class="mdl" onclick="delCat(${i})">×</button></div>`
   ).join('');
@@ -2409,6 +2502,12 @@ function addStore(){
   document.getElementById('store-inp').value='';renderMaster();
 }
 function delStore(i){const st=gSt();st.splice(i,1);sSt(st);renderMaster();}
+function addStaff(){
+  const v=document.getElementById('staff-inp').value.trim();
+  if(!v)return;const sf=gStaff();if(sf.includes(v))return;sf.push(v);sStaff(sf);
+  document.getElementById('staff-inp').value='';renderMaster();populateSels();
+}
+function delStaff(i){const sf=gStaff();sf.splice(i,1);sStaff(sf);renderMaster();populateSels();}
 function addCat(){
   const v=document.getElementById('cat-inp').value.trim();
   if(!v)return;const ct=gCt();ct.push(v);sCt(ct);
@@ -2423,6 +2522,7 @@ function doExportSettings(){
     version:APP_VERSION,
     exported:new Date().toISOString(),
     stores:gSt(),
+    workers:gStaff(),
     cats:gCt(),
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -2443,6 +2543,10 @@ function handleSettingsImport(ev){
       if(Array.isArray(d.stores)&&d.stores.length){
         const v=d.stores.filter(s=>typeof s==='string'&&s.trim());
         if(v.length){sSt(v);msgs.push('店名 '+v.length+'件');}
+      }
+      if(Array.isArray(d.workers)&&d.workers.length){
+        const v=d.workers.filter(s=>typeof s==='string'&&s.trim());
+        if(v.length){sStaff(v);msgs.push('担当作業者 '+v.length+'件');}
       }
       if(Array.isArray(d.cats)&&d.cats.length){
         const v=d.cats.filter(c=>typeof c==='string'&&c.trim());
