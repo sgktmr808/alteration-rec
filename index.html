@@ -11,6 +11,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>AlteREC</title>
 <style>
@@ -362,7 +363,25 @@ select option{background:#1a1a24}
 <div class="screen" id="scr-hist">
   <div class="hdr">
     <div><div class="ht">履歴</div></div>
-    <button class="btn-g" onclick="doCSV()" title="Excel出力" style="padding:6px 8px;font-size:16px">📊</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn-g" id="hist-sel-btn" onclick="togHistSelMode()" style="font-size:13px;padding:6px 10px">選択</button>
+      <button class="btn-g" onclick="doCSV()" title="CSV出力" style="padding:6px 8px;font-size:16px">📊</button>
+    </div>
+  </div>
+  <!-- 選択モード時の一括操作バー -->
+  <div id="hist-bulk-bar" style="display:none;padding:8px 16px;background:var(--s2);border-bottom:1px solid var(--bd);position:sticky;top:52px;z-index:99">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:12px;color:var(--tx2)" id="hist-sel-count">0件選択</span>
+      <button onclick="histSelAll()" style="margin-left:auto;padding:4px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:11px;font-family:var(--f);cursor:pointer">全選択</button>
+      <button onclick="histSelNone()" style="padding:4px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:11px;font-family:var(--f);cursor:pointer">解除</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button onclick="histBulkDel()" style="flex:1;min-width:80px;padding:8px 4px;border-radius:10px;border:1px solid rgba(192,90,90,.3);background:var(--red-bg);color:var(--red);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">🗑 一括削除</button>
+      <button onclick="histBulkStatus('recv')" style="flex:1;min-width:60px;padding:8px 4px;border-radius:10px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer">受付済</button>
+      <button onclick="histBulkStatus('work')" style="flex:1;min-width:60px;padding:8px 4px;border-radius:10px;border:1px solid rgba(196,132,58,.3);background:var(--amber-bg);color:var(--amber);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer">作業中</button>
+      <button onclick="histBulkStatus('done')" style="flex:1;min-width:60px;padding:8px 4px;border-radius:10px;border:1px solid rgba(90,172,122,.3);background:var(--green-bg);color:var(--green);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer">完成</button>
+      <button onclick="histBulkStatus('ret')" style="flex:1;min-width:60px;padding:8px 4px;border-radius:10px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer">返却済</button>
+    </div>
   </div>
   <div class="sw2"><input class="si" type="search" placeholder="客名・伝票No・品名…" id="srch" oninput="renderHist()"></div>
   <div class="df">
@@ -409,34 +428,52 @@ select option{background:#1a1a24}
 <div class="ov" id="ov-master" onclick="closeOv('ov-master',event)">
   <div class="md">
     <div class="mp"><div class="mpb"></div></div>
-    <div class="mh">⚙️</div>
+    <div class="mh">⚙️ 設定</div>
     <div class="ms">
       <div class="mb">
-        <div style="margin-bottom:10px;padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px">
-          <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:6px">💾 データバックアップ</div>
-          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">最終バックアップ：<span id="bk-ts">—</span></div>
+
+        <!-- ① 全データバックアップ -->
+        <div style="margin-bottom:12px;padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px">
+          <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:4px">💾 全データバックアップ（JSON）</div>
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">設定＋登録データをまとめて保存／復元</div>
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">最終バックアップ：<span id="bk-ts">—</span></div>
           <div style="display:flex;gap:6px">
-            <button onclick="exportJSON()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--amber);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📥 JSONで保存</button>
+            <button onclick="exportJSON()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--amber);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📥 バックアップ保存</button>
             <button onclick="restoreBackup()" style="flex:1;padding:9px;border-radius:9px;border:1px solid rgba(196,132,58,.3);background:var(--s3);color:var(--amber);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">🔄 直前に戻す</button>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button onclick="doExport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📤 マスター書出</button>
-          <button onclick="showImport()" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(90,172,122,.3);background:var(--green-bg);color:var(--green);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📥 マスター読込</button>
+
+        <!-- ② 設定ファイル（stores・cats のみ） -->
+        <div style="margin-bottom:12px;padding:10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px">
+          <div style="font-size:11px;color:var(--blue);font-weight:700;margin-bottom:4px">⚙️ 設定ファイル（JSON）</div>
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">店名・カテゴリーのみを書き出し／読み込み</div>
+          <div style="display:flex;gap:6px">
+            <button onclick="doExportSettings()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--blue);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 設定を書き出す</button>
+            <button onclick="document.getElementById('settings-file-input').click()" style="flex:1;padding:9px;border-radius:9px;border:1px solid rgba(91,155,213,.3);background:var(--s3);color:var(--blue);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 設定を読み込む</button>
+          </div>
+          <input type="file" id="settings-file-input" accept=".json" style="display:none" onchange="handleSettingsImport(event)">
         </div>
-        <div style="margin-bottom:14px">
-          <button onclick="trigCSVImport()" style="width:100%;padding:10px;border-radius:10px;border:1px solid rgba(155,114,207,.3);background:var(--purple-bg);color:var(--purple);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">📊 CSV インポート</button>
-          <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+
+        <!-- ③ 記録データ（Excel） -->
+        <div style="margin-bottom:14px;padding:10px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px">
+          <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px">📊 記録データ</div>
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">登録データをExcel／CSVで書き出し・読み込み</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <button onclick="doExportXLSX()" style="padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 Excel書き出し</button>
+            <button onclick="document.getElementById('xlsx-file-input').click()" style="padding:9px;border-radius:9px;border:1px solid rgba(90,172,122,.3);background:var(--s3);color:var(--green);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 Excel読み込み</button>
+            <button onclick="doExportCSV()" style="padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 CSV書き出し</button>
+            <button onclick="document.getElementById('csv-rec-input').click()" style="padding:9px;border-radius:9px;border:1px solid rgba(90,172,122,.3);background:var(--s3);color:var(--green);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 CSV読み込み</button>
+          </div>
+          <input type="file" id="xlsx-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleXLSXImport(event)">
+          <input type="file" id="csv-rec-input" accept=".csv" style="display:none" onchange="handleCSVRecImport(event)">
+          <div style="font-size:10px;color:var(--tx3)">※ 読み込みは現在のデータに追加されます（重複IDは除外）</div>
         </div>
-        <div class="ea" id="exp-area">
-          <div style="font-size:11px;color:var(--tx3);margin-bottom:5px">テキストをコピーして保存</div>
-          <textarea class="eat" id="exp-text" readonly onclick="this.select()"></textarea>
-          <button class="cpb" id="cpb" onclick="doCopy()">コピー</button>
-        </div>
-        <div class="ea" id="imp-area">
-          <div style="font-size:11px;color:var(--tx3);margin-bottom:5px">エクスポートしたテキストを貼り付け</div>
-          <textarea class="eat" id="imp-text" placeholder="ここに貼り付け…"></textarea>
-          <button class="imb" onclick="doImport()">復元する</button>
+
+        <!-- 店名・カテゴリー管理 -->
+        <div style="margin-bottom:12px;padding:10px;background:var(--red-bg);border:1px solid rgba(192,90,90,.3);border-radius:10px">
+          <div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:4px">🧹 データクリーンアップ</div>
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">客名・品名・伝票No・店名・持込日がすべて空のレコードを削除します</div>
+          <button onclick="cleanEmptyRecs()" style="width:100%;padding:9px;border-radius:9px;border:none;background:var(--red);color:#fff;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">🗑 空レコードを一括削除</button>
         </div>
         <div class="mst">店名</div>
         <div class="mli" id="store-list"></div>
@@ -460,7 +497,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y36';
+const APP_VERSION = 'v16y36i';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -928,6 +965,7 @@ const sCt=v=>localStorage.setItem('ar2_ct',JSON.stringify(v));
 let curType=null,curClr={h:'',n:''},curPat='',curTime=0;
 let stfOn=false,spmOn=false,wkFil='all',hiFil='all',curId=null;
 let selMode=false, selIds=new Set();
+let histSelMode=false, histSelIds=new Set();
 
 // ══ INIT ══
 function init(){
@@ -1630,31 +1668,114 @@ function renderHist(){
     `<button class="fp${hiFil===t.id?' on':''}" onclick="setHF('${t.id}')">${t.label}</button>`
   ).join('');
   if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
+  // 現在のフィルター結果をキャッシュ（全選択に使用）
+  window._histFilteredIds=all.map(r=>r.id);
   const el=document.getElementById('hl');
-  if(!all.length){el.innerHTML=`<div class="empty"><div class="ei">📋</div>記録がありません</div>`;return;}
+  if(!all.length){el.innerHTML=`<div class="empty"><div class="ei">📋</div>記録がありません</div>`;updHistSelCount();return;}
   const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
   const tpL=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
+  const selTh=histSelMode?`<th style="width:36px;padding:6px 8px"><input type="checkbox" id="hist-chk-all" onclick="histTogAllChk(this)" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer"></th>`:'';
   el.innerHTML=`<table class="ht"><thead><tr>
-    <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
+    ${selTh}<th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
     <th>客名</th><th>担当者</th><th>品名</th><th>カテゴリー</th><th>素材</th>
     <th>補正内容</th><th>金額</th><th>状態</th>
   </tr></thead><tbody>
-  ${all.map(r=>`<tr onclick="openDet('${r.id}')">
-    <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
-    <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+r.ticket:''}</td>
-    <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
-    <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
-    <td>${r.staff||'—'}</td><td>${r.item||'—'}</td>
-    <td>${r.cat||'—'}</td>
-    <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
-    <td>${aSum(r.cAlts)}</td>
-    <td style="font-family:var(--fm);color:var(--gold);text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
-    <td>${stL(r.status)}</td>
-  </tr>`).join('')}
+  ${all.map(r=>{
+    const selTd=histSelMode
+      ?`<td style="padding:6px 8px" onclick="event.stopPropagation();histTogRow('${r.id}')"><input type="checkbox" ${histSelIds.has(r.id)?'checked':''} onclick="event.stopPropagation();histTogRow('${r.id}')" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer"></td>`
+      :'';
+    const rowSel=histSelMode&&histSelIds.has(r.id)?'background:var(--gold-bg)':'';
+    return `<tr onclick="${histSelMode?`histTogRow('${r.id}')`:`openDet('${r.id}')`}" style="cursor:pointer;${rowSel}">
+      ${selTd}
+      <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
+      <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+r.ticket:''}</td>
+      <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
+      <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
+      <td>${r.staff||'—'}</td><td>${r.item||'—'}</td>
+      <td>${r.cat||'—'}</td>
+      <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
+      <td>${aSum(r.cAlts)}</td>
+      <td style="font-family:var(--fm);color:var(--gold);text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
+      <td>${stL(r.status)}</td>
+    </tr>`;
+  }).join('')}
   </tbody></table>`;
+  updHistSelCount();
 }
 function setHF(f){hiFil=f;renderHist();}
 function clrDate(){document.getElementById('hf').value='';document.getElementById('ht2').value='';renderHist();}
+
+// ══ 履歴 選択モード ══
+function togHistSelMode(){
+  histSelMode=!histSelMode;
+  histSelIds.clear();
+  const btn=document.getElementById('hist-sel-btn');
+  const bar=document.getElementById('hist-bulk-bar');
+  if(btn) btn.className='btn-g'+(histSelMode?' on-a':'');
+  if(btn) btn.style.cssText=histSelMode
+    ?'font-size:13px;padding:6px 10px;background:var(--amber-bg);color:var(--amber);border-color:var(--amber)'
+    :'font-size:13px;padding:6px 10px';
+  if(bar) bar.style.display=histSelMode?'block':'none';
+  renderHist();
+}
+function histTogRow(id){
+  if(histSelIds.has(id)) histSelIds.delete(id);
+  else histSelIds.add(id);
+  // チェックボックスとrow背景のみ更新（再renderなし）
+  const rows=document.querySelectorAll('#hl tbody tr');
+  rows.forEach(tr=>{
+    const chk=tr.querySelector('input[type=checkbox]');
+    if(!chk)return;
+    const rowId=chk.getAttribute('onclick')?.match(/'([^']+)'/)?.[1]||
+                tr.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+    if(!rowId)return;
+    const on=histSelIds.has(rowId);
+    chk.checked=on;
+    tr.style.background=on?'var(--gold-bg)':'';
+  });
+  updHistSelCount();
+}
+function histTogAllChk(chk){
+  if(chk.checked) (window._histFilteredIds||[]).forEach(id=>histSelIds.add(id));
+  else histSelIds.clear();
+  renderHist();
+}
+function histSelAll(){
+  (window._histFilteredIds||[]).forEach(id=>histSelIds.add(id));
+  renderHist();
+}
+function histSelNone(){
+  histSelIds.clear();
+  renderHist();
+}
+function updHistSelCount(){
+  const el=document.getElementById('hist-sel-count');
+  if(el) el.textContent=histSelIds.size+'件選択';
+  // ヘッダーチェック状態を同期
+  const allChk=document.getElementById('hist-chk-all');
+  if(allChk){
+    const filtered=window._histFilteredIds||[];
+    allChk.checked=filtered.length>0&&filtered.every(id=>histSelIds.has(id));
+    allChk.indeterminate=!allChk.checked&&filtered.some(id=>histSelIds.has(id));
+  }
+}
+function histBulkDel(){
+  if(!histSelIds.size){alert('削除する記録を選択してください');return;}
+  if(!confirm(histSelIds.size+'件を削除しますか？\nこの操作は元に戻せません。'))return;
+  sR(gR().filter(r=>!histSelIds.has(r.id)));
+  histSelIds.clear();
+  renderWork();renderHist();
+}
+function histBulkStatus(st){
+  if(!histSelIds.size){alert('変更する記録を選択してください');return;}
+  const stL=(STATUS.find(s=>s.id===st)||{label:st}).label;
+  if(!confirm(histSelIds.size+'件を「'+stL+'」に変更しますか？'))return;
+  const rs=gR();
+  rs.forEach(r=>{if(histSelIds.has(r.id))r.status=st;});
+  sR(rs);
+  histSelIds.clear();
+  renderWork();renderHist();
+}
 
 // ══ CARD ══
 function rCard(r,showSel){
@@ -2223,8 +2344,6 @@ function closeOv(id,e){if(e.target===document.getElementById(id))closeOvBtn(id);
 function openMaster(){renderMaster();openMasterUpdate();openOv('ov-master');}
 function closeMaster(){
   closeOvBtn('ov-master');
-  document.getElementById('exp-area').style.display='none';
-  document.getElementById('imp-area').style.display='none';
   populateSels();
 }
 function openMasterUpdate(){
@@ -2275,6 +2394,15 @@ function renderMaster(){
     `<div class="mit"><span class="mn">${c}</span><button class="mdl" onclick="delCat(${i})">×</button></div>`
   ).join('');
 }
+function cleanEmptyRecs(){
+  const before=gR();
+  const clean=before.filter(r=>r.client||r.item||r.ticket||r.store||r.inDate);
+  const removed=before.length-clean.length;
+  if(!removed){alert('削除対象の空レコードはありませんでした');return;}
+  if(!confirm(removed+'件の空レコードを削除しますか？'))return;
+  sR(clean);renderWork();renderHist();
+  alert('✅ '+removed+'件の空レコードを削除しました');
+}
 function addStore(){
   const v=document.getElementById('store-inp').value.trim();
   if(!v)return;const st=gSt();st.push(v);sSt(st);
@@ -2288,110 +2416,278 @@ function addCat(){
 }
 function delCat(i){const ct=gCt();ct.splice(i,1);sCt(ct);renderMaster();}
 
-function doExport(){
-  const data={stores:gSt(),cats:gCt(),exported:new Date().toISOString()};
-  document.getElementById('exp-text').value=JSON.stringify(data,null,2);
-  document.getElementById('exp-area').style.display='block';
-  document.getElementById('imp-area').style.display='none';
-  document.getElementById('cpb').textContent='コピー';
-}
-function doCopy(){
-  const el=document.getElementById('exp-text');el.select();
-  navigator.clipboard?.writeText(el.value).then(()=>{
-    document.getElementById('cpb').textContent='✅ コピーしました';
-    setTimeout(()=>document.getElementById('cpb').textContent='コピー',2000);
-  }).catch(()=>{document.execCommand('copy');});
-}
-function showImport(){
-  document.getElementById('imp-area').style.display='block';
-  document.getElementById('exp-area').style.display='none';
-  document.getElementById('imp-text').value='';
-}
-function doImport(){
-  try{
-    const raw=document.getElementById('imp-text').value.trim();
-    const d=JSON.parse(raw);
-    const msgs=[];
-    // 店名（マッチするもののみ）
-    if(Array.isArray(d.stores)){
-      const valid=d.stores.filter(s=>typeof s==='string'&&s.trim());
-      if(valid.length){sSt(valid);msgs.push('店名 '+valid.length+'件');}
-    }
-    // カテゴリー（マッチするもののみ）
-    if(Array.isArray(d.cats)){
-      const valid=d.cats.filter(c=>typeof c==='string'&&c.trim());
-      if(valid.length){sCt(valid);msgs.push('カテゴリー '+valid.length+'件');}
-    }
-    // 記録データ（recs）
-    if(Array.isArray(d.recs)&&d.recs.length){
-      if(confirm('記録データ '+d.recs.length+'件もインポートしますか？\n現在のデータに追加されます。')){
-        const cur=gR();
-        // 既存IDと重複しないものだけ追加
-        const existIds=new Set(cur.map(r=>r.id));
-        const newRecs=d.recs.filter(r=>r&&r.id&&!existIds.has(r.id));
-        sR([...newRecs,...cur]);
-        msgs.push('記録 '+newRecs.length+'件（重複除外）');
-      }
-    }
-    if(!msgs.length){alert('インポートできるデータが見つかりませんでした');return;}
-    document.getElementById('imp-area').style.display='none';
-    renderMaster();renderWork();renderHist();
-    alert('✅ インポート完了：'+msgs.join('・'));
-  }catch(e){alert('データの読み込みに失敗しました。\nJSON形式のファイルか確認してください。');}
+// ══ 設定ファイル書き出し（stores・catsのみ）══
+function doExportSettings(){
+  const data={
+    type:'AlteREC_settings',
+    version:APP_VERSION,
+    exported:new Date().toISOString(),
+    stores:gSt(),
+    cats:gCt(),
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='AlteREC_settings_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();URL.revokeObjectURL(a.href);
 }
 
-// ══ CSV IMPORT ══
-function trigCSVImport(){document.getElementById('csv-file-input').click();}
-function handleCSVImport(ev){
+// ══ 設定ファイル読み込み（ファイル選択）══
+function handleSettingsImport(ev){
   const file=ev.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=function(e){
+  reader.onload=e=>{
     try{
-      const text=e.target.result;
-      const lines=parseCSVLines(text);
-      if(lines.length<2){alert('データが見つかりません');return;}
+      const d=JSON.parse(e.target.result);
+      const msgs=[];
+      if(Array.isArray(d.stores)&&d.stores.length){
+        const v=d.stores.filter(s=>typeof s==='string'&&s.trim());
+        if(v.length){sSt(v);msgs.push('店名 '+v.length+'件');}
+      }
+      if(Array.isArray(d.cats)&&d.cats.length){
+        const v=d.cats.filter(c=>typeof c==='string'&&c.trim());
+        if(v.length){sCt(v);msgs.push('カテゴリー '+v.length+'件');}
+      }
+      if(!msgs.length){alert('設定データが見つかりませんでした');return;}
+      renderMaster();populateSels();
+      alert('✅ 設定を読み込みました：'+msgs.join('・'));
+    }catch(err){alert('ファイルの読み込みに失敗しました。\nJSON形式か確認してください。');}
+  };
+  reader.readAsText(file,'UTF-8');
+  ev.target.value='';
+}
+
+// ══ Excel エクスポート（記録データ）══
+const XLSX_COLS=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','スタッフ',
+  '担当者','品名','カテゴリー','色名','色コード','柄','素材','特殊素材',
+  '客様指定補正','指定メモ','実行工程','工程メモ','特殊','ミシン設定',
+  '所要時間(分)','使用資材','金額','備考','ステータス','ID'];
+
+function doExportXLSX(){
+  if(typeof XLSX==='undefined'){alert('SheetJSの読み込みに失敗しました。インターネット接続を確認してください。');return;}
+  const stL=id=>(STATUS.find(s=>s.id===id)||{label:''}).label;
+  const tpL=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
+  const all=gR();
+  if(!all.length){alert('出力するデータがありません');return;}
+  const rows=all.map(r=>[
+    r.inDate||'', r.inTime||'', r.outDate||'',
+    r.ticket||'', tpL(r.type), r.store||'',
+    r.client||'', r.isStaff?'スタッフ':'', r.staff||'',
+    r.item||'', r.cat||'', r.clrN||'', r.clrH||'',
+    r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'',
+    r.mat||'', r.isSpm?'特殊素材':'',
+    aSum(r.cAlts||[]), r.cMemo||'',
+    wStr(r.wAlts||[]).replace(/\n/g,' / '), r.wMemo||'', r.special||'',
+    machineStr(r.machineData||[]).replace(/\n/g,' / '),
+    r.time||'', r.materials||'', r.price||'', r.note||'',
+    stL(r.status), r.id||'',
+  ]);
+  const ws=XLSX.utils.aoa_to_sheet([XLSX_COLS,...rows]);
+  // 列幅設定
+  ws['!cols']=[
+    {wch:12},{wch:8},{wch:12},{wch:8},{wch:10},{wch:10},{wch:12},{wch:8},
+    {wch:10},{wch:14},{wch:12},{wch:12},{wch:10},{wch:10},{wch:12},{wch:8},
+    {wch:30},{wch:20},{wch:30},{wch:20},{wch:16},{wch:30},
+    {wch:10},{wch:16},{wch:10},{wch:20},{wch:8},{wch:18},
+  ];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'補正記録');
+  XLSX.writeFile(wb,'AlteREC_記録_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// ══ Excel インポート（記録データ）══
+function handleXLSXImport(ev){
+  const file=ev.target.files[0];if(!file)return;
+  if(typeof XLSX==='undefined'){alert('SheetJSの読み込みに失敗しました。インターネット接続を確認してください。');return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){alert('データが見つかりません');return;}
+      const header=rows[0].map(h=>String(h).trim());
+      const ci=k=>header.indexOf(k);
+      const cv=(c,k)=>{const i=ci(k);return i>=0?String(c[i]??''):'';};
       const stMap={'受付済':'recv','作業中':'work','完成':'done','返却済':'ret'};
       const tpMap={};TYPES.forEach(t=>tpMap[t.label]=t);
       const cur=gR();
-      let added=0;
-      for(let i=1;i<lines.length;i++){
-        const c=lines[i];if(c.length<10)continue;
-        const id='imp_'+Date.now()+'_'+i;
-        const tp=tpMap[c[4]]||null;
+      const existIds=new Set(cur.map(r=>r.id));
+      let added=0,skipped=0;
+      for(let i=1;i<rows.length;i++){
+        const c=rows[i];
+        if(c.every(v=>v===''))continue; // 空行スキップ
+        const existingId=cv(c,'ID').trim();
+        if(existingId&&existIds.has(existingId)){skipped++;continue;}
+        const newId=existingId||('ximp_'+Date.now()+'_'+i);
+        const tpLbl=cv(c,'案件種別');
+        const tp=tpMap[tpLbl]||null;
         const rec={
-          id,type:tp?.id||'',typeLbl:tp?.label||c[4]||'',typeCls:tp?.cls||'o',
-          inDate:c[0]||'',inTime:c[1]||'',outDate:c[2]||'',
-          ticket:(c[3]||'').replace('#',''),
-          store:c[5]||'',
-          client:(c[6]||'').replace(' [スタッフ]',''),
-          isStaff:(c[6]||'').includes('[スタッフ]'),
-          staff:c[7]||'',item:c[8]||'',cat:c[9]||'',
-          clrH:'',clrN:c[10]||'',pat:c[11]||'',
-          mat:(c[12]||'').replace(' [特殊素材]',''),
-          isSpm:(c[12]||'').includes('[特殊素材]'),
-          cAlts:[],wAlts:[],cMemo:'',wMemo:'',special:'',
-          machineData:[],time:parseInt(c[21]||0,10)||0,
-          materials:c[22]||'',price:parseInt(c[23]||0,10)||0,
-          note:c[24]||'',
-          status:stMap[c[25]]||'recv',
+          id:newId,
+          type:tp?.id||'',typeLbl:tp?.label||tpLbl,typeCls:tp?.cls||'o',
+          inDate:cv(c,'持込日'),
+          inTime:cv(c,'持込時刻'),
+          outDate:cv(c,'納品日'),
+          ticket:cv(c,'伝票No.'),
+          store:cv(c,'店名'),
+          client:cv(c,'客名'),
+          isStaff:cv(c,'スタッフ').includes('スタッフ'),
+          staff:cv(c,'担当者'),
+          item:cv(c,'品名'),
+          cat:cv(c,'カテゴリー'),
+          clrN:cv(c,'色名'),
+          clrH:cv(c,'色コード'),
+          pat:cv(c,'柄'),
+          mat:cv(c,'素材'),
+          isSpm:cv(c,'特殊素材').includes('特殊'),
+          cAlts:[],wAlts:[],
+          cMemo:cv(c,'指定メモ'),
+          wMemo:cv(c,'工程メモ'),
+          special:cv(c,'特殊'),
+          machineData:[],
+          time:parseInt(cv(c,'所要時間(分)')||'0',10)||0,
+          materials:cv(c,'使用資材'),
+          price:parseInt(cv(c,'金額')||'0',10)||0,
+          note:cv(c,'備考'),
+          status:stMap[cv(c,'ステータス')]||'recv',
         };
-        cur.unshift(rec);added++;
+        // 意味のあるデータが最低1つあるレコードのみ追加
+        if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
+        cur.unshift(rec);existIds.add(newId);added++;
       }
       sR(cur);renderWork();renderHist();
-      alert('✅ '+added+'件インポートしました');
-    }catch(err){alert('CSVの読み込みに失敗しました：'+err.message);}
+      alert('✅ '+added+'件インポートしました'+(skipped?'（'+skipped+'件スキップ）':''));
+    }catch(err){alert('ファイルの読み込みに失敗しました：'+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value='';
+}
+
+// ══ CSV 記録データ書き出し ══
+function doExportCSV(){
+  const all=gR();
+  if(!all.length){alert('出力するデータがありません');return;}
+  const stL=id=>(STATUS.find(s=>s.id===id)||{label:''}).label;
+  const tpL=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
+  const esc=v=>{const s=String(v??'');return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;};
+  const hd=XLSX_COLS; // Excel・CSVで同じ列定義を共有
+  const rows=all.map(r=>[
+    r.inDate||'', r.inTime||'', r.outDate||'',
+    r.ticket||'', tpL(r.type), r.store||'',
+    r.client||'', r.isStaff?'スタッフ':'', r.staff||'',
+    r.item||'', r.cat||'', r.clrN||'', r.clrH||'',
+    r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'',
+    r.mat||'', r.isSpm?'特殊素材':'',
+    aSum(r.cAlts||[]), r.cMemo||'',
+    wStr(r.wAlts||[]).replace(/\n/g,' / '), r.wMemo||'', r.special||'',
+    machineStr(r.machineData||[]).replace(/\n/g,' / '),
+    r.time||'', r.materials||'', r.price||'', r.note||'',
+    stL(r.status), r.id||'',
+  ].map(esc).join(','));
+  const csv='\uFEFF'+[hd.map(esc).join(','),...rows].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='AlteREC_記録_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();URL.revokeObjectURL(a.href);
+}
+
+// ══ CSV 記録データ読み込み ══
+function handleCSVRecImport(ev){
+  const file=ev.target.files[0];if(!file)return;
+  // まずArrayBufferで読み込み、BOMでエンコーディングを判定してからTextDecoderで変換
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const buf=e.target.result;
+      const u8=new Uint8Array(buf);
+      // BOM判定でエンコーディング決定
+      let encoding='UTF-8';
+      if(u8[0]===0xFF&&u8[1]===0xFE) encoding='UTF-16LE';
+      else if(u8[0]===0xFE&&u8[1]===0xFF) encoding='UTF-16BE';
+      else if(u8[0]===0xEF&&u8[1]===0xBB&&u8[2]===0xBF) encoding='UTF-8'; // UTF-8 BOM
+      else {
+        // Shift-JIS判定：0x81-0x9F または 0xE0-0xFC で始まるバイトがあればSJIS
+        let sjisScore=0;
+        for(let i=0;i<Math.min(u8.length,200);i++){
+          if((u8[i]>=0x81&&u8[i]<=0x9F)||(u8[i]>=0xE0&&u8[i]<=0xFC)) sjisScore++;
+        }
+        if(sjisScore>3) encoding='Shift_JIS';
+      }
+      let text;
+      try{
+        text=new TextDecoder(encoding).decode(buf);
+      }catch(ex){
+        text=new TextDecoder('UTF-8').decode(buf);
+      }
+      const lines=parseCSVLines(text);
+      if(lines.length<2){alert('データが見つかりません');ev.target.value='';return;}
+      const header=lines[0].map(h=>h.trim());
+      const ci=k=>{const i=header.indexOf(k);return i>=0?i:-1;};
+      const cv=(c,k)=>{const i=ci(k);return i>=0?String(c[i]??''):'';};
+      const stMap={'受付済':'recv','作業中':'work','完成':'done','返却済':'ret'};
+      const tpMap={};TYPES.forEach(t=>tpMap[t.label]=t);
+      const cur=gR();
+      const existIds=new Set(cur.map(r=>r.id));
+      let added=0,skipped=0;
+      for(let i=1;i<lines.length;i++){
+        const c=lines[i];
+        if(c.every(v=>v===''))continue;
+        const existingId=cv(c,'ID').trim();
+        if(existingId&&existIds.has(existingId)){skipped++;continue;}
+        const newId=existingId||('cimp_'+Date.now()+'_'+i);
+        const tpLbl=cv(c,'案件種別');
+        const tp=tpMap[tpLbl]||null;
+        const rec={
+          id:newId,
+          type:tp?.id||'',typeLbl:tp?.label||tpLbl,typeCls:tp?.cls||'o',
+          inDate:cv(c,'持込日'),
+          inTime:cv(c,'持込時刻'),
+          outDate:cv(c,'納品日'),
+          ticket:cv(c,'伝票No.'),
+          store:cv(c,'店名'),
+          client:cv(c,'客名'),
+          isStaff:cv(c,'スタッフ').includes('スタッフ'),
+          staff:cv(c,'担当者'),
+          item:cv(c,'品名'),
+          cat:cv(c,'カテゴリー'),
+          clrN:cv(c,'色名'),
+          clrH:cv(c,'色コード'),
+          pat:cv(c,'柄'),
+          mat:cv(c,'素材'),
+          isSpm:cv(c,'特殊素材').includes('特殊'),
+          cAlts:[],wAlts:[],
+          cMemo:cv(c,'指定メモ'),
+          wMemo:cv(c,'工程メモ'),
+          special:cv(c,'特殊'),
+          machineData:[],
+          time:parseInt(cv(c,'所要時間(分)')||'0',10)||0,
+          materials:cv(c,'使用資材'),
+          price:parseInt(cv(c,'金額')||'0',10)||0,
+          note:cv(c,'備考'),
+          status:stMap[cv(c,'ステータス')]||'recv',
+        };
+        // 意味のあるデータが最低1つあるレコードのみ追加
+        if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
+        cur.unshift(rec);existIds.add(newId);added++;
+      }
+      sR(cur);renderWork();renderHist();
+      alert('✅ '+added+'件インポートしました'+(skipped?'（'+skipped+'件スキップ）':''));
+    }catch(err){alert('ファイルの読み込みに失敗しました：'+err.message);}
     ev.target.value='';
   };
-  reader.readAsText(file,'UTF-8');
+  reader.readAsArrayBuffer(file);
 }
+
 function parseCSVLines(text){
+  // BOM除去
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
   const lines=[];let cur=[];let val='';let inQ=false;
   for(let i=0;i<text.length;i++){
     const ch=text[i];
     if(inQ){
       if(ch==='"'&&text[i+1]==='"'){val+='"';i++;}
       else if(ch==='"'){inQ=false;}
-      else{val+=ch;}
+      else val+=ch;
     }else{
       if(ch==='"'){inQ=true;}
       else if(ch===','){cur.push(val);val='';}
@@ -2399,7 +2695,7 @@ function parseCSVLines(text){
         cur.push(val);lines.push(cur);cur=[];val='';
         if(ch==='\r')i++;
       }else if(ch==='\r'){cur.push(val);lines.push(cur);cur=[];val='';}
-      else{val+=ch;}
+      else val+=ch;
     }
   }
   if(val||cur.length){cur.push(val);lines.push(cur);}
