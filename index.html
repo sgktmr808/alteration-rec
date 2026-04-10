@@ -338,7 +338,16 @@ select option{background:#1a1a24}
     </div>
     <div class="sec">
       <div class="sh">💴 金額・備考</div>
-      <div class="fld"><div class="fl">金額（円）</div><input type="number" id="f-price" min="0" step="100"></div>
+      <div class="fld">
+        <div class="fl">
+          <span>金額（円）</span>
+          <span id="f-price-hint" style="font-size:10px;color:var(--gold);display:none">📊 目安</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="f-price" min="0" step="100" style="flex:1" oninput="lockPrice('f')">
+          <button id="f-price-lock" onclick="unlockPrice('f')" title="目安に戻す" style="display:none;padding:6px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:11px;cursor:pointer;white-space:nowrap">🔓 解除</button>
+        </div>
+      </div>
       <div class="fld"><div class="fl">備考</div><textarea id="f-note"></textarea></div>
     </div>
     <button class="save-btn" onclick="saveRec()">受付を登録</button>
@@ -444,15 +453,39 @@ select option{background:#1a1a24}
           </div>
         </div>
 
-        <!-- ② 設定ファイル（stores・cats のみ） -->
+        <!-- ② 設定ファイル（項目別） -->
         <div style="margin-bottom:12px;padding:10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px">
-          <div style="font-size:11px;color:var(--blue);font-weight:700;margin-bottom:4px">⚙️ 設定ファイル（JSON）</div>
-          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">店名・カテゴリーのみを書き出し／読み込み</div>
-          <div style="display:flex;gap:6px">
-            <button onclick="doExportSettings()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--blue);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 設定を書き出す</button>
-            <button onclick="document.getElementById('settings-file-input').click()" style="flex:1;padding:9px;border-radius:9px;border:1px solid rgba(91,155,213,.3);background:var(--s3);color:var(--blue);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 設定を読み込む</button>
+          <div style="font-size:11px;color:var(--blue);font-weight:700;margin-bottom:8px">⚙️ 設定ファイル（JSON）</div>
+          <!-- 店名 -->
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:4px;font-weight:600">店名</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button onclick="doExportStores()" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--blue);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 書き出し</button>
+            <button onclick="document.getElementById('stores-file-input').click()" style="flex:1;padding:8px;border-radius:9px;border:1px solid rgba(91,155,213,.3);background:var(--s3);color:var(--blue);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 読み込み</button>
           </div>
-          <input type="file" id="settings-file-input" accept=".json" style="display:none" onchange="handleSettingsImport(event)">
+          <input type="file" id="stores-file-input" accept=".json" style="display:none" onchange="handleStoresImport(event)">
+          <!-- 担当作業者 -->
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:4px;font-weight:600">担当作業者</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button onclick="doExportWorkers()" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--blue);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 書き出し</button>
+            <button onclick="document.getElementById('workers-file-input').click()" style="flex:1;padding:8px;border-radius:9px;border:1px solid rgba(91,155,213,.3);background:var(--s3);color:var(--blue);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 読み込み</button>
+          </div>
+          <input type="file" id="workers-file-input" accept=".json" style="display:none" onchange="handleWorkersImport(event)">
+          <!-- カテゴリー -->
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:4px;font-weight:600">カテゴリー</div>
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <button onclick="doExportCats()" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--blue);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 書き出し</button>
+            <button onclick="document.getElementById('cats-file-input').click()" style="flex:1;padding:8px;border-radius:9px;border:1px solid rgba(91,155,213,.3);background:var(--s3);color:var(--blue);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 読み込み</button>
+          </div>
+          <input type="file" id="cats-file-input" accept=".json" style="display:none" onchange="handleCatsImport(event)">
+          <!-- まとめて -->
+          <div style="border-top:1px solid rgba(91,155,213,.2);padding-top:10px">
+            <div style="font-size:11px;color:var(--tx3);margin-bottom:4px;font-weight:600">まとめて（全項目）</div>
+            <div style="display:flex;gap:6px">
+              <button onclick="doExportSettings()" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--blue);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 書き出し</button>
+              <button onclick="document.getElementById('settings-file-input').click()" style="flex:1;padding:8px;border-radius:9px;border:1px solid rgba(91,155,213,.3);background:var(--s3);color:var(--blue);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 読み込み</button>
+            </div>
+            <input type="file" id="settings-file-input" accept=".json" style="display:none" onchange="handleSettingsImport(event)">
+          </div>
         </div>
 
         <!-- ③ 記録データ（Excel） -->
@@ -514,7 +547,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y36p';
+const APP_VERSION = 'v16y36x';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -568,7 +601,14 @@ const ALT={
     {n:'スリット移動',d:'none',dm:'none',pk:'スリット移動_パンツ'},
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_パンツ'},
     {n:'デニムダメージ残し加工',d:'none',dm:'len_dmg',pk:'デニムダメージ残し加工'},
+    {n:'ヒザ巾',     d:'both',dm:'cm',     pk:'ヒザ巾_パンツ'},
+    {n:'股リペア',   d:'none',dm:'none',   pk:'股リペア_パンツ'},
+    {n:'裏地取替',   d:'none',dm:'none',   pk:'裏地取替_パンツ'},
+    {n:'タック変更', d:'none',dm:'none',   pk:'タック変更_パンツ'},
+    {n:'シック布付け',d:'none',dm:'none',  pk:'シック布付け_パンツ'},
+    {n:'フライ変換', d:'none',dm:'none',   pk:'フライ変換_パンツ'},
     {n:'股下修理',     d:'none',dm:'none',  pk:'股下修理_パンツ'},
+    {n:'裾ほつれ修理', d:'none',dm:'none',  pk:'裾ほつれ修理_パンツ'},
     {n:'ポケット袋修理',d:'none',dm:'none', pk:'ポケット袋修理_パンツ'},
     {n:'かけはぎ（ミシン補修）',d:'none',dm:'none',pk:'かけはぎミシン_パンツ'},
     {n:'タグ付け', d:'none',dm:'none',   pk:'タグ付け_パンツ'},
@@ -579,8 +619,16 @@ const ALT={
     {n:'着丈',     d:'both',dm:'len_sk', pk:'着丈_スカート'},
     {n:'ウエスト', d:'both',dm:'cm',     pk:'ウエスト_スカート'},
     {n:'ヒップ',   d:'both',dm:'cm',     pk:'ヒップ_スカート'},
+    {n:'身幅',       d:'tsume',dm:'cm',    pk:'身幅_スカート'},
+    {n:'裏地のみ着丈詰め',d:'none',dm:'none',pk:'裏地着丈詰め_スカート'},
+    {n:'ペチコート作成',  d:'none',dm:'none',pk:'ペチコート作成_スカート'},
+    {n:'ウエストゴム交換',d:'none',dm:'none',pk:'ウエストゴム交換_スカート'},
+    {n:'スリット開け',    d:'none',dm:'none',pk:'スリット開け_スカート'},
+    {n:'裏地外し',        d:'none',dm:'none',pk:'裏地外し_スカート'},
     {n:'スリット加工',d:'none',dm:'none',pk:'スリット加工_スカート'},
     {n:'スリット移動',d:'none',dm:'none',pk:'スリット移動_スカート'},
+    {n:'スリット破れ修理',d:'none',dm:'none',pk:'スリット破れ修理_スカート'},
+    {n:'脇ポケット作成',  d:'none',dm:'none',pk:'脇ポケット作成_スカート'},
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_スカート'},
     {n:'裏地修理', d:'none',dm:'none',   pk:'裏地修理_スカート'},
     {n:'タグ付け', d:'none',dm:'none',   pk:'タグ付け_スカート'},
@@ -593,12 +641,20 @@ const ALT={
     {n:'身幅',       d:'both',  dm:'cm',     pk:'身幅_ジャケット'},
     {n:'ウエスト絞り',d:'tsume',dm:'cm',     pk:'ウエスト絞り_ジャケット'},
     {n:'肩幅',       d:'tsume', dm:'cm',     pk:'肩幅_ジャケット'},
+    {n:'袖巾',       d:'tsume', dm:'cm',     pk:'袖巾_ジャケット'},
     {n:'ベントさわり',d:'none',  dm:'none',   pk:'ベントさわり_ジャケット'},
     {n:'ラペル補正', d:'none',  dm:'none',   pk:'ラペル補正_ジャケット'},
     {n:'裏地修理',   d:'none',  dm:'none',   pk:'裏地修理_ジャケット'},
     {n:'ボタン付け替え',d:'none',dm:'none',  pk:'ボタン付け替え_ジャケット'},
     {n:'タグ付け',   d:'none',  dm:'none',   pk:'タグ付け_ジャケット'},
     {n:'ボタン補強', d:'none',  dm:'none',   pk:'ボタン補強_ジャケット'},
+    {n:'マチ入れ',   d:'none',  dm:'none',   pk:'マチ入れ_ジャケット'},
+    {n:'つき取り',   d:'none',  dm:'none',   pk:'つき取り_ジャケット'},
+    {n:'リブ交換',   d:'none',  dm:'none',   pk:'リブ交換_ジャケット'},
+    {n:'段返り作り直し',d:'none',dm:'none', pk:'段返り作り直し_ジャケット'},
+    {n:'脇パッド取付',  d:'none',dm:'none', pk:'脇パッド取付_ジャケット'},
+    {n:'内ポケット新設',d:'none',dm:'none', pk:'内ポケット新設_ジャケット'},
+    {n:'エルボーパッチ', d:'none',dm:'none', pk:'エルボーパッチ_ジャケット'},
     {n:'袖口すり切れ修理',d:'none',dm:'none',pk:'袖口すり切れ修理_ジャケット'},
     {n:'ポケット修理',   d:'none',dm:'none', pk:'ポケット修理_ジャケット'},
     {n:'ベント修理',     d:'none',dm:'none', pk:'ベント修理_ジャケット'},
@@ -611,10 +667,17 @@ const ALT={
     {n:'身幅',       d:'both',  dm:'cm',     pk:'身幅_コート'},
     {n:'ウエスト絞り',d:'tsume',dm:'cm',     pk:'ウエスト絞り_コート'},
     {n:'肩幅',       d:'tsume', dm:'cm',     pk:'肩幅_コート'},
+    {n:'袖巾',       d:'tsume', dm:'cm',     pk:'袖巾_コート'},
     {n:'ベントさわり',d:'none',  dm:'none',   pk:'ベントさわり_コート'},
     {n:'ファスナー交換',d:'none',dm:'none',  pk:'ファスナー交換_コート'},
     {n:'裏地修理',   d:'none',  dm:'none',   pk:'裏地修理_コート'},
     {n:'ボタン付け替え',d:'none',dm:'none',  pk:'ボタン付け替え_コート'},
+    {n:'マチ入れ',       d:'none',  dm:'none',   pk:'マチ入れ_コート'},
+    {n:'つき取り',       d:'none',  dm:'none',   pk:'つき取り_コート'},
+    {n:'皮革・ダウン対応',d:'none', dm:'none',   pk:'皮革ダウン_コート'},
+    {n:'トレンチベルト作成',d:'none',dm:'none',pk:'トレンチベルト作成_コート'},
+    {n:'エポレット作成',   d:'none',dm:'none',pk:'エポレット作成_コート'},
+    {n:'ダッフル紐交換',   d:'none',dm:'none',pk:'ダッフル紐交換_コート'},
     {n:'袖口修理',   d:'none',  dm:'none',   pk:'袖口修理_コート'},
     {n:'ラペル補正', d:'none',  dm:'none',   pk:'ラペル補正_コート'},
     {n:'ダウン仕様', d:'none',  dm:'none',   pk:'ダウン仕様_コート'},
@@ -626,10 +689,19 @@ const ALT={
     {n:'着丈',     d:'tsume',dm:'kitake',pk:'着丈_シャツ'},
     {n:'袖丈',     d:'both', dm:'len_jk',pk:'袖丈_シャツ'},
     {n:'身幅',     d:'both', dm:'cm',    pk:'身幅_シャツ'},
+    {n:'袖巾',     d:'tsume',dm:'cm',    pk:'袖巾_シャツ'},
+    {n:'長袖→半袖', d:'none', dm:'none',  pk:'長袖半袖_シャツ'},
     {n:'ウエスト絞り',d:'tsume',dm:'cm', pk:'ウエスト絞り_シャツ'},
     {n:'肩幅',     d:'tsume',dm:'cm',    pk:'肩幅_シャツ'},
     {n:'襟修理',   d:'none', dm:'none',  pk:'襟修理_シャツ'},
     {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_シャツ'},
+    {n:'衿巾ツメ',   d:'none', dm:'none',  pk:'衿巾ツメ_シャツ'},
+    {n:'衿なし化',   d:'none', dm:'none',  pk:'衿なし化_シャツ'},
+    {n:'スリット作成',d:'none',dm:'none',  pk:'スリット作成_シャツ'},
+    {n:'ダーツ操作',       d:'none',dm:'none',  pk:'ダーツ操作_シャツ'},
+    {n:'胸ポケット作成',   d:'none',dm:'none',  pk:'胸ポケット作成_シャツ'},
+    {n:'ネックサイズ詰め', d:'none',dm:'none',  pk:'ネックサイズ詰め_シャツ'},
+    {n:'ダブル→シングルカフス',d:'none',dm:'none',pk:'ダブルシングルカフス_シャツ'},
     {n:'衿裏返し加工',d:'none', dm:'none',  pk:'衿裏返し加工_シャツ'},
     {n:'カフス修理',  d:'none', dm:'none',  pk:'カフス修理_シャツ'},
     {n:'シャーリング交換',d:'none',dm:'none',pk:'シャーリング交換_シャツ'},
@@ -642,6 +714,10 @@ const ALT={
     {n:'袖丈',       d:'tsume',dm:'len_jk',pk:'袖丈_ニット'},
     {n:'身幅',       d:'tsume',dm:'cm',    pk:'身幅_ニット'},
     {n:'ウエスト絞り',d:'tsume',dm:'cm',   pk:'ウエスト絞り_ニット'},
+    {n:'袖巾',       d:'tsume',dm:'cm',    pk:'袖巾_ニット'},
+    {n:'肩巾',       d:'tsume',dm:'cm',    pk:'肩巾_ニット'},
+    {n:'ネック形変更',d:'none', dm:'none',  pk:'ネック形変更_ニット'},
+    {n:'ベルト作成',   d:'none', dm:'none',  pk:'ベルト作成_ニット'},
     {n:'ほつれ補修', d:'none', dm:'none',  pk:'ほつれ補修_ニット'},
     {n:'穴修理',     d:'none', dm:'none',  pk:'穴修理_ニット'},
     {n:'かけはぎ',   d:'none', dm:'none',  pk:'かけはぎ_ニット'},
@@ -656,6 +732,8 @@ const ALT={
     {n:'袖丈',       d:'tsume',dm:'len_jk',pk:'袖丈_スウェット'},
     {n:'身幅',       d:'tsume',dm:'cm',    pk:'身幅_スウェット'},
     {n:'ウエスト絞り',d:'tsume',dm:'cm',   pk:'ウエスト絞り_スウェット'},
+    {n:'袖巾',       d:'tsume',dm:'cm',    pk:'袖巾_スウェット'},
+    {n:'肩巾',       d:'tsume',dm:'cm',    pk:'肩巾_スウェット'},
     {n:'ほつれ補修', d:'none', dm:'none',  pk:'ほつれ補修_スウェット'},
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_スウェット'},
     {n:'リブ交換',   d:'none', dm:'none',  pk:'リブ交換_スウェット'},
@@ -676,6 +754,8 @@ const ALT={
     {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_ドレス'},
     {n:'ほつれ補修',   d:'none',dm:'none',   pk:'ほつれ補修_ドレス'},
     {n:'スパンコール修理',d:'none',dm:'none', pk:'スパンコール修理_ドレス'},
+    {n:'スリット破れ修理',d:'none',dm:'none', pk:'スリット破れ修理_ドレス'},
+    {n:'ストラップ付け',  d:'none',dm:'none', pk:'ストラップ付け_ドレス'},
     {n:'タグ付け',   d:'none',dm:'none',   pk:'タグ付け_ドレス'},
     {n:'ボタン補強', d:'none',dm:'none',   pk:'ボタン補強_ドレス'},
     {n:'プレス',     d:'none',dm:'none',   pk:'プレス_ドレス'},
@@ -691,11 +771,44 @@ const ALT={
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_ワンピース'},
     {n:'裏地修理',   d:'none',dm:'none',   pk:'裏地修理_ワンピース'},
     {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_ワンピース'},
+    {n:'袖巾',       d:'tsume',dm:'cm',    pk:'袖巾_ワンピース'},
+    {n:'アームホールくり',d:'none',dm:'none',pk:'アームホールくり_ワンピース'},
+    {n:'ダーツ操作', d:'none',dm:'none',   pk:'ダーツ操作_ワンピース'},
+    {n:'衿周り修理', d:'none',dm:'none',   pk:'衿周り修理_ワンピース'},
+    {n:'カフスすり切れ修理',d:'none',dm:'none',pk:'カフスすり切れ修理_ワンピース'},
+    {n:'背中から詰め',d:'none',dm:'none',   pk:'背中から詰め_ワンピース'},
+    {n:'ネックサイズ',d:'none',dm:'none',   pk:'ネックサイズ_ワンピース'},
+    {n:'スリット破れ修理',d:'none',dm:'none', pk:'スリット破れ修理_ワンピース'},
     {n:'ほつれ補修',   d:'none',dm:'none',   pk:'ほつれ補修_ワンピース'},
     {n:'スパンコール修理',d:'none',dm:'none', pk:'スパンコール修理_ワンピース'},
     {n:'タグ付け',   d:'none',dm:'none',   pk:'タグ付け_ワンピース'},
     {n:'ボタン補強', d:'none',dm:'none',   pk:'ボタン補強_ワンピース'},
     {n:'プレス',     d:'none',dm:'none',   pk:'プレス_ワンピース'},
+  ],
+  'Tシャツ/ポロシャツ':[
+    {n:'着丈',   d:'tsume',dm:'len_jk1',pk:'着丈_Tシャツ'},
+    {n:'袖丈',   d:'tsume',dm:'len_jk', pk:'袖丈_Tシャツ'},
+    {n:'身幅',   d:'tsume',dm:'cm',     pk:'身幅_Tシャツ'},
+    {n:'袖巾',   d:'tsume',dm:'cm',     pk:'袖巾_Tシャツ'},
+    {n:'肩幅',   d:'tsume',dm:'cm',     pk:'肩幅_Tシャツ'},
+    {n:'ネック',  d:'none', dm:'none',  pk:'ネック_Tシャツ'},
+    {n:'リブニット交換',d:'none',dm:'none', pk:'リブニット交換_Tシャツ'},
+    {n:'タグ付け',d:'none', dm:'none',  pk:'タグ付け_Tシャツ'},
+    {n:'ボタン補強',d:'none',dm:'none', pk:'ボタン補強_Tシャツ'},
+    {n:'プレス',  d:'none', dm:'none',  pk:'プレス_Tシャツ'},
+  ],
+  'ブルゾン':[
+    {n:'着丈',       d:'tsume',dm:'len_jk1',pk:'着丈_ブルゾン'},
+    {n:'袖丈',       d:'tsume',dm:'len_jk', pk:'袖丈_ブルゾン'},
+    {n:'身幅',       d:'tsume',dm:'cm',     pk:'身幅_ブルゾン'},
+    {n:'袖巾',       d:'tsume',dm:'cm',     pk:'袖巾_ブルゾン'},
+    {n:'ファスナー交換',d:'none',dm:'none', pk:'ファスナー交換_ブルゾン'},
+    {n:'リブ交換',   d:'none', dm:'none',   pk:'リブ交換_ブルゾン'},
+    {n:'裏地修理',   d:'none', dm:'none',   pk:'裏地修理_ブルゾン'},
+    {n:'ボタン付け替え',d:'none',dm:'none', pk:'ボタン付け替え_ブルゾン'},
+    {n:'タグ付け',   d:'none', dm:'none',   pk:'タグ付け_ブルゾン'},
+    {n:'ボタン補強', d:'none', dm:'none',   pk:'ボタン補強_ブルゾン'},
+    {n:'プレス',     d:'none', dm:'none',   pk:'プレス_ブルゾン'},
   ],
   '小物':[
     {n:'裾上げ・裾処理', d:'none',dm:'none',  pk:'裾上げ・裾処理'},
@@ -713,9 +826,68 @@ const ALT={
     {n:'ほつれ補修',     d:'none',dm:'none',  pk:'ほつれ補修_小物'},
     {n:'穴修理',         d:'none',dm:'none',  pk:'穴修理_小物'},
     {n:'裏地修理',       d:'none',dm:'none',  pk:'裏地修理_小物'},
+    {n:'ネクタイ補正', d:'none',dm:'none',  pk:'ネクタイ補正_小物'},
+    {n:'ネーム刺繍',   d:'none',dm:'none',  pk:'ネーム刺繍_小物'},
+    {n:'ボタンホール', d:'none',dm:'none',  pk:'ボタンホール_小物'},
+    {n:'ファスナースライダー交換',d:'none',dm:'none',pk:'ファスナースライダー_小物'},
+    {n:'ドットボタン付け替え',   d:'none',dm:'none',pk:'ドットボタン_小物'},
+    {n:'ホック付け',             d:'none',dm:'none',pk:'ホック付け_小物'},
+    {n:'ストラップ付け',         d:'none',dm:'none',pk:'ストラップ付け_小物'},
     {n:'ボタン付け替え', d:'none',dm:'none',  pk:'ボタン付け替え_小物'},
     {n:'タグ付け',       d:'none',dm:'none',  pk:'タグ付け_小物'},
     {n:'プレス',         d:'none',dm:'none',  pk:'プレス_小物'},
+  ],
+  'ジレ':[
+    {n:'着丈',   d:'tsume',dm:'len_jk1',pk:'着丈_ジレ'},
+    {n:'身幅',   d:'tsume',dm:'cm',     pk:'身幅_ジレ'},
+    {n:'裏地取替',d:'none',dm:'none',   pk:'裏地取替_ジレ'},
+    {n:'タグ付け',d:'none',dm:'none',   pk:'タグ付け_ジレ'},
+    {n:'プレス',  d:'none',dm:'none',   pk:'プレス_ジレ'},
+  ],
+  'ベスト':[
+    {n:'着丈',   d:'tsume',dm:'len_jk1',pk:'着丈_ベスト'},
+    {n:'身幅',   d:'tsume',dm:'cm',     pk:'身幅_ベスト'},
+    {n:'裏地取替',d:'none', dm:'none',  pk:'裏地取替_ベスト'},
+    {n:'背布交換',d:'none', dm:'none',  pk:'背布交換_ベスト'},
+    {n:'タグ付け',d:'none', dm:'none',  pk:'タグ付け_ベスト'},
+    {n:'プレス',  d:'none', dm:'none',  pk:'プレス_ベスト'},
+  ],
+  'レザー・革製品':[
+    {n:'袖丈',   d:'both', dm:'len_jk', pk:'袖丈_レザー'},
+    {n:'着丈',   d:'tsume',dm:'len_jk1',pk:'着丈_レザー'},
+    {n:'身幅',   d:'tsume',dm:'cm',     pk:'身幅_レザー'},
+    {n:'肩幅',   d:'tsume',dm:'cm',     pk:'肩幅_レザー'},
+    {n:'ウエスト',d:'tsume',dm:'cm',    pk:'ウエスト_レザー'},
+    {n:'裾幅',   d:'tsume',dm:'cm',     pk:'裾幅_レザー'},
+    {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_レザー'},
+    {n:'リブ交換',      d:'none',dm:'none',pk:'リブ交換_レザー'},
+    {n:'裏地交換',      d:'none',dm:'none',pk:'裏地交換_レザー'},
+    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_レザー'},
+    {n:'穴あけ・修理',  d:'none',dm:'none',pk:'穴あけ修理_レザー'},
+    {n:'タグ付け',      d:'none',dm:'none',pk:'タグ付け_レザー'},
+  ],
+  '毛皮・ムートン':[
+    {n:'袖丈',   d:'tsume',dm:'len_jk', pk:'袖丈_毛皮'},
+    {n:'着丈',   d:'tsume',dm:'len_jk1',pk:'着丈_毛皮'},
+    {n:'身幅',   d:'tsume',dm:'cm',     pk:'身幅_毛皮'},
+    {n:'肩幅',   d:'tsume',dm:'cm',     pk:'肩幅_毛皮'},
+    {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_毛皮'},
+    {n:'裏地交換',      d:'none',dm:'none',pk:'裏地交換_毛皮'},
+    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_毛皮'},
+    {n:'金具交換',      d:'none',dm:'none',pk:'金具交換_毛皮'},
+    {n:'タグ付け',      d:'none',dm:'none',pk:'タグ付け_毛皮'},
+  ],
+  'リメイク・オーダー':[
+    {n:'スカート作成',      d:'none',dm:'none',pk:'スカート作成_リメイク'},
+    {n:'パンツ作成',        d:'none',dm:'none',pk:'パンツ作成_リメイク'},
+    {n:'ブラウス作成',      d:'none',dm:'none',pk:'ブラウス作成_リメイク'},
+    {n:'ワンピース作成',    d:'none',dm:'none',pk:'ワンピース作成_リメイク'},
+    {n:'ジャケット作成',    d:'none',dm:'none',pk:'ジャケット作成_リメイク'},
+    {n:'コート作成',        d:'none',dm:'none',pk:'コート作成_リメイク'},
+    {n:'ベスト作成',        d:'none',dm:'none',pk:'ベスト作成_リメイク'},
+    {n:'ワンピース→ツーピース',d:'none',dm:'none',pk:'ワンピースツーピース_リメイク'},
+    {n:'衿リフォーム',      d:'none',dm:'none',pk:'衿リフォーム_リメイク'},
+    {n:'マチ入れ',          d:'none',dm:'none',pk:'マチ入れ_リメイク'},
   ],
 };
 
@@ -736,11 +908,14 @@ const PROC={
     {id:'s3',l:'3方詰め',ex:'side'},{id:'ry',l:'両脇',ex:'side'},
     {id:'ib',l:'インベルさわり'},
     {id:'lp',l:'ループ移動',sub:[{l:'ループ本数',ex:null,input:'number',placeholder:'本',label:'ループ本数'}]},
+    {id:'la',l:'ループ作成',sub:[{l:'ループ本数',ex:null,input:'number',placeholder:'本',label:'ループ本数'}]},
     {id:'st',l:'ステッチ入れ直し',sub:[{l:'ステッチ本数',ex:null,input:'number',placeholder:'本',label:'ステッチ本数'}]},
     {id:'tg',l:'タグ移動'},{id:'aj',l:'アジャスター移動'},
-    {id:'gm',l:'ゴム補正'},{id:'il',l:'インベルループ下切替'},
+    {id:'gm',l:'ゴム補正'},{id:'ge',l:'インサイドベルト・ゴム全交換'},
+    {id:'il',l:'インベルループ下切替'},
     {id:'mi',l:'マチ入れ'},{id:'vs',l:'Vスリット'},{id:'kn',l:'かんぬき入れ直し'},
     {id:'kr',l:'くり直し'},{id:'bm',l:'ボタン移動'},
+    {id:'fk',l:'前カン付け'},
   ]},
   '裾幅_パンツ':{m:[
     {id:'ui',l:'内のみ',ex:'sw'},{id:'so',l:'外のみ',ex:'sw'},{id:'ry',l:'両脇',ex:'sw'},
@@ -799,6 +974,8 @@ const PROC={
     {id:'wd',l:'ワイド'},
     {id:'pl',l:'プリーツ'},
     {id:'bl',l:'ベルト下で詰め'},
+    {id:'gk2',l:'学生スカート'},
+    {id:'qu',l:'キュロット'},
   ]},
   'ウエスト_スカート':{m:[
     {id:'s3',l:'3方詰め'},{id:'ry',l:'両脇'},
@@ -836,6 +1013,9 @@ const PROC={
     {id:'mf',l:'三つ折り',  ex:'sty'},
     {id:'rd',l:'丸どんでん',ex:'sty'},
     {id:'kd',l:'角どんでん',ex:'sty'},
+    {id:'hs',l:'ハンドステッチ'},
+    {id:'pm',l:'アウトポケット移動'},
+    {id:'pr',l:'アウトポケット作り替え'},
   ]},
   '袖丈_ジャケット':{m:[
     {id:'ts',l:'筒袖',        ex:'sty'},
@@ -846,11 +1026,14 @@ const PROC={
     {id:'kz',l:'飾りボタンあり'},
     {id:'li',l:'裏地あり'},
     {id:'sy',l:'袖山から詰め'},
+    {id:'hs',l:'ハンドステッチ'},
   ]},
   '身幅_ジャケット':{m:[
     {id:'li',l:'裏地あり'},
     {id:'pp',l:'パイピング始末'},
     {id:'dt',l:'ダーツ操作'},
+    {id:'hs',l:'ハンドステッチ'},
+    {id:'pm',l:'アウトポケット移動'},
     {id:'lm',l:'限界あり',fin:true},
   ]},
   'ウエスト絞り_ジャケット':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
@@ -862,18 +1045,31 @@ const PROC={
     {id:'sg',l:'袖ぐり調整'},
     {id:'nm',l:'衿みつ操作'},
   ]},
-  'ベントさわり_ジャケット':{m:[{id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'}]},
+  'ベントさわり_ジャケット':{m:[
+    {id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'},
+    {id:'cl',l:'ベント閉じ'},{id:'op',l:'ベント開け'},
+  ]},
   'ラペル補正_ジャケット':{m:[
     {id:'rr',l:'ラペル幅変更'},{id:'rb',l:'ラペル返り線調整'},
-    {id:'rc',l:'衿付け直し'}, {id:'rn',l:'衿形状変更'},
+    {id:'rc',l:'衿付け直し'},{id:'rn',l:'衿形状変更'},
+    {id:'cs',l:'衿芯入れ替え'},{id:'sg',l:'段返りプレス'},
   ]},
-  '裏地修理_ジャケット':{m:[{id:'pt',l:'部分補修'},{id:'fl',l:'全取替'}]},
+  '裏地修理_ジャケット':{m:[
+    {id:'pt',l:'部分補修'},{id:'do',l:'胴裏のみ'},
+    {id:'fl',l:'総裏交換'},{id:'sl',l:'袖裏交換'},
+    {id:'bk',l:'背抜きに変更'},
+  ]},
   'ボタン付け替え_ジャケット':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
   'タグ付け_ジャケット':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
   'ボタン補強_ジャケット':{m:[{id:'sp',l:'特殊'}]},
   'その他_ジャケット':{m:[
     {id:'bp',l:'箱ポケット作成'},
     {id:'fh',l:'フラワーホール空け'},
+    {id:'gj',l:'ゴージ手縫い'},
+    {id:'hh',l:'ハンドホール（1個）'},
+    {id:'wp',l:'ワッペン付け'},
+    {id:'sp',l:'袖口スエードパイピング'},
+    {id:'pb',l:'袖裏をパイピング仕様に'},
   ]},
   '袖口すり切れ修理_ジャケット':{m:[
     {id:'pt',l:'部分補修'},{id:'at',l:'当て布'},{id:'kk',l:'共生地での修理'},
@@ -895,6 +1091,10 @@ const PROC={
     {id:'ch',l:'千鳥掛け',ex:'sty'},{id:'mc',l:'ミシン',ex:'sty'},
     {id:'mf',l:'三つ折り',ex:'sty'},{id:'fk',l:'袋縫い',ex:'sty'},
     {id:'ls',l:'ロックステッチ'},
+    {id:'fl',l:'フレアー'},
+    {id:'hs',l:'ハンドステッチ'},
+    {id:'pm',l:'アウトポケット移動'},
+    {id:'pr',l:'アウトポケット作り替え'},
   ]},
   '袖丈_コート':{m:[
     {id:'sg',l:'シングル',ex:'sty'},{id:'aa',l:'アキあり',ex:'sty'},
@@ -905,18 +1105,27 @@ const PROC={
   ]},
   '身幅_コート':{m:[
     {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
-    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},{id:'lm',l:'限界あり',fin:true},
+    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},
+    {id:'pm',l:'アウトポケット移動'},
+    {id:'lm',l:'限界あり',fin:true},
   ]},
   'ウエスト絞り_コート':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
   '肩幅_コート':{m:[{id:'kt',l:'肩線'},{id:'sd',l:'袖付け'}]},
-  'ベントさわり_コート':{m:[{id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'}]},
+  'ベントさわり_コート':{m:[
+    {id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'},
+    {id:'cl',l:'ベント閉じ'},{id:'op',l:'ベント開け'},
+  ]},
   'ファスナー交換_コート':{m:[
     {id:'op',l:'オープンファスナー',ex:'ftype'},
     {id:'cc',l:'コンシール',        ex:'ftype'},
     {id:'vs',l:'ビスロン',          ex:'ftype'},
     {id:'li',l:'裏地あり'},
   ]},
-  '裏地修理_コート':{m:[{id:'pt',l:'部分補修'},{id:'fl',l:'全取替'}]},
+  '裏地修理_コート':{m:[
+    {id:'pt',l:'部分補修'},{id:'do',l:'胴裏のみ'},
+    {id:'fl',l:'総裏交換'},{id:'sl',l:'袖裏交換'},
+    {id:'bk',l:'背抜きに変更'},{id:'ln',l:'ライナー詰め'},
+  ]},
   'ボタン付け替え_コート':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
   '袖口修理_コート':{m:[
     {id:'pt',l:'部分補修'},{id:'at',l:'当て布'},{id:'kk',l:'共生地での修理'},
@@ -950,13 +1159,27 @@ const PROC={
     {id:'cn',l:'カフスなし',ex:'cf'},
     {id:'rb',l:'リブ付け'},{id:'sy',l:'袖山から詰め'},
     {id:'tz',l:'タンザク移動'},{id:'kr',l:'切り込み跡芯補強'},
+    {id:'lc',l:'レースカット'},{id:'lm',l:'レース移動'},
+    {id:'fl',l:'袖口フレアー切替え'},
+    {id:'da',l:'袖丈出し（AH+カフス）'},
   ]},
   '身幅_シャツ':{m:[
-    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},{id:'lm',l:'限界あり',fin:true},
+    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},
+    {id:'yk',l:'肩ヨークタック外し（センター）'},
+    {id:'ys',l:'肩ヨークタック外し（サイド）'},
+    {id:'lm',l:'限界あり',fin:true},
   ]},
   'ウエスト絞り_シャツ':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
-  '肩幅_シャツ':{m:[{id:'kt',l:'肩線'},{id:'sd',l:'袖付け'}]},
-  '襟修理_シャツ':{m:[{id:'nr',l:'縫い直し'},{id:'tk',l:'付け直し'}]},
+  '肩幅_シャツ':{m:[
+    {id:'kt',l:'肩線'},{id:'sd',l:'袖付け'},
+    {id:'rg',l:'ラグラン袖ハラミ取り'},
+  ]},
+  '襟修理_シャツ':{m:[
+    {id:'nr',l:'縫い直し'},{id:'tk',l:'付け直し'},
+    {id:'bk',l:'後ろ衿ぐりをくる'},
+    {id:'kp',l:'くるみ肩パット付け（付属代込み）'},
+    {id:'st',l:'ストラップ付け（材料代別）'},
+  ]},
   'ボタン付け替え_シャツ':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
   '衿裏返し加工_シャツ':{m:[
     {id:'re',l:'表裏反転'},{id:'sp',l:'特殊素材'},
@@ -980,10 +1203,13 @@ const PROC={
     {id:'tm',l:'手まつり',ex:'sty'},{id:'ch',l:'千鳥掛け',ex:'sty'},
     {id:'mc',l:'ミシン',ex:'sty'},{id:'lk',l:'ロック処理',ex:'sty'},
     {id:'ls',l:'ロックステッチ'},
+    {id:'lk2',l:'リンキング仕上げ（専門工場）'},
   ]},
   '袖丈_ニット':{m:[
     {id:'rb',l:'リブ付け'},{id:'sy',l:'袖山から詰め'},
     {id:'mt',l:'まつり縫い'},{id:'lk',l:'ロック処理'},
+    {id:'lk2',l:'リンキング仕上げ（専門工場）'},
+    {id:'sh',l:'肩山カット'},
   ]},
   '身幅_ニット':{m:[
     {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
@@ -1086,11 +1312,18 @@ const PROC={
     {id:'sg',l:'シングル',ex:'sty'},{id:'tm',l:'手まつり',ex:'sty'},
     {id:'ch',l:'千鳥掛け',ex:'sty'},{id:'mc',l:'ミシン',ex:'sty'},
     {id:'mf',l:'三つ折り',ex:'sty'},{id:'ls',l:'ロックステッチ'},
+    {id:'wc',l:'ウエスト切替えで詰め（上）'},
+    {id:'wb',l:'ウエスト切替えで詰め（上下）'},
+    {id:'pl',l:'総プリーツ'},
+    {id:'mr',l:'メローロック・カバーステッチ'},
   ]},
   '袖丈_ワンピース':{m:[
     {id:'ts',l:'筒袖',   ex:'sty'},{id:'ak',l:'開き見せ',ex:'sty'},
     {id:'mt',l:'まつり縫い'},{id:'lk',l:'ロック処理'},
     {id:'sy',l:'袖山から詰め'},
+    {id:'fl',l:'袖口フレアー切替え'},
+    {id:'lc',l:'レースカット'},
+    {id:'lm2',l:'レース移動'},
   ]},
   'ウエスト_ワンピース':{m:[
     {id:'wk',l:'脇縫い'},{id:'dt',l:'ダーツ'},{id:'bt',l:'両方'},
@@ -1120,6 +1353,138 @@ const PROC={
   'ボタン補強_ワンピース':{m:[{id:'sp',l:'特殊'}]},
   'プレス_ワンピース':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
 
+  // ── ジャケット追加 ──
+  '袖巾_ジャケット':{m:[
+    {id:'so',l:'袖口巾',    ex:'sw'},
+    {id:'ah',l:'アーム〜ヒジ巾',ex:'sw'},
+    {id:'as',l:'アーム〜袖口巾',ex:'sw'},
+    {id:'pp',l:'パイピング入り'},
+    {id:'st',l:'ステッチ入り'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+
+  // ── コート追加 ──
+  '袖巾_コート':{m:[
+    {id:'so',l:'袖口巾',      ex:'sw'},
+    {id:'ah',l:'二の腕〜ヒジ巾',ex:'sw'},
+    {id:'as',l:'二の腕〜袖口巾',ex:'sw'},
+    {id:'rg',l:'ラグランスリーブ'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+
+  // ── シャツ追加 ──
+  '袖巾_シャツ':{m:[
+    {id:'nc',l:'カフスさわらず'},
+    {id:'wc',l:'カフスも共に'},
+    {id:'cw',l:'カフス幅のみ'},
+  ]},
+  '長袖半袖_シャツ':{m:[
+    {id:'st',l:'ステッチ仕上げ'},
+    {id:'rb',l:'リブ付け'},
+    {id:'lk',l:'ロック処理'},
+  ]},
+
+  // ── ニット追加 ──
+  '袖巾_ニット':{m:[
+    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '肩巾_ニット':{m:[
+    {id:'km',l:'肩線移動'},{id:'sg',l:'袖ぐり調整'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'ネック形変更_ニット':{m:[
+    {id:'vn',l:'Vネックに'},
+    {id:'rn',l:'ラウンドネックに'},
+    {id:'tt',l:'タートルネックに'},
+    {id:'tc',l:'タートルカット（丈詰め）'},
+    {id:'tw',l:'タートル幅詰め'},
+    {id:'sp',l:'特殊'},
+  ]},
+
+  // ── スウェット追加 ──
+  '袖巾_スウェット':{m:[
+    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
+    {id:'rb',l:'リブさわり'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '肩巾_スウェット':{m:[
+    {id:'km',l:'肩線移動'},{id:'sg',l:'袖ぐり調整'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+
+  // ── Tシャツ/ポロシャツ ──
+  '着丈_Tシャツ':{m:[
+    {id:'mc',l:'ミシン',ex:'sty'},{id:'tm',l:'手まつり',ex:'sty'},
+    {id:'lk',l:'ロック処理',ex:'sty'},{id:'ls',l:'ロックステッチ'},
+    {id:'rb',l:'リブ付け'},
+  ]},
+  '袖丈_Tシャツ':{m:[
+    {id:'rb',l:'リブ付け'},{id:'sy',l:'袖山から詰め'},
+    {id:'mt',l:'まつり縫い'},{id:'lk',l:'ロック処理'},
+  ]},
+  '身幅_Tシャツ':{m:[
+    {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '袖巾_Tシャツ':{m:[
+    {id:'ui',l:'内のみ'},{id:'ry',l:'両脇'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '肩幅_Tシャツ':{m:[
+    {id:'km',l:'肩線移動'},{id:'sg',l:'袖ぐり調整'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'ネック_Tシャツ':{m:[
+    {id:'sz',l:'ネックサイズ詰め'},{id:'rb',l:'リブ付け直し'},
+    {id:'re',l:'縫い直し'},
+    {id:'wd',l:'衿ぐりを広く'},
+    {id:'mi',l:'マチ入れで身巾を広く'},
+  ]},
+  'タグ付け_Tシャツ':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
+  'ボタン補強_Tシャツ':{m:[{id:'sp',l:'特殊'}]},
+  'プレス_Tシャツ':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
+
+  // ── ブルゾン ──
+  '着丈_ブルゾン':{m:[
+    {id:'rb',l:'裾リブ移動',ex:'sty'},
+    {id:'bl',l:'裾ベルト移動',ex:'sty'},
+    {id:'zp',l:'ファスナーカット'},
+    {id:'dc',l:'ドローコード付き'},
+  ]},
+  '袖丈_ブルゾン':{m:[
+    {id:'rb',l:'リブ付き',   ex:'sty'},
+    {id:'cf',l:'カフス付き', ex:'sty'},
+    {id:'zp',l:'ファスナーカット',ex:'sty'},
+    {id:'zm',l:'ファスナー移動'},
+    {id:'sy',l:'袖山から詰め'},
+  ]},
+  '身幅_ブルゾン':{m:[
+    {id:'ry',l:'両脇'},
+    {id:'rb',l:'裾リブ付き'},
+    {id:'bl',l:'裾ベルト付き'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '袖巾_ブルゾン':{m:[
+    {id:'ah',l:'アーム〜ヒジ巾',ex:'sw'},
+    {id:'as',l:'アーム〜袖口巾',ex:'sw'},
+    {id:'so',l:'袖口リブのみ'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'ファスナー交換_ブルゾン':{m:[
+    {id:'op',l:'オープンファスナー',ex:'ftype'},
+    {id:'vs',l:'ビスロン',          ex:'ftype'},
+    {id:'cc',l:'コンシール',        ex:'ftype'},
+  ]},
+  'リブ交換_ブルゾン':{m:[
+    {id:'sl',l:'袖口',  ex:'pos'},{id:'cl',l:'衿口',ex:'pos'},{id:'hm',l:'裾',ex:'pos'},
+    {id:'sm',l:'同素材'},{id:'df',l:'別素材'},
+  ]},
+  '裏地修理_ブルゾン':{m:[{id:'pt',l:'部分補修'},{id:'fl',l:'全取替'}]},
+  'ボタン付け替え_ブルゾン':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
+  'タグ付け_ブルゾン':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
+  'ボタン補強_ブルゾン':{m:[{id:'sp',l:'特殊'}]},
+  'プレス_ブルゾン':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
 
   // ── 小物 ──
   '裾上げ・裾処理':{m:[
@@ -1129,7 +1494,7 @@ const PROC={
   'フリンジ補修':{m:[{id:'re',l:'結び直し'},{id:'add',l:'追加補修'},{id:'cut',l:'カット揃え'}]},
   'サイズ調整_小物':{m:[{id:'sm',l:'縫い詰め'},{id:'lm',l:'限界あり',fin:true}]},
   '長さ調整_小物':{m:[{id:'ct',l:'カット'},{id:'ad',l:'継ぎ足し'}]},
-  '穴あけ':{m:[{id:'hand',l:'手工具'},{id:'punch',l:'ポンチ'},{id:'laser',l:'レーザー'}]},
+  '穴あけ':{m:[{id:'hand',l:'手工具'},{id:'punch',l:'ポンチ'},{id:'laser',l:'レーザー'},{id:'hm',l:'ハトメ'}]},
   'バックル交換':{m:[{id:'same',l:'同型'},{id:'diff',l:'別型'},{id:'cust',l:'持ち込み'}]},
   'ブリム修理':{m:[{id:'re',l:'縫い直し'},{id:'stiffen',l:'芯入れ直し'},{id:'shape',l:'形状整形'}]},
   'スウェット交換':{m:[{id:'same',l:'同素材'},{id:'diff',l:'別素材'}]},
@@ -1143,6 +1508,445 @@ const PROC={
   'ボタン付け替え_小物':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
   'タグ付け_小物':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
   'プレス_小物':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
+  'ネクタイ補正_小物':{m:[
+    {id:'bw',l:'大剣幅詰め'},{id:'lc',l:'長さカット'},
+    {id:'bwlc',l:'大剣幅詰め+長さカット'},{id:'mt',l:'まつり直し'},
+  ]},
+  'ネーム刺繍_小物':{m:[
+    {id:'kj',l:'漢字'},{id:'al',l:'アルファベット'},
+    {id:'hd',l:'ほどき込み'},
+  ]},
+  'ボタンホール_小物':{m:[
+    {id:'mc',l:'マシーン（1ヶ）'},{id:'hd',l:'ハンド（1ヶ）'},
+  ]},
+
+  // ── ジレ ──
+  '着丈_ジレ':{m:[
+    {id:'hm',l:'裾から詰め'},{id:'sh',l:'肩線詰め'},
+  ]},
+  '身幅_ジレ':{m:[
+    {id:'ts',l:'詰め'},{id:'mi',l:'マチ入れ（生地代別）'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '裏地取替_ジレ':{m:[{id:'fl',l:'全取替'},{id:'pt',l:'部分補修'}]},
+  'タグ付け_ジレ':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
+  'プレス_ジレ':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
+
+  // ── パンツ追加 ──
+  'ヒザ巾_パンツ':{m:[
+    {id:'ui',l:'内のみ',ex:'kn'},{id:'so',l:'外のみ',ex:'kn'},{id:'ry',l:'両脇',ex:'kn'},
+    {id:'dst',l:'ダブルステッチ'},{id:'cst',l:'チェーンステッチ'},
+  ]},
+  '股リペア_パンツ':{m:[
+    {id:'tk',l:'ミシンタタキ（3cm以内）'},
+    {id:'tl',l:'ミシンタタキ（3cm以上）'},
+    {id:'at',l:'当て布補修'},
+    {id:'ks',l:'股両側当て布'},
+  ]},
+  '裏地取替_パンツ':{m:[
+    {id:'kn',l:'膝裏前のみ'},{id:'fl',l:'総裏前後'},
+    {id:'hn',l:'ヒザ継ぎ出し'},
+  ]},
+
+  // ── スカート追加 ──
+  '身幅_スカート':{m:[
+    {id:'wh',l:'ウエスト〜裾巾',ex:'sw'},
+    {id:'hh',l:'ヒップ〜裾巾',ex:'sw'},
+    {id:'hm',l:'裾巾のみ',ex:'sw'},
+    {id:'zp',l:'ファスナーさわり'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '裏地着丈詰め_スカート':{m:[
+    {id:'lh',l:'裏地のみ着丈詰め'},{id:'wh',l:'ウエストで着丈詰め'},
+  ]},
+  'ペチコート作成_スカート':{m:[
+    {id:'mk',l:'新規作成'},{id:'re',l:'丈直しのみ'},
+  ]},
+
+  // ── ジャケット追加 ──
+  '内ポケット新設_ジャケット':{m:[
+    {id:'sm',l:'スナップ型'},{id:'zp',l:'ZIP型'},
+    {id:'op',l:'オープン型'},{id:'fl',l:'フラップ付き'},
+  ]},
+  'エルボーパッチ_ジャケット':{m:[
+    {id:'ex',l:'エクセーヌ（生地代込）'},
+    {id:'lh',l:'合皮（生地代込）'},
+    {id:'ow',l:'生地持ち込み'},
+  ]},
+
+  // ── コート追加 ──
+  'トレンチベルト作成_コート':{m:[
+    {id:'mk',l:'新規作成（生地別）'},
+    {id:'dk',l:'Dカン有（生地別）'},
+    {id:'fx',l:'固定型作成（生地別）'},
+    {id:'lp',l:'ベルトループ上げる'},
+    {id:'bk',l:'革バックル交換'},
+  ]},
+  'エポレット作成_コート':{m:[
+    {id:'mk',l:'新規作成（生地別）'},
+    {id:'ct',l:'カットのみ'},
+  ]},
+  'ダッフル紐交換_コート':{m:[
+    {id:'lp',l:'麻紐'},{id:'lh',l:'レザー紐'},
+    {id:'pt',l:'パッチ付け直し'},
+  ]},
+
+  // ── シャツ追加 ──
+  'ダーツ操作_シャツ':{m:[
+    {id:'in',l:'ダーツ入れ'},{id:'rm',l:'ダーツ取り'},
+  ]},
+  '胸ポケット作成_シャツ':{m:[
+    {id:'mk',l:'新規作成'},{id:'rm',l:'外しのみ'},
+  ]},
+  'ネックサイズ詰め_シャツ':{m:[
+    {id:'ct',l:'衿先カット'},
+    {id:'lw',l:'台襟低くする'},
+    {id:'ex',l:'衿延くする'},
+    {id:'tb',l:'タブ付き'},
+  ]},
+  'ダブルシングルカフス_シャツ':{m:[
+    {id:'ds',l:'ダブル→シングル'},
+    {id:'sd',l:'シングル→ダブル'},
+  ]},
+
+  // ── ニット追加 ──
+  'ベルト作成_ニット':{m:[
+    {id:'mk',l:'新規作成'},
+    {id:'lp',l:'ループ付き'},
+    {id:'re',l:'丈直しのみ'},
+  ]},
+
+  // ── ワンピース追加 ──
+  '背中から詰め_ワンピース':{m:[
+    {id:'bk',l:'背中から詰め'},
+    {id:'bh',l:'背中から裾まで'},
+    {id:'zp',l:'ファスナー有り'},
+  ]},
+  'ネックサイズ_ワンピース':{m:[
+    {id:'sz',l:'ネックサイズ詰め'},
+    {id:'rb',l:'リブ付け直し'},
+    {id:'re',l:'縫い直し'},
+  ]},
+
+  // ── パンツ追加 ──
+  'タック変更_パンツ':{m:[
+    {id:'t2t1',l:'2タック→1タック'},
+    {id:'t2t0',l:'2タック→ノータック'},
+    {id:'t1t0',l:'1タック→ノータック'},
+    {id:'t0t1',l:'ノータック→1タック'},
+  ]},
+  'シック布付け_パンツ':{m:[
+    {id:'sm',l:'小（標準）'},{id:'lg',l:'大'},
+  ]},
+  'フライ変換_パンツ':{m:[
+    {id:'bf',l:'ボタンフライ→ZIPフライ'},
+    {id:'fb',l:'ZIPフライ→ボタンフライ'},
+  ]},
+
+  // ── スカート追加 ──
+  'ウエストゴム交換_スカート':{m:[
+    {id:'tt',l:'総ゴム交換'},{id:'sd',l:'両脇ゴムのみ'},
+    {id:'ib',l:'インサイドベルト交換'},
+  ]},
+  'スリット開け_スカート':{m:[
+    {id:'ns',l:'新規作成'},{id:'ex',l:'スリット拡張'},
+  ]},
+  '裏地外し_スカート':{m:[
+    {id:'rm',l:'全取り外し'},{id:'pt',l:'部分外し'},
+  ]},
+
+  // ── ジャケット追加 ──
+  'マチ入れ_ジャケット':{m:[
+    {id:'ah',l:'アームホール'},
+    {id:'sb',l:'袖〜身巾'},
+    {id:'sh',l:'袖〜身巾〜裾'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'つき取り_ジャケット':{m:[
+    {id:'bk',l:'背のみ（〜0.6cm）'},
+    {id:'sl',l:'肩線修正含む'},
+  ]},
+  'リブ交換_ジャケット':{m:[
+    {id:'sl',l:'袖口（両袖）',ex:'pos'},
+    {id:'hm',l:'裾',          ex:'pos'},
+    {id:'cl',l:'衿',          ex:'pos'},
+    {id:'gm',l:'ゴム交換'},
+  ]},
+
+  // ── コート追加 ──
+  'マチ入れ_コート':{m:[
+    {id:'ah',l:'アームホール'},
+    {id:'sb',l:'袖〜身巾'},
+    {id:'sh',l:'袖〜身巾〜裾'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'つき取り_コート':{m:[
+    {id:'rg',l:'ラグラン袖ハラミ取り'},
+    {id:'sl',l:'肩線修正含む'},
+  ]},
+  '皮革ダウン_コート':{m:[
+    {id:'lh',l:'レザー'},
+    {id:'dn',l:'ダウン'},
+    {id:'mt',l:'ムートン'},
+    {id:'lm',l:'特殊素材（要相談）',fin:true},
+  ]},
+
+  // ── シャツ追加 ──
+  '衿巾ツメ_シャツ':{m:[
+    {id:'sh',l:'シャツ衿'},
+    {id:'tl',l:'テーラー仕立て'},
+    {id:'tk',l:'つき取り'},
+    {id:'re',l:'すり切れ修理'},
+  ]},
+  '衿なし化_シャツ':{m:[
+    {id:'rm',l:'衿取り外し'},
+    {id:'rk',l:'衿作り替え'},
+  ]},
+  'スリット作成_シャツ':{m:[
+    {id:'sm',l:'簡易スリット（片側）'},
+    {id:'bt',l:'両脇スリット'},
+    {id:'al',l:'別布あり'},
+  ]},
+
+  // ── ワンピース追加 ──
+  '袖巾_ワンピース':{m:[
+    {id:'so',l:'袖口巾'},
+    {id:'al',l:'袖巾全体'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'アームホールくり_ワンピース':{m:[
+    {id:'ku',l:'アームホールくり'},
+    {id:'kd',l:'アームホールくり下げ'},
+    {id:'ns',l:'ノースリーブ脇ツメ'},
+  ]},
+  'ダーツ操作_ワンピース':{m:[
+    {id:'in',l:'ダーツ入れ'},{id:'rm',l:'ダーツ取り'},
+  ]},
+  '衿周り修理_ワンピース':{m:[
+    {id:'re',l:'すり切れ修理（裏返し）'},
+    {id:'rp',l:'すり切れ修理（縫い直し）'},
+    {id:'mk',l:'衿作り替え'},
+    {id:'rm',l:'衿なし化'},
+  ]},
+  'カフスすり切れ修理_ワンピース':{m:[
+    {id:'re',l:'接ぎなし'},{id:'rp',l:'接ぎあり'},
+    {id:'mk',l:'カフス作り替え'},
+  ]},
+
+  // ── Tシャツ追加 ──
+  'リブニット交換_Tシャツ':{m:[
+    {id:'sl',l:'袖口（両袖）',ex:'pos'},
+    {id:'hm',l:'裾',          ex:'pos'},
+    {id:'cl',l:'衿',          ex:'pos'},
+  ]},
+
+  // ── 小物追加 ──
+  'ファスナースライダー_小物':{m:[
+    {id:'re',l:'スライダー交換のみ'},
+    {id:'lh',l:'革引き手付き替え'},
+  ]},
+  'ドットボタン_小物':{m:[
+    {id:'re',l:'打ち直し'},{id:'mk',l:'新規取付'},
+    {id:'hd',l:'ほどき込み'},
+  ]},
+  'ホック付け_小物':{m:[
+    {id:'sm',l:'同位置'},{id:'mv',l:'移動あり'},
+    {id:'ad',l:'新規追加'},
+  ]},
+  'ストラップ付け_小物':{m:[
+    {id:'mk',l:'新規作成（材料別）'},
+    {id:'re',l:'付け直し'},
+    {id:'lh',l:'革ストラップ'},
+  ]},
+
+  // ── ベスト ──
+  '着丈_ベスト':{m:[
+    {id:'sh',l:'肩で処理'},
+    {id:'hm',l:'裾で処理'},
+    {id:'dt',l:'ダーツで処理'},
+  ]},
+  '身幅_ベスト':{m:[
+    {id:'dt',l:'ダーツでツメ'},
+    {id:'al',l:'全体ツメ'},
+    {id:'mi',l:'マチ入れ（裏なし）'},
+    {id:'mi2',l:'マチ入れ（裏あり）'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '裏地取替_ベスト':{m:[{id:'bk',l:'背布交換'},{id:'fl',l:'総裏交換'},{id:'pt',l:'部分補修'}]},
+  '背布交換_ベスト':{m:[{id:'sm',l:'同素材'},{id:'df',l:'別素材'}]},
+  'タグ付け_ベスト':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
+  'プレス_ベスト':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
+
+  // ── レザー・革製品 ──
+  '袖丈_レザー':{m:[
+    {id:'ts',l:'筒袖'},
+    {id:'cf',l:'カフス付き'},
+    {id:'ak',l:'明きカフス'},
+    {id:'el',l:'ひじ切替えで'},
+    {id:'sh',l:'肩でツメ'},
+  ]},
+  '着丈_レザー':{m:[
+    {id:'hm',l:'裾から'},
+    {id:'rd',l:'前裾ラウンド'},
+    {id:'ct',l:'切り放し'},
+  ]},
+  '身幅_レザー':{m:[
+    {id:'ui',l:'内のみ'},{id:'ry',l:'内外両面'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '肩幅_レザー':{m:[
+    {id:'ts',l:'標準'},
+    {id:'sp',l:'肩パッド付け'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'ウエスト_レザー':{m:[
+    {id:'bk',l:'後中心のみ'},{id:'s3',l:'三方ツメ'},
+  ]},
+  '裾幅_レザー':{m:[
+    {id:'ui',l:'内のみ'},{id:'ry',l:'内外両面'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'ファスナー交換_レザー':{m:[
+    {id:'op',l:'オープン（ファスナー代別）'},
+    {id:'sl',l:'スライダー交換のみ'},
+    {id:'lh',l:'革引き手付け替え'},
+  ]},
+  'リブ交換_レザー':{m:[
+    {id:'sl',l:'袖口リブ'},{id:'hm',l:'裾リブ'},
+  ]},
+  '裏地交換_レザー':{m:[
+    {id:'jk',l:'ジャケット（70cm以下）'},
+    {id:'ct',l:'コート（90cm以下）'},
+    {id:'lc',l:'ロングコート（120cm以下）'},
+    {id:'pt',l:'パンツ'},
+  ]},
+  'ボタン付け替え_レザー':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
+  '穴あけ修理_レザー':{m:[
+    {id:'hl',l:'穴あけ（1ヶ所）'},
+    {id:'re',l:'破れ修理'},
+    {id:'dt',l:'ドットボタン付け替え'},
+  ]},
+  'タグ付け_レザー':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
+
+  // ── 新規ALT項目 PROC ──
+  '裾ほつれ修理_パンツ':{m:[
+    {id:'hs',l:'裾ほつれ直し'},
+    {id:'sk',l:'裾すり切れ毛抜き合わせ'},
+    {id:'lp',l:'ルイス直し'},
+  ]},
+  'スリット破れ修理_スカート':{m:[
+    {id:'re',l:'縫い直し'},{id:'rp',l:'補強縫い'},
+    {id:'at',l:'当て布'},
+  ]},
+  '脇ポケット作成_スカート':{m:[
+    {id:'ns',l:'新規作成（1個）'},
+    {id:'bt',l:'両脇作成'},
+    {id:'mv',l:'アウトポケット移動'},
+    {id:'rp',l:'アウトポケット作り替え'},
+  ]},
+  '段返り作り直し_ジャケット':{m:[
+    {id:'pr',l:'段返りプレスのみ'},
+    {id:'re',l:'段返り作り直し'},
+    {id:'cs',l:'芯入れ'},
+  ]},
+  '脇パッド取付_ジャケット':{m:[
+    {id:'at',l:'取付（付属代別）'},
+    {id:'rm',l:'取り外しのみ'},
+    {id:'re',l:'交換'},
+  ]},
+  'スリット破れ修理_ドレス':{m:[
+    {id:'re',l:'縫い直し'},{id:'rp',l:'補強縫い'},
+    {id:'at',l:'当て布'},
+  ]},
+  'ストラップ付け_ドレス':{m:[
+    {id:'mk',l:'新規作成（材料別）'},
+    {id:'re',l:'付け直し'},
+    {id:'lh',l:'革ストラップ'},
+    {id:'fb',l:'ファブリック'},
+  ]},
+  'スリット破れ修理_ワンピース':{m:[
+    {id:'re',l:'縫い直し'},{id:'rp',l:'補強縫い'},
+    {id:'at',l:'当て布'},
+  ]},
+
+  // ── 毛皮・ムートン ──
+  '袖丈_毛皮':{m:[
+    {id:'ts',l:'筒袖（折込み）'},
+    {id:'cf',l:'カフス付き'},
+    {id:'dc',l:'ダブルカフス'},
+    {id:'sh',l:'肩でツメ'},
+    {id:'el',l:'ひじ切替えでツメ'},
+  ]},
+  '着丈_毛皮':{m:[
+    {id:'hm',l:'裾から'},
+    {id:'rd',l:'前裾ラウンド'},
+    {id:'ct',l:'切り放し'},
+  ]},
+  '身幅_毛皮':{m:[
+    {id:'ry',l:'両脇'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  '肩幅_毛皮':{m:[
+    {id:'ts',l:'標準'},
+    {id:'sp',l:'肩パッド付け'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
+  'ファスナー交換_毛皮':{m:[
+    {id:'op',l:'フロントファスナー（ファスナー代別）'},
+    {id:'sl',l:'スライダー交換のみ'},
+  ]},
+  '裏地交換_毛皮':{m:[
+    {id:'jk',l:'ジャケット（70cm以下）'},
+    {id:'ct',l:'コート（90cm以下）'},
+    {id:'lc',l:'ロングコート（120cm以下）'},
+    {id:'rv',l:'リバーシブルコート'},
+  ]},
+  'ボタン付け替え_毛皮':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
+  '金具交換_毛皮':{m:[
+    {id:'ks',l:'ケスカ（留め具）'},
+    {id:'hk',l:'カギホック'},
+    {id:'cl',l:'クリップ付け'},
+    {id:'rs',l:'ロールスナップ'},
+  ]},
+  'タグ付け_毛皮':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
+
+  // ── リメイク・オーダー ──
+  'スカート作成_リメイク':{m:[
+    {id:'pl',l:'プレーン'},{id:'ds',l:'デザイン物'},
+  ]},
+  'パンツ作成_リメイク':{m:[
+    {id:'std',l:'標準'},
+  ]},
+  'ブラウス作成_リメイク':{m:[
+    {id:'pl',l:'プレーン'},{id:'ds',l:'デザイン物'},
+  ]},
+  'ワンピース作成_リメイク':{m:[
+    {id:'pl',l:'プレーン'},{id:'ds',l:'デザイン物'},
+  ]},
+  'ジャケット作成_リメイク':{m:[
+    {id:'std',l:'標準'},
+  ]},
+  'コート作成_リメイク':{m:[
+    {id:'std',l:'標準'},
+  ]},
+  'ベスト作成_リメイク':{m:[
+    {id:'std',l:'標準'},
+  ]},
+  'ワンピースツーピース_リメイク':{m:[
+    {id:'wp',l:'ワンピース→ツーピース'},
+    {id:'sk',l:'ウエストで切ってスカートに'},
+  ]},
+  '衿リフォーム_リメイク':{m:[
+    {id:'jk',l:'ブレザー（テーラー）'},
+    {id:'bl',l:'ブルゾン（テーラー以外）'},
+    {id:'ct',l:'コート（ステンカラー）'},
+    {id:'tc',l:'コート（テーラードカラー）'},
+  ]},
+  'マチ入れ_リメイク':{m:[
+    {id:'vs',l:'ベスト'},
+    {id:'wp',l:'ワンピース'},
+    {id:'jk',l:'上衣'},
+  ]},
 
 };
 
@@ -1488,11 +2292,96 @@ function buildAB(a,uid,isW){
   return h;
 }
 
+// ══ 目安料金テーブル（税抜・下限平均） ══
+const PRICE={
+  '裾上げ_パンツ':1300,'ウエスト_パンツ':2500,'裾幅_パンツ':2600,'わたり_パンツ':3300,
+  '股上_パンツ':4250,'ヒップ_パンツ':2000,'ヒザ巾_パンツ':4000,
+  'ファスナー交換_パンツ':2200,'裏地取替_パンツ':3000,'股リペア_パンツ':2500,
+  '股下修理_パンツ':1000,'裾ほつれ修理_パンツ':500,'ポケット袋修理_パンツ':2000,
+  'タック変更_パンツ':10000,'シック布付け_パンツ':1300,
+  '着丈_スカート':2200,'ウエスト_スカート':3000,'ヒップ_スカート':1500,
+  '身幅_スカート':2000,'ファスナー交換_スカート':2500,'裏地修理_スカート':2500,
+  'ウエストゴム交換_スカート':1500,
+  '着丈_ジャケット':3200,'袖丈_ジャケット':2600,'身幅_ジャケット':5000,
+  'ウエスト絞り_ジャケット':5000,'肩幅_ジャケット':6700,'袖巾_ジャケット':2400,
+  '裏地修理_ジャケット':3500,'ラペル補正_ジャケット':8000,'マチ入れ_ジャケット':5000,
+  'つき取り_ジャケット':3000,'リブ交換_ジャケット':3000,'エルボーパッチ_ジャケット':3000,
+  '袖口すり切れ修理_ジャケット':1000,'ポケット修理_ジャケット':2000,
+  '段返り作り直し_ジャケット':3500,'脇パッド取付_ジャケット':2000,
+  '着丈_コート':4000,'袖丈_コート':3000,'身幅_コート':6400,'肩幅_コート':6900,
+  '袖巾_コート':3000,'裏地修理_コート':5000,'ファスナー交換_コート':8000,
+  'マチ入れ_コート':5700,'つき取り_コート':4000,'トレンチベルト作成_コート':8000,
+  '着丈_シャツ':2200,'袖丈_シャツ':1800,'身幅_シャツ':2000,'袖巾_シャツ':2000,
+  '肩幅_シャツ':3500,'長袖半袖_シャツ':2500,'衿修理_シャツ':2500,
+  '衿巾ツメ_シャツ':3500,'ネックサイズ詰め_シャツ':5000,'ダーツ操作_シャツ':1800,
+  '胸ポケット作成_シャツ':6000,'カフス修理_シャツ':3000,
+  '着丈_ニット':2800,'袖丈_ニット':2800,'身幅_ニット':3800,'袖巾_ニット':3500,
+  '肩巾_ニット':4000,'かけはぎ_ニット':5000,'ほつれ補修_ニット':1200,'穴修理_ニット':1200,
+  '着丈_スウェット':2700,'袖丈_スウェット':2300,'身幅_スウェット':3000,'袖巾_スウェット':2400,
+  'ファスナー交換_スウェット':5000,'リブ交換_スウェット':2300,
+  '着丈_ドレス':2700,'袖丈_ドレス':1800,'ウエスト_ドレス':2800,'バスト_ドレス':3000,
+  'ヒップ_ドレス':2500,'肩幅_ドレス':3500,'ファスナー交換_ドレス':3400,
+  '着丈_ワンピース':2700,'袖丈_ワンピース':1800,'ウエスト_ワンピース':2800,
+  'バスト_ワンピース':3000,'ヒップ_ワンピース':2500,'肩幅_ワンピース':3500,
+  'ファスナー交換_ワンピース':3400,'袖巾_ワンピース':2000,
+  '着丈_Tシャツ':1800,'袖丈_Tシャツ':1500,'身幅_Tシャツ':2000,'袖巾_Tシャツ':1800,
+  '肩幅_Tシャツ':3000,'リブニット交換_Tシャツ':2600,
+  '着丈_ブルゾン':5000,'袖丈_ブルゾン':4500,'身幅_ブルゾン':8000,'袖巾_ブルゾン':3500,
+  'ファスナー交換_ブルゾン':6500,'リブ交換_ブルゾン':5000,
+  'ネクタイ補正_小物':1700,'ネーム刺繍_小物':600,'ボタンホール_小物':500,
+  'ファスナースライダー_小物':1000,'ドットボタン_小物':800,'ホック付け_小物':500,
+};
+
+// ── 価格ロック状態 ──
+const _priceLocked={f:false,e:false};
+
+function calcEstPrice(prefix){
+  if(_priceLocked[prefix]) return;
+  const cat=prefix==='f'
+    ? (document.getElementById('f-cat')?.value||'')
+    : (document.getElementById('e-cat')?.value||'');
+  const cid=prefix==='f'?'alt-client':'edit-alts';
+  const el=document.getElementById(cid);
+  if(!el) return;
+  const items=ALT[cat]||[];
+  let total=0;
+  el.querySelectorAll('[id^="chk-"]').forEach((chk,i)=>{
+    if(chk.checked && items[i]){
+      const p=PRICE[items[i].pk];
+      if(p) total+=p;
+    }
+  });
+  const inp=document.getElementById(prefix+'-price');
+  const hint=document.getElementById(prefix+'-price-hint');
+  if(inp){
+    inp.value=total>0?total:'';
+    if(hint) hint.style.display=total>0?'inline':'none';
+  }
+}
+
+function lockPrice(prefix){
+  _priceLocked[prefix]=true;
+  const lb=document.getElementById(prefix+'-price-lock');
+  const hint=document.getElementById(prefix+'-price-hint');
+  if(lb) lb.style.display='inline-block';
+  if(hint){ hint.textContent='✏️ 手動'; hint.style.display='inline';}
+}
+
+function unlockPrice(prefix){
+  _priceLocked[prefix]=false;
+  const lb=document.getElementById(prefix+'-price-lock');
+  if(lb) lb.style.display='none';
+  calcEstPrice(prefix);
+}
+
 function togAlt(uid){
   const chk=document.getElementById('chk-'+uid);
   const body=document.getElementById('body-'+uid);
   chk.checked=!chk.checked;
   body.classList.toggle('on',chk.checked);
+  // 受付画面か編集画面かを判定して目安料金を再計算
+  const prefix=uid.startsWith('edit-alts')?'e':'f';
+  calcEstPrice(prefix);
 }
 function setDir(uid,d){
   ['t','d','n'].forEach(x=>{
@@ -2270,7 +3159,16 @@ function openEdit(){
     </div>
     <div class="sec">
       <div class="sh">💴 金額・備考</div>
-      <div class="fld"><div class="fl">金額（円）</div><input type="number" id="e-price" min="0" step="100" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.price||''}"></div>
+      <div class="fld">
+        <div class="fl">
+          <span>金額（円）</span>
+          <span id="e-price-hint" style="font-size:10px;color:var(--gold);display:none">📊 目安</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="e-price" min="0" step="100" style="flex:1;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.price||''}" oninput="lockPrice('e')">
+          <button id="e-price-lock" onclick="unlockPrice('e')" title="目安に戻す" style="display:none;padding:6px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:11px;cursor:pointer;white-space:nowrap">🔓 解除</button>
+        </div>
+      </div>
       <div class="fld"><div class="fl">備考</div><textarea id="e-note" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${r.note||''}</textarea></div>
     </div>
   </div>`;
@@ -2669,15 +3567,46 @@ function addCat(){
 }
 function delCat(i){const ct=gCt();ct.splice(i,1);sCt(ct);renderMaster();}
 
-// ══ 設定ファイル書き出し（stores・catsのみ）══
+// ══ 設定ファイル書き出し（項目別）══
+function _exportSettingFile(key, data, label){
+  const blob=new Blob([JSON.stringify({type:'AlteREC_'+key,version:APP_VERSION,exported:new Date().toISOString(),[key]:data},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='AlteREC_'+label+'_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();URL.revokeObjectURL(a.href);
+}
+function doExportStores(){ _exportSettingFile('stores',gSt(),'stores'); }
+function doExportWorkers(){ _exportSettingFile('workers',gStaff(),'workers'); }
+function doExportCats(){ _exportSettingFile('cats',gCt(),'cats'); }
+
+// ══ 設定ファイル読み込み（項目別）══
+function _importSettingFile(ev, key, saveFn, label){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      const arr=d[key];
+      if(!Array.isArray(arr)||!arr.length){alert('データが見つかりませんでした');ev.target.value='';return;}
+      const v=arr.filter(s=>typeof s==='string'&&s.trim());
+      if(!v.length){alert('有効なデータがありませんでした');ev.target.value='';return;}
+      saveFn(v);renderMaster();populateSels();
+      alert('✅ '+label+'を読み込みました（'+v.length+'件）');
+    }catch(err){alert('読み込みに失敗しました。\nJSON形式を確認してください。');}
+    ev.target.value='';
+  };
+  reader.readAsText(file,'UTF-8');
+}
+function handleStoresImport(ev){ _importSettingFile(ev,'stores',sSt,'店名'); }
+function handleWorkersImport(ev){ _importSettingFile(ev,'workers',sStaff,'担当作業者'); }
+function handleCatsImport(ev){ _importSettingFile(ev,'cats',sCt,'カテゴリー'); }
+
+// ══ 設定ファイル書き出し／読み込み（まとめて）══
 function doExportSettings(){
   const data={
-    type:'AlteREC_settings',
-    version:APP_VERSION,
+    type:'AlteREC_settings',version:APP_VERSION,
     exported:new Date().toISOString(),
-    stores:gSt(),
-    workers:gStaff(),
-    cats:gCt(),
+    stores:gSt(),workers:gStaff(),cats:gCt(),
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
@@ -2685,8 +3614,6 @@ function doExportSettings(){
   a.download='AlteREC_settings_'+new Date().toISOString().slice(0,10)+'.json';
   a.click();URL.revokeObjectURL(a.href);
 }
-
-// ══ 設定ファイル読み込み（ファイル選択）══
 function handleSettingsImport(ev){
   const file=ev.target.files[0];if(!file)return;
   const reader=new FileReader();
@@ -2706,16 +3633,16 @@ function handleSettingsImport(ev){
         const v=d.cats.filter(c=>typeof c==='string'&&c.trim());
         if(v.length){sCt(v);msgs.push('カテゴリー '+v.length+'件');}
       }
-      if(!msgs.length){alert('設定データが見つかりませんでした');return;}
+      if(!msgs.length){alert('設定データが見つかりませんでした');ev.target.value='';return;}
       renderMaster();populateSels();
       alert('✅ 設定を読み込みました：'+msgs.join('・'));
     }catch(err){alert('ファイルの読み込みに失敗しました。\nJSON形式か確認してください。');}
+    ev.target.value='';
   };
   reader.readAsText(file,'UTF-8');
-  ev.target.value='';
 }
 
-// ══ Excel エクスポート（記録データ）══
+
 const XLSX_COLS=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','スタッフ',
   '担当者','品名','カテゴリー','色名','色コード','柄','素材','特殊素材',
   '客様指定補正','指定メモ','実行工程','工程メモ','特殊','ミシン設定',
