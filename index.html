@@ -215,6 +215,9 @@ select option{background:#1a1a24}
 </head>
 <body>
 
+<!-- 5-4: ストレージ残量警告バナー（全画面共通・85%超で表示） -->
+<div id="storage-top-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9990;background:var(--red-bg);border-bottom:1px solid rgba(192,90,90,.5);padding:6px 16px;font-size:11px;color:var(--red);font-weight:700;text-align:center"></div>
+
 <div class="screen on" id="scr-new">
   <div class="hdr">
     <div><div class="ht">AlteREC</div><div class="hv">v16y</div></div>
@@ -233,7 +236,7 @@ select option{background:#1a1a24}
     </div>
     <div class="sec">
       <div class="sh">🏷 伝票・顧客</div>
-      <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="f-ticket" maxlength="5" inputmode="numeric" autocomplete="off"></div>
+      <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="f-ticket" maxlength="5" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
       <div class="fld">
         <div class="fl">客名 <button id="btn-staff" class="tog" onclick="togStaff()">スタッフ</button></div>
         <input type="text" id="f-client" autocomplete="off">
@@ -331,7 +334,7 @@ select option{background:#1a1a24}
         <span class="tv" id="t-disp">0</span>
         <span class="tu">分</span>
         <button class="tb2" onclick="adjT(5)">＋</button>
-        <input class="tc" type="number" id="f-time" placeholder="直接" min="0" oninput="syncT()">
+        <input class="tc" type="number" id="f-time" placeholder="直接" min="0" inputmode="decimal" pattern="[0-9]*" oninput="syncT()">
         <span class="tu">分</span>
       </div>
       <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">使用資材</div><textarea id="f-materials" style="min-height:52px"></textarea></div>
@@ -342,11 +345,13 @@ select option{background:#1a1a24}
         <div class="fl">
           <span>金額（円）</span>
           <span id="f-price-hint" style="font-size:10px;color:var(--gold);display:none">📊 目安</span>
+          <button id="f-breakdown-btn" onclick="togBreakdown('f')" style="display:none;margin-left:6px;padding:2px 7px;border-radius:6px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:10px;font-family:var(--f);cursor:pointer">内訳 ▼</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <input type="number" id="f-price" min="0" step="100" style="flex:1" oninput="lockPrice('f')">
+          <input type="number" id="f-price" min="0" step="100" inputmode="decimal" pattern="[0-9]*" style="flex:1" oninput="lockPrice('f')">
           <button id="f-price-lock" onclick="unlockPrice('f')" title="目安に戻す" style="display:none;padding:6px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:11px;cursor:pointer;white-space:nowrap">🔓 解除</button>
         </div>
+        <div id="f-breakdown" style="display:none;margin-top:6px;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd2);font-size:11px;color:var(--tx2)"></div>
       </div>
       <div class="fld"><div class="fl">備考</div><textarea id="f-note"></textarea></div>
     </div>
@@ -359,7 +364,10 @@ select option{background:#1a1a24}
 
 <div class="screen" id="scr-work">
   <div class="hdr"><div><div class="ht">登録済</div><div class="hv" id="wc"></div></div>
-    <button class="btn-g" id="btn-sel-mode" onclick="togSelMode()" style="font-size:13px;padding:6px 10px">選択</button>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span id="rec-count" style="font-size:10px;color:var(--tx3)"></span>
+      <button class="btn-g" id="btn-sel-mode" onclick="togSelMode()" style="font-size:13px;padding:6px 10px">選択</button>
+    </div>
   </div>
   <div id="bulk-bar" style="display:none;padding:8px 16px;background:var(--s2);border-bottom:1px solid var(--bd);position:sticky;top:52px;z-index:99">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -375,10 +383,11 @@ select option{background:#1a1a24}
 
 <div class="screen" id="scr-hist">
   <div class="hdr">
-    <div><div class="ht">履歴</div></div>
-    <div style="display:flex;gap:6px">
-      <button class="btn-g" id="hist-sel-btn" onclick="togHistSelMode()" style="font-size:13px;padding:6px 10px">選択</button>
-      <button class="btn-g" onclick="doCSV()" title="CSV出力" style="padding:6px 8px;font-size:16px">📊</button>
+    <div style="min-width:0;flex:1"><div class="ht">履歴</div></div>
+    <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">
+      <button class="btn-g" onclick="showDash()" style="font-size:18px;padding:4px 6px;line-height:1" title="ダッシュボード">📊</button>
+      <button class="btn-g" onclick="doCSV()" title="CSV出力" style="font-size:18px;padding:4px 6px;line-height:1">📋</button>
+      <button class="btn-g" id="hist-sel-btn" onclick="togHistSelMode()" style="font-size:11px;padding:4px 8px;white-space:nowrap">選択</button>
     </div>
   </div>
   <!-- 選択モード時の一括操作バー -->
@@ -401,7 +410,16 @@ select option{background:#1a1a24}
     <div><label>持込日 FROM</label><input type="date" id="hf" onchange="renderHist()"></div>
     <div><label>持込日 TO</label><input type="date" id="ht2" onchange="renderHist()"></div>
   </div>
-  <button class="cd-btn" onclick="clrDate()">日付フィルターをクリア</button>
+  <div style="display:flex;align-items:center;gap:8px;padding:4px 16px 0">
+    <button class="cd-btn" style="flex:1;text-align:left" onclick="clrDate()">日付フィルターをクリア</button>
+    <select id="hist-sort" onchange="renderHist()" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f);outline:none">
+      <option value="newest">新着順</option>
+      <option value="outdate">納品日順</option>
+      <option value="price_h">金額（高）</option>
+      <option value="price_l">金額（低）</option>
+      <option value="cat">カテゴリー</option>
+    </select>
+  </div>
   <div class="fbar" id="hf2"></div>
   <div class="htw"><div id="hl"></div></div>
 </div>
@@ -419,6 +437,7 @@ select option{background:#1a1a24}
       <div class="ma">
         <button class="mac" style="background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3)" onclick="doPrint()">🖨 PDF</button>
         <button class="mac" style="background:var(--gold-bg);color:var(--gold);border:1px solid rgba(200,168,74,.3)" onclick="openEdit()">✏️ 編集</button>
+        <button class="mac" style="background:var(--purple-bg);color:var(--purple);border:1px solid rgba(155,114,207,.3)" onclick="duplicateRec()">📋 複製</button>
         <button class="mac" style="background:var(--red-bg);color:var(--red);border:1px solid rgba(192,90,90,.3)" onclick="doDel()">削除</button>
       </div>
       <button class="mc" onclick="closeOvBtn('ov-det')">✕ 閉じる</button>
@@ -438,6 +457,26 @@ select option{background:#1a1a24}
   </div>
 </div>
 
+<!-- 3-3: 実行工程修正モーダル -->
+<div class="ov" id="ov-walts" onclick="closeOv('ov-walts',event)">
+  <div class="md" style="max-height:88vh">
+    <div class="mp"><div class="mpb"></div></div>
+    <div class="mh">✏️ 実行工程を修正</div>
+    <input type="hidden" id="walts-rec-id">
+    <div class="ms">
+      <div style="padding:8px 14px 4px;font-size:11px;color:var(--tx3);line-height:1.6">
+        客様指定から変更した工程のみ修正してください。<br>修正済の場合、詳細画面に「修正済」バッジが表示されます。
+      </div>
+      <div class="alt-list" id="walts-alts"></div>
+      <div style="padding:0 16px 4px;display:flex;gap:8px">
+        <button style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer" onclick="resetWAltsToClient()">↩ 客様指定に戻す</button>
+      </div>
+      <button class="mc" style="background:var(--amber);color:#0a0a0f" onclick="saveWAltsEdit()">💾 実行工程を保存</button>
+      <button class="mc" style="background:var(--s3);color:var(--tx2);margin-top:4px" onclick="closeOvBtn('ov-walts')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="ov-master" onclick="closeOv('ov-master',event)">
   <div class="md">
     <div class="mp"><div class="mpb"></div></div>
@@ -445,15 +484,37 @@ select option{background:#1a1a24}
     <div class="ms">
       <div class="mb">
 
+        <!-- ⓪ storage容量警告バナー（3-2） -->
+        <div id="storage-warning" style="display:none;margin-bottom:10px;padding:10px;background:var(--red-bg);border:1px solid rgba(192,90,90,.5);border-radius:10px">
+          <div style="font-size:12px;color:var(--red);font-weight:700">⚠️ ストレージ残量が少なくなっています</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:4px">今すぐ「全データバックアップ」でデータを保存してください。古い履歴データのエクスポート後に削除することも検討してください。</div>
+        </div>
+
+        <!-- 容量バー（3-2） -->
+        <div style="margin-bottom:12px;padding:8px 10px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:5px">💾 ストレージ使用量</div>
+          <div style="background:var(--s3);border-radius:4px;height:6px;overflow:hidden;margin-bottom:4px">
+            <div id="storage-bar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .4s"></div>
+          </div>
+          <div id="storage-usage" style="font-size:11px;color:var(--tx3)">計測中...</div>
+        </div>
+
         <!-- ① 全データバックアップ -->
         <div style="margin-bottom:12px;padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px">
           <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:4px">💾 全データバックアップ（JSON）</div>
           <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">設定＋登録データをまとめて保存／復元</div>
           <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">最終バックアップ：<span id="bk-ts">—</span></div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
             <button onclick="exportJSON()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--amber);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📥 バックアップ保存</button>
             <button onclick="restoreBackup()" style="flex:1;padding:9px;border-radius:9px;border:1px solid rgba(196,132,58,.3);background:var(--s3);color:var(--amber);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">🔄 直前に戻す</button>
           </div>
+          <!-- 3-1: 日付別スナップショット復元 -->
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:4px">過去7日のスナップショットから復元：</div>
+          <select id="snap-select" style="width:100%;padding:7px 10px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:12px;font-family:var(--f);margin-bottom:6px;outline:none" onchange="renderSnapInfo()">
+            <option value="">— 日付を選択 —</option>
+          </select>
+          <div id="snap-info" style="font-size:11px;color:var(--tx3);margin-bottom:6px"></div>
+          <button onclick="restoreSnap()" style="width:100%;padding:8px;border-radius:9px;border:1px solid rgba(196,132,58,.3);background:var(--s3);color:var(--amber);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📅 選択日のデータに戻す</button>
         </div>
 
         <!-- ② 設定ファイル（項目別） -->
@@ -512,6 +573,19 @@ select option{background:#1a1a24}
           <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">客名・品名・伝票No・店名・持込日がすべて空のレコードを削除します</div>
           <button onclick="cleanEmptyRecs()" style="width:100%;padding:9px;border-radius:9px;border:none;background:var(--red);color:#fff;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">🗑 空レコードを一括削除</button>
         </div>
+
+        <!-- ④ 料金テーブル編集（3-6） -->
+        <div style="margin-bottom:12px;padding:10px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px">
+          <div style="font-size:11px;color:var(--tx1);font-weight:700;margin-bottom:4px">💴 目安料金テーブル編集</div>
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">項目ごとの基本料金を端末ごとにカスタマイズできます。変更した項目は目安計算に反映されます。</div>
+          <div style="display:flex;gap:6px">
+            <button onclick="openPriceEditor()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--s3);color:var(--tx1);font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer;border:1px solid var(--bd2)">✏️ 料金を編集</button>
+            <button onclick="exportPriceJSON()" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📤 書き出し</button>
+            <button onclick="document.getElementById('price-import-input').click()" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 読み込み</button>
+          </div>
+          <input type="file" id="price-import-input" accept=".json" style="display:none" onchange="importPriceJSON(event)">
+        </div>
+
         <div class="mst">店名</div>
         <div class="mli" id="store-list"></div>
         <div class="mar"><input class="mai" id="store-inp" placeholder="店名を追加"><button class="mab" onclick="addStore()">追加</button></div>
@@ -521,6 +595,13 @@ select option{background:#1a1a24}
         <div class="mst">カテゴリー</div>
         <div class="mli" id="cat-list"></div>
         <div class="mar"><input class="mai" id="cat-inp" placeholder="カテゴリーを追加"><button class="mab" onclick="addCat()">追加</button></div>
+        <!-- 2-5: カテゴリー表示/非表示 -->
+        <div style="margin-top:10px;padding:10px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px">
+          <div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:8px">👁 受付画面での表示設定</div>
+          <div style="font-size:10px;color:var(--tx3);margin-bottom:8px">使わないカテゴリーを非表示にできます。使用回数も表示されます。</div>
+          <div id="cat-vis-list"></div>
+          <button onclick="localStorage.removeItem('ar2_cat_vis');populateSels();renderCatVisList();" style="width:100%;margin-top:8px;padding:7px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:11px;font-family:var(--f);cursor:pointer">全て表示に戻す</button>
+        </div>
       </div>
       <button class="mc" onclick="closeMaster()">✕ 閉じる</button>
     </div>
@@ -550,7 +631,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v16y36z';
+const APP_VERSION = 'v17a';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -624,6 +705,7 @@ const ALT={
     {n:'ドローコード付き',      d:'none',dm:'none',pk:'ドローコード付き_パンツ'},
     {n:'リブ移動',              d:'none',dm:'none',pk:'リブ移動_パンツ'},
     {n:'フロントファスナー取替',d:'none',dm:'none',pk:'フロントファスナー取替_パンツ'},
+    {n:'サイドアジャスター',   d:'none',dm:'none',pk:'サイドアジャスター_パンツ'},
     {n:'タグ付け', d:'none',dm:'none',   pk:'タグ付け_パンツ'},
     {n:'ボタン補強',d:'none',dm:'none',  pk:'ボタン補強_パンツ'},
     {n:'プレス',   d:'none',dm:'none',   pk:'プレス_パンツ'},
@@ -699,10 +781,12 @@ const ALT={
     {n:'ダッフル紐交換',   d:'none',dm:'none',pk:'ダッフル紐交換_コート'},
     {n:'袖口修理',   d:'none',  dm:'none',   pk:'袖口修理_コート'},
     {n:'ラペル補正', d:'none',  dm:'none',   pk:'ラペル補正_コート'},
+    {n:'衿巾ツメ',   d:'none',  dm:'none',   pk:'衿巾ツメ_コート'},
     {n:'ダウン仕様', d:'none',  dm:'none',   pk:'ダウン仕様_コート'},
     {n:'総裏全交換', d:'none',  dm:'none',   pk:'総裏全交換_コート'},
     {n:'ウエストベルトループ上げ',d:'none',dm:'none',pk:'ウエストベルトループ上げ_コート'},
     {n:'ベルト革バックル交換',   d:'none',dm:'none',pk:'ベルト革バックル交換_コート'},
+    {n:'ウエストベルト固定型作成',d:'none',dm:'none',pk:'ウエストベルト固定型_コート'},
     {n:'タグ付け',   d:'none',  dm:'none',   pk:'タグ付け_コート'},
     {n:'ボタン補強', d:'none',  dm:'none',   pk:'ボタン補強_コート'},
     {n:'プレス',     d:'none',  dm:'none',   pk:'プレス_コート'},
@@ -715,6 +799,8 @@ const ALT={
     {n:'長袖→半袖', d:'none', dm:'none',  pk:'長袖半袖_シャツ'},
     {n:'ウエスト絞り',d:'tsume',dm:'cm', pk:'ウエスト絞り_シャツ'},
     {n:'肩幅',     d:'tsume',dm:'cm',    pk:'肩幅_シャツ'},
+    {n:'肩巾ツメ', d:'none', dm:'none',  pk:'肩巾ツメ_シャツ'},
+    {n:'肩線・肩ひも',d:'none',dm:'none', pk:'肩線_シャツ'},
     {n:'襟修理',   d:'none', dm:'none',  pk:'襟修理_シャツ'},
     {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_シャツ'},
     {n:'衿巾ツメ',   d:'none', dm:'none',  pk:'衿巾ツメ_シャツ'},
@@ -782,6 +868,7 @@ const ALT={
     {n:'スパンコール修理',d:'none',dm:'none', pk:'スパンコール修理_ドレス'},
     {n:'スリット破れ修理',d:'none',dm:'none', pk:'スリット破れ修理_ドレス'},
     {n:'ストラップ付け',  d:'none',dm:'none', pk:'ストラップ付け_ドレス'},
+    {n:'袖巾',       d:'tsume',dm:'cm',    pk:'袖巾_ドレス'},
     {n:'タグ付け',   d:'none',dm:'none',   pk:'タグ付け_ドレス'},
     {n:'ボタン補強', d:'none',dm:'none',   pk:'ボタン補強_ドレス'},
     {n:'プレス',     d:'none',dm:'none',   pk:'プレス_ドレス'},
@@ -859,6 +946,7 @@ const ALT={
     {n:'ドットボタン付け替え',   d:'none',dm:'none',pk:'ドットボタン_小物'},
     {n:'ホック付け',             d:'none',dm:'none',pk:'ホック付け_小物'},
     {n:'ストラップ付け',         d:'none',dm:'none',pk:'ストラップ付け_小物'},
+    {n:'リベット',               d:'none',dm:'none',pk:'リベット_小物'},
     {n:'ボタン付け替え', d:'none',dm:'none',  pk:'ボタン付け替え_小物'},
     {n:'タグ付け',       d:'none',dm:'none',  pk:'タグ付け_小物'},
     {n:'プレス',         d:'none',dm:'none',  pk:'プレス_小物'},
@@ -1028,6 +1116,11 @@ const PROC={
     {id:'re',l:'取替'},
     {id:'hs',l:'ハンドステッチ仕上げ'},
   ]},
+  'サイドアジャスター_パンツ':{m:[
+    {id:'nm',l:'通常型',  ex:'tp'},
+    {id:'ps',l:'ピストル型',ex:'tp'},
+    {id:'mk',l:'新規作り付け'},
+  ]},
   'タグ付け_パンツ':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
   'ボタン補強_パンツ':{m:[{id:'sp',l:'特殊'}]},
   'プレス_パンツ':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
@@ -1083,23 +1176,28 @@ const PROC={
 
   // ── ジャケット ──
   '着丈_ジャケット':{m:[
-    {id:'ch',l:'千鳥掛け',  ex:'sty'},
-    {id:'mf',l:'三つ折り',  ex:'sty'},
-    {id:'rd',l:'丸どんでん',ex:'sty'},
-    {id:'kd',l:'角どんでん',ex:'sty'},
+    {id:'ch',l:'千鳥掛け',          ex:'sty'},
+    {id:'mf',l:'三つ折り',          ex:'sty'},
+    {id:'rd',l:'丸どんでん',        ex:'sty'},
+    {id:'kd',l:'角どんでん',        ex:'sty'},
+    {id:'bk',l:'後ろのみ詰め'},
+    {id:'fr',l:'フロント丸み作り直しのみ'},
     {id:'hs',l:'ハンドステッチ'},
     {id:'pm',l:'アウトポケット移動'},
     {id:'pr',l:'アウトポケット作り替え'},
   ]},
   '袖丈_ジャケット':{m:[
-    {id:'ts',l:'筒袖',        ex:'sty'},
-    {id:'ak',l:'開き見せ',    ex:'sty'},
-    {id:'gk',l:'額縁',        ex:'sty'},
-    {id:'pp',l:'パイピング始末',ex:'sty'},
-    {id:'hk',l:'本切羽',      ex:'sty'},
+    {id:'ts',l:'筒袖',            ex:'sty'},
+    {id:'ak',l:'開き見せ',        ex:'sty'},
+    {id:'gk',l:'額縁',            ex:'sty'},
+    {id:'pp',l:'パイピング始末',  ex:'sty'},
+    {id:'hk',l:'本切羽',          ex:'sty'},
+    {id:'tk',l:'天継ぎ',          ex:'sty'},
+    {id:'tu',l:'ターンナップカフス',ex:'sty'},
     {id:'kz',l:'飾りボタンあり'},
     {id:'li',l:'裏地あり'},
     {id:'sy',l:'袖山から詰め'},
+    {id:'sh',l:'肩山カット'},
     {id:'hs',l:'ハンドステッチ'},
   ]},
   '身幅_ジャケット':{m:[
@@ -1130,7 +1228,7 @@ const PROC={
   ]},
   '裏地修理_ジャケット':{m:[
     {id:'pt',l:'部分補修'},{id:'do',l:'胴裏のみ'},
-    {id:'fl',l:'総裏交換'},{id:'sl',l:'袖裏交換'},
+    {id:'sl',l:'袖裏交換'},
     {id:'bk',l:'背抜きに変更'},
   ]},
   'ボタン付け替え_ジャケット':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
@@ -1195,11 +1293,18 @@ const PROC={
     {id:'pr',l:'アウトポケット作り替え'},
   ]},
   '袖丈_コート':{m:[
-    {id:'sg',l:'シングル',ex:'sty'},{id:'aa',l:'アキあり',ex:'sty'},
-    {id:'an',l:'アキなし',ex:'sty'},{id:'hk',l:'本切羽',ex:'sty'},
-    {id:'kz',l:'飾りボタンあり'},{id:'ca',l:'カフスあり',ex:'cf'},
-    {id:'cn',l:'カフスなし',ex:'cf'},{id:'mt',l:'まつり縫い'},
-    {id:'lk',l:'ロック処理'},{id:'sy',l:'袖山から詰め'},
+    {id:'sg',l:'シングル',    ex:'sty'},
+    {id:'aa',l:'アキあり',    ex:'sty'},
+    {id:'an',l:'アキなし',    ex:'sty'},
+    {id:'hk',l:'本切羽',      ex:'sty'},
+    {id:'tk',l:'天継ぎ',      ex:'sty'},
+    {id:'vr',l:'ベラ移動',    ex:'sty'},
+    {id:'kz',l:'飾りボタンあり'},
+    {id:'ca',l:'カフスあり',  ex:'cf'},
+    {id:'cn',l:'カフスなし',  ex:'cf'},
+    {id:'mt',l:'まつり縫い'},
+    {id:'lk',l:'ロック処理'},
+    {id:'sy',l:'袖山から詰め'},
   ]},
   '身幅_コート':{m:[
     {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
@@ -1221,7 +1326,7 @@ const PROC={
   ]},
   '裏地修理_コート':{m:[
     {id:'pt',l:'部分補修'},{id:'do',l:'胴裏のみ'},
-    {id:'fl',l:'総裏交換'},{id:'sl',l:'袖裏交換'},
+    {id:'sl',l:'袖裏交換'},
     {id:'bk',l:'背抜きに変更'},{id:'ln',l:'ライナー詰め'},
   ]},
   'ボタン付け替え_コート':{m:[{id:'sm',l:'同位置'},{id:'mv',l:'移動あり'}]},
@@ -1254,6 +1359,10 @@ const PROC={
     {id:'re',l:'バックル交換'},
     {id:'sp',l:'特殊バックル'},
   ]},
+  'ウエストベルト固定型_コート':{m:[
+    {id:'mk',l:'新規作成（生地別）'},
+    {id:'sp',l:'特殊仕様'},
+  ]},
   'プレス_コート':{m:[{id:'al',l:'全体'},{id:'pt',l:'部分'},{id:'st',l:'スチームのみ'},{id:'dy',l:'ドライ'}]},
 
   // ── シャツ・ブラウス ──
@@ -1270,15 +1379,24 @@ const PROC={
     {id:'kz',l:'飾りボタンあり'},{id:'ca',l:'カフスあり',ex:'cf'},
     {id:'cn',l:'カフスなし',ex:'cf'},
     {id:'rb',l:'リブ付け'},{id:'sy',l:'袖山から詰め'},
+    {id:'sh',l:'肩山カット'},
     {id:'tz',l:'タンザク移動'},{id:'kr',l:'切り込み跡芯補強'},
-    {id:'lc',l:'レースカット'},{id:'lm',l:'レース移動'},
+    {id:'lc',l:'レースカット'},{id:'lm2',l:'レース移動'},
     {id:'fl',l:'袖口フレアー切替え'},
     {id:'da',l:'袖丈出し（AH+カフス）'},
   ]},
   '身幅_シャツ':{m:[
-    {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},
+    {id:'bs',l:'バストのみ'},
+    {id:'bh',l:'バスト〜裾'},
+    {id:'hm',l:'裾のみ'},
+    {id:'ns',l:'ノースリーブ（袖ぐりくる）'},
+    {id:'fs',l:'折り伏せ・袋縫い',ex:'fin'},
+    {id:'fk',l:'袋縫いの場合',ex:'fin'},
     {id:'yk',l:'肩ヨークタック外し（センター）'},
     {id:'ys',l:'肩ヨークタック外し（サイド）'},
+    {id:'ah',l:'アームホール修正あり'},
+    {id:'dt',l:'ダーツ取り外し'},
+    {id:'di',l:'ダーツ入れ（4本まで）'},
     {id:'lm',l:'限界あり',fin:true},
   ]},
   'ウエスト絞り_シャツ':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
@@ -1497,9 +1615,18 @@ const PROC={
 
   // ── シャツ追加 ──
   '袖巾_シャツ':{m:[
+    {id:'so',l:'袖口巾のみ'},
+    {id:'al',l:'袖巾全体'},
     {id:'nc',l:'カフスさわらず'},
     {id:'wc',l:'カフスも共に'},
     {id:'cw',l:'カフス幅のみ'},
+    {id:'fz',l:'ファスナー付き'},
+    {id:'pp',l:'パイピング'},
+    {id:'ff',l:'折り伏せ・袋縫い'},
+    {id:'cr',l:'カフス作り替え（生地代別）'},
+    {id:'cs',l:'カフスすり切れ修理'},
+    {id:'ss',l:'簡易スリット作り'},
+    {id:'lm',l:'限界あり',fin:true},
   ]},
   '長袖半袖_シャツ':{m:[
     {id:'st',l:'ステッチ仕上げ'},
@@ -1520,8 +1647,6 @@ const PROC={
     {id:'vn',l:'Vネックに'},
     {id:'rn',l:'ラウンドネックに'},
     {id:'tt',l:'タートルネックに'},
-    {id:'tc',l:'タートルカット（丈詰め）'},
-    {id:'tw',l:'タートル幅詰め'},
     {id:'sp',l:'特殊'},
   ]},
 
@@ -1645,7 +1770,7 @@ const PROC={
 
   // ── ジレ ──
   '着丈_ジレ':{m:[
-    {id:'hm',l:'裾から詰め'},{id:'sh',l:'肩線詰め'},
+    {id:'hm',l:'裾から詰め'},
   ]},
   '身幅_ジレ':{m:[
     {id:'ts',l:'詰め'},{id:'mi',l:'マチ入れ（生地代別）'},
@@ -1830,17 +1955,51 @@ const PROC={
     {id:'mt',l:'ムートン'},
     {id:'lm',l:'特殊素材（要相談）',fin:true},
   ]},
+  '衿巾ツメ_コート':{m:[
+    {id:'tl',l:'テーラード仕立て（紳士）'},
+    {id:'tf',l:'テーラード仕立て（婦人）'},
+    {id:'nt',l:'非テーラード（衿巾ツメ・衿取り外し）'},
+    {id:'pp',l:'パイピング'},
+    {id:'ri',l:'裏地あり'},
+  ]},
 
   // ── シャツ追加 ──
   '衿巾ツメ_シャツ':{m:[
     {id:'sh',l:'シャツ衿'},
     {id:'tl',l:'テーラー仕立て'},
     {id:'tk',l:'つき取り'},
-    {id:'re',l:'すり切れ修理'},
+    {id:'re',l:'すり切れ直し（裏返しのみ）'},
+    {id:'rp',l:'すり切れ直し（破れ直しあり）'},
+    {id:'rm',l:'衿なしに'},
+    {id:'rk',l:'衿作り替え'},
+    {id:'nk',l:'ネックツメ（ノーカラー衿ぐりツメ）'},
+    {id:'pp',l:'パイピング'},
   ]},
   '衿なし化_シャツ':{m:[
     {id:'rm',l:'衿取り外し'},
     {id:'rk',l:'衿作り替え'},
+  ]},
+  '肩巾ツメ_シャツ':{m:[
+    {id:'pl',l:'プレーン'},
+    {id:'ds',l:'デザイン物'},
+    {id:'ah',l:'アームホール修正あり'},
+    {id:'yk',l:'肩ヨーク タック外し（センター）'},
+    {id:'ys',l:'肩ヨーク タック外し（サイド）'},
+    {id:'yi',l:'肩ヨーク タック入れ（センター）'},
+    {id:'yj',l:'肩ヨーク タック入れ（サイド）'},
+    {id:'pp',l:'パイピング'},
+    {id:'fl',l:'飾り移動'},
+    {id:'ff',l:'折り伏せ・袋縫い'},
+  ]},
+  '肩線_シャツ':{m:[
+    {id:'nk',l:'ネックツメ'},
+    {id:'rg',l:'ラグラン袖ハラミ取り'},
+    {id:'st',l:'肩ひもツメ'},
+    {id:'hm',l:'挟み込み（前後）'},
+    {id:'hs',l:'挟み込み（どちらか一方）'},
+    {id:'ri',l:'裏地あり'},
+    {id:'pp',l:'パイピング'},
+    {id:'fl',l:'飾り移動'},
   ]},
   'スリット作成_シャツ':{m:[
     {id:'sm',l:'簡易スリット（片側）'},
@@ -1898,6 +2057,16 @@ const PROC={
     {id:'re',l:'付け直し'},
     {id:'lh',l:'革ストラップ'},
   ]},
+  'リベット_小物':{m:[
+    {id:'nw',l:'新規打ち（1ヶ）'},
+    {id:'re',l:'打ち直し（1ヶ）'},
+    {id:'rm',l:'外しのみ'},
+  ]},
+  '袖巾_ドレス':{m:[
+    {id:'so',l:'袖口巾'},
+    {id:'al',l:'袖巾全体'},
+    {id:'lm',l:'限界あり',fin:true},
+  ]},
 
   // ── ベスト ──
   '着丈_ベスト':{m:[
@@ -1906,7 +2075,6 @@ const PROC={
     {id:'dt',l:'ダーツで処理'},
   ]},
   '身幅_ベスト':{m:[
-    {id:'dt',l:'ダーツでツメ'},
     {id:'al',l:'全体ツメ'},
     {id:'mi',l:'マチ入れ（裏なし）'},
     {id:'mi2',l:'マチ入れ（裏あり）'},
@@ -2108,7 +2276,28 @@ const sR =v=>{
       localStorage.setItem('ar2_bk_ts',new Date().toISOString().slice(0,10));
     }
   }catch(e){}
+  // 5-4: 書き込みのたびに容量チェック（85%超で常時バナー表示）
+  _checkStorageInline();
 };
+function _checkStorageInline(){
+  try{
+    let total=0;
+    for(const key of Object.keys(localStorage)){total+=(localStorage.getItem(key)||'').length;}
+    const pct=Math.round(total/25000);
+    const banner=document.getElementById('storage-top-banner');
+    if(banner){
+      if(pct>=85){
+        const remain=Math.max(0,Math.floor((25000-total)/700));
+        banner.textContent='⚠️ ストレージ残量わずか（'+pct+'%使用中・残り約'+remain+'件分）';
+        banner.style.display='block';
+      } else {
+        banner.style.display='none';
+      }
+    }
+    // 設定画面のバーも更新
+    checkStorageCapacity();
+  }catch(e){}
+}
 const gSt=()=>JSON.parse(localStorage.getItem('ar2_st')||JSON.stringify(DEF_ST));
 const sSt=v=>localStorage.setItem('ar2_st',JSON.stringify(v));
 const gCt=()=>JSON.parse(localStorage.getItem('ar2_ct')||JSON.stringify(DEF_CATS));
@@ -2120,6 +2309,7 @@ const sStaff=v=>localStorage.setItem('ar2_staff',JSON.stringify(v));
 let curType=null,curClr={h:'',n:''},curPat='',curTime=0;
 let stfOn=false,spmOn=false,wkFil='all',hiFil='all',curId=null;
 let selMode=false, selIds=new Set();
+let _lastDeleted=null,_toastTimer=null;
 let histSelMode=false, histSelIds=new Set();
 
 // ══ INIT ══
@@ -2138,6 +2328,12 @@ function init(){
   // 自動バックアップ（起動のたびに別キーに保存）
   autoBackup();
 
+  // 3-4: DEF_CATSマイグレーション — ar2_ctと現在のALTキーを自動同期
+  migrateCats();
+
+  // 3-2: localStorage容量チェック
+  checkStorageCapacity();
+
   buildTypes();buildColors();buildPats();populateSels();setDefaults();
   renderWork();renderHist();
 }
@@ -2148,13 +2344,295 @@ function autoBackup(){
     const st=localStorage.getItem('ar2_st');
     const ct=localStorage.getItem('ar2_ct');
     if(recs&&recs!=='[]'){
-      const ts=new Date().toISOString().slice(0,10);
+      const today=new Date().toISOString().slice(0,10);
+      // 単一バックアップ（後方互換）
       localStorage.setItem('ar2_bk_recs',recs);
       localStorage.setItem('ar2_bk_st',st||'');
       localStorage.setItem('ar2_bk_ct',ct||'');
-      localStorage.setItem('ar2_bk_ts',ts);
+      localStorage.setItem('ar2_bk_ts',today);
+      // 3-1: 日付別スナップショット（最大7世代）
+      localStorage.setItem('ar2_snap_'+today,recs);
+      // 7日超のスナップショットを削除
+      const cutoff=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+      Object.keys(localStorage)
+        .filter(k=>k.startsWith('ar2_snap_')&&k.slice(9)<cutoff)
+        .forEach(k=>localStorage.removeItem(k));
     }
   }catch(e){}
+}
+
+// ── 3-4: DEF_CATSマイグレーション ──
+// ar2_ctに古いカテゴリーが残っている、または新しいカテゴリーが未追加の場合に自動同期する
+// ── 2-2: カテゴリー使用頻度 ──
+const USE_KEY='ar2_cat_use';
+function gUse(){try{return JSON.parse(localStorage.getItem(USE_KEY)||'{}');}catch(e){return {};}}
+function recordCatUse(cat){
+  const u=gUse();
+  u[cat]=(u[cat]||0)+1;
+  localStorage.setItem(USE_KEY,JSON.stringify(u));
+}
+function sortedCats(cats){
+  const u=gUse();
+  return [...cats].sort((a,b)=>(u[b]||0)-(u[a]||0));
+}
+
+// ── 2-5: カテゴリー表示/非表示 ──
+const VIS_KEY='ar2_cat_vis';
+function gVis(){
+  try{
+    const s=localStorage.getItem(VIS_KEY);
+    return s?new Set(JSON.parse(s)):null; // nullなら全表示
+  }catch(e){return null;}
+}
+function sVis(set){localStorage.setItem(VIS_KEY,JSON.stringify([...set]));}
+function isCatVisible(cat){const v=gVis();return v===null||v.has(cat);}
+function togCatVis(cat){
+  const all=gCt();
+  let v=gVis();
+  if(v===null) v=new Set(all); // 初回は全表示から
+  if(v.has(cat)) v.delete(cat); else v.add(cat);
+  sVis(v);
+  populateSels();
+  renderCatVisList();
+}
+function renderCatVisList(){
+  const el=document.getElementById('cat-vis-list');
+  if(!el) return;
+  const all=gCt();
+  const u=gUse();
+  el.innerHTML=all.map(c=>{
+    const vis=isCatVisible(c);
+    const cnt=u[c]||0;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bd2)">
+      <span style="font-size:12px;color:${vis?'var(--tx1)':'var(--tx3)'}">${c}${cnt?` <span style="font-size:10px;color:var(--tx3)">(${cnt}回)</span>`:''}</span>
+      <button onclick="togCatVis('${c}')" style="padding:3px 10px;border-radius:7px;border:1px solid var(--bd2);background:${vis?'var(--green)':'var(--s3)'};color:${vis?'#fff':'var(--tx3)'};font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer">${vis?'表示中':'非表示'}</button>
+    </div>`;
+  }).join('');
+}
+
+// ── 2-4: 月次集計ダッシュボード ──
+let dashMonth='';
+function showDash(){
+  const overlay=document.getElementById('dash-overlay');
+  if(overlay) overlay.style.display='flex';
+  if(!dashMonth){
+    const now=new Date();
+    dashMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+  renderDash();
+}
+function closeDash(){
+  const overlay=document.getElementById('dash-overlay');
+  if(overlay) overlay.style.display='none';
+}
+function renderDash(){
+  const mi=document.getElementById('dash-month');
+  if(mi) mi.value=dashMonth;
+  const recs=gR();
+  const [yr,mo]=dashMonth.split('-');
+  const filtered=recs.filter(r=>{
+    if(!r.inDate) return false;
+    const [ry,rm]=r.inDate.split('-');
+    return ry===yr&&rm===mo;
+  });
+  // 集計
+  const catCount={},catPrice={};
+  let totalPrice=0,totalCount=filtered.length;
+  filtered.forEach(r=>{
+    const c=r.cat||'未分類';
+    catCount[c]=(catCount[c]||0)+1;
+    catPrice[c]=(catPrice[c]||0)+(r.price||0);
+    totalPrice+=(r.price||0);
+  });
+  const el=document.getElementById('dash-body');
+  if(!el) return;
+  if(!totalCount){
+    el.innerHTML=`<div style="text-align:center;padding:32px;color:var(--tx3);font-size:13px">この月のデータはありません</div>`;
+    return;
+  }
+  const sorted=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
+  const maxCnt=sorted[0]?.[1]||1;
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="padding:12px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;text-align:center">
+        <div style="font-size:11px;color:var(--blue);font-weight:600">件数</div>
+        <div style="font-size:24px;font-weight:700;color:var(--tx1)">${totalCount}<span style="font-size:12px">件</span></div>
+      </div>
+      <div style="padding:12px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px;text-align:center">
+        <div style="font-size:11px;color:var(--green);font-weight:600">売上合計</div>
+        <div style="font-size:20px;font-weight:700;color:var(--tx1)">¥${totalPrice.toLocaleString()}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:8px">カテゴリー別件数</div>
+    ${sorted.map(([cat,cnt])=>{
+      const pct=Math.round(cnt/maxCnt*100);
+      const price=catPrice[cat]||0;
+      return `<div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span style="font-size:12px;color:var(--tx1)">${cat}</span>
+          <span style="font-size:11px;color:var(--tx2)">${cnt}件 ¥${price.toLocaleString()}</span>
+        </div>
+        <div style="background:var(--s3);border-radius:4px;height:8px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--blue);border-radius:4px;transition:width .3s"></div>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="font-size:11px;color:var(--tx3);margin-top:10px;text-align:right">平均単価: ¥${totalCount?Math.round(totalPrice/totalCount).toLocaleString():0}</div>
+  `;
+}
+
+function migrateCats(){
+  try{
+    const stored=gCt();
+    const current=DEF_CATS;
+    // 現在のALTに存在しないキーを削除、存在するが未登録のキーを末尾に追加
+    const filtered=stored.filter(c=>current.includes(c));
+    const missing=current.filter(c=>!stored.includes(c));
+    if(missing.length>0||filtered.length!==stored.length){
+      const merged=[...filtered,...missing];
+      sCt(merged);
+      if(missing.length>0){
+        console.info('[AlteREC] カテゴリー自動追加:',missing.join(', '));
+      }
+      if(filtered.length!==stored.length){
+        const removed=stored.filter(c=>!current.includes(c));
+        console.info('[AlteREC] 旧カテゴリー自動削除:',removed.join(', '));
+      }
+    }
+  }catch(e){
+    console.warn('[AlteREC] migrateCats error:',e);
+  }
+}
+
+// ── 3-2: localStorage容量チェック ──
+function checkStorageCapacity(){
+  try{
+    let total=0;
+    for(const key of Object.keys(localStorage)){
+      total+=(localStorage.getItem(key)||'').length;
+    }
+    const pct=Math.round(total/25000);
+    const count=gR().length;
+    // 1件あたりの平均サイズから残り件数を推算
+    const avgSize=count>0?Math.round((localStorage.getItem('ar2_recs')||'').length/count):700;
+    const remaining=Math.max(0,Math.floor((2500000-total)/avgSize));
+    const el=document.getElementById('storage-usage');
+    if(el){
+      el.textContent=`使用量: 約${(total/1000).toFixed(0)}KB（${pct}% / 現在${count}件・残り約${remaining}件分）`;
+      el.style.color=pct>=80?'var(--red)':pct>=60?'var(--amber)':'var(--tx3)';
+      const bar=document.getElementById('storage-bar');
+      if(bar){
+        bar.style.width=Math.min(pct,100)+'%';
+        bar.style.background=pct>=80?'var(--red)':pct>=60?'var(--amber)':'var(--green)';
+      }
+    }
+    if(pct>=80){
+      const banner=document.getElementById('storage-warning');
+      if(banner) banner.style.display='block';
+    }
+  }catch(e){}
+}
+
+// PRICE/PRICE_OPTをlocalStorageから読み込む（未保存ならデフォルト使用）
+const PRICE_KEY='ar2_price';
+const PRICE_OPT_KEY='ar2_price_opt';
+function gPrice(){
+  try{
+    const s=localStorage.getItem(PRICE_KEY);
+    return s?JSON.parse(s):null;
+  }catch(e){return null;}
+}
+function sPrice(v){localStorage.setItem(PRICE_KEY,JSON.stringify(v));}
+function gPriceOpt(){
+  try{
+    const s=localStorage.getItem(PRICE_OPT_KEY);
+    return s?JSON.parse(s):null;
+  }catch(e){return null;}
+}
+function sPriceOpt(v){localStorage.setItem(PRICE_OPT_KEY,JSON.stringify(v));}
+
+// ── 3-6: PRICE編集UI ──
+function openPriceEditor(){
+  const overlay=document.getElementById('price-editor-overlay');
+  if(overlay) overlay.style.display='flex';
+  renderPriceEditor();
+}
+function closePriceEditor(){
+  const overlay=document.getElementById('price-editor-overlay');
+  if(overlay) overlay.style.display='none';
+}
+function renderPriceEditor(){
+  const el=document.getElementById('price-editor-body');
+  if(!el) return;
+  // 現在有効なPRICEを使用（localStorageカスタムがあればそちら）
+  const custom=gPrice()||{};
+  let html='<div style="font-size:11px;color:var(--tx3);margin-bottom:8px">基本料金（税抜・目安）を編集できます。変更はこの端末にのみ保存されます。</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html+='<tr><th style="text-align:left;padding:4px;color:var(--tx2);font-weight:600;border-bottom:1px solid var(--bd2)">項目（pk）</th><th style="text-align:right;padding:4px;color:var(--tx2);font-weight:600;border-bottom:1px solid var(--bd2);width:90px">金額（税抜）</th></tr>';
+  const merged={...PRICE,...custom};
+  for(const pk of Object.keys(merged).sort()){
+    const orig=PRICE[pk]??'';
+    const cur=custom[pk]??orig;
+    const changed=custom[pk]!==undefined&&custom[pk]!==orig;
+    html+=`<tr>
+      <td style="padding:3px 4px;color:${changed?'var(--amber)':'var(--tx1)'};font-size:11px">${pk}${changed?' ✏️':''}</td>
+      <td style="padding:3px 4px;text-align:right">
+        <input type="number" min="0" step="100"
+          value="${cur}"
+          data-pk="${pk}"
+          data-orig="${orig}"
+          onchange="updatePriceEntry(this)"
+          style="width:80px;padding:3px 6px;border:1px solid var(--bd2);border-radius:6px;background:var(--s2);color:var(--tx1);font-size:11px;font-family:var(--f);text-align:right">
+      </td>
+    </tr>`;
+  }
+  html+='</table>';
+  el.innerHTML=html;
+}
+function updatePriceEntry(input){
+  const pk=input.dataset.pk;
+  const orig=parseInt(input.dataset.orig||'0',10);
+  const val=parseInt(input.value||'0',10);
+  const custom=gPrice()||{};
+  if(val===orig){
+    delete custom[pk]; // デフォルトに戻す
+  } else {
+    custom[pk]=val;
+  }
+  sPrice(custom);
+  // 入力行のラベルをリアルタイム更新
+  const td=input.closest('tr')?.querySelector('td:first-child');
+  if(td) td.style.color=custom[pk]!==undefined?'var(--amber)':'var(--tx1)';
+}
+function resetPriceToDefault(){
+  if(!confirm('全ての料金カスタムをリセットしてデフォルトに戻しますか？'))return;
+  localStorage.removeItem(PRICE_KEY);
+  renderPriceEditor();
+  alert('✅ デフォルトに戻しました');
+}
+function exportPriceJSON(){
+  const custom=gPrice()||{};
+  const data={type:'AlteREC_price',version:'v1',exported:new Date().toISOString().slice(0,10),customPrice:custom};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`AlteREC_price_${data.exported}.json`;
+  a.click();
+}
+function importPriceJSON(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(d.type!=='AlteREC_price'||!d.customPrice)throw new Error('形式が違います');
+      sPrice(d.customPrice);
+      renderPriceEditor();
+      alert('✅ 料金データを読み込みました');
+    }catch(err){alert('❌ 読み込み失敗: '+err.message);}
+    ev.target.value='';
+  };
+  r.readAsText(file);
 }
 function setDefaults(){
   const n=new Date();
@@ -2169,7 +2647,11 @@ function populateSels(){
   const wk=document.getElementById('f-worker');
   const cv=cs.value;
   ss.innerHTML=gSt().map(s=>`<option>${s}</option>`).join('');
-  cs.innerHTML=gCt().map(c=>`<option${c===cv?' selected':''}>${c}</option>`).join('');
+  // 2-2: 頻度ソート + 2-5: 表示フィルター
+  const allCats=gCt();
+  const visCats=allCats.filter(c=>isCatVisible(c));
+  const sorted=sortedCats(visCats);
+  cs.innerHTML=sorted.map(c=>`<option${c===cv?' selected':''}>${c}</option>`).join('');
   if(wk){
     const wv=wk.value;
     wk.innerHTML='<option value="">（選択）</option>'+gStaff().map(s=>`<option${s===wv?' selected':''}>${s}</option>`).join('');
@@ -2440,23 +2922,25 @@ function buildAB(a,uid,isW){
 const PRICE={
   '裾上げ_パンツ':1300,'ウエスト_パンツ':2500,'裾幅_パンツ':2600,'わたり_パンツ':3300,
   '股上_パンツ':4250,'ヒップ_パンツ':2000,'ヒザ巾_パンツ':4000,
-  'ファスナー交換_パンツ':2200,'裏地取替_パンツ':3000,'股リペア_パンツ':2500,
+  'ファスナー交換_パンツ':2200,'裏地取替_パンツ':4000,'股リペア_パンツ':2500,
   '股下修理_パンツ':1000,'裾ほつれ修理_パンツ':500,'ポケット袋修理_パンツ':2000,
   'タック変更_パンツ':10000,'シック布付け_パンツ':1300,
   '着丈_スカート':2200,'ウエスト_スカート':3000,'ヒップ_スカート':1500,
   '身幅_スカート':2000,'ファスナー交換_スカート':2500,'裏地修理_スカート':2500,
   'ウエストゴム交換_スカート':1500,
-  '着丈_ジャケット':3200,'袖丈_ジャケット':2600,'身幅_ジャケット':5000,
+  '着丈_ジャケット':3200,'袖丈_ジャケット':2600,'身幅_ジャケット':6250,
   'ウエスト絞り_ジャケット':5000,'肩幅_ジャケット':6700,'袖巾_ジャケット':2400,
-  '裏地修理_ジャケット':3500,'ラペル補正_ジャケット':8000,'マチ入れ_ジャケット':5000,
+  '裏地修理_ジャケット':3500,'ラペル補正_ジャケット':12000,'マチ入れ_ジャケット':5000,
   'つき取り_ジャケット':3000,'リブ交換_ジャケット':3000,'エルボーパッチ_ジャケット':3000,
   '袖口すり切れ修理_ジャケット':1000,'ポケット修理_ジャケット':2000,
   '段返り作り直し_ジャケット':3500,'脇パッド取付_ジャケット':2000,
   '着丈_コート':4000,'袖丈_コート':3000,'身幅_コート':6400,'肩幅_コート':6900,
   '袖巾_コート':3000,'裏地修理_コート':5000,'ファスナー交換_コート':8000,
   'マチ入れ_コート':5700,'つき取り_コート':4000,'トレンチベルト作成_コート':8000,
+  '衿巾ツメ_コート':7000,
   '着丈_シャツ':2200,'袖丈_シャツ':1800,'身幅_シャツ':2000,'袖巾_シャツ':2000,
-  '肩幅_シャツ':3500,'長袖半袖_シャツ':2500,'衿修理_シャツ':2500,
+  '肩幅_シャツ':3500,'肩巾ツメ_シャツ':3500,'肩線_シャツ':2000,
+  '長袖半袖_シャツ':2500,'衿修理_シャツ':2500,
   '衿巾ツメ_シャツ':3500,'ネックサイズ詰め_シャツ':5000,'ダーツ操作_シャツ':1800,
   '胸ポケット作成_シャツ':6000,'カフス修理_シャツ':3000,
   '着丈_ニット':2800,'袖丈_ニット':2800,'身幅_ニット':3800,'袖巾_ニット':3500,
@@ -2568,6 +3052,50 @@ const PRICE={
   // ── ウエスト絞り（コート以外はジャケットで対応済み）──
   'ウエスト絞り_コート':6000,
   'かけはぎミシン_パンツ':1500,'その他_ジャケット':3000,'肩巾_スウェット':3500,
+  // ── 提案1 新規追加分 ──
+  '袖巾_ドレス':2000,
+  'サイドアジャスター_パンツ':5000,
+  'ウエストベルト固定型_コート':16000,
+  'リベット_小物':500,
+  // ── 1-1: PRICE未登録53件 一括追加 ──
+  // タグ付け（全カテゴリー共通 ¥1,500）
+  'タグ付け_パンツ':1500,'タグ付け_スカート':1500,'タグ付け_ジャケット':1500,
+  'タグ付け_コート':1500,'タグ付け_シャツ':1500,'タグ付け_ニット':1500,
+  'タグ付け_スウェット':1500,'タグ付け_ドレス':1500,'タグ付け_ワンピース':1500,
+  'タグ付け_Tシャツ':1500,'タグ付け_ブルゾン':1500,'タグ付け_小物':1500,
+  'タグ付け_ジレ':1500,'タグ付け_ベスト':1500,'タグ付け_レザー':1500,
+  'タグ付け_毛皮':1500,
+  // プレス（カテゴリー別）
+  'プレス_パンツ':1000,'プレス_スカート':1000,'プレス_ジャケット':1500,
+  'プレス_コート':1500,'プレス_シャツ':1000,'プレス_ニット':1000,
+  'プレス_スウェット':1000,'プレス_ドレス':1500,'プレス_ワンピース':1500,
+  'プレス_Tシャツ':1000,'プレス_ブルゾン':1000,'プレス_ジレ':1000,
+  'プレス_ベスト':1000,'プレス_小物':500,
+  // ボタン付け替え（¥300 = 1個目料金）
+  'ボタン付け替え_シャツ':300,'ボタン付け替え_コート':300,
+  'ボタン付け替え_ジャケット':300,'ボタン付け替え_ドレス':300,
+  'ボタン付け替え_ブルゾン':300,'ボタン付け替え_ワンピース':300,
+  'ボタン付け替え_小物':300,
+  // ボタン補強（¥500）
+  'ボタン補強_パンツ':500,'ボタン補強_シャツ':500,'ボタン補強_コート':500,
+  'ボタン補強_ジャケット':500,'ボタン補強_スウェット':500,'ボタン補強_スカート':500,
+  'ボタン補強_ドレス':500,'ボタン補強_ニット':500,'ボタン補強_ブルゾン':500,
+  'ボタン補強_ワンピース':500,'ボタン補強_Tシャツ':500,
+  // 個別未登録
+  'デニムダメージ残し加工':2500,'スウェット交換':2000,
+  '穴あけ':500,'バックル交換':1500,'フリンジ補修':2000,
+  'ブリム修理':2000,'裾上げ・裾処理':1500,
+};
+
+// ── 1-2: 素材倍率係数テーブル ──
+const PRICE_RATE={
+  'ベルベット':1.5,'ベロア':1.5,'コーデュロイ':1.3,
+  'リバーシブル':2.0,'シルク':1.5,'サテン':1.3,
+  'カシミヤ':1.5,'アンゴラ':1.5,'モヘア':1.5,
+  'レース':1.5,'チュール':1.5,'刺繍':1.3,
+  'ダウン':1.5,'中わた':1.5,'キルティング':1.3,
+  'スパンコール':1.5,'ビーズ':1.5,'プリーツ':1.3,
+  'ツイード':1.3,'デニム':1.2,
 };
 
 // ── 価格ロック状態 ──
@@ -2663,6 +3191,15 @@ const PRICE_OPT={
   '袖丈_ジャケット:ハンドステッチ':1500,
   '袖丈_ジャケット:裏地あり':500,
   '袖丈_ジャケット:パイピング始末':1000,
+  '袖丈_ジャケット:天継ぎ':2400,
+  '袖丈_ジャケット:ターンナップカフス':2200,
+  '袖丈_ジャケット:肩山カット（〜2cm）':5400,
+  '袖丈_ジャケット:肩山カット（2.1〜3.9cm）':6400,
+  '袖丈_ジャケット:肩山カット（4cm〜）':8400,
+
+  // ── 着丈_ジャケット 追加 ──
+  '着丈_ジャケット:後ろのみ詰め':-200,
+  '着丈_ジャケット:フロント丸み作り直しのみ':300,
 
   // ── 身幅_ジャケット ──
   '身幅_ジャケット:裏地あり':1500,
@@ -2702,6 +3239,8 @@ const PRICE_OPT={
   '袖丈_コート:ベルト移動':1000,
   '袖丈_コート:袖山から詰め':1000,
   '袖丈_コート:パイピング始末':1000,
+  '袖丈_コート:天継ぎ':1500,
+  '袖丈_コート:ベラ移動':1500,
 
   // ── 身幅_コート ──
   '身幅_コート:アウトポケット移動':2000,
@@ -2721,7 +3260,7 @@ const PRICE_OPT={
 
   // ── 着丈_シャツ ──
   '着丈_シャツ:サイドスリット付移動':1500,
-  '着丈_シャツ:ハリツケ':3000,
+  '着丈_シャツ:ハリツケ':3800,
   '着丈_シャツ:三角マチ付き':1500,
 
   // ── 袖丈_シャツ ──
@@ -2729,10 +3268,91 @@ const PRICE_OPT={
   '袖丈_シャツ:袖口フレアー切替え':1000,
   '袖丈_シャツ:袖丈出し（AH+カフス）':3500,
   '袖丈_シャツ:袖巾調整あり':500,
+  '袖丈_シャツ:肩山カット（〜2cm）':3200,
+  '袖丈_シャツ:肩山カット（2.1〜3.9cm）':4200,
+  '袖丈_シャツ:肩山カット（4cm〜）':5200,
 
   // ── 身幅_シャツ ──
+  '身幅_シャツ:バストのみ':0,
+  '身幅_シャツ:バスト〜裾':500,
+  '身幅_シャツ:裾のみ':0,
+  '身幅_シャツ:ノースリーブ（袖ぐりくる）':500,
+  '身幅_シャツ:アームホール修正あり':1000,
+  '身幅_シャツ:折り伏せ・袋縫い':1000,
   '身幅_シャツ:肩ヨークタック外し（センター）':3500,
   '身幅_シャツ:肩ヨークタック外し（サイド）':4000,
+  '身幅_シャツ:ダーツ取り外し':1500,
+  '身幅_シャツ:ダーツ入れ（4本まで）':2000,
+
+  // ── 袖巾_シャツ ──
+  '袖巾_シャツ:袖口巾のみ':0,
+  '袖巾_シャツ:袖巾全体':1000,
+  '袖巾_シャツ:ファスナー付き':1000,
+  '袖巾_シャツ:パイピング':1000,
+  '袖巾_シャツ:折り伏せ・袋縫い':1000,
+  '袖巾_シャツ:カフス作り替え（生地代別）':5000,
+  '袖巾_シャツ:カフスすり切れ修理':2500,
+  '袖巾_シャツ:簡易スリット作り':1200,
+
+  // ── 衿巾ツメ_シャツ ──
+  '衿巾ツメ_シャツ:シャツ衿':0,
+  '衿巾ツメ_シャツ:テーラー仕立て':1500,
+  '衿巾ツメ_シャツ:つき取り':-1000,
+  '衿巾ツメ_シャツ:すり切れ直し（裏返しのみ）':-1000,
+  '衿巾ツメ_シャツ:すり切れ直し（破れ直しあり）':0,
+  '衿巾ツメ_シャツ:衿なしに':500,
+  '衿巾ツメ_シャツ:衿作り替え':2500,
+  '衿巾ツメ_シャツ:ネックツメ（ノーカラー衿ぐりツメ）':-1500,
+  '衿巾ツメ_シャツ:パイピング':1000,
+
+  // ── 肩巾ツメ_シャツ ──
+  '肩巾ツメ_シャツ:プレーン':0,
+  '肩巾ツメ_シャツ:デザイン物':500,
+  '肩巾ツメ_シャツ:アームホール修正あり':1000,
+  '肩巾ツメ_シャツ:肩ヨーク タック外し（センター）':3500,
+  '肩巾ツメ_シャツ:肩ヨーク タック外し（サイド）':4000,
+  '肩巾ツメ_シャツ:肩ヨーク タック入れ（センター）':4000,
+  '肩巾ツメ_シャツ:肩ヨーク タック入れ（サイド）':5000,
+  '肩巾ツメ_シャツ:パイピング':1000,
+  '肩巾ツメ_シャツ:飾り移動':1000,
+  '肩巾ツメ_シャツ:折り伏せ・袋縫い':1000,
+
+  // ── 肩線_シャツ ──
+  '肩線_シャツ:ネックツメ':0,
+  '肩線_シャツ:ラグラン袖ハラミ取り':0,
+  '肩線_シャツ:肩ひもツメ':0,
+  '肩線_シャツ:挟み込み（前後）':500,
+  '肩線_シャツ:挟み込み（どちらか一方）':-500,
+  '肩線_シャツ:裏地あり':1000,
+  '肩線_シャツ:パイピング':1000,
+  '肩線_シャツ:飾り移動':1000,
+
+  // ── 衿巾ツメ_コート ──
+  '衿巾ツメ_コート:テーラード仕立て（紳士）':1000,
+  '衿巾ツメ_コート:テーラード仕立て（婦人）':0,
+  '衿巾ツメ_コート:非テーラード（衿巾ツメ・衿取り外し）':-2000,
+  '衿巾ツメ_コート:パイピング':1000,
+  '衿巾ツメ_コート:裏地あり':2000,
+
+  // ── マチ入れ_ジャケット ──
+  'マチ入れ_ジャケット:アームホール':0,
+  'マチ入れ_ジャケット:袖〜身巾':2000,
+  'マチ入れ_ジャケット:袖〜身巾〜裾':5000,
+  'マチ入れ_ジャケット:裏地あり':1000,
+
+  // ── マチ入れ_コート ──
+  'マチ入れ_コート:アームホール':0,
+  'マチ入れ_コート:袖〜身巾':2200,
+  'マチ入れ_コート:袖〜身巾〜裾':6300,
+  'マチ入れ_コート:裏地あり':1100,
+
+  // ── 着丈_ジャケット どんでん精緻化 ──
+  '着丈_ジャケット:センターベンツ':400,
+  '着丈_ジャケット:サイドベンツ':1200,
+
+  // ── 身幅_ジャケット ──
+  '身幅_ジャケット:裏地あり':1250,
+  '身幅_ジャケット:AH修正含む':1000,
 
   // ── 着丈_ワンピース ──
   '着丈_ワンピース:総プリーツ':2000,
@@ -2833,8 +3453,7 @@ const PRICE_OPT={
   'ウエスト_スカート:プリーツ・ギャザー':2000,
 
   // ── ニット タートルネック系オプション（ネック形変更の加算） ──
-  'ネック形変更_ニット:タートルカット（丈詰め）':0,
-  'ネック形変更_ニット:タートル幅詰め':0,
+  // タートルカット・タートル幅詰めは独立ALTに統一済みのため削除
 
   // ── レザー系 ──
   '袖丈_レザー:カフス':2000,
@@ -2857,30 +3476,87 @@ function calcEstPrice(prefix){
   const el=document.getElementById(cid);
   if(!el) return;
   const items=ALT[cat]||[];
+  const customP=gPrice()||{};
+  const effectivePrice={...PRICE,...customP};
   let total=0;
+  const breakdown=[];
   el.querySelectorAll('[id^="chk-"]').forEach((chk,i)=>{
     if(!chk.checked || !items[i]) return;
     const pk=items[i].pk;
-    // 基本料金
-    const base=PRICE[pk];
-    if(base) total+=base;
-    // PROCオプション加算
+    const itemName=items[i].n;
+    const base=effectivePrice[pk]||0;
+    let itemTotal=base;
+    const optLabels=[];
     const uid=chk.id.replace('chk-','');
     const body=document.getElementById('body-'+uid);
-    if(!body) return;
-    const procs=JSON.parse(body.dataset.procs||'[]');
-    procs.forEach(label=>{
-      const optKey=pk+':'+label;
-      const opt=PRICE_OPT[optKey];
-      if(opt) total+=opt;
-    });
+    if(body){
+      const procs=JSON.parse(body.dataset.procs||'[]');
+      procs.forEach(label=>{
+        const optKey=pk+':'+label;
+        const opt=PRICE_OPT[optKey];
+        if(opt){itemTotal+=opt;optLabels.push(`${label} +¥${opt.toLocaleString()}`);}
+      });
+    }
+    if(itemTotal>0){
+      breakdown.push({name:itemName,base,optLabels,total:itemTotal});
+      total+=itemTotal;
+    }
   });
+  // 1-2: 素材倍率を適用
+  // 素材フィールド（f-material/e-material）と特殊フィールド（f-special/e-special）を照合
+  const matText=(
+    (document.getElementById(prefix==='f'?'f-material':'e-mat')?.value||'')+' '+
+    (document.getElementById(prefix==='f'?'f-special':'e-special')?.value||'')+' '+
+    (prefix==='f'&&spmOn?'特殊素材':'')+' '+
+    (prefix==='e'&&document.getElementById('edit-body')?.dataset.espm==='1'?'特殊素材':'')
+  ).toLowerCase();
+  let rate=1;
+  let rateName='';
+  for(const [k,v] of Object.entries(PRICE_RATE)){
+    if(matText.includes(k.toLowerCase())&&v>rate){rate=v;rateName=k;}
+  }
+  if(rate>1&&total>0){
+    const rateAdd=Math.round(total*(rate-1));
+    breakdown.push({name:`素材割増（${rateName} ×${rate}）`,base:0,optLabels:[],total:rateAdd});
+    total=Math.round(total*rate);
+  }
   const inp=document.getElementById(prefix+'-price');
   const hint=document.getElementById(prefix+'-price-hint');
+  const btn=document.getElementById(prefix+'-breakdown-btn');
   if(inp){
     inp.value=total>0?total:'';
     if(hint) hint.style.display=total>0?'inline':'none';
+    if(btn) btn.style.display=total>0?'inline-block':'none';
   }
+  // 内訳データを保存（表示中なら即更新）
+  const bdEl=document.getElementById(prefix+'-breakdown');
+  if(bdEl){
+    bdEl.dataset.items=JSON.stringify(breakdown);
+    if(bdEl.style.display!=='none') renderBreakdown(prefix);
+  }
+}
+function togBreakdown(prefix){
+  const bdEl=document.getElementById(prefix+'-breakdown');
+  const btn=document.getElementById(prefix+'-breakdown-btn');
+  if(!bdEl) return;
+  const isOpen=bdEl.style.display!=='none';
+  bdEl.style.display=isOpen?'none':'block';
+  if(btn) btn.textContent=isOpen?'内訳 ▼':'内訳 ▲';
+  if(!isOpen) renderBreakdown(prefix);
+}
+function renderBreakdown(prefix){
+  const bdEl=document.getElementById(prefix+'-breakdown');
+  if(!bdEl) return;
+  let items=[];
+  try{items=JSON.parse(bdEl.dataset.items||'[]');}catch(e){}
+  if(!items.length){bdEl.innerHTML='<span style="color:var(--tx3)">補正項目を選択すると内訳が表示されます</span>';return;}
+  bdEl.innerHTML=items.map(it=>{
+    const opts=it.optLabels.length?`<div style="color:var(--tx3);margin-left:10px">${it.optLabels.join(' / ')}</div>`:'';
+    return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--bd2)">
+      <div><span style="color:var(--tx1)">${it.name}</span>${opts}</div>
+      <div style="font-weight:600;color:var(--tx1);white-space:nowrap;margin-left:8px">¥${it.total.toLocaleString()}</div>
+    </div>`;
+  }).join('')+`<div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:2px;font-weight:700;color:var(--gold)"><span>合計（目安）</span><span>¥${items.reduce((s,i)=>s+i.total,0).toLocaleString()}</span></div>`;
 }
 
 function lockPrice(prefix){
@@ -3181,12 +3857,16 @@ function syncT(){
 
 // ══ SAVE ══
 function saveRec(){
-  const ticket=document.getElementById('f-ticket').value.trim()||'00000';
+  // 5-3: 伝票No.バリデーション（数字のみ・未入力は00000）
+  const ticketRaw=document.getElementById('f-ticket').value.trim();
+  const ticket=ticketRaw?ticketRaw.replace(/[^0-9]/g,'').padStart(5,'0').slice(-5):'00000';
+  document.getElementById('f-ticket').value=ticket;
   const client=document.getElementById('f-client').value.trim()||'—';
   const cat=document.getElementById('f-cat').value;
   const tp=TYPES.find(t=>t.id===curType);
+  const now=new Date().toISOString();
   const rec={
-    id:Date.now().toString(),
+    id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
     type:curType,typeLbl:tp?.label||'',typeCls:tp?.cls||'o',
     store:document.getElementById('f-store').value,
     inDate:document.getElementById('f-in-date').value,
@@ -3212,8 +3892,13 @@ function saveRec(){
     price:parseInt(document.getElementById('f-price').value||0,10)||0,
     note:document.getElementById('f-note').value.trim(),
     status:'recv',
+    createdAt:now,updatedAt:now,
   };
   const rs=gR();rs.unshift(rec);sR(rs);
+  // 5-3: 最後に使った伝票No.を記録（自動インクリメント用）
+  if(ticket!=='00000') localStorage.setItem('ar2_last_ticket',ticket);
+  // 2-2: カテゴリー使用回数を記録
+  recordCatUse(cat);
   resetForm();
   showScr('work');
 }
@@ -3240,6 +3925,10 @@ function resetForm(){
 function renderWork(){
   const all=gR().filter(r=>r.status!=='ret');
   document.getElementById('wc').textContent=all.length?all.length+'件進行中':'案件なし';
+  // 3-3: 全件数を常時表示
+  const totalRecs=gR().length;
+  const rcEl=document.getElementById('rec-count');
+  if(rcEl) rcEl.textContent='全'+totalRecs+'件';
   const fs=[{id:'all',l:'全て'},{id:'recv',l:'受付済'},{id:'work',l:'作業中'},{id:'done',l:'完成'}];
   document.getElementById('wf').innerHTML=fs.map(f=>
     `<button class="fp${wkFil===f.id?' on':''}" onclick="setWF('${f.id}')">${f.l}</button>`
@@ -3298,6 +3987,12 @@ function renderHist(){
     `<button class="fp${hiFil===t.id?' on':''}" onclick="setHF('${t.id}')">${t.label}</button>`
   ).join('');
   if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
+  // 1-5: ソート
+  const sortMode=document.getElementById('hist-sort')?.value||'newest';
+  if(sortMode==='outdate') all.sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
+  else if(sortMode==='price_h') all.sort((a,b)=>(b.price||0)-(a.price||0));
+  else if(sortMode==='price_l') all.sort((a,b)=>(a.price||0)-(b.price||0));
+  else if(sortMode==='cat') all.sort((a,b)=>(a.cat||'').localeCompare(b.cat||''));
   // 現在のフィルター結果をキャッシュ（全選択に使用）
   window._histFilteredIds=all.map(r=>String(r.id));
   const el=document.getElementById('hl');
@@ -3391,17 +4086,30 @@ function histBulkDel(){
   const n=histSelIds.size;
   showConfirm(
     '一括削除',
-    n+'件を削除しますか？\nこの操作は元に戻せません。',
+    n+'件を削除しますか？',
     'var(--red)','#fff',
     ()=>{
-      sR(gR().filter(r=>!histSelIds.has(String(r.id))));
+      const rs=gR();
+      const deleted=rs.filter(r=>histSelIds.has(String(r.id)));
+      const deletedIdxMap=deleted.map(r=>({rec:r,idx:rs.findIndex(x=>x.id===r.id)}));
+      sR(rs.filter(r=>!histSelIds.has(String(r.id))));
       histSelIds.clear();
       histSelMode=false;
       const btn=document.getElementById('hist-sel-btn');
       const bar=document.getElementById('hist-bulk-bar');
-      if(btn){btn.className='btn-g';btn.style.cssText='font-size:13px;padding:6px 10px';}
+      if(btn){btn.className='btn-g';btn.style.cssText='font-size:11px;padding:5px 7px;white-space:nowrap';}
       if(bar) bar.style.display='none';
       renderWork();renderHist();
+      // アンドゥトースト（6秒）
+      _lastDeleted={bulk:deletedIdxMap};
+      showToast(n+'件削除しました','↩ 元に戻す',()=>{
+        const cur=gR();
+        // 元の位置に逆順で挿入
+        [...deletedIdxMap].reverse().forEach(({rec,idx})=>{
+          cur.splice(Math.min(idx,cur.length),0,rec);
+        });
+        sR(cur);_lastDeleted=null;renderWork();renderHist();hideToast();
+      },6000);
     }
   );
 }
@@ -3541,6 +4249,44 @@ function dw(k,v,pre=false){
 }
 
 // ══ DETAIL ══
+// 3-3: 実行工程の表示（cAltsと差異がある場合は「修正済」バッジ付き）
+function dwWAlts(r){
+  const cStr=aSum(r.cAlts);
+  const wStr_=wStr(r.wAlts);
+  const isModified=JSON.stringify(r.wAlts)!==JSON.stringify(r.cAlts);
+  const badge=isModified
+    ?`<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:700">修正済</span>`
+    :'';
+  const editBtn=`<button onclick="openWAltsEdit('${r.id}')" style="margin-left:8px;padding:2px 8px;border-radius:6px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:10px;font-family:var(--f);cursor:pointer">✏️ 修正</button>`;
+  return `<div class="dw"><span class="dk">実行工程${badge}</span><span class="dvp" style="text-align:right">${wStr_||'—'}${editBtn}</span></div>`;
+}
+
+// 3-3: 実行工程インライン編集モーダル
+function openWAltsEdit(id){
+  const r=gR().find(r=>r.id===id);if(!r)return;
+  const ov=document.getElementById('ov-walts');
+  if(!ov) return;
+  document.getElementById('walts-rec-id').value=id;
+  buildAlts('walts-alts',r.cat,true);
+  restoreAlts('walts-alts',r.cat,r.wAlts||r.cAlts||[]);
+  openOv('ov-walts');
+}
+function saveWAltsEdit(){
+  const id=document.getElementById('walts-rec-id').value;if(!id)return;
+  const rs=gR();const i=rs.findIndex(r=>r.id===id);if(i<0)return;
+  const cat=rs[i].cat;
+  rs[i].wAlts=colAlts('walts-alts',cat);
+  rs[i].updatedAt=new Date().toISOString();
+  sR(rs);closeOvBtn('ov-walts');openDet(id);
+  showToast('実行工程を更新しました','',null,2500);
+}
+function resetWAltsToClient(){
+  const id=document.getElementById('walts-rec-id').value;if(!id)return;
+  const rs=gR();const i=rs.findIndex(r=>r.id===id);if(i<0)return;
+  const cat=rs[i].cat;
+  restoreAlts('walts-alts',cat,rs[i].cAlts||[]);
+}
+
 function openDet(id){
   const r=gR().find(r=>r.id===id);if(!r)return;
   curId=id;
@@ -3557,7 +4303,7 @@ function openDet(id){
     (r.clrH?`<div class="dw"><span class="dk">色</span><span class="dv"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${r.clrH};border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:4px"></span>${r.clrN||r.clrH}</span></div>`:'')+
     dw('柄',r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'')+dw('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))+
     dw('客様指定',aSum(r.cAlts),true)+dw('指定メモ',r.cMemo,true)+
-    dw('実行工程',wStr(r.wAlts),true)+dw('工程メモ',r.wMemo,true)+
+    dwWAlts(r)+dw('工程メモ',r.wMemo,true)+
     dw('特殊',r.special,true)+
     dw('作業手順と設定',machineStr(r.machineData),true)+
     dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
@@ -3690,11 +4436,13 @@ function openEdit(){
         <div class="fl">
           <span>金額（円）</span>
           <span id="e-price-hint" style="font-size:10px;color:var(--gold);display:none">📊 目安</span>
+          <button id="e-breakdown-btn" onclick="togBreakdown('e')" style="display:none;margin-left:6px;padding:2px 7px;border-radius:6px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:10px;font-family:var(--f);cursor:pointer">内訳 ▼</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <input type="number" id="e-price" min="0" step="100" style="flex:1;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.price||''}" oninput="lockPrice('e')">
           <button id="e-price-lock" onclick="unlockPrice('e')" title="目安に戻す" style="display:none;padding:6px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-size:11px;cursor:pointer;white-space:nowrap">🔓 解除</button>
         </div>
+        <div id="e-breakdown" style="display:none;margin-top:6px;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd2);font-size:11px;color:var(--tx2)"></div>
       </div>
       <div class="fld"><div class="fl">備考</div><textarea id="e-note" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${r.note||''}</textarea></div>
     </div>
@@ -3865,15 +4613,72 @@ function saveEdit(){
     time:eCurTime,
     materials:gv('e-materials'),price:parseInt(gv('e-price')||0,10)||0,
     note:gv('e-note'),
+    updatedAt:new Date().toISOString(),
   };
   sR(rs);closeOvBtn('ov-edit');openDet(curId);renderWork();renderHist();
+}
+
+// ══ DUPLICATE ══
+function duplicateRec(){
+  const r=gR().find(r=>r.id===curId);if(!r)return;
+  const now=new Date().toISOString();
+  const today=now.slice(0,10);
+  const newRec={
+    ...r,
+    id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
+    ticket:'',
+    inDate:today,
+    inTime:'',
+    outDate:'',
+    status:'recv',
+    createdAt:now,
+    updatedAt:now,
+  };
+  const rs=gR();rs.unshift(newRec);sR(rs);
+  closeOvBtn('ov-det');
+  renderWork();renderHist();
+  showScr('work');
+  showToast('複製して新規登録しました','✏️ 編集する',()=>{
+    curId=newRec.id;
+    openDet(newRec.id);
+    setTimeout(()=>openEdit(),100);
+  },5000);
 }
 
 // ══ DELETE & PRINT ══
 function doDel(){
   if(!curId||!confirm('この記録を削除しますか？'))return;
-  sR(gR().filter(r=>r.id!==curId));
+  const rs=gR();
+  const idx=rs.findIndex(r=>r.id===curId);
+  if(idx<0)return;
+  _lastDeleted={rec:rs[idx],idx};
+  sR(rs.filter(r=>r.id!==curId));
   closeOvBtn('ov-det');curId=null;renderWork();renderHist();
+  showToast('削除しました','↩ 元に戻す',undoDel,4000);
+}
+function undoDel(){
+  if(!_lastDeleted)return;
+  const rs=gR();
+  rs.splice(_lastDeleted.idx,0,_lastDeleted.rec);
+  sR(rs);_lastDeleted=null;renderWork();renderHist();
+  hideToast();
+}
+function showToast(msg,actionLabel,actionFn,duration=3000){
+  let el=document.getElementById('app-toast');
+  if(!el){
+    el=document.createElement('div');el.id='app-toast';
+    el.style.cssText='position:fixed;bottom:calc(env(safe-area-inset-bottom)+80px);left:50%;transform:translateX(-50%);background:#222232;border:1px solid rgba(255,255,255,.15);color:#efefef;font-size:13px;font-family:var(--f);padding:10px 14px;border-radius:12px;display:flex;align-items:center;gap:12px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);white-space:nowrap;max-width:90vw';
+    document.body.appendChild(el);
+  }
+  el.innerHTML=`<span>${msg}</span>`+(actionLabel?`<button onclick="(${actionFn.name||'undoDel'})()" style="padding:4px 10px;border-radius:8px;border:none;background:var(--gold);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">${actionLabel}</button>`:'');
+  el.style.display='flex';
+  if(_toastTimer)clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(hideToast,duration);
+}
+function hideToast(){
+  const el=document.getElementById('app-toast');
+  if(el)el.style.display='none';
+  if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;}
 }
 function doPrint(){
   const r=gR().find(r=>r.id===curId);if(!r)return;
@@ -4010,7 +4815,40 @@ function closeOvBtn(id){document.getElementById(id).classList.remove('on');}
 function closeOv(id,e){if(e.target===document.getElementById(id))closeOvBtn(id);}
 
 // ══ MASTER ══
-function openMaster(){renderMaster();openMasterUpdate();openOv('ov-master');}
+function openMaster(){renderMaster();openMasterUpdate();openOv('ov-master');renderCatVisList();checkStorageCapacity();populateSnapSelect();}
+
+// 3-1: スナップショット復元
+function populateSnapSelect(){
+  const sel=document.getElementById('snap-select');if(!sel)return;
+  const snaps=Object.keys(localStorage)
+    .filter(k=>k.startsWith('ar2_snap_'))
+    .map(k=>k.slice(9))
+    .sort((a,b)=>b.localeCompare(a));
+  sel.innerHTML='<option value="">— 日付を選択 —</option>'+
+    snaps.map(d=>`<option value="${d}">${d}（${JSON.parse(localStorage.getItem('ar2_snap_'+d)||'[]').length}件）</option>`).join('');
+  document.getElementById('snap-info').textContent='';
+}
+function renderSnapInfo(){
+  const d=document.getElementById('snap-select')?.value;
+  const el=document.getElementById('snap-info');if(!el)return;
+  if(!d){el.textContent='';return;}
+  const data=localStorage.getItem('ar2_snap_'+d);
+  if(!data){el.textContent='データが見つかりません';return;}
+  const count=JSON.parse(data).length;
+  el.textContent=d+' 時点のデータ '+count+'件';
+}
+function restoreSnap(){
+  const d=document.getElementById('snap-select')?.value;
+  if(!d){alert('日付を選択してください');return;}
+  const data=localStorage.getItem('ar2_snap_'+d);
+  if(!data){alert('該当スナップショットが見つかりません');return;}
+  const count=JSON.parse(data).length;
+  if(!confirm(d+' 時点のデータ（'+count+'件）に戻しますか？\n現在のデータは上書きされます。'))return;
+  localStorage.setItem('ar2_recs',data);
+  renderWork();renderHist();
+  alert('✅ '+d+' 時点のデータに復元しました');
+  closeOvBtn('ov-master');
+}
 function closeMaster(){
   closeOvBtn('ov-master');
   populateSels();
@@ -4420,5 +5258,39 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 </script>
+
+<!-- 料金編集オーバーレイ（3-6） -->
+<div id="price-editor-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">
+  <div style="background:var(--s1);border-radius:16px;width:100%;max-width:500px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--bd2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div style="font-size:14px;font-weight:700;color:var(--tx1)">💴 目安料金テーブル編集</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="resetPriceToDefault()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer">🔄 デフォルトに戻す</button>
+        <button onclick="closePriceEditor()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--s3);color:var(--tx1);font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div id="price-editor-body" style="padding:12px 16px;overflow-y:auto;flex:1"></div>
+    <div style="padding:10px 16px;border-top:1px solid var(--bd2);flex-shrink:0;display:flex;gap:8px">
+      <button onclick="closePriceEditor()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--blue);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer">✅ 閉じる（自動保存済み）</button>
+    </div>
+  </div>
+</div>
+
+<!-- ダッシュボードオーバーレイ（2-4） -->
+<div id="dash-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">
+  <div style="background:var(--s1);border-radius:16px;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--bd2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div style="font-size:14px;font-weight:700;color:var(--tx1)">📊 月次集計</div>
+      <button onclick="closeDash()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--s3);color:var(--tx1);font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer">✕</button>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bd2);flex-shrink:0;display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;color:var(--tx2);font-weight:600">月を選択</label>
+      <input type="month" id="dash-month" onchange="dashMonth=this.value;renderDash()"
+        style="padding:6px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx1);font-size:13px;font-family:var(--f);outline:none;flex:1">
+    </div>
+    <div id="dash-body" style="padding:14px 16px;overflow-y:auto;flex:1"></div>
+  </div>
+</div>
+
 </body>
 </html>
