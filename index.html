@@ -751,7 +751,7 @@ const ALT={
     {n:'チェーンステッチ裾上げ',d:'none',dm:'none',pk:'チェーンステッチ裾上げ_パンツ'},
     {n:'フリンジ加工',          d:'none',dm:'none',pk:'フリンジ加工_パンツ'},
     {n:'センタークリース補正',  d:'none',dm:'none',pk:'センタークリース補正_パンツ'},
-    {n:'ベルトループ',          d:'none',dm:'none',pk:'ベルトループ移動_パンツ'},
+    {n:'ベルトループ',          d:'none',dm:'cnt',  pk:'ベルトループ移動_パンツ'},
     {n:'ポケット袋全取替',      d:'none',dm:'none',pk:'ポケット袋全取替_パンツ'},
     {n:'膝裏取替',              d:'none',dm:'none',pk:'膝裏取替_パンツ'},
     {n:'両股三角当て布',        d:'none',dm:'none',pk:'両股三角当て布_パンツ'},
@@ -2861,7 +2861,7 @@ function onPatOther(){
 // ══ ALT ITEMS ══
 function onCatChange(){
   const cat=document.getElementById('f-cat').value;
-  buildAlts('alt-client',cat,true);
+  buildAlts('alt-client',cat,false);
 }
 function buildAlts(cid,cat,isW){
   const items=ALT[cat]||[];
@@ -3723,7 +3723,9 @@ function calcEstPrice(prefix){
   const hint=document.getElementById(prefix+'-price-hint');
   const btn=document.getElementById(prefix+'-breakdown-btn');
   if(inp){
+    window._skipLock=true;
     inp.value=total>0?total:'';
+    window._skipLock=false;
     if(hint) hint.style.display=total>0?'inline':'none';
     if(btn) btn.style.display=total>0?'inline-block':'none';
   }
@@ -3759,6 +3761,7 @@ function renderBreakdown(prefix){
 }
 
 function lockPrice(prefix){
+  if(window._skipLock) return;
   _priceLocked[prefix]=true;
   const lb=document.getElementById(prefix+'-price-lock');
   const hint=document.getElementById(prefix+'-price-hint');
@@ -4141,6 +4144,8 @@ function resetForm(){
   document.getElementById('f-client').placeholder='';
   document.getElementById('f-client').style.borderColor='';
   buildTypes();buildColors();buildPats();populateSels();setDefaults();
+  // 複数件数スピナーをリセット
+  const bc=document.getElementById('f-bulk-count');if(bc)bc.value='1';
 }
 
 // ══ WORK ══
