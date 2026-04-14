@@ -35,13 +35,13 @@
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)
 }
 html,body{height:100%;width:100%;max-width:100vw;overflow-x:hidden;background:var(--bg);color:var(--tx);font-family:var(--f);font-size:var(--base-font)}
-.screen{display:none;min-height:100dvh;width:100%;max-width:100vw;padding-top:0;padding-bottom:calc(env(safe-area-inset-bottom) + 72px);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.screen{display:none;min-height:100dvh;width:100%;max-width:100vw;padding-top:calc(env(safe-area-inset-top) + 56px);padding-bottom:calc(env(safe-area-inset-bottom) + 72px);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .screen.on{display:block}
 .nav{position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(10,10,15,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--bd);display:flex;padding-bottom:calc(env(safe-area-inset-bottom) + 2px)}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0 6px;border:none;background:none;color:var(--tx3);font-size:10px;font-family:var(--f);cursor:pointer}
 .nb.on{color:var(--gold)}
 .ni{font-size:20px;line-height:1}
-.hdr{padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;z-index:100;width:100%;background:rgba(10,10,15,.93);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--bd)}
+.hdr{padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(10,10,15,.93);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--bd)}
 .ht{font-size:17px;font-weight:700}
 .hv{font-size:10px;color:var(--tx3);font-family:var(--fm);margin-top:1px}
 .btn-g{padding:8px 10px;border-radius:12px;border:1px solid var(--bd2);background:none;color:var(--tx2);font-size:18px;font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1}
@@ -220,19 +220,36 @@ select option{background:#1a1a24}
 
 <div class="screen on" id="scr-new">
   <div class="hdr">
-    <div><div class="ht">AlteREC</div><div class="hv">v16y</div></div>
-    <button class="btn-g" onclick="openMaster()">⚙️</button>
+    <div style="min-width:0;flex:1">
+      <div class="ht">AlteREC</div>
+      <div class="hv" id="app-hv">beta1.1</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
+      <button class="btn-g" onclick="openMaster()">⚙️</button>
+    </div>
   </div>
   <div class="fb">
     <div class="sec">
       <div class="sh">📋 受付情報</div>
       <div class="fld"><div class="fl">案件種別</div><div id="type-wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
       <div class="fld"><div class="fl">店名</div><select id="f-store"></select></div>
-      <div class="fld"><div class="fld2">
-        <div><div class="fl">持ち込み日</div><input type="date" id="f-in-date"></div>
-        <div><div class="fl">持ち込み時刻</div><input type="time" id="f-in-time"></div>
-      </div></div>
-      <div class="fld"><div class="fl">納品日</div><input type="date" id="f-out-date"></div>
+      <div class="fld">
+        <div style="display:flex;gap:10px;align-items:flex-end">
+          <div style="flex:1.2">
+            <div class="fl">持ち込み日 <button onclick="setToday('f-in-date')" class="tog" style="padding:2px 7px;font-size:10px">今日</button></div>
+            <input type="date" id="f-in-date" style="width:100%">
+          </div>
+          <div style="flex:1">
+            <div class="fl">時刻</div>
+            <input type="time" id="f-in-time" style="width:100%">
+          </div>
+        </div>
+      </div>
+      <div class="fld">
+        <div class="fl">納品日 <button onclick="setToday('f-out-date')" class="tog" style="padding:2px 7px;font-size:10px">今日</button></div>
+        <input type="date" id="f-out-date" style="width:100%">
+      </div>
     </div>
     <div class="sec">
       <div class="sh">🏷 伝票・顧客</div>
@@ -262,7 +279,7 @@ select option{background:#1a1a24}
       </div>
       <div class="fld">
         <div class="fl">素材 <button id="btn-spm" class="tog" onclick="togSpm()">特殊素材</button></div>
-        <input type="text" id="f-material">
+        <input type="text" id="f-material" oninput="calcEstPrice('f')">
       </div>
     </div>
     <div class="sec">
@@ -270,7 +287,7 @@ select option{background:#1a1a24}
       <div class="alt-list" id="alt-client"></div>
       <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="f-cmemo"></textarea></div>
       <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="f-wmemo"></textarea></div>
-      <div class="fld"><div class="fl">特殊</div><textarea id="f-special" style="min-height:52px"></textarea></div>
+      <div class="fld"><div class="fl">特殊</div><textarea id="f-special" style="min-height:52px" oninput="calcEstPrice('f')"></textarea></div>
     </div>
     <div class="sec">
       <div class="sh" onclick="togMachine()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
@@ -355,18 +372,24 @@ select option{background:#1a1a24}
       </div>
       <div class="fld"><div class="fl">備考</div><textarea id="f-note"></textarea></div>
     </div>
-    <div style="display:flex;gap:10px">
+    <div style="display:flex;gap:10px;align-items:center">
       <button class="save-btn" onclick="saveRec()" style="flex:1">受付を登録</button>
-      <button onclick="if(confirm('入力内容をリセットしますか？'))resetForm()" style="padding:0 18px;border-radius:14px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:14px;font-weight:600;font-family:var(--f);cursor:pointer">リセット</button>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <input type="number" id="f-bulk-count" min="1" max="20" value="1" step="1"
+          inputmode="numeric" style="width:46px;padding:8px 4px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-size:14px;font-family:var(--fm);text-align:center;outline:none">
+        <span style="font-size:11px;color:var(--tx3)">件</span>
+      </div>
+      <button onclick="if(confirm('入力内容をリセットしますか？'))resetForm()" style="padding:0 14px;border-radius:14px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:14px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap">リセット</button>
     </div>
   </div>
 </div>
 
 <div class="screen" id="scr-work">
-  <div class="hdr"><div><div class="ht">登録済</div><div class="hv" id="wc"></div></div>
-    <div style="display:flex;align-items:center;gap:6px">
-      <span id="rec-count" style="font-size:10px;color:var(--tx3)"></span>
-      <button class="btn-g" id="btn-sel-mode" onclick="togSelMode()" style="font-size:13px;padding:6px 10px">選択</button>
+  <div class="hdr">
+    <div style="min-width:0;flex:1"><div class="ht">登録済</div><div class="hv" id="wc"></div></div>
+    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+      <span id="rec-count" style="font-size:10px;color:var(--tx3);white-space:nowrap"></span>
+      <button class="btn-g" id="btn-sel-mode" onclick="togSelMode()" style="font-size:11px;padding:5px 8px;white-space:nowrap">選択</button>
     </div>
   </div>
   <div id="bulk-bar" style="display:none;padding:8px 16px;background:var(--s2);border-bottom:1px solid var(--bd);position:sticky;top:52px;z-index:99">
@@ -413,7 +436,8 @@ select option{background:#1a1a24}
   <div style="display:flex;align-items:center;gap:8px;padding:4px 16px 0">
     <button class="cd-btn" style="flex:1;text-align:left" onclick="clrDate()">日付フィルターをクリア</button>
     <select id="hist-sort" onchange="renderHist()" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f);outline:none">
-      <option value="newest">新着順</option>
+      <option value="indate" selected>持込日順</option>
+      <option value="newest">登録順</option>
       <option value="outdate">納品日順</option>
       <option value="price_h">金額（高）</option>
       <option value="price_l">金額（低）</option>
@@ -501,7 +525,7 @@ select option{background:#1a1a24}
 
         <!-- ① 全データバックアップ -->
         <div style="margin-bottom:12px;padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px">
-          <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:4px">💾 全データバックアップ（JSON）</div>
+          <div style="font-size:11px;color:var(--amber);font-weight:700;display:flex;justify-content:space-between;cursor:pointer;user-select:none" onclick="togSettingsSection('backup')"><span>💾 全データバックアップ（JSON）</span><span class="settings-sec-arrow" data-sec="backup">▼</span></div><div class="settings-sec-body" data-sec="backup">
           <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">設定＋登録データをまとめて保存／復元</div>
           <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">最終バックアップ：<span id="bk-ts">—</span></div>
           <div style="display:flex;gap:6px;margin-bottom:6px">
@@ -515,11 +539,12 @@ select option{background:#1a1a24}
           </select>
           <div id="snap-info" style="font-size:11px;color:var(--tx3);margin-bottom:6px"></div>
           <button onclick="restoreSnap()" style="width:100%;padding:8px;border-radius:9px;border:1px solid rgba(196,132,58,.3);background:var(--s3);color:var(--amber);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📅 選択日のデータに戻す</button>
+          </div><!-- /settings-sec-body -->
         </div>
 
         <!-- ② 設定ファイル（項目別） -->
         <div style="margin-bottom:12px;padding:10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px">
-          <div style="font-size:11px;color:var(--blue);font-weight:700;margin-bottom:8px">⚙️ 設定ファイル（JSON）</div>
+          <div style="font-size:11px;color:var(--blue);font-weight:700;display:flex;justify-content:space-between;cursor:pointer;user-select:none" onclick="togSettingsSection('settingsfile')"><span>⚙️ 設定ファイル（JSON）</span><span class="settings-sec-arrow" data-sec="settingsfile">▼</span></div><div class="settings-sec-body" data-sec="settingsfile" style="display:none">
           <!-- 店名 -->
           <div style="font-size:11px;color:var(--tx3);margin-bottom:4px;font-weight:600">店名</div>
           <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -550,11 +575,12 @@ select option{background:#1a1a24}
             </div>
             <input type="file" id="settings-file-input" accept=".json" style="display:none" onchange="handleSettingsImport(event)">
           </div>
+          </div><!-- /settings-sec-body -->
         </div>
 
         <!-- ③ 記録データ（Excel） -->
         <div style="margin-bottom:14px;padding:10px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px">
-          <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px">📊 記録データ</div>
+          <div style="font-size:11px;color:var(--green);font-weight:700;display:flex;justify-content:space-between;cursor:pointer;user-select:none" onclick="togSettingsSection('recdata')"><span>📊 記録データ</span><span class="settings-sec-arrow" data-sec="recdata">▼</span></div><div class="settings-sec-body" data-sec="recdata">
           <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">登録データをExcel／CSVで書き出し・読み込み</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
             <button onclick="doExportXLSX()" style="padding:9px;border-radius:9px;border:none;background:var(--green);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📤 Excel書き出し</button>
@@ -572,11 +598,37 @@ select option{background:#1a1a24}
           <div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:4px">🧹 データクリーンアップ</div>
           <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">客名・品名・伝票No・店名・持込日がすべて空のレコードを削除します</div>
           <button onclick="cleanEmptyRecs()" style="width:100%;padding:9px;border-radius:9px;border:none;background:var(--red);color:#fff;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">🗑 空レコードを一括削除</button>
+          </div><!-- /settings-sec-body -->
+        </div>
+
+        <!-- ⑤ 受付デフォルト設定 -->
+        <div style="margin-bottom:12px;padding:10px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px">
+          <div style="font-size:11px;color:var(--tx2);font-weight:700;display:flex;justify-content:space-between;cursor:pointer;user-select:none" onclick="togSettingsSection('bizdefaults')"><span>⏱ 受付デフォルト設定</span><span class="settings-sec-arrow" data-sec="bizdefaults">▼</span></div><div class="settings-sec-body" data-sec="bizdefaults" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-size:10px;color:var(--tx3);margin-bottom:3px">営業開始時刻</div>
+              <input type="time" id="biz-open" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx);font-size:13px;font-family:var(--f);outline:none"
+                value="12:00" onchange="localStorage.setItem('ar2_biz_open',this.value)">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--tx3);margin-bottom:3px">営業終了時刻</div>
+              <input type="time" id="biz-close" style="width:100%;padding:7px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx);font-size:13px;font-family:var(--f);outline:none"
+                value="18:50" onchange="localStorage.setItem('ar2_biz_close',this.value)">
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:10px;color:var(--tx3);white-space:nowrap">デフォルト納期（日数）</div>
+            <input type="number" id="biz-days" min="0" max="30" value="3" step="1" inputmode="numeric"
+              style="width:60px;padding:7px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx);font-size:13px;font-family:var(--fm);text-align:center;outline:none"
+              onchange="localStorage.setItem('ar2_default_days',this.value)">
+            <span style="font-size:11px;color:var(--tx3)">日後</span>
+          </div>
+          </div><!-- /settings-sec-body -->
         </div>
 
         <!-- ④ 料金テーブル編集（3-6） -->
         <div style="margin-bottom:12px;padding:10px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px">
-          <div style="font-size:11px;color:var(--tx1);font-weight:700;margin-bottom:4px">💴 目安料金テーブル編集</div>
+          <div style="font-size:11px;color:var(--tx2);font-weight:700;display:flex;justify-content:space-between;cursor:pointer;user-select:none" onclick="togSettingsSection('pricetable')"><span>💴 目安料金テーブル編集</span><span class="settings-sec-arrow" data-sec="pricetable">▼</span></div><div class="settings-sec-body" data-sec="pricetable" style="display:none">
           <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">項目ごとの基本料金を端末ごとにカスタマイズできます。変更した項目は目安計算に反映されます。</div>
           <div style="display:flex;gap:6px">
             <button onclick="openPriceEditor()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--s3);color:var(--tx1);font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer;border:1px solid var(--bd2)">✏️ 料金を編集</button>
@@ -584,6 +636,7 @@ select option{background:#1a1a24}
             <button onclick="document.getElementById('price-import-input').click()" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 読み込み</button>
           </div>
           <input type="file" id="price-import-input" accept=".json" style="display:none" onchange="importPriceJSON(event)">
+          </div><!-- /settings-sec-body -->
         </div>
 
         <div class="mst">店名</div>
@@ -631,7 +684,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'v17a';
+const APP_VERSION = 'beta1.1';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -707,7 +760,7 @@ const ALT={
     {n:'フロントファスナー取替',d:'none',dm:'none',pk:'フロントファスナー取替_パンツ'},
     {n:'サイドアジャスター',   d:'none',dm:'none',pk:'サイドアジャスター_パンツ'},
     {n:'タグ付け', d:'none',dm:'none',   pk:'タグ付け_パンツ'},
-    {n:'ボタン補強',d:'none',dm:'none',  pk:'ボタン補強_パンツ'},
+    {n:'ボタン補強',d:'none',dm:'cnt',  pk:'ボタン補強_パンツ'},
     {n:'プレス',   d:'none',dm:'none',   pk:'プレス_パンツ'},
   ],
   'スカート':[
@@ -728,7 +781,7 @@ const ALT={
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_スカート'},
     {n:'裏地修理', d:'none',dm:'none',   pk:'裏地修理_スカート'},
     {n:'タグ付け', d:'none',dm:'none',   pk:'タグ付け_スカート'},
-    {n:'ボタン補強',d:'none',dm:'none',  pk:'ボタン補強_スカート'},
+    {n:'ボタン補強',d:'none',dm:'cnt',  pk:'ボタン補強_スカート'},
     {n:'プレス',   d:'none',dm:'none',   pk:'プレス_スカート'},
   ],
   'ジャケット':[
@@ -741,9 +794,9 @@ const ALT={
     {n:'ベントさわり',d:'none',  dm:'none',   pk:'ベントさわり_ジャケット'},
     {n:'ラペル補正', d:'none',  dm:'none',   pk:'ラペル補正_ジャケット'},
     {n:'裏地修理',   d:'none',  dm:'none',   pk:'裏地修理_ジャケット'},
-    {n:'ボタン付け替え',d:'none',dm:'none',  pk:'ボタン付け替え_ジャケット'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt',  pk:'ボタン付け替え_ジャケット'},
     {n:'タグ付け',   d:'none',  dm:'none',   pk:'タグ付け_ジャケット'},
-    {n:'ボタン補強', d:'none',  dm:'none',   pk:'ボタン補強_ジャケット'},
+    {n:'ボタン補強', d:'none',  dm:'cnt',   pk:'ボタン補強_ジャケット'},
     {n:'マチ入れ',   d:'none',  dm:'none',   pk:'マチ入れ_ジャケット'},
     {n:'つき取り',   d:'none',  dm:'none',   pk:'つき取り_ジャケット'},
     {n:'リブ交換',   d:'none',  dm:'none',   pk:'リブ交換_ジャケット'},
@@ -772,7 +825,7 @@ const ALT={
     {n:'ベントさわり',d:'none',  dm:'none',   pk:'ベントさわり_コート'},
     {n:'ファスナー交換',d:'none',dm:'none',  pk:'ファスナー交換_コート'},
     {n:'裏地修理',   d:'none',  dm:'none',   pk:'裏地修理_コート'},
-    {n:'ボタン付け替え',d:'none',dm:'none',  pk:'ボタン付け替え_コート'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt',  pk:'ボタン付け替え_コート'},
     {n:'マチ入れ',       d:'none',  dm:'none',   pk:'マチ入れ_コート'},
     {n:'つき取り',       d:'none',  dm:'none',   pk:'つき取り_コート'},
     {n:'皮革・ダウン対応',d:'none', dm:'none',   pk:'皮革ダウン_コート'},
@@ -788,7 +841,7 @@ const ALT={
     {n:'ベルト革バックル交換',   d:'none',dm:'none',pk:'ベルト革バックル交換_コート'},
     {n:'ウエストベルト固定型作成',d:'none',dm:'none',pk:'ウエストベルト固定型_コート'},
     {n:'タグ付け',   d:'none',  dm:'none',   pk:'タグ付け_コート'},
-    {n:'ボタン補強', d:'none',  dm:'none',   pk:'ボタン補強_コート'},
+    {n:'ボタン補強', d:'none',  dm:'cnt',   pk:'ボタン補強_コート'},
     {n:'プレス',     d:'none',  dm:'none',   pk:'プレス_コート'},
   ],
   'シャツ・ブラウス':[
@@ -802,7 +855,7 @@ const ALT={
     {n:'肩巾ツメ', d:'none', dm:'none',  pk:'肩巾ツメ_シャツ'},
     {n:'肩線・肩ひも',d:'none',dm:'none', pk:'肩線_シャツ'},
     {n:'襟修理',   d:'none', dm:'none',  pk:'襟修理_シャツ'},
-    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_シャツ'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt',pk:'ボタン付け替え_シャツ'},
     {n:'衿巾ツメ',   d:'none', dm:'none',  pk:'衿巾ツメ_シャツ'},
     {n:'衿なし化',   d:'none', dm:'none',  pk:'衿なし化_シャツ'},
     {n:'スリット作成',d:'none',dm:'none',  pk:'スリット作成_シャツ'},
@@ -816,7 +869,7 @@ const ALT={
     {n:'ボックスプリーツ取り',d:'none',dm:'none',pk:'ボックスプリーツ取り_シャツ'},
     {n:'衿付け替え',   d:'none',dm:'none',  pk:'衿付け替え_シャツ'},
     {n:'タグ付け', d:'none', dm:'none',  pk:'タグ付け_シャツ'},
-    {n:'ボタン補強',d:'none',dm:'none',  pk:'ボタン補強_シャツ'},
+    {n:'ボタン補強',d:'none',dm:'cnt',  pk:'ボタン補強_シャツ'},
     {n:'プレス',   d:'none', dm:'none',  pk:'プレス_シャツ'},
   ],
   'ニット':[
@@ -836,7 +889,7 @@ const ALT={
     {n:'引き糸修正', d:'none', dm:'none',  pk:'引き糸修正_ニット'},
     {n:'衿ぐりほつれ',d:'none',dm:'none',  pk:'衿ぐりほつれ_ニット'},
     {n:'タグ付け',   d:'none', dm:'none',  pk:'タグ付け_ニット'},
-    {n:'ボタン補強', d:'none', dm:'none',  pk:'ボタン補強_ニット'},
+    {n:'ボタン補強', d:'none', dm:'cnt',  pk:'ボタン補強_ニット'},
     {n:'プレス',     d:'none', dm:'none',  pk:'プレス_ニット'},
   ],
   'スウェット/フーディ':[
@@ -850,7 +903,7 @@ const ALT={
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_スウェット'},
     {n:'リブ交換',   d:'none', dm:'none',  pk:'リブ交換_スウェット'},
     {n:'タグ付け',   d:'none', dm:'none',  pk:'タグ付け_スウェット'},
-    {n:'ボタン補強', d:'none', dm:'none',  pk:'ボタン補強_スウェット'},
+    {n:'ボタン補強', d:'none', dm:'cnt',  pk:'ボタン補強_スウェット'},
     {n:'プレス',     d:'none', dm:'none',  pk:'プレス_スウェット'},
   ],
   'ドレス':[
@@ -863,14 +916,14 @@ const ALT={
     {n:'肩ひも調整', d:'none',dm:'none',   pk:'肩ひも調整_ドレス'},
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_ドレス'},
     {n:'裏地修理',   d:'none',dm:'none',   pk:'裏地修理_ドレス'},
-    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_ドレス'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt',pk:'ボタン付け替え_ドレス'},
     {n:'ほつれ補修',   d:'none',dm:'none',   pk:'ほつれ補修_ドレス'},
     {n:'スパンコール修理',d:'none',dm:'none', pk:'スパンコール修理_ドレス'},
     {n:'スリット破れ修理',d:'none',dm:'none', pk:'スリット破れ修理_ドレス'},
     {n:'ストラップ付け',  d:'none',dm:'none', pk:'ストラップ付け_ドレス'},
     {n:'袖巾',       d:'tsume',dm:'cm',    pk:'袖巾_ドレス'},
     {n:'タグ付け',   d:'none',dm:'none',   pk:'タグ付け_ドレス'},
-    {n:'ボタン補強', d:'none',dm:'none',   pk:'ボタン補強_ドレス'},
+    {n:'ボタン補強', d:'none',dm:'cnt',   pk:'ボタン補強_ドレス'},
     {n:'プレス',     d:'none',dm:'none',   pk:'プレス_ドレス'},
   ],
   'ワンピース':[
@@ -883,7 +936,7 @@ const ALT={
     {n:'肩ひも調整', d:'none',dm:'none',   pk:'肩ひも調整_ワンピース'},
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_ワンピース'},
     {n:'裏地修理',   d:'none',dm:'none',   pk:'裏地修理_ワンピース'},
-    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_ワンピース'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt',pk:'ボタン付け替え_ワンピース'},
     {n:'袖巾',       d:'tsume',dm:'cm',    pk:'袖巾_ワンピース'},
     {n:'アームホールくり',d:'none',dm:'none',pk:'アームホールくり_ワンピース'},
     {n:'ダーツ操作', d:'none',dm:'none',   pk:'ダーツ操作_ワンピース'},
@@ -895,7 +948,7 @@ const ALT={
     {n:'ほつれ補修',   d:'none',dm:'none',   pk:'ほつれ補修_ワンピース'},
     {n:'スパンコール修理',d:'none',dm:'none', pk:'スパンコール修理_ワンピース'},
     {n:'タグ付け',   d:'none',dm:'none',   pk:'タグ付け_ワンピース'},
-    {n:'ボタン補強', d:'none',dm:'none',   pk:'ボタン補強_ワンピース'},
+    {n:'ボタン補強', d:'none',dm:'cnt',   pk:'ボタン補強_ワンピース'},
     {n:'プレス',     d:'none',dm:'none',   pk:'プレス_ワンピース'},
   ],
   'Tシャツ/ポロシャツ':[
@@ -907,7 +960,7 @@ const ALT={
     {n:'ネック',  d:'none', dm:'none',  pk:'ネック_Tシャツ'},
     {n:'リブニット交換',d:'none',dm:'none', pk:'リブニット交換_Tシャツ'},
     {n:'タグ付け',d:'none', dm:'none',  pk:'タグ付け_Tシャツ'},
-    {n:'ボタン補強',d:'none',dm:'none', pk:'ボタン補強_Tシャツ'},
+    {n:'ボタン補強',d:'none',dm:'cnt', pk:'ボタン補強_Tシャツ'},
     {n:'プレス',  d:'none', dm:'none',  pk:'プレス_Tシャツ'},
   ],
   'ブルゾン':[
@@ -918,9 +971,9 @@ const ALT={
     {n:'ファスナー交換',d:'none',dm:'none', pk:'ファスナー交換_ブルゾン'},
     {n:'リブ交換',   d:'none', dm:'none',   pk:'リブ交換_ブルゾン'},
     {n:'裏地修理',   d:'none', dm:'none',   pk:'裏地修理_ブルゾン'},
-    {n:'ボタン付け替え',d:'none',dm:'none', pk:'ボタン付け替え_ブルゾン'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt', pk:'ボタン付け替え_ブルゾン'},
     {n:'タグ付け',   d:'none', dm:'none',   pk:'タグ付け_ブルゾン'},
-    {n:'ボタン補強', d:'none', dm:'none',   pk:'ボタン補強_ブルゾン'},
+    {n:'ボタン補強', d:'none', dm:'cnt',   pk:'ボタン補強_ブルゾン'},
     {n:'プレス',     d:'none', dm:'none',   pk:'プレス_ブルゾン'},
   ],
   '小物':[
@@ -947,7 +1000,7 @@ const ALT={
     {n:'ホック付け',             d:'none',dm:'none',pk:'ホック付け_小物'},
     {n:'ストラップ付け',         d:'none',dm:'none',pk:'ストラップ付け_小物'},
     {n:'リベット',               d:'none',dm:'none',pk:'リベット_小物'},
-    {n:'ボタン付け替え', d:'none',dm:'none',  pk:'ボタン付け替え_小物'},
+    {n:'ボタン付け替え', d:'none',dm:'cnt',  pk:'ボタン付け替え_小物'},
     {n:'タグ付け',       d:'none',dm:'none',  pk:'タグ付け_小物'},
     {n:'プレス',         d:'none',dm:'none',  pk:'プレス_小物'},
   ],
@@ -978,7 +1031,7 @@ const ALT={
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_レザー'},
     {n:'リブ交換',      d:'none',dm:'none',pk:'リブ交換_レザー'},
     {n:'裏地交換',      d:'none',dm:'none',pk:'裏地交換_レザー'},
-    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_レザー'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt',pk:'ボタン付け替え_レザー'},
     {n:'穴あけ・修理',  d:'none',dm:'none',pk:'穴あけ修理_レザー'},
     {n:'タグ付け',      d:'none',dm:'none',pk:'タグ付け_レザー'},
   ],
@@ -989,7 +1042,7 @@ const ALT={
     {n:'肩幅',   d:'tsume',dm:'cm',     pk:'肩幅_毛皮'},
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_毛皮'},
     {n:'裏地交換',      d:'none',dm:'none',pk:'裏地交換_毛皮'},
-    {n:'ボタン付け替え',d:'none',dm:'none',pk:'ボタン付け替え_毛皮'},
+    {n:'ボタン付け替え',d:'none',dm:'cnt',pk:'ボタン付け替え_毛皮'},
     {n:'金具交換',      d:'none',dm:'none',pk:'金具交換_毛皮'},
     {n:'タグ付け',      d:'none',dm:'none',pk:'タグ付け_毛皮'},
   ],
@@ -2263,6 +2316,18 @@ const PROC={
 };
 
 const DEF_CATS=Object.keys(ALT);
+
+// 2-7: Lis専売項目（量販店が基本非対応の高難度工程）
+const LIS_ONLY_PKS=new Set([
+  '着丈_ジャケット','マチ入れ_ジャケット','マチ入れ_コート',
+  'つき取り_ジャケット','つき取り_コート',
+  'ラペル補正_ジャケット','衿ミツ詰め_ジャケット',
+  '帯鯨取り_ジャケット','ゴージ手縫い_ジャケット',
+  'ハンドホール_ジャケット',
+  '総裏全交換_ジャケット','総裏全交換_コート',
+  'チェーンステッチ裾上げ_パンツ','デニムダメージ残し加工',
+  '肩巾ツメ_シャツ','衿巾ツメ_コート',
+]);
 const DEF_ST=['本店'];
 
 // ══ STORAGE ══
@@ -2290,8 +2355,11 @@ function _checkStorageInline(){
         const remain=Math.max(0,Math.floor((25000-total)/700));
         banner.textContent='⚠️ ストレージ残量わずか（'+pct+'%使用中・残り約'+remain+'件分）';
         banner.style.display='block';
+        // 1-8: バナー表示時にhdrをバナー分下にずらす
+        document.querySelectorAll('.hdr').forEach(h=>h.style.top='28px');
       } else {
         banner.style.display='none';
+        document.querySelectorAll('.hdr').forEach(h=>h.style.top='0');
       }
     }
     // 設定画面のバーも更新
@@ -2336,6 +2404,36 @@ function init(){
 
   buildTypes();buildColors();buildPats();populateSels();setDefaults();
   renderWork();renderHist();
+  // 2-5: オフライン通知
+  updateOnlineStatus();
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  // 1-10: バージョン表示を APP_VERSION で上書き
+  const hvEl=document.getElementById('app-hv');
+  if(hvEl) hvEl.textContent=APP_VERSION;
+}
+
+// 2-5: オフライン通知バッジ
+function updateOnlineStatus(){
+  const badge=document.getElementById('online-badge');
+  if(!badge) return;
+  badge.style.display=navigator.onLine?'none':'inline';
+}
+
+// 1-12: 今日ボタン
+function setToday(fieldId){
+  document.getElementById(fieldId).value=new Date().toISOString().split('T')[0];
+  calcEstPrice('f');
+}
+
+// 1-14: 営業時間内デフォルト時刻を返す
+function getDefaultTime(){
+  const open=localStorage.getItem('ar2_biz_open')||'12:00';
+  const close=localStorage.getItem('ar2_biz_close')||'18:50';
+  const now=new Date().toTimeString().slice(0,5);
+  if(now<open) return open;
+  if(now>close) return close;
+  return now;
 }
 
 function autoBackup(){
@@ -2437,13 +2535,17 @@ function renderDash(){
   });
   // 集計
   const catCount={},catPrice={};
-  let totalPrice=0,totalCount=filtered.length;
+  let totalPrice=0,totalCount=filtered.length,totalTime=0;
   filtered.forEach(r=>{
     const c=r.cat||'未分類';
     catCount[c]=(catCount[c]||0)+1;
     catPrice[c]=(catPrice[c]||0)+(r.price||0);
     totalPrice+=(r.price||0);
+    totalTime+=(r.time||0);
   });
+  const avgHourly=totalTime>0?Math.round(totalPrice/totalTime*60):0;
+  const totalTimeH=Math.floor(totalTime/60);
+  const totalTimeM=totalTime%60;
   const el=document.getElementById('dash-body');
   if(!el) return;
   if(!totalCount){
@@ -2453,16 +2555,25 @@ function renderDash(){
   const sorted=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
   const maxCnt=sorted[0]?.[1]||1;
   el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div style="padding:12px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;text-align:center">
-        <div style="font-size:11px;color:var(--blue);font-weight:600">件数</div>
-        <div style="font-size:24px;font-weight:700;color:var(--tx1)">${totalCount}<span style="font-size:12px">件</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="padding:10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;text-align:center">
+        <div style="font-size:10px;color:var(--blue);font-weight:600">件数</div>
+        <div style="font-size:22px;font-weight:700">${totalCount}<span style="font-size:11px">件</span></div>
       </div>
-      <div style="padding:12px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px;text-align:center">
-        <div style="font-size:11px;color:var(--green);font-weight:600">売上合計</div>
-        <div style="font-size:20px;font-weight:700;color:var(--tx1)">¥${totalPrice.toLocaleString()}</div>
+      <div style="padding:10px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px;text-align:center">
+        <div style="font-size:10px;color:var(--green);font-weight:600">売上合計</div>
+        <div style="font-size:18px;font-weight:700">¥${totalPrice.toLocaleString()}</div>
+      </div>
+      <div style="padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px;text-align:center">
+        <div style="font-size:10px;color:var(--amber);font-weight:600">作業時間</div>
+        <div style="font-size:18px;font-weight:700">${totalTimeH}h${totalTimeM}m</div>
+      </div>
+      <div style="padding:10px;background:var(--purple-bg);border:1px solid rgba(155,114,207,.3);border-radius:10px;text-align:center">
+        <div style="font-size:10px;color:var(--purple);font-weight:600">時給換算</div>
+        <div style="font-size:18px;font-weight:700">${avgHourly?'¥'+avgHourly.toLocaleString():'—'}</div>
       </div>
     </div>
+    <div style="font-size:11px;color:var(--tx3);text-align:right;margin-bottom:10px">平均単価: ¥${totalCount?Math.round(totalPrice/totalCount).toLocaleString():0}</div>
     <div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:8px">カテゴリー別件数</div>
     ${sorted.map(([cat,cnt])=>{
       const pct=Math.round(cnt/maxCnt*100);
@@ -2477,7 +2588,6 @@ function renderDash(){
         </div>
       </div>`;
     }).join('')}
-    <div style="font-size:11px;color:var(--tx3);margin-top:10px;text-align:right">平均単価: ¥${totalCount?Math.round(totalPrice/totalCount).toLocaleString():0}</div>
   `;
 }
 
@@ -2637,9 +2747,16 @@ function importPriceJSON(ev){
 function setDefaults(){
   const n=new Date();
   document.getElementById('f-in-date').value=n.toISOString().split('T')[0];
-  document.getElementById('f-in-time').value=n.toTimeString().slice(0,5);
-  const o=new Date(n);o.setDate(o.getDate()+3);
+  document.getElementById('f-in-time').value=getDefaultTime();
+  const defaultDays=parseInt(localStorage.getItem('ar2_default_days')||'3',10);
+  const o=new Date(n);o.setDate(o.getDate()+defaultDays);
   document.getElementById('f-out-date').value=o.toISOString().split('T')[0];
+  // 2-1: 伝票No.自動インクリメント
+  const lastTicket=localStorage.getItem('ar2_last_ticket');
+  if(lastTicket&&/^\d{5}$/.test(lastTicket)){
+    const next=String(parseInt(lastTicket,10)+1).padStart(5,'0');
+    document.getElementById('f-ticket').value=next;
+  }
 }
 function populateSels(){
   const ss=document.getElementById('f-store');
@@ -2676,7 +2793,15 @@ function buildTypes(){
     `<button class="tpill${curType===t.id?' '+t.cls:''}" onclick="selType('${t.id}')">${t.label}</button>`
   ).join('');
 }
-function selType(id){curType=curType===id?null:id;buildTypes();}
+function selType(id){
+  curType=curType===id?null:id;
+  buildTypes();
+  // 1-13: クイック選択時は納品日を持込日と同日に
+  if(curType==='quick'){
+    const inDate=document.getElementById('f-in-date').value;
+    if(inDate) document.getElementById('f-out-date').value=inDate;
+  }
+}
 
 // ══ TOGGLE BTNS ══
 function togStaff(){
@@ -2690,6 +2815,7 @@ function togStaff(){
 function togSpm(){
   spmOn=!spmOn;
   document.getElementById('btn-spm').className='tog'+(spmOn?' on-a':'');
+  calcEstPrice('f');
 }
 
 // ══ COLOR ══
@@ -2741,18 +2867,37 @@ function buildAlts(cid,cat,isW){
   const items=ALT[cat]||[];
   const el=document.getElementById(cid);
   if(!items.length){el.innerHTML='<div style="padding:6px 0;font-size:13px;color:var(--tx3)">補正項目なし</div>';return;}
-  el.innerHTML=items.map((a,i)=>{
+  // 2-6: 検索ボックス
+  const searchHtml=`<input type="text" id="${cid}-search" placeholder="絞り込み…"
+    oninput="filterAlts(this.value,'${cid}')"
+    style="width:100%;margin-bottom:6px;padding:6px 10px;border-radius:8px;
+    border:1px solid var(--bd2);background:var(--s3);color:var(--tx);
+    font-size:13px;font-family:var(--f);outline:none">`;
+  el.innerHTML=searchHtml+items.map((a,i)=>{
     const uid=cid+'-'+i;
+    // 2-7: Lis専売バッジ
+    const lisBadge=LIS_ONLY_PKS.has(a.pk)
+      ?`<span style="font-size:9px;background:var(--purple-bg);color:var(--purple);padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:700">★専売</span>`
+      :'';
     return `<div class="ai">
       <div class="ah" onclick="togAlt('${uid}')">
         <input type="checkbox" id="chk-${uid}" onclick="event.stopPropagation();togAlt('${uid}')">
-        <span class="an">${a.n}</span>
+        <span class="an">${a.n}${lisBadge}</span>
       </div>
       <div class="ab" id="body-${uid}" data-name="${a.pk||a.n}" data-dm="${a.dm}" data-dir="${a.d}" data-isw="${isW}">
         ${buildAB(a,uid,isW)}
       </div>
     </div>`;
   }).join('');
+}
+
+function filterAlts(q,cid){
+  const els=document.querySelectorAll(`#${cid} .ai`);
+  const lq=q.toLowerCase();
+  els.forEach(el=>{
+    const name=el.querySelector('.an')?.textContent||'';
+    el.style.display=(!lq||name.toLowerCase().includes(lq))?'':'none';
+  });
 }
 
 function buildAB(a,uid,isW){
@@ -2834,6 +2979,16 @@ function buildAB(a,uid,isW){
       <span style="font-size:11px;color:var(--tx3);margin-left:4px">後</span>
       <input class="dmi" type="number" id="dim-R-${uid}" placeholder="0.0" step="0.5" min="0" style="flex:1">
       <span class="dmu">cm</span>
+    </div>`;
+  }else if(a.dm==='cnt'){
+    // ボタン補強・付け替え用（個数入力）
+    const pfx=isW?'e':'f';
+    h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:4px 0">
+      <span style="font-size:11px;color:var(--tx3);flex-shrink:0">個数</span>
+      <button onclick="adjCnt('${uid}',-1,'${pfx}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-size:16px;font-weight:700;font-family:var(--f);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1">−</button>
+      <span id="cnt-disp-${uid}" style="min-width:32px;text-align:center;font-size:16px;font-weight:700;color:var(--tx);font-family:var(--fm)">1</span>
+      <button onclick="adjCnt('${uid}',1,'${pfx}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-size:16px;font-weight:700;font-family:var(--f);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1">＋</button>
+      <span style="font-size:11px;color:var(--tx3);flex-shrink:0">個</span>
     </div>`;
   }else if(a.dm==='cm'){
     h+=`<div class="dmrow">
@@ -3098,7 +3253,22 @@ const PRICE_RATE={
   'ツイード':1.3,'デニム':1.2,
 };
 
-// ── 価格ロック状態 ──
+// ── 1-2: ブランド割増係数テーブル ──
+// 品名・特殊フィールドのテキストマッチで係数乗算
+const BRAND_RATE={
+  'CHANEL':1.5,'HERMÈS':1.5,'HERMES':1.5,
+  'LOUIS VUITTON':1.5,'VUITTON':1.5,
+  'DIOR':1.5,'CHRISTIAN DIOR':1.5,
+  'GUCCI':1.5,'PRADA':1.5,'BOTTEGA':1.3,
+  'CELINE':1.3,'CÉLINE':1.3,
+  'SAINT LAURENT':1.3,'YSL':1.3,
+  'VALENTINO':1.3,'BALENCIAGA':1.3,
+  'GIVENCHY':1.3,'LOEWE':1.3,
+  'BURBERRY':1.3,'MAX MARA':1.3,
+  'BRUNELLO':1.3,'CUCINELLI':1.3,
+  'TOM FORD':1.3,'TOMFORD':1.3,
+  'BRIONI':1.5,'KITON':1.5,'ZEGNA':1.3,
+};
 const _priceLocked={f:false,e:false};
 
 // ── PROCオプション加算額テーブル（pk:ラベル → 加算額・税抜・両ファイル平均） ──
@@ -3480,15 +3650,25 @@ function calcEstPrice(prefix){
   const effectivePrice={...PRICE,...customP};
   let total=0;
   const breakdown=[];
-  el.querySelectorAll('[id^="chk-"]').forEach((chk,i)=>{
-    if(!chk.checked || !items[i]) return;
-    const pk=items[i].pk;
-    const itemName=items[i].n;
+  el.querySelectorAll('[id^="chk-"]').forEach(chk=>{
+    if(!chk.checked) return;
+    const uid=chk.id.replace('chk-','');
+    // uidの末尾の数字からALTインデックスを取得（DOM順インデックスより確実）
+    const aidx=parseInt(uid.split('-').pop(),10);
+    const a=items[aidx];
+    if(!a) return;
+    const pk=a.pk;
+    const itemName=a.n;
     const base=effectivePrice[pk]||0;
     let itemTotal=base;
-    const optLabels=[];
-    const uid=chk.id.replace('chk-','');
     const body=document.getElementById('body-'+uid);
+    const dmMode=body?.dataset.dm||'none';
+    // 1-3: cnt dmモードは個数×単価
+    if(dmMode==='cnt'){
+      const cnt=Math.max(1,parseInt(body?.dataset.cnt||'1',10)||1);
+      itemTotal=base*cnt;
+    }
+    const optLabels=[];
     if(body){
       const procs=JSON.parse(body.dataset.procs||'[]');
       procs.forEach(label=>{
@@ -3498,7 +3678,9 @@ function calcEstPrice(prefix){
       });
     }
     if(itemTotal>0){
-      breakdown.push({name:itemName,base,optLabels,total:itemTotal});
+      const cntVal=dmMode==='cnt'?Math.max(1,parseInt(body?.dataset.cnt||'1',10)||1):1;
+      const displayName=cntVal>1?`${itemName}（×${cntVal}個）`:itemName;
+      breakdown.push({name:displayName,base,optLabels,total:itemTotal});
       total+=itemTotal;
     }
   });
@@ -3515,10 +3697,27 @@ function calcEstPrice(prefix){
   for(const [k,v] of Object.entries(PRICE_RATE)){
     if(matText.includes(k.toLowerCase())&&v>rate){rate=v;rateName=k;}
   }
+  // 1-4: isSpm ONかつ素材マッチなし → デフォルト×1.3
+  const isSpmOn=prefix==='f'?spmOn:(document.getElementById('edit-body')?.dataset.espm==='1');
+  if(rate===1&&isSpmOn){rate=1.3;rateName='特殊素材';}
   if(rate>1&&total>0){
     const rateAdd=Math.round(total*(rate-1));
     breakdown.push({name:`素材割増（${rateName} ×${rate}）`,base:0,optLabels:[],total:rateAdd});
     total=Math.round(total*rate);
+  }
+  // 1-2: ブランド割増を適用（品名・特殊フィールドのテキストマッチ）
+  const brandText=(
+    (document.getElementById(prefix==='f'?'f-item':'e-item')?.value||'')+' '+
+    (document.getElementById(prefix==='f'?'f-special':'e-special')?.value||'')
+  ).toUpperCase();
+  let brandRate=1,brandName='';
+  for(const [k,v] of Object.entries(BRAND_RATE)){
+    if(brandText.includes(k)&&v>brandRate){brandRate=v;brandName=k;}
+  }
+  if(brandRate>1&&total>0){
+    const brandAdd=Math.round(total*(brandRate-1));
+    breakdown.push({name:`ブランド割増（${brandName} ×${brandRate}）`,base:0,optLabels:[],total:brandAdd});
+    total=Math.round(total*brandRate);
   }
   const inp=document.getElementById(prefix+'-price');
   const hint=document.getElementById(prefix+'-price-hint');
@@ -3571,6 +3770,17 @@ function unlockPrice(prefix){
   _priceLocked[prefix]=false;
   const lb=document.getElementById(prefix+'-price-lock');
   if(lb) lb.style.display='none';
+  calcEstPrice(prefix);
+}
+
+function adjCnt(uid,delta,prefix){
+  const body=document.getElementById('body-'+uid);
+  if(!body) return;
+  const cur=parseInt(body.dataset.cnt||'1',10)||1;
+  const next=Math.max(1,Math.min(99,cur+delta));
+  body.dataset.cnt=String(next);
+  const disp=document.getElementById('cnt-disp-'+uid);
+  if(disp) disp.textContent=next;
   calcEstPrice(prefix);
 }
 
@@ -3794,7 +4004,8 @@ function colAlts(cid,cat){
       const ww=body.dataset.ww||'';
       const mae=body.dataset.mae||'';const ato=body.dataset.ato||'';const kokomae=body.dataset.kokomae||'';const kokoato=body.dataset.kokoato||'';
       const wkdims=JSON.parse(body.dataset.wkdims||'{}');
-      return{n:a.n,dir,procs,subs,ww,mae,ato,kokomae,kokoato,wkdims,memo};
+      const cnt=body.dataset.dm==='cnt'?parseInt(body.dataset.cnt||'1',10)||1:null;
+      return{n:a.n,dir,procs,subs,ww,mae,ato,kokomae,kokoato,wkdims,memo,...(cnt&&cnt>1?{cnt}:{})};
     }
     return{n:a.n,dir,dim,dl,swsub,swpos,swposdim,memo};
   }).filter(Boolean);
@@ -3894,13 +4105,24 @@ function saveRec(){
     status:'recv',
     createdAt:now,updatedAt:now,
   };
-  const rs=gR();rs.unshift(rec);sR(rs);
+  const rs=gR();
+  // 1-6: 複数件数一括登録
+  const bulkCount=Math.max(1,Math.min(20,parseInt(document.getElementById('f-bulk-count')?.value||'1',10)||1));
+  for(let bi=0;bi<bulkCount;bi++){
+    const bRec=bi===0?rec:{...rec,
+      id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
+      createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+    };
+    rs.unshift(bRec);
+  }
+  sR(rs);
   // 5-3: 最後に使った伝票No.を記録（自動インクリメント用）
   if(ticket!=='00000') localStorage.setItem('ar2_last_ticket',ticket);
   // 2-2: カテゴリー使用回数を記録
   recordCatUse(cat);
   resetForm();
   showScr('work');
+  if(bulkCount>1) showToast(bulkCount+'件を一括登録しました','',null,2500);
 }
 
 function resetForm(){
@@ -3987,12 +4209,14 @@ function renderHist(){
     `<button class="fp${hiFil===t.id?' on':''}" onclick="setHF('${t.id}')">${t.label}</button>`
   ).join('');
   if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
-  // 1-5: ソート
-  const sortMode=document.getElementById('hist-sort')?.value||'newest';
-  if(sortMode==='outdate') all.sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
+  // 1-5: ソート（デフォルト:持込日順）
+  const sortMode=document.getElementById('hist-sort')?.value||'indate';
+  if(sortMode==='indate') all.sort((a,b)=>(b.inDate||'').localeCompare(a.inDate||''));
+  else if(sortMode==='outdate') all.sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
   else if(sortMode==='price_h') all.sort((a,b)=>(b.price||0)-(a.price||0));
   else if(sortMode==='price_l') all.sort((a,b)=>(a.price||0)-(b.price||0));
   else if(sortMode==='cat') all.sort((a,b)=>(a.cat||'').localeCompare(b.cat||''));
+  // newest は登録順（ソートなし）のまま
   // 現在のフィルター結果をキャッシュ（全選択に使用）
   window._histFilteredIds=all.map(r=>String(r.id));
   const el=document.getElementById('hl');
@@ -4149,6 +4373,17 @@ function rCard(r,showSel){
   const st=STATUS.find(s=>s.id===r.status)||STATUS[0];
   const inD=r.inDate?r.inDate.slice(5).replace('-','/'):'—';
   const outD=r.outDate?r.outDate.slice(5).replace('-','/'):'—';
+  // 2-4: 納期アラート
+  const today=new Date().toISOString().slice(0,10);
+  const diffDays=r.outDate?Math.ceil((new Date(r.outDate)-new Date(today))/86400000):null;
+  const urgentStyle=diffDays===null?''
+    :diffDays<0?';border-left:3px solid var(--red)'
+    :diffDays===0?';border-left:3px solid var(--red)'
+    :diffDays===1?';border-left:3px solid var(--amber)'
+    :'';
+  const urgentBadge=diffDays!==null&&diffDays<=1
+    ?`<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;background:${diffDays<1?'var(--red-bg)':'var(--amber-bg)'};color:${diffDays<1?'var(--red)':'var(--amber)'}">${diffDays<0?'超過':diffDays===0?'本日':'明日'}</span>`
+    :'';
   const tags=[r.cat,r.mat].filter(Boolean).map(t=>`<span class="rtg">${t}</span>`).join('');
   const altTags=(r.cAlts||[]).slice(0,4).map(a=>{
     let s=a.n+(a.dir?' '+a.dir:'');
@@ -4156,7 +4391,7 @@ function rCard(r,showSel){
     return `<span class="rtg" style="color:var(--gold);border-color:rgba(200,168,74,.3)">${s}</span>`;
   }).join('');
   const selCb=showSel?`<input type="checkbox" id="wsel-${r.id}" ${selIds.has(r.id)?'checked':''} onclick="togSelCard('${r.id}',event)" style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0;margin-right:6px;cursor:pointer">`:'';
-  return `<div class="rc" onclick="${showSel?`togSelCard('${r.id}',event)`:`openDet('${r.id}')`}">
+  return `<div class="rc" style="overflow:hidden${urgentStyle}" onclick="${showSel?`togSelCard('${r.id}',event)`:`openDet('${r.id}')`}">
     <div class="rh">
       <div class="rm" style="display:flex;align-items:flex-start">
         ${selCb}
@@ -4177,7 +4412,7 @@ function rCard(r,showSel){
     ${tags?`<div class="rb">${tags}</div>`:''}
     ${altTags?`<div class="rb">${altTags}</div>`:''}
     <div class="rf">
-      <span class="rd">持込 ${inD} → 納品 ${outD}</span>
+      <span class="rd">持込 ${inD} → 納品 ${outD}${urgentBadge}</span>
       <span class="rp">${r.price?'¥'+r.price.toLocaleString():''}</span>
     </div>
   </div>`;
@@ -4307,7 +4542,9 @@ function openDet(id){
     dw('特殊',r.special,true)+
     dw('作業手順と設定',machineStr(r.machineData),true)+
     dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
-    dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true);
+    dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true)+
+    dw('登録日時',r.createdAt?r.createdAt.slice(0,16).replace('T',' '):null)+
+    dw('更新日時',r.updatedAt&&r.updatedAt!==r.createdAt?r.updatedAt.slice(0,16).replace('T',' '):null);
   openOv('ov-det');
 }
 function updSt(id,st){
@@ -4557,6 +4794,11 @@ function restoreAlts(cid,cat,saved){
       if(d)setDir(uid,d);
     }
     if(sa.dl) setDT(uid,sa.dl);
+    if(sa.cnt){
+      body.dataset.cnt=String(sa.cnt);
+      const disp=document.getElementById('cnt-disp-'+uid);
+      if(disp) disp.textContent=sa.cnt;
+    }
     if(sa.procs&&sa.procs.length){
       const procKey=items[idx].pk||sa.n;
       sa.procs.forEach(p=>{
@@ -4664,13 +4906,14 @@ function undoDel(){
   hideToast();
 }
 function showToast(msg,actionLabel,actionFn,duration=3000){
+  window._toastAction=actionFn||null;
   let el=document.getElementById('app-toast');
   if(!el){
     el=document.createElement('div');el.id='app-toast';
     el.style.cssText='position:fixed;bottom:calc(env(safe-area-inset-bottom)+80px);left:50%;transform:translateX(-50%);background:#222232;border:1px solid rgba(255,255,255,.15);color:#efefef;font-size:13px;font-family:var(--f);padding:10px 14px;border-radius:12px;display:flex;align-items:center;gap:12px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);white-space:nowrap;max-width:90vw';
     document.body.appendChild(el);
   }
-  el.innerHTML=`<span>${msg}</span>`+(actionLabel?`<button onclick="(${actionFn.name||'undoDel'})()" style="padding:4px 10px;border-radius:8px;border:none;background:var(--gold);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">${actionLabel}</button>`:'');
+  el.innerHTML=`<span>${msg}</span>`+(actionLabel?`<button onclick="if(window._toastAction){window._toastAction();}" style="padding:4px 10px;border-radius:8px;border:none;background:var(--gold);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">${actionLabel}</button>`:'');
   el.style.display='flex';
   if(_toastTimer)clearTimeout(_toastTimer);
   _toastTimer=setTimeout(hideToast,duration);
@@ -4679,6 +4922,7 @@ function hideToast(){
   const el=document.getElementById('app-toast');
   if(el)el.style.display='none';
   if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;}
+  window._toastAction=null;
 }
 function doPrint(){
   const r=gR().find(r=>r.id===curId);if(!r)return;
@@ -4794,14 +5038,16 @@ function doCSV(){
   const e=v=>{const s=String(v||'');return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;};
   const stL=id=>(STATUS.find(s=>s.id===id)||{label:''}).label;
   const tpL=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
-  const hd=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','担当者','品名','カテゴリー','色','柄','素材','客様指定補正','実行工程','機材','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス'];
+  const hd=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','スタッフ','担当者','担当作業者','品名','カテゴリー','色','柄','素材','客様指定補正','実行工程','機材','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス','登録日時','更新日時'];
   const rows=all.map(r=>[
     r.inDate,r.inTime,r.outDate,r.ticket?'#'+r.ticket:'',
-    tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.staff,
+    tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.isStaff?'スタッフ':'',r.staff,r.worker||'',
     r.item,r.cat,r.clrN||r.clrH,(r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:''),r.mat+(r.isSpm?' [特殊素材]':''),
     aSum(r.cAlts),wStr(r.wAlts).replace(/\n/g,' / '),
     machineStr(r.machineData).replace(/\n/g,' / '),'','','','','',
-    r.time||'',r.materials,r.price||'',r.note,stL(r.status)
+    r.time||'',r.materials,r.price||'',r.note,stL(r.status),
+    r.createdAt?r.createdAt.slice(0,16).replace('T',' '):'',
+    r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):'',
   ].map(e).join(','));
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+[hd.map(e).join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'}));
@@ -4815,7 +5061,45 @@ function closeOvBtn(id){document.getElementById(id).classList.remove('on');}
 function closeOv(id,e){if(e.target===document.getElementById(id))closeOvBtn(id);}
 
 // ══ MASTER ══
-function openMaster(){renderMaster();openMasterUpdate();openOv('ov-master');renderCatVisList();checkStorageCapacity();populateSnapSelect();}
+function openMaster(){
+  renderMaster();openMasterUpdate();openOv('ov-master');renderCatVisList();checkStorageCapacity();populateSnapSelect();
+  // 受付デフォルト設定の値を復元
+  const bo=document.getElementById('biz-open');
+  const bc=document.getElementById('biz-close');
+  const bd=document.getElementById('biz-days');
+  if(bo) bo.value=localStorage.getItem('ar2_biz_open')||'12:00';
+  if(bc) bc.value=localStorage.getItem('ar2_biz_close')||'18:50';
+  if(bd) bd.value=localStorage.getItem('ar2_default_days')||'3';
+  // 設定セクション開閉の初期化
+  initSettingsSections();
+}
+
+// 設定画面セクション開閉
+function initSettingsSections(){
+  const OPEN_KEY='ar2_sec_open';
+  const saved=JSON.parse(localStorage.getItem(OPEN_KEY)||'{}');
+  document.querySelectorAll('.settings-sec-body').forEach(body=>{
+    const id=body.dataset.sec;
+    const arrow=document.querySelector(`.settings-sec-arrow[data-sec="${id}"]`);
+    // デフォルト: backup・recdata は開、他は閉
+    const defaultOpen=(id==='backup'||id==='recdata');
+    const isOpen=id in saved?saved[id]:defaultOpen;
+    body.style.display=isOpen?'':'none';
+    if(arrow) arrow.textContent=isOpen?'▲':'▼';
+  });
+}
+function togSettingsSection(id){
+  const OPEN_KEY='ar2_sec_open';
+  const saved=JSON.parse(localStorage.getItem(OPEN_KEY)||'{}');
+  const body=document.querySelector(`.settings-sec-body[data-sec="${id}"]`);
+  const arrow=document.querySelector(`.settings-sec-arrow[data-sec="${id}"]`);
+  if(!body) return;
+  const isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'';
+  if(arrow) arrow.textContent=isOpen?'▼':'▲';
+  saved[id]=!isOpen;
+  localStorage.setItem(OPEN_KEY,JSON.stringify(saved));
+}
 
 // 3-1: スナップショット復元
 function populateSnapSelect(){
@@ -5009,9 +5293,9 @@ function handleSettingsImport(ev){
 
 
 const XLSX_COLS=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','スタッフ',
-  '担当者','品名','カテゴリー','色名','色コード','柄','素材','特殊素材',
+  '担当者','担当作業者','品名','カテゴリー','色名','色コード','柄','素材','特殊素材',
   '客様指定補正','指定メモ','実行工程','工程メモ','特殊','ミシン設定',
-  '所要時間(分)','使用資材','金額','備考','ステータス','ID'];
+  '所要時間(分)','使用資材','金額','備考','ステータス','登録日時','更新日時','ID'];
 
 function doExportXLSX(){
   if(typeof XLSX==='undefined'){alert('SheetJSの読み込みに失敗しました。インターネット接続を確認してください。');return;}
@@ -5022,7 +5306,7 @@ function doExportXLSX(){
   const rows=all.map(r=>[
     r.inDate||'', r.inTime||'', r.outDate||'',
     r.ticket||'', tpL(r.type), r.store||'',
-    r.client||'', r.isStaff?'スタッフ':'', r.staff||'',
+    r.client||'', r.isStaff?'スタッフ':'', r.staff||'', r.worker||'',
     r.item||'', r.cat||'', r.clrN||'', r.clrH||'',
     r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'',
     r.mat||'', r.isSpm?'特殊素材':'',
@@ -5030,15 +5314,18 @@ function doExportXLSX(){
     wStr(r.wAlts||[]).replace(/\n/g,' / '), r.wMemo||'', r.special||'',
     machineStr(r.machineData||[]).replace(/\n/g,' / '),
     r.time||'', r.materials||'', r.price||'', r.note||'',
-    stL(r.status), r.id||'',
+    stL(r.status),
+    r.createdAt?r.createdAt.slice(0,16).replace('T',' '):'',
+    r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):'',
+    r.id||'',
   ]);
   const ws=XLSX.utils.aoa_to_sheet([XLSX_COLS,...rows]);
   // 列幅設定
   ws['!cols']=[
     {wch:12},{wch:8},{wch:12},{wch:8},{wch:10},{wch:10},{wch:12},{wch:8},
-    {wch:10},{wch:14},{wch:12},{wch:12},{wch:10},{wch:10},{wch:12},{wch:8},
+    {wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:10},{wch:10},{wch:12},{wch:8},
     {wch:30},{wch:20},{wch:30},{wch:20},{wch:16},{wch:30},
-    {wch:10},{wch:16},{wch:10},{wch:20},{wch:8},{wch:18},
+    {wch:10},{wch:16},{wch:10},{wch:20},{wch:8},{wch:16},{wch:16},{wch:18},
   ];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'補正記録');
@@ -5083,6 +5370,7 @@ function handleXLSXImport(ev){
           client:cv(c,'客名'),
           isStaff:cv(c,'スタッフ').includes('スタッフ'),
           staff:cv(c,'担当者'),
+          worker:cv(c,'担当作業者'),
           item:cv(c,'品名'),
           cat:cv(c,'カテゴリー'),
           clrN:cv(c,'色名'),
@@ -5100,6 +5388,8 @@ function handleXLSXImport(ev){
           price:parseInt(cv(c,'金額')||'0',10)||0,
           note:cv(c,'備考'),
           status:stMap[cv(c,'ステータス')]||'recv',
+          createdAt:cv(c,'登録日時')||'',
+          updatedAt:cv(c,'更新日時')||'',
         };
         // 意味のあるデータが最低1つあるレコードのみ追加
         if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
@@ -5124,7 +5414,7 @@ function doExportCSV(){
   const rows=all.map(r=>[
     r.inDate||'', r.inTime||'', r.outDate||'',
     r.ticket||'', tpL(r.type), r.store||'',
-    r.client||'', r.isStaff?'スタッフ':'', r.staff||'',
+    r.client||'', r.isStaff?'スタッフ':'', r.staff||'', r.worker||'',
     r.item||'', r.cat||'', r.clrN||'', r.clrH||'',
     r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'',
     r.mat||'', r.isSpm?'特殊素材':'',
@@ -5132,7 +5422,10 @@ function doExportCSV(){
     wStr(r.wAlts||[]).replace(/\n/g,' / '), r.wMemo||'', r.special||'',
     machineStr(r.machineData||[]).replace(/\n/g,' / '),
     r.time||'', r.materials||'', r.price||'', r.note||'',
-    stL(r.status), r.id||'',
+    stL(r.status),
+    r.createdAt?r.createdAt.slice(0,16).replace('T',' '):'',
+    r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):'',
+    r.id||'',
   ].map(esc).join(','));
   const csv='\uFEFF'+[hd.map(esc).join(','),...rows].join('\n');
   const a=document.createElement('a');
@@ -5198,6 +5491,7 @@ function handleCSVRecImport(ev){
           client:cv(c,'客名'),
           isStaff:cv(c,'スタッフ').includes('スタッフ'),
           staff:cv(c,'担当者'),
+          worker:cv(c,'担当作業者'),
           item:cv(c,'品名'),
           cat:cv(c,'カテゴリー'),
           clrN:cv(c,'色名'),
@@ -5215,6 +5509,8 @@ function handleCSVRecImport(ev){
           price:parseInt(cv(c,'金額')||'0',10)||0,
           note:cv(c,'備考'),
           status:stMap[cv(c,'ステータス')]||'recv',
+          createdAt:cv(c,'登録日時')||'',
+          updatedAt:cv(c,'更新日時')||'',
         };
         // 意味のあるデータが最低1つあるレコードのみ追加
         if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
