@@ -173,7 +173,7 @@ select option{background:#1a1a24}
 .dv{font-size:14px;color:var(--tx);font-weight:500;text-align:right;word-break:break-all}
 .dvp{font-size:13px;color:var(--tx);white-space:pre-wrap;text-align:right;line-height:1.6}
 .ma{display:flex;gap:8px;padding:0 16px}
-.mac{flex:1;padding:11px;border-radius:11px;border:none;font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer}
+.mac{flex:1;padding:8px 4px;border-radius:11px;border:none;font-size:10px;font-weight:600;font-family:var(--f);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.2}
 .step{display:flex;gap:6px;padding:10px 14px;flex-wrap:wrap}
 .stb{flex:1;min-width:68px;padding:8px 4px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx3);font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
 .stb.recv{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta2.0</div>
+      <div class="hv" id="app-hv">beta2.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -480,11 +480,11 @@ select option{background:#1a1a24}
       </div>
       <div class="mb" id="det-body"></div>
       <div class="ma">
-        <button class="mac" style="background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3)" onclick="doPrint()">🖨 PDF</button>
-        <button class="mac" style="background:var(--gold-bg);color:var(--gold);border:1px solid rgba(200,168,74,.3)" onclick="openEdit()">✏️ 編集</button>
-        <button class="mac" style="background:var(--purple-bg);color:var(--purple);border:1px solid rgba(155,114,207,.3)" onclick="duplicateRec()">📋 複製</button>
-        <button class="mac" id="det-star-btn" onclick="togDetStar()" style="background:var(--s3);color:var(--tx2);border:1px solid var(--bd2)">☆ スター</button>
-        <button class="mac" style="background:var(--red-bg);color:var(--red);border:1px solid rgba(192,90,90,.3)" onclick="doDel()">削除</button>
+        <button class="mac" style="background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3)" onclick="doPrint()"><span style="font-size:18px">🖨</span><span>PDF</span></button>
+        <button class="mac" style="background:var(--gold-bg);color:var(--gold);border:1px solid rgba(200,168,74,.3)" onclick="openEdit()"><span style="font-size:18px">✏️</span><span>編集</span></button>
+        <button class="mac" style="background:var(--purple-bg);color:var(--purple);border:1px solid rgba(155,114,207,.3)" onclick="duplicateRec()"><span style="font-size:18px">📋</span><span>複製</span></button>
+        <button class="mac" id="det-star-btn" onclick="togDetStar()" style="background:var(--s3);color:var(--tx2);border:1px solid var(--bd2)"><span style="font-size:18px">☆</span><span>スター</span></button>
+        <button class="mac" style="background:var(--red-bg);color:var(--red);border:1px solid rgba(192,90,90,.3)" onclick="doDel()"><span style="font-size:18px">🗑</span><span>削除</span></button>
       </div>
       <button class="mc" onclick="closeOvBtn('ov-det')">✕ 閉じる</button>
     </div>
@@ -777,7 +777,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta2.0';
+const APP_VERSION = 'beta2.1';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -4152,6 +4152,111 @@ const PRICE_OPT={
   '袖丈_毛皮:カフス':2000,
   '着丈_毛皮:切放し':-8000,
   '着丈_毛皮:前裾ラウンド':2000,
+
+  // ── 着丈系：仕上げ方法差額 ──
+  '着丈_スカート:手まつり':1000,'着丈_スカート:ロックステッチ':0,'着丈_スカート:額縁':800,
+  '着丈_コート:手まつり':1000,'着丈_コート:ロックステッチ':0,
+  '着丈_ドレス:手まつり':1000,'着丈_ドレス:ロックステッチ':0,
+  '着丈_ワンピース:手まつり':1000,'着丈_ワンピース:ロックステッチ':0,
+  '着丈_ニット:手まつり':1000,'着丈_ニット:ロックステッチ':0,
+  '着丈_スウェット:手まつり':1000,'着丈_スウェット:ロックステッチ':0,
+  '着丈_Tシャツ:手まつり':1000,'着丈_Tシャツ:ロックステッチ':0,
+  '着丈_シャツ:スリット移動':1500,
+
+  // ── 袖丈系：仕上げ方法差額 ──
+  '袖丈_シャツ:カフスあり':500,'袖丈_シャツ:カフスなし':0,'袖丈_シャツ:肩山カット':3200,
+  '袖丈_コート:カフスなし':0,'袖丈_コート:本切羽':3000,
+  '袖丈_ジャケット:肩山カット':3000,
+  '袖丈_ドレス:開き見せ':1500,
+  '袖丈_ワンピース:開き見せ':1500,
+  '袖丈_ブルゾン:カフス付き':1000,
+  '袖丈_レザー:カフス付き':2000,'袖丈_レザー:明きカフス':1500,
+  '袖丈_毛皮:ダブルカフス':2500,
+
+  // ── ウエスト系：方式差額 ──
+  'ウエスト_スカート:3方詰め':3000,'ウエスト_スカート:裏地あり':1000,
+  'ウエスト_スカート:Vスリット':1500,'ウエスト_スカート:ステッチ入れ直し':500,
+  'ウエスト_スカート:ステッチ本数':0,
+  'ウエスト裾巾詰め_スカート:裏地あり':1000,
+  'ウエスト_レザー:三方ツメ':3000,
+
+  // ── チェーンステッチ裾上げ：仕上げ種別差額（基本料と重複しないよう0） ──
+  'チェーンステッチ裾上げ_パンツ:チェーンステッチ':0,
+  'チェーンステッチ裾上げ_パンツ:チェーンステッチ二重':500,
+  'チェーンステッチ裾上げ_パンツ:ハリツケチェーンステッチ':1500,
+  'チェーンステッチ裾上げ_パンツ:ハリツケチェーンステッチ二重':2000,
+
+  // ── センタークリース補正 ──
+  'センタークリース補正_パンツ:センタークリースステッチ入れ':1500,
+
+  // ── フリンジ加工 ──
+  'フリンジ加工_パンツ:フリンジ加工':0,
+
+  // ── ヒップ_パンツ（方向選択） ──
+  'ヒップ_パンツ:両脇':0,'ヒップ_パンツ:後ろ1方':0,'ヒップ_パンツ:3方':1500,
+
+  // ── ファスナー交換_パンツ ──
+  'ファスナー交換_パンツ:前立てハンドステッチ':1500,
+
+  // ── 袖巾_シャツ（カフス関連） ──
+  '袖巾_シャツ:カフスさわらず':0,'袖巾_シャツ:カフスも共に':500,'袖巾_シャツ:カフス幅のみ':0,
+
+  // ── ダブルシングルカフス_シャツ ──
+  'ダブルシングルカフス_シャツ:シングル→ダブル':1500,'ダブルシングルカフス_シャツ:ダブル→シングル':1000,
+
+  // ── ボックスプリーツ取り_シャツ ──
+  'ボックスプリーツ取り_シャツ:背中プリーツ取り':0,'ボックスプリーツ取り_シャツ:サイドプリーツ取り':0,
+
+  // ── スリット作成_シャツ ──
+  'スリット作成_シャツ:両脇スリット':1500,'スリット作成_シャツ:簡易スリット（片側）':0,
+
+  // ── スリット移動 ──
+  'スリット移動_パンツ:ステッチ':500,'スリット移動_パンツ:ファスナー移動':1500,
+  'スリット移動_スカート:ステッチ':500,'スリット移動_スカート:ファスナー移動':1500,
+
+  // ── スリット開け_スカート ──
+  'スリット開け_スカート:スリット拡張':1000,
+
+  // ── カフス修理_シャツ ──
+  'カフス修理_シャツ:ステッチ入れ直し':500,
+  'カフスすり切れ修理_ワンピース:カフス作り替え':3000,
+
+  // ── タートルネック丈詰め_ニット ──
+  'タートルネック丈詰め_ニット:リンキング仕上げ（専門工場）':7000,
+
+  // ── フロントファスナー取替_パンツ ──
+  'フロントファスナー取替_パンツ:ハンドステッチ仕上げ':1500,
+
+  // ── ベント修理_ジャケット ──
+  'ベント修理_ジャケット:スリット補強':500,
+
+  // ── 裾上げ_パンツ ──
+  '裾上げ_パンツ:天継出し':1500,
+
+  // ── その他_ジャケット ──
+  'その他_ジャケット:袖口スエードパイピング':2500,'その他_ジャケット:袖裏をパイピング仕様に':2500,
+
+  // ── ダウン仕様_コート ──
+  'ダウン仕様_コート:ステッチ継ぎ直し':2000,'ダウン仕様_コート:カフス補修':1500,
+
+  // ── リブ移動_パンツ ──
+  'リブ移動_パンツ:特殊ステッチ':500,
+
+  // ── 長袖半袖_シャツ ──
+  '長袖半袖_シャツ:ステッチ仕上げ':500,
+
+  // ── 衿裏返し加工_シャツ ──
+  '衿裏返し加工_シャツ:ステッチ入れ直し':500,
+
+  // ── 身幅・マチ入れ ──
+  '身幅_ジレ:マチ入れ（生地代別）':4500,
+  '身幅_ベスト:マチ入れ（裏あり）':5000,'身幅_ベスト:マチ入れ（裏なし）':4000,
+
+  // ── 袖口修理_コート ──
+  '袖口修理_コート:カフス修理':1500,
+
+  // ── ネック_Tシャツ ──
+  'ネック_Tシャツ:マチ入れで身巾を広く':2500,
 };
 
 function calcEstPrice(prefix){
@@ -5227,6 +5332,16 @@ function resetForm(){
   document.querySelectorAll('[id$="-search"]').forEach(el=>{
     el.value='';filterAlts('',el.id.replace('-search',''));
   });
+  // 内訳・目安料金を完全リセット
+  const _bdEl=document.getElementById('f-breakdown');
+  if(_bdEl){_bdEl.dataset.items='[]';_bdEl.style.display='none';_bdEl.innerHTML='';}
+  const _bdBtn=document.getElementById('f-breakdown-btn');
+  if(_bdBtn){_bdBtn.style.display='none';_bdBtn.textContent='内訳 ▼';}
+  const _pHint=document.getElementById('f-price-hint');
+  if(_pHint){_pHint.style.display='none';}
+  const _pLock=document.getElementById('f-price-lock');
+  if(_pLock) _pLock.style.display='none';
+  _priceLocked['f']=false;
 }
 
 // ══ WORK ══
@@ -5669,7 +5784,7 @@ function togDetStar(){
   const rs=gR();const i=rs.findIndex(r=>r.id===curId);if(i<0)return;
   rs[i].starred=!rs[i].starred;sR(rs);
   const btn=document.getElementById('det-star-btn');
-  if(btn){btn.textContent=(rs[i].starred?'★':'\u2606')+' スター';btn.style.color=rs[i].starred?'var(--gold)':'var(--tx2)';}
+  if(btn){const ic=btn.querySelector('span:first-child');const tx=btn.querySelector('span:last-child');if(ic)ic.textContent=rs[i].starred?'★':'☆';if(tx)tx.textContent='スター';btn.style.color=rs[i].starred?'var(--gold)':'var(--tx2)';}
   renderWork();
 }
 
@@ -5698,7 +5813,7 @@ function openDet(id){
     dw('登録日時',r.createdAt?r.createdAt.slice(0,16).replace('T',' '):null)+
     dw('更新日時',r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):null);
   const _sb=document.getElementById('det-star-btn');
-  if(_sb){_sb.textContent=(r.starred?'★':'☆')+' スター';_sb.style.color=r.starred?'var(--gold)':'var(--tx2)';}
+  if(_sb){const _ic=_sb.querySelector('span:first-child');const _tx=_sb.querySelector('span:last-child');if(_ic)_ic.textContent=r.starred?'★':'☆';if(_tx)_tx.textContent='スター';_sb.style.color=r.starred?'var(--gold)':'var(--tx2)';}
   openOv('ov-det');
 }
 function updSt(id,st){
