@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToTop('scr-new')" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta2.6</div>
+      <div class="hv" id="app-hv">beta2.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -781,7 +781,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta2.6';
+const APP_VERSION = 'beta2.7';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -6718,12 +6718,27 @@ function handleXLSXImport(ev){
       const tpMap={};TYPES.forEach(t=>tpMap[t.label]=t);
       const cur=gR();
       const existIds=new Set(cur.map(r=>r.id));
-      let added=0,skipped=0;
+      let added=0,skipped=0,updated=0;
       for(let i=1;i<rows.length;i++){
         const c=rows[i];
         if(c.every(v=>v===''))continue; // 空行スキップ
         const existingId=cv(c,'ID').trim();
-        if(existingId&&existIds.has(existingId)){skipped++;continue;}
+        if(existingId&&existIds.has(existingId)){
+          const _altTxt=cv(c,'客様指定補正')||'';
+          if(_altTxt){
+            const _idx=cur.findIndex(r=>r.id===existingId);
+            if(_idx>=0&&!(cur[_idx].cAlts&&cur[_idx].cAlts.length)){
+              const _alts=_altTxt.split(' / ').map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+              cur[_idx].cAlts=_alts;cur[_idx].wAlts=_alts;
+              updated=(updated||0)+1;
+            }
+          }
+          skipped++;continue;
+        }
+        if(!existingId){
+          const _di=cv(c,'持込日'),_cl=cv(c,'客名'),_it=cv(c,'品名'),_tk=cv(c,'伝票No.').replace(/^#+/,'');
+          if(_di&&_cl&&cur.some(r=>r.inDate===_di&&(r.client||'')===_cl&&(r.item||'')===_it&&(r.ticket||'')===_tk)){skipped++;continue;}
+        }
         const newId=existingId||('ximp_'+Date.now()+'_'+i);
         const tpLbl=cv(c,'案件種別');
         const tp=tpMap[tpLbl]||null;
@@ -6741,7 +6756,7 @@ function handleXLSXImport(ev){
           worker:cv(c,'担当作業者'),
           item:cv(c,'品名'),
           cat:cv(c,'カテゴリー'),
-          clrN:cv(c,'色名'),
+          clrN:cv(c,'色名')||cv(c,'色'),
           clrH:cv(c,'色コード'),
           pat:cv(c,'柄'),
           mat:cv(c,'素材'),
@@ -6760,9 +6775,10 @@ function handleXLSXImport(ev){
           createdAt:cv(c,'登録日時')||'',
           updatedAt:cv(c,'更新日時')||'',
         };
-        // 補正内容テキストをcAltsに復元（・／で分割）
+        // 補正内容テキストをcAlts・wAltsに復元（' / ' で分割）
         if(rec._importedAlts){
-          rec.cAlts=rec._importedAlts.split(/[・\/／]/).map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+          const _alts=rec._importedAlts.split(' / ').map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+          rec.cAlts=_alts; rec.wAlts=_alts;
         }
         delete rec._importedAlts;
         // 意味のあるデータが最低1つあるレコードのみ追加
@@ -6770,7 +6786,7 @@ function handleXLSXImport(ev){
         cur.unshift(rec);existIds.add(newId);added++;
       }
       sR(cur);renderWork();renderHist();
-      alert('✅ '+added+'件インポートしました'+(skipped?'（'+skipped+'件スキップ）':''));
+      alert('✅ '+added+'件追加'+(updated?'・'+updated+'件補正内容を更新':'')+(skipped?'（'+skipped+'件スキップ）':''));
     }catch(err){alert('ファイルの読み込みに失敗しました：'+err.message);}
   };
   reader.readAsArrayBuffer(file);
@@ -6845,12 +6861,29 @@ function handleCSVRecImport(ev){
       const tpMap={};TYPES.forEach(t=>tpMap[t.label]=t);
       const cur=gR();
       const existIds=new Set(cur.map(r=>r.id));
-      let added=0,skipped=0;
+      let added=0,skipped=0,updated=0;
       for(let i=1;i<lines.length;i++){
         const c=lines[i];
         if(c.every(v=>v===''))continue;
         const existingId=cv(c,'ID').trim();
-        if(existingId&&existIds.has(existingId)){skipped++;continue;}
+        // IDが一致する既存レコードに補正内容が空の場合は上書き更新
+        if(existingId&&existIds.has(existingId)){
+          const _altTxt=cv(c,'客様指定補正')||cv(c,'実行工程')||'';
+          if(_altTxt){
+            const _idx=cur.findIndex(r=>r.id===existingId);
+            if(_idx>=0&&!(cur[_idx].cAlts&&cur[_idx].cAlts.length)){
+              const _alts=_altTxt.split(' / ').map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+              cur[_idx].cAlts=_alts;cur[_idx].wAlts=_alts;
+              updated=(updated||0)+1;
+            }
+          }
+          skipped++;continue;
+        }
+        // IDなし旧CSVの重複防止
+        if(!existingId){
+          const _di=cv(c,'持込日'),_cl=cv(c,'客名'),_it=cv(c,'品名'),_tk=cv(c,'伝票No.').replace(/^#+/,'');
+          if(_di&&_cl&&cur.some(r=>r.inDate===_di&&(r.client||'')===_cl&&(r.item||'')===_it&&(r.ticket||'')===_tk)){skipped++;continue;}
+        }
         const newId=existingId||('cimp_'+Date.now()+'_'+i);
         const tpLbl=cv(c,'案件種別');
         const tp=tpMap[tpLbl]||null;
@@ -6868,7 +6901,7 @@ function handleCSVRecImport(ev){
           worker:cv(c,'担当作業者'),
           item:cv(c,'品名'),
           cat:cv(c,'カテゴリー'),
-          clrN:cv(c,'色名'),
+          clrN:cv(c,'色名')||cv(c,'色'),
           clrH:cv(c,'色コード'),
           pat:cv(c,'柄'),
           mat:cv(c,'素材'),
@@ -6887,9 +6920,11 @@ function handleCSVRecImport(ev){
           createdAt:cv(c,'登録日時')||'',
           updatedAt:cv(c,'更新日時')||'',
         };
-        // 補正内容テキストをcAltsに復元（・／で分割）
+        // 補正内容テキストをcAlts・wAltsに復元（' / ' で分割）
         if(rec._importedAlts){
-          rec.cAlts=rec._importedAlts.split(/[・\/／\s*\/\s*]/).map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+          const _alts=rec._importedAlts.split(' / ').map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+          rec.cAlts=_alts;
+          rec.wAlts=_alts;
         }
         delete rec._importedAlts;
         // 意味のあるデータが最低1つあるレコードのみ追加
@@ -6897,7 +6932,7 @@ function handleCSVRecImport(ev){
         cur.unshift(rec);existIds.add(newId);added++;
       }
       sR(cur);renderWork();renderHist();
-      alert('✅ '+added+'件インポートしました'+(skipped?'（'+skipped+'件スキップ）':''));
+      alert('✅ '+added+'件追加'+(updated?'・'+updated+'件補正内容を更新':'')+(skipped?'（'+skipped+'件スキップ）':''));
     }catch(err){alert('ファイルの読み込みに失敗しました：'+err.message);}
     ev.target.value='';
   };
