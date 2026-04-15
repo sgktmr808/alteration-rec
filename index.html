@@ -6408,7 +6408,7 @@ function doCSV(){
   const tpL=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
   const hd=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','スタッフ','担当者','担当作業者','品名','カテゴリー','色','柄','素材','客様指定補正','実行工程','機材','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス','登録日時','更新日時'];
   const rows=all.map(r=>[
-    r.inDate,r.inTime,r.outDate,r.ticket?'#'+r.ticket:'',
+    r.inDate,r.inTime,r.outDate,r.ticket||'',
     tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.isStaff?'スタッフ':'',r.staff,r.worker||'',
     r.item,r.cat,r.clrN||r.clrH,(r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:''),r.mat+(r.isSpm?' [特殊素材]':''),
     aSum(r.cAlts),wStr(r.wAlts).replace(/\n/g,' / '),
@@ -6733,7 +6733,7 @@ function handleXLSXImport(ev){
           inDate:cv(c,'持込日'),
           inTime:cv(c,'持込時刻'),
           outDate:cv(c,'納品日'),
-          ticket:cv(c,'伝票No.'),
+          ticket:cv(c,'伝票No.').replace(/^#+/,'').replace(/^#/,''),
           store:cv(c,'店名'),
           client:cv(c,'客名'),
           isStaff:cv(c,'スタッフ').includes('スタッフ'),
@@ -6747,6 +6747,7 @@ function handleXLSXImport(ev){
           mat:cv(c,'素材'),
           isSpm:cv(c,'特殊素材').includes('特殊'),
           cAlts:[],wAlts:[],
+          _importedAlts:cv(c,'客様指定補正')||cv(c,'補正内容')||'',
           cMemo:cv(c,'指定メモ'),
           wMemo:cv(c,'工程メモ'),
           special:cv(c,'特殊'),
@@ -6759,6 +6760,16 @@ function handleXLSXImport(ev){
           createdAt:cv(c,'登録日時')||'',
           updatedAt:cv(c,'更新日時')||'',
         };
+        // _importedAltsをcAltsの簡易テキスト形式に変換（テキストのみ・構造なし）
+        if(rec._importedAlts){
+          rec.cAlts=rec._importedAlts.split(/[・/／]/).map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+          delete rec._importedAlts;
+        }
+        // _importedAltsをcAltsの簡易テキスト形式に変換
+        if(rec._importedAlts){
+          rec.cAlts=rec._importedAlts.split(/[・\/／]/).map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+          delete rec._importedAlts;
+        }
         // 意味のあるデータが最低1つあるレコードのみ追加
         if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
         cur.unshift(rec);existIds.add(newId);added++;
@@ -6854,7 +6865,7 @@ function handleCSVRecImport(ev){
           inDate:cv(c,'持込日'),
           inTime:cv(c,'持込時刻'),
           outDate:cv(c,'納品日'),
-          ticket:cv(c,'伝票No.'),
+          ticket:cv(c,'伝票No.').replace(/^#+/,''),
           store:cv(c,'店名'),
           client:cv(c,'客名'),
           isStaff:cv(c,'スタッフ').includes('スタッフ'),
@@ -6868,6 +6879,7 @@ function handleCSVRecImport(ev){
           mat:cv(c,'素材'),
           isSpm:cv(c,'特殊素材').includes('特殊'),
           cAlts:[],wAlts:[],
+          _importedAlts:cv(c,'客様指定補正')||'',
           cMemo:cv(c,'指定メモ'),
           wMemo:cv(c,'工程メモ'),
           special:cv(c,'特殊'),
