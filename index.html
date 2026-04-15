@@ -47,7 +47,7 @@ html,body{height:100%;width:100%;max-width:100vw;overflow-x:hidden;background:va
 .hv{font-size:10px;color:var(--tx3);font-family:var(--fm);margin-top:1px}
 .btn-g{padding:8px 10px;border-radius:12px;border:1px solid var(--bd2);background:none;color:var(--tx2);font-size:18px;font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1}
 .btn-gold{padding:8px 16px;border-radius:18px;border:none;background:var(--gold);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
-.chart-tab{padding:5px 12px;border-radius:16px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap;transition:all .15s}
+.chart-tab{padding:7px 4px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap;transition:all .15s;text-align:center}
 .chart-tab.on{background:var(--gold);color:#0a0a0f;border-color:var(--gold)}
 .fb{padding:12px 16px 0}
 .sec{background:var(--s1);border:1px solid var(--bd);border-radius:14px;margin-bottom:12px;overflow:hidden}
@@ -156,6 +156,7 @@ select option{background:#1a1a24}
 .ht tr:hover td,.ht tr:active td{background:var(--s2)}
 .empty{text-align:center;padding:56px 20px;color:var(--tx3);font-size:14px;line-height:2.4}
 .ei{font-size:36px;margin-bottom:8px}
+.quick-hide{transition:opacity .2s}
 .ov{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.78);align-items:flex-end}
 .ov.on{display:flex}
 .md{background:var(--s1);border-radius:20px 20px 0 0;width:100%;max-width:100vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;padding-bottom:calc(var(--sb) + 8px)}
@@ -225,7 +226,7 @@ select option{background:#1a1a24}
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta1.1</div>
+      <div class="hv" id="app-hv">beta2.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -254,19 +255,21 @@ select option{background:#1a1a24}
         <input type="date" id="f-out-date" style="width:100%">
       </div>
     </div>
-    <div class="sec">
+    <div class="sec" id="sec-ticket">
       <div class="sh">🏷 伝票・顧客</div>
       <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="f-ticket" maxlength="5" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
       <div class="fld">
         <div class="fl">客名 <button id="btn-staff" class="tog" onclick="togStaff()">スタッフ</button></div>
-        <input type="text" id="f-client" autocomplete="off">
+        <input type="text" id="f-client" autocomplete="off" list="client-suggestions" oninput="onClientInput(this.value)">
+        <datalist id="client-suggestions"></datalist>
+        <div id="f-client-hint" style="display:none;font-size:11px;color:var(--tx3);padding:3px 2px;line-height:1.5"></div>
       </div>
       <div class="fld"><div class="fl">担当者名</div><input type="text" id="f-staff" autocomplete="off"></div>
       <div class="fld"><div class="fl">担当作業者</div><select id="f-worker" style="width:100%"><option value="">（選択）</option></select></div>
     </div>
     <div class="sec">
       <div class="sh">👔 商品情報</div>
-      <div class="fld"><div class="fl">品名</div><input type="text" id="f-item" autocomplete="off"></div>
+      <div class="fld"><div class="fl">品名</div><input type="text" id="f-item" autocomplete="off" list="item-suggestions"><datalist id="item-suggestions"></datalist></div>
       <div class="fld"><div class="fl">カテゴリー</div><select id="f-cat" onchange="onCatChange()"></select></div>
       <div>
         <div class="fl" style="padding:10px 14px 6px">色</div>
@@ -286,13 +289,17 @@ select option{background:#1a1a24}
       </div>
     </div>
     <div class="sec">
-      <div class="sh">✂️ 補正箇所</div>
+      <div class="sh" style="display:flex;justify-content:space-between;align-items:center">
+        <span>✂️ 補正箇所</span>
+        <button onclick="openTmplMgr()" style="font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer">📋 テンプレート</button>
+      </div>
+      <div id="tmpl-bar" style="display:none;padding:6px 14px 2px;flex-wrap:wrap;gap:6px"></div>
       <div class="alt-list" id="alt-client"></div>
-      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="f-cmemo"></textarea></div>
-      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="f-wmemo"></textarea></div>
+      <div class="fld quick-hide" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="f-cmemo"></textarea></div>
+      <div class="fld quick-hide" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="f-wmemo"></textarea></div>
       <div class="fld"><div class="fl">特殊</div><textarea id="f-special" style="min-height:52px" oninput="calcEstPrice('f')"></textarea></div>
     </div>
-    <div class="sec">
+    <div class="sec quick-hide">
       <div class="sh" onclick="togMachine()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
         <span>⚙️ 作業手順と設定の記録</span>
         <span id="machine-arrow" style="font-size:12px;color:var(--tx3)">▼ 開く</span>
@@ -346,7 +353,7 @@ select option{background:#1a1a24}
         </div>
       </div>
     </div>
-    <div class="sec">
+    <div class="sec quick-hide">
       <div class="sh">⏱ 作業情報</div>
       <div class="fl" style="padding:10px 14px 0">補正所要時間</div>
       <div class="tr">
@@ -375,6 +382,9 @@ select option{background:#1a1a24}
       </div>
       <div class="fld"><div class="fl">備考</div><textarea id="f-note"></textarea></div>
     </div>
+    <div style="display:flex;gap:6px;align-items:center;padding:6px 16px 0;justify-content:flex-end">
+      <button id="btn-quick-mode" onclick="togQuickMode()" style="font-size:10px;padding:3px 10px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx3);font-family:var(--f);cursor:pointer">⚡ クイック</button>
+    </div>
     <div style="display:flex;gap:10px;align-items:center">
       <button class="save-btn" onclick="confirmRec()" style="flex:1">受付を登録</button>
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
@@ -383,6 +393,7 @@ select option{background:#1a1a24}
         <span style="font-size:11px;color:var(--tx3)">件</span>
       </div>
       <button onclick="if(confirm('入力内容をリセットしますか？'))resetForm()" style="padding:0 14px;border-radius:14px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:14px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap">リセット</button>
+      <button onclick="applyLastRec()" style="padding:0 10px;border-radius:14px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap">前回同じ</button>
     </div>
   </div>
 </div>
@@ -403,7 +414,12 @@ select option{background:#1a1a24}
     </div>
     <div style="display:flex;gap:6px" id="bulk-btns"></div>
   </div>
-  <div class="fbar" id="wf"></div>
+  <div id="today-bar" style="display:none;padding:5px 16px;background:var(--s2);border-bottom:1px solid var(--bd);font-size:12px;position:sticky;top:52px;z-index:98"></div>
+  <div class="sw2"><input class="si" type="search" placeholder="客名・品名・補正内容…" id="wsrch" oninput="renderWork()"></div>
+  <div style="display:flex;align-items:center;gap:6px;padding:4px 16px 0">
+    <div class="fbar" id="wf" style="flex:1;padding:0;border:none"></div>
+    <select id="w-sort" onchange="renderWork()" style="font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f);outline:none;flex-shrink:0"><option value="reg">登録順</option><option value="due">納期順</option><option value="status">ステータス順</option></select>
+  </div>
   <div class="cl" id="wl"></div>
 </div>
 
@@ -675,40 +691,63 @@ select option{background:#1a1a24}
 
 <!-- グラフ分析オーバーレイ -->
 <div class="ov" id="ov-chart" onclick="closeChartOv(event)" style="z-index:700">
-  <div class="md" onclick="event.stopPropagation()" style="border-radius:20px;margin:auto;width:calc(100% - 24px);max-width:480px;max-height:90vh;display:flex;flex-direction:column;padding-bottom:20px">
+  <div class="md" onclick="event.stopPropagation()" style="border-radius:20px;margin:auto;width:calc(100% - 24px);max-width:480px;max-height:92vh;display:flex;flex-direction:column;padding-bottom:16px">
     <div class="mp"><div class="mpb"></div></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 12px;flex-shrink:0">
+    <!-- ヘッダー -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 10px;flex-shrink:0">
       <div class="mh" style="font-size:15px;padding:0;margin:0">📈 グラフ分析</div>
       <button onclick="closeChartOv()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer;padding:0;line-height:1">✕</button>
     </div>
-    <!-- グラフ種別タブ -->
-    <div style="display:flex;gap:6px;padding:0 16px 12px;flex-shrink:0;overflow-x:auto">
+    <!-- グラフ種別タブ（2行グリッド） -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:0 16px 10px;flex-shrink:0">
       <button class="chart-tab on" id="ctab-rank"  onclick="switchChartTab('rank')" >補正ランキング</button>
       <button class="chart-tab"    id="ctab-month" onclick="switchChartTab('month')">月別推移</button>
       <button class="chart-tab"    id="ctab-cat"   onclick="switchChartTab('cat')"  >カテゴリー</button>
       <button class="chart-tab"    id="ctab-dow"   onclick="switchChartTab('dow')"  >曜日別</button>
+      <button class="chart-tab"    id="ctab-hour"  onclick="switchChartTab('hour')" >時間帯別</button>
+      <button class="chart-tab"    id="ctab-price" onclick="switchChartTab('price')" >価格帯</button>
+      <button class="chart-tab"    id="ctab-combo" onclick="switchChartTab('combo')" >共起</button>
+      <button class="chart-tab"    id="ctab-eff"   onclick="switchChartTab('eff')"   >時間効率</button>
     </div>
-    <!-- 期間フィルター -->
-    <div style="display:flex;gap:8px;align-items:center;padding:0 16px 10px;flex-shrink:0;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx3)">
-        <span>期間</span>
-        <input type="date" id="chart-df" onchange="renderCurrentChart()" style="font-size:11px;padding:3px 6px;border-radius:7px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-family:var(--f);outline:none">
-        <span>〜</span>
-        <input type="date" id="chart-dt" onchange="renderCurrentChart()" style="font-size:11px;padding:3px 6px;border-radius:7px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-family:var(--f);outline:none">
+    <!-- フィルターエリア（期間＋カテゴリーを統合） -->
+    <div style="padding:0 16px 10px;flex-shrink:0;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--tx3);flex-shrink:0">期間</span>
+        <input type="date" id="chart-df" onchange="renderCurrentChart()" style="flex:1;font-size:11px;padding:5px 6px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-family:var(--f);outline:none">
+        <span style="font-size:11px;color:var(--tx3)">〜</span>
+        <input type="date" id="chart-dt" onchange="renderCurrentChart()" style="flex:1;font-size:11px;padding:5px 6px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-family:var(--f);outline:none">
+        <button onclick="clearChartFilter()" style="font-size:10px;padding:5px 9px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0">クリア</button>
       </div>
-      <button onclick="clearChartFilter()" style="font-size:10px;padding:3px 8px;border-radius:7px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer;white-space:nowrap">クリア</button>
+      <select id="chart-cat-fil" onchange="renderCurrentChart()" style="width:100%;font-size:12px;padding:6px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-family:var(--f);outline:none">
+        <option value="">カテゴリー：全て</option>
+      </select>
     </div>
     <!-- キャンバスエリア -->
     <div style="flex:1;overflow-y:auto;padding:0 16px">
-      <div id="chart-summary" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"></div>
+      <div id="chart-summary" style="margin-bottom:8px"></div>
       <div style="position:relative;width:100%">
-        <canvas id="chart-canvas" style="width:100%;max-height:320px"></canvas>
+        <canvas id="chart-canvas" style="width:100%;max-height:300px"></canvas>
       </div>
-      <div id="chart-legend" style="margin-top:12px;font-size:11px;color:var(--tx2)"></div>
+      <div id="chart-legend" style="margin-top:14px;font-size:11px;color:var(--tx2);line-height:1.8"></div>
     </div>
   </div>
 </div>
 <!-- 受付登録確認モーダル -->
+<!-- テンプレート管理モーダル -->
+<div class="ov" id="ov-tmpl" onclick="closeOv('ov-tmpl',event)" style="z-index:720">
+  <div class="md" onclick="event.stopPropagation()" style="border-radius:20px;margin:auto;width:calc(100% - 32px);max-width:400px;max-height:80vh;display:flex;flex-direction:column;padding-bottom:20px">
+    <div class="mp"><div class="mpb"></div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 10px;flex-shrink:0">
+      <div class="mh" style="font-size:15px;padding:0;margin:0">📋 テンプレート</div>
+      <button onclick="closeOvBtn('ov-tmpl')" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer;padding:0">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:0 16px">
+      <div id="tmpl-list"></div>
+      <button onclick="saveCurAsTemplate()" style="width:100%;margin-top:12px;padding:11px;border-radius:12px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:13px;font-weight:600;font-family:var(--f);cursor:pointer">＋ 現在の補正項目をテンプレートとして保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="ov-reg-confirm" style="z-index:650">
   <div class="md" style="border-radius:20px;margin:auto;width:calc(100% - 32px);max-width:400px;padding-bottom:20px;max-height:85vh;display:flex;flex-direction:column">
     <div class="mp"><div class="mpb"></div></div>
@@ -736,7 +775,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta1.1';
+const APP_VERSION = 'beta2.0';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -2525,6 +2564,24 @@ function recordCatUse(cat){
   u[cat]=(u[cat]||0)+1;
   localStorage.setItem(USE_KEY,JSON.stringify(u));
 }
+const ALT_USE_KEY='ar2_alt_use';
+function gAltUse(){try{return JSON.parse(localStorage.getItem(ALT_USE_KEY)||'{}');}catch(e){return {};}}
+function recordAltUse(alts){
+  if(!alts||!alts.length) return;
+  const u=gAltUse();
+  alts.forEach(a=>{const k=a.pk||a.n;if(k) u[k]=(u[k]||0)+(a.cnt||1);});
+  localStorage.setItem(ALT_USE_KEY,JSON.stringify(u));
+}
+function topAltPks(cat,n=3){
+  const u=gAltUse();
+  const items=ALT[cat]||[];
+  return items
+    .filter(a=>u[a.pk||a.n]>0)
+    .sort((a,b)=>(u[b.pk||b.n]||0)-(u[a.pk||a.n]||0))
+    .slice(0,n)
+    .map(a=>a.pk||a.n);
+}
+
 function sortedCats(cats){
   const u=gUse();
   return [...cats].sort((a,b)=>(u[b]||0)-(u[a]||0));
@@ -2575,9 +2632,62 @@ function showDash(){
   }
   renderDash();
 }
+function printDashReport(){
+  const body=document.getElementById('dash-body');
+  if(!body)return;
+  const mo=dashMonth||'';
+  const printWin=window.open('','_blank','width=600,height=800');
+  printWin.document.write(
+    '<html><head><meta charset="utf-8"><title>月次レポート '+mo+'</title>'
+    +'<style>body{font-family:sans-serif;font-size:12px;color:#111;padding:20px}'
+    +'h2{font-size:16px;margin-bottom:4px}hr{margin:12px 0;border:none;border-top:1px solid #ddd}'
+    +'.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}'
+    +'.tile{border:1px solid #ddd;border-radius:8px;padding:10px;text-align:center}'
+    +'.tk{font-size:10px;color:#666}.tv{font-size:20px;font-weight:700}'
+    +'table{width:100%;border-collapse:collapse;font-size:11px}'
+    +'th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}'
+    +'th{background:#f5f5f5}</style></head><body>'
+    +'<h2>Lis \u6708\u6b21\u30ec\u30dd\u30fc\u30c8 '+mo+'</h2><hr>'
+    +body.innerHTML
+    +'<hr><p style="font-size:10px;color:#999">\u51fa\u529b\u65e5\u6642: '+new Date().toLocaleString('ja-JP')+'</p>'
+    +'</body></html>'
+  );
+  printWin.document.close();
+  setTimeout(()=>printWin.print(),400);
+}
+
+function applyLastRec(){
+  const rs=gR();
+  if(!rs.length){showToast('\u767b\u9332\u30c7\u30fc\u30bf\u304c\u3042\u308a\u307e\u305b\u3093','',null,2000);return;}
+  const last=rs[0];
+  const fi=id=>document.getElementById(id);
+  if(last.store)fi('f-store').value=last.store;
+  if(last.client)fi('f-client').value=last.client;
+  if(last.staff)fi('f-staff').value=last.staff;
+  if(last.worker)fi('f-worker').value=last.worker;
+  if(last.item)fi('f-item').value=last.item;
+  if(last.cat){
+    fi('f-cat').value=last.cat;
+    buildAlts('alt-client',last.cat,true);
+    setTimeout(()=>{
+      restoreAlts('alt-client',last.cat,last.wAlts||last.cAlts||[]);
+      calcEstPrice('f');
+    },80);
+  }
+  showToast('\u524d\u56de\u306e\u5185\u5bb9\u3092\u8aad\u307f\u8fbc\u307f\u307e\u3057\u305f','',null,2500);
+}
+
 function closeDash(){
   const overlay=document.getElementById('dash-overlay');
   if(overlay) overlay.style.display='none';
+}
+function moveDashMonth(delta){
+  const [yr,mo]=dashMonth.split('-').map(Number);
+  const d=new Date(yr,mo-1+delta,1);
+  dashMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  const mi=document.getElementById('dash-month');
+  if(mi)mi.value=dashMonth;
+  renderDash();
 }
 function renderDash(){
   const mi=document.getElementById('dash-month');
@@ -2589,6 +2699,27 @@ function renderDash(){
     const [ry,rm]=r.inDate.split('-');
     return ry===yr&&rm===mo;
   });
+  // C-2: 前月データ取得
+  const prevDate=new Date(parseInt(yr),parseInt(mo)-2,1);
+  const pyr=String(prevDate.getFullYear());
+  const pmo=String(prevDate.getMonth()+1).padStart(2,'0');
+  const prevFiltered=recs.filter(r=>{
+    if(!r.inDate) return false;
+    const [ry,rm]=r.inDate.split('-');
+    return ry===pyr&&rm===pmo;
+  });
+  const prevCount=prevFiltered.length;
+  const prevPrice=prevFiltered.reduce((s,r)=>s+(r.price||0),0);
+  const prevAvg=prevCount?Math.round(prevPrice/prevCount):0;
+  // C-2: 前月比バッジ生成
+  const diffBadge=(cur,prev)=>{
+    if(!prev) return '';
+    const pct=Math.round((cur-prev)/prev*100);
+    const up=pct>=0;
+    return '<span style="font-size:10px;font-weight:700;color:'+(up?'var(--green)':'var(--red)')
+      +';display:block;margin-top:2px">'+(up?'▲':'▼')+Math.abs(pct)+'%'
+      +'<span style="font-weight:400;color:var(--tx3)"> vs前月</span></span>';
+  };
   // 集計
   const catCount={},catPrice={};
   let totalPrice=0,totalCount=filtered.length,totalTime=0;
@@ -2599,54 +2730,147 @@ function renderDash(){
     totalPrice+=(r.price||0);
     totalTime+=(r.time||0);
   });
+  // C-5: Lis専売集計
+  let lisCount=0;
+  filtered.forEach(r=>{
+    (r.wAlts||r.cAlts||[]).forEach(a=>{
+      if(LIS_ONLY_PKS.has(a.pk||a.n)) lisCount+=(a.cnt||1);
+    });
+  });
+  const lisPct=totalCount?Math.round(lisCount/totalCount*100):0;
+  // C-4: 納期遵守率（返却済案件のoutDate<=updatedAt or outDate>=返却日）
+  const retRecs=filtered.filter(r=>r.status==='ret'&&r.outDate);
+  const retCount=retRecs.length;
+  const ontimeCount=retRecs.filter(r=>{
+    // updatedAtをISO日付に変換して比較
+    const retDay=(r.updatedAt||'').slice(0,10);
+    return retDay<=r.outDate;
+  }).length;
+  const onTimePct=retCount?Math.round(ontimeCount/retCount*100):null;
   const avgHourly=totalTime>0?Math.round(totalPrice/totalTime*60):0;
   const totalTimeH=Math.floor(totalTime/60);
   const totalTimeM=totalTime%60;
+  const avgPrice=totalCount?Math.round(totalPrice/totalCount):0;
   const el=document.getElementById('dash-body');
   if(!el) return;
   if(!totalCount){
-    el.innerHTML=`<div style="text-align:center;padding:32px;color:var(--tx3);font-size:13px">この月のデータはありません</div>`;
+    el.innerHTML='<div style="text-align:center;padding:32px;color:var(--tx3);font-size:13px">この月のデータはありません</div>';
     return;
   }
   const sorted=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
   const maxCnt=sorted[0]?.[1]||1;
-  el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="padding:10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;text-align:center">
-        <div style="font-size:10px;color:var(--blue);font-weight:600">件数</div>
-        <div style="font-size:22px;font-weight:700">${totalCount}<span style="font-size:11px">件</span></div>
-      </div>
-      <div style="padding:10px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px;text-align:center">
-        <div style="font-size:10px;color:var(--green);font-weight:600">売上合計</div>
-        <div style="font-size:18px;font-weight:700">¥${totalPrice.toLocaleString()}</div>
-      </div>
-      <div style="padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px;text-align:center">
-        <div style="font-size:10px;color:var(--amber);font-weight:600">作業時間</div>
-        <div style="font-size:18px;font-weight:700">${totalTimeH}h${totalTimeM}m</div>
-      </div>
-      <div style="padding:10px;background:var(--purple-bg);border:1px solid rgba(155,114,207,.3);border-radius:10px;text-align:center">
-        <div style="font-size:10px;color:var(--purple);font-weight:600">時給換算</div>
-        <div style="font-size:18px;font-weight:700">${avgHourly?'¥'+avgHourly.toLocaleString():'—'}</div>
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--tx3);text-align:right;margin-bottom:10px">平均単価: ¥${totalCount?Math.round(totalPrice/totalCount).toLocaleString():0}</div>
-    <div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:8px">カテゴリー別件数</div>
-    ${sorted.map(([cat,cnt])=>{
+  el.innerHTML=
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+    +'<div style="padding:10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--blue);font-weight:600">件数</div>'
+    +'<div style="font-size:22px;font-weight:700">'+totalCount+'<span style="font-size:11px">件</span></div>'
+    +diffBadge(totalCount,prevCount)
+    +'</div>'
+    +'<div style="padding:10px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--green);font-weight:600">売上合計</div>'
+    +'<div style="font-size:18px;font-weight:700">¥'+totalPrice.toLocaleString()+'</div>'
+    +diffBadge(totalPrice,prevPrice)
+    +'</div>'
+    +'<div style="padding:10px;background:var(--amber-bg);border:1px solid rgba(196,132,58,.3);border-radius:10px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--amber);font-weight:600">作業時間</div>'
+    +'<div style="font-size:18px;font-weight:700">'+totalTimeH+'h'+totalTimeM+'m</div>'
+    +'</div>'
+    +'<div style="padding:10px;background:var(--purple-bg);border:1px solid rgba(155,114,207,.3);border-radius:10px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--purple);font-weight:600">時給換算</div>'
+    +'<div style="font-size:18px;font-weight:700">'+(avgHourly?'¥'+avgHourly.toLocaleString():'—')+'</div>'
+    +'</div>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--tx3);text-align:right;margin-bottom:10px">平均単価: ¥'+avgPrice.toLocaleString()+' '+diffBadge(avgPrice,prevAvg).replace('display:block','display:inline')+'</div>'
+    +'<div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:8px">カテゴリー別件数</div>'
+    +sorted.map(([cat,cnt])=>{
       const pct=Math.round(cnt/maxCnt*100);
       const price=catPrice[cat]||0;
-      return `<div style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-          <span style="font-size:12px;color:var(--tx1)">${cat}</span>
-          <span style="font-size:11px;color:var(--tx2)">${cnt}件 ¥${price.toLocaleString()}</span>
-        </div>
-        <div style="background:var(--s3);border-radius:4px;height:8px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:var(--blue);border-radius:4px;transition:width .3s"></div>
-        </div>
-      </div>`;
-    }).join('')}
-  `;
+      return '<div style="margin-bottom:8px">'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
+        +'<span style="font-size:12px;color:var(--tx1)">'+cat+'</span>'
+        +'<span style="font-size:11px;color:var(--tx2)">'+cnt+'件 ¥'+price.toLocaleString()+'</span>'
+        +'</div>'
+        +'<div style="background:var(--s3);border-radius:4px;height:8px;overflow:hidden">'
+        +'<div style="height:100%;width:'+pct+'%;background:var(--blue);border-radius:4px;transition:width .3s"></div>'
+        +'</div></div>';
+    }).join('')
+    +(lisCount>0
+      ? '<div style="margin-top:14px;padding:10px 12px;background:var(--purple-bg);border:1px solid rgba(155,114,207,.3);border-radius:10px">'
+        +'<div style="font-size:11px;color:var(--purple);font-weight:700;margin-bottom:4px">★ Lis専売工程</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
+        +'<span style="font-size:18px;font-weight:700;color:var(--purple)">'+lisCount+'<span style="font-size:11px">工程</span></span>'
+        +'<span style="font-size:12px;color:var(--tx2)">全体の'+lisPct+'%</span>'
+        +'</div></div>'
+      : '')
+    +(onTimePct!==null
+      ? '<div style="margin-top:10px;padding:10px 12px;background:var(--green-bg);border:1px solid rgba(90,172,122,.3);border-radius:10px">'
+        +'<div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px">✓ 納期遵守率</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
+        +'<span style="font-size:22px;font-weight:700;color:var(--green)">'+onTimePct+'<span style="font-size:13px">%</span></span>'
+        +'<span style="font-size:11px;color:var(--tx3)">返却済 '+retCount+'件中 '+ontimeCount+'件</span>'
+        +'</div></div>'
+      : '')
+    +_renderWeeklyBreakdown(filtered,yr,mo)
+    +_renderYearTotal(recs,yr,mo);
 }
 
+function _renderYearTotal(recs,yr,mo){
+  const moNum=parseInt(mo,10),yrNum=parseInt(yr,10);
+  const fyStart=moNum>=4?yrNum:yrNum-1;
+  const fyS=fyStart+'-04', fyE=(fyStart+1)+'-03';
+  const fy=recs.filter(r=>r.inDate&&r.inDate.slice(0,7)>=fyS&&r.inDate.slice(0,7)<=fyE);
+  if(!fy.length)return '';
+  const fyC=fy.length;
+  const fyP=fy.reduce((s,r)=>s+(r.price||0),0);
+  const fyM=[...new Set(fy.map(r=>r.inDate.slice(0,7)))].length;
+  const fyA=fyM?Math.round(fyP/fyM):0;
+  return '<div style="margin-top:14px;padding:10px 12px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px">'
+    +'<div style="font-size:11px;color:var(--tx2);font-weight:700;margin-bottom:8px">'
+    +'📅 '+fyStart+'年度累計（'+fyStart+'/4～'+(fyStart+1)+'/3）</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'
+    +'<div style="text-align:center;padding:8px;background:var(--s3);border-radius:8px"><div style="font-size:10px;color:var(--tx3);font-weight:600">総件数</div>'
+    +'<div style="font-size:18px;font-weight:700">'+fyC+'<span style="font-size:10px">件</span></div></div>'
+    +'<div style="text-align:center;padding:8px;background:var(--s3);border-radius:8px"><div style="font-size:10px;color:var(--tx3);font-weight:600">総売上</div>'
+    +'<div style="font-size:14px;font-weight:700">¥'+fyP.toLocaleString()+'</div></div>'
+    +'<div style="text-align:center;padding:8px;background:var(--s3);border-radius:8px"><div style="font-size:10px;color:var(--tx3);font-weight:600">月平均</div>'
+    +'<div style="font-size:14px;font-weight:700">¥'+fyA.toLocaleString()+'</div></div>'
+    +'</div></div>';
+}
+
+function _renderWeeklyBreakdown(filtered,yr,mo){
+  if(!filtered.length) return '';
+  // 月の週区切り（1〜7日=第1週、8〜14日=第2週、15〜21日=第3週、22〜末日=第4週）
+  const weeks=[
+    {label:'第1週',min:1,max:7},
+    {label:'第2週',min:8,max:14},
+    {label:'第3週',min:15,max:21},
+    {label:'第4週',min:22,max:31},
+  ];
+  const wCnt=weeks.map(w=>filtered.filter(r=>{
+    if(!r.inDate) return false;
+    const d=parseInt(r.inDate.slice(8,10),10);
+    return d>=w.min&&d<=w.max;
+  }).length);
+  const maxW=Math.max(...wCnt,1);
+  const wPrice=weeks.map(w=>filtered.filter(r=>{
+    if(!r.inDate) return false;
+    const d=parseInt(r.inDate.slice(8,10),10);
+    return d>=w.min&&d<=w.max;
+  }).reduce((s,r)=>s+(r.price||0),0));
+  return '<div style="margin-top:14px">'
+    +'<div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:8px">週別内訳</div>'
+    +weeks.map((w,i)=>wCnt[i]===0?'':
+      '<div style="margin-bottom:6px">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
+      +'<span style="font-size:11px;color:var(--tx2)">'+w.label+' ('+w.min+'～'+w.max+'日)</span>'
+      +'<span style="font-size:11px;color:var(--tx3)">'+wCnt[i]+'件 ¥'+wPrice[i].toLocaleString()+'</span>'
+      +'</div>'
+      +'<div style="background:var(--s3);border-radius:4px;height:6px;overflow:hidden">'
+      +'<div style="height:100%;width:'+Math.round(wCnt[i]/maxW*100)+'%;background:var(--amber);border-radius:4px;transition:width .3s"></div>'
+      +'</div></div>'
+    ).join('')
+    +'</div>';
+}
 function migrateCats(){
   try{
     const stored=gCt();
@@ -2800,6 +3024,21 @@ function importPriceJSON(ev){
   };
   r.readAsText(file);
 }
+function onClientInput(val){
+  const hint=document.getElementById('f-client-hint');
+  if(!hint)return;
+  const v=val.trim();
+  if(!v){hint.style.display='none';return;}
+  const past=gR().filter(r=>(r.client||''). trim()===v).sort((a,b)=>(b.inDate||''). localeCompare(a.inDate||'')).slice(0,1);
+  if(!past.length){hint.style.display='none';return;}
+  const lr=past[0];
+  const ld=lr.inDate?lr.inDate.slice(5).replace('-','/'):'—';
+  const la=(lr.wAlts||lr.cAlts||[]).slice(0,2).map(a=>a.n).join('・')||'—';
+  const lp=lr.price?' ¥'+lr.price.toLocaleString():'';
+  hint.style.display='block';
+  hint.innerHTML='🔄 前回: '+ld+'　'+la+lp;
+}
+
 function setDefaults(){
   const n=new Date();
   document.getElementById('f-in-date').value=n.toISOString().split('T')[0];
@@ -2807,6 +3046,17 @@ function setDefaults(){
   const defaultDays=parseInt(localStorage.getItem('ar2_default_days')||'3',10);
   const o=new Date(n);o.setDate(o.getDate()+defaultDays);
   document.getElementById('f-out-date').value=o.toISOString().split('T')[0];
+  // 客名サジェスト更新
+  const _dl=document.getElementById('client-suggestions');
+  if(_dl){
+    const _names=[...new Set(gR().map(r=>r.client||'').filter(Boolean))].slice(0,80);
+    _dl.innerHTML=_names.map(n=>`<option value="${n}">`).join('');
+  }
+  const _dli=document.getElementById('item-suggestions');
+  if(_dli){
+    const _items=[...new Set(gR().map(r=>r.item||'').filter(Boolean))].slice(0,80);
+    _dli.innerHTML=_items.map(n=>`<option value="${n}">`).join('');
+  }
   // 2-1: 伝票No.自動インクリメント
   const lastTicket=localStorage.getItem('ar2_last_ticket');
   if(lastTicket&&/^\d{5}$/.test(lastTicket)){
@@ -2839,7 +3089,10 @@ function showScr(n){
   document.getElementById('scr-'+n).classList.add('on');
   document.getElementById('nb-'+n).classList.add('on');
   if(n==='work')renderWork();
-  if(n==='hist')renderHist();
+  if(n==='hist'){
+    if(window._drillFilter) renderHistDrill();
+    else renderHist();
+  }
   window.scrollTo(0,0);
 }
 
@@ -2857,6 +3110,136 @@ function selType(id){
     const inDate=document.getElementById('f-in-date').value;
     if(inDate) document.getElementById('f-out-date').value=inDate;
   }
+}
+
+// ══ TEMPLATE ══
+const TMPL_KEY='ar2_alt_tmpl';
+function gTmpl(){try{return JSON.parse(localStorage.getItem(TMPL_KEY)||'[]');}catch(e){return[];}}
+function sTmpl(v){localStorage.setItem(TMPL_KEY,JSON.stringify(v));}
+
+function renderTmplBar(){
+  const bar=document.getElementById('tmpl-bar');
+  if(!bar)return;
+  const allTmpls=gTmpl();
+  if(!allTmpls.length){bar.style.display='none';return;}
+  // ② 現在のカテゴリーに合うテンプレートのみ表示
+  const curCat=document.getElementById('f-cat')?.value||'';
+  const tmpls=allTmpls.map((t,i)=>({t,i})).filter(({t})=>!t.cat||t.cat===curCat);
+  if(!tmpls.length){bar.style.display='none';return;}
+  bar.style.display='flex';
+  bar.innerHTML=tmpls.map(({t,i})=>
+    `<button onclick="applyTemplate(${i})" style="font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f);cursor:pointer;white-space:nowrap">${t.name}</button>`
+  ).join('');
+}
+
+function openTmplMgr(){
+  renderTmplList();
+  openOv('ov-tmpl');
+}
+
+function renderTmplList(){
+  const el=document.getElementById('tmpl-list');if(!el)return;
+  const tmpls=gTmpl();
+  if(!tmpls.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--tx3);font-size:13px">テンプレートなし<br><span style="font-size:11px">補正項目を選択後「現在の補正項目を保存」で登録</span></div>';return;}
+  // ⑤ カテゴリー別グルーピング
+  const groups={};
+  tmpls.forEach((t,i)=>{
+    const k=t.cat||'その他';
+    if(!groups[k])groups[k]=[];
+    groups[k].push({t,i});
+  });
+  el.innerHTML=Object.entries(groups).map(([cat,items])=>
+    '<div style="margin-bottom:4px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--tx3);padding:8px 0 4px;border-bottom:1px solid var(--bd2)">' +cat+'</div>'
+    +items.map(({t,i})=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--bd)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${t.name}</div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:2px">${(t.alts||[]).map(a=>a.n+(a.procs&&a.procs.length?'['+a.procs.slice(0,2).join('/')+']':'')+(a.cnt&&a.cnt>1?' ×'+a.cnt:'')).join(' / ')}</div>
+      </div>
+      <button onclick="applyTemplate(${i});closeOvBtn('ov-tmpl')" style="padding:5px 10px;border-radius:8px;border:none;background:var(--gold);color:#0a0a0f;font-size:11px;font-weight:700;font-family:var(--f);cursor:pointer">適用</button>
+      <button onclick="deleteTmpl(${i})" style="padding:5px 8px;border-radius:8px;border:1px solid rgba(192,90,90,.3);background:var(--red-bg);color:var(--red);font-size:11px;font-family:var(--f);cursor:pointer">削除</button>
+    </div>`).join('')
+    +'</div>'
+  ).join('');
+}
+
+function saveCurAsTemplate(){
+  const cat=document.getElementById('f-cat').value;
+  const alts=colAlts('alt-client',cat);
+  if(!alts.length){showToast('補正項目を選択してください','',null,2000);return;}
+  const name=prompt('テンプレート名を入力してください');
+  if(!name||!name.trim())return;
+  const tmpls=gTmpl();
+  tmpls.push({name:name.trim(),cat,alts});
+  sTmpl(tmpls);
+  renderTmplList();
+  renderTmplBar();
+  showToast('テンプレートを保存しました','',null,2000);
+}
+
+function applyTemplate(i){
+  const t=gTmpl()[i];if(!t)return;
+  const cat=document.getElementById('f-cat').value;
+  if(t.cat&&t.cat!==cat){
+    document.getElementById('f-cat').value=t.cat;
+    onCatChange();
+    setTimeout(()=>{restoreAlts('alt-client',t.cat,t.alts);renderTmplBar();calcEstPrice('f');},100);
+  }else{
+    restoreAlts('alt-client',cat,t.alts);
+    calcEstPrice('f');
+  }
+}
+
+function deleteTmpl(i){
+  const tmpls=gTmpl();
+  tmpls.splice(i,1);
+  sTmpl(tmpls);
+  renderTmplList();
+  renderTmplBar();
+}
+
+// ══ SWIPE STATUS ══
+let _swipeX=0,_swipeY=0;
+const STATUS_ORDER=['recv','work','done','ret'];
+function swipeStart(e,id){
+  _swipeX=e.touches[0].clientX;
+  _swipeY=e.touches[0].clientY;
+}
+function swipeEnd(e,id){
+  const dx=e.changedTouches[0].clientX-_swipeX;
+  const dy=e.changedTouches[0].clientY-_swipeY;
+  if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx)*0.8) return;
+  e.stopPropagation();
+  const rs=gR();const i=rs.findIndex(r=>r.id===id);if(i<0)return;
+  const cur=rs[i].status;
+  if(dx>0){
+    // 右スワイプ→返却済
+    if(cur==='ret') return;
+    rs[i].status='ret';
+    sR(rs);renderWork();renderHist();
+    showToast('返却済に変更','↩ 元に戻す',()=>{rs[i].status=cur;sR(rs);renderWork();},4000);
+  }else{
+    // 左スワイプ→次のステータス
+    const idx=STATUS_ORDER.indexOf(cur);
+    const next=STATUS_ORDER[idx+1];
+    if(!next||next==='ret') return;
+    rs[i].status=next;
+    const nextLabel=(STATUS.find(s=>s.id===next)||{label:next}).label;
+    sR(rs);renderWork();renderHist();
+    showToast(nextLabel+'に変更','↩ 元に戻す',()=>{rs[i].status=cur;sR(rs);renderWork();},4000);
+  }
+}
+
+// ══ QUICK MODE ══
+let _quickMode=false;
+function togQuickMode(){
+  _quickMode=!_quickMode;
+  const btn=document.getElementById('btn-quick-mode');
+  if(btn){btn.style.background=_quickMode?'var(--gold)':'var(--s2)';btn.style.color=_quickMode?'#0a0a0f':'var(--tx3)';}
+  document.querySelectorAll('.quick-hide').forEach(el=>{
+    el.style.display=_quickMode?'none':'';
+  });
 }
 
 // ══ TOGGLE BTNS ══
@@ -2918,27 +3301,51 @@ function onPatOther(){
 function onCatChange(){
   const cat=document.getElementById('f-cat').value;
   buildAlts('alt-client',cat,true);
+  renderTmplBar();
+  const u=gAltUse();
+  const items=ALT[cat]||[];
+  const top=items.filter(a=>(u[a.pk||a.n]||0)>=3).sort((a,b)=>(u[b.pk||b.n]||0)-(u[a.pk||a.n]||0)).slice(0,3);
+  if(top.length>=2){
+    const names=top.map(a=>a.n).join('・');
+    showToast('💡 '+names+' をよく使っています','適用',()=>{
+      restoreAlts('alt-client',cat,top.map(a=>({n:a.n,pk:a.pk||a.n})));
+      calcEstPrice('f');
+    },5000);
+  }
 }
 function buildAlts(cid,cat,isW){
   const items=ALT[cat]||[];
   const el=document.getElementById(cid);
   if(!items.length){el.innerHTML='<div style="padding:6px 0;font-size:13px;color:var(--tx3)">補正項目なし</div>';return;}
+  // B-2: よく使う項目のpkセット
+  const pinPks=cid==='alt-client'?new Set(topAltPks(cat,3)):new Set();
   // 2-6: 検索ボックス
+  const pinBadgeHtml=pinPks.size
+    ?`<div style="font-size:10px;color:var(--amber);font-weight:600;margin-bottom:4px;padding:0 2px">⚡ よく使う</div>`
+    :'';
   const searchHtml=`<input type="text" id="${cid}-search" placeholder="絞り込み…"
     oninput="filterAlts(this.value,'${cid}')"
     style="width:100%;margin-bottom:6px;padding:6px 10px;border-radius:8px;
     border:1px solid var(--bd2);background:var(--s3);color:var(--tx);
     font-size:13px;font-family:var(--f);outline:none">`;
-  el.innerHTML=searchHtml+items.map((a,i)=>{
-    const uid=cid+'-'+i;
+  // ピン項目を先頭に、残りを後続に並べる
+  const pinItems=items.filter(a=>pinPks.has(a.pk||a.n));
+  const restItems=items.filter(a=>!pinPks.has(a.pk||a.n));
+  const orderedItems=[...pinItems,...restItems];
+  el.innerHTML=searchHtml+(pinItems.length?pinBadgeHtml:'')+orderedItems.map((a)=>{
+    const uid=cid+'-'+items.indexOf(a); // 元インデックス維持（colAltsと一致させる）
     // 2-7: Lis専売バッジ
     const lisBadge=LIS_ONLY_PKS.has(a.pk)
       ?`<span style="font-size:9px;background:var(--purple-bg);color:var(--purple);padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:700">★専売</span>`
       :'';
+    // B-2: よく使うバッジ
+    const pinBadge=pinPks.has(a.pk||a.n)
+      ?`<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 4px;border-radius:4px;margin-left:4px;font-weight:700">⚡</span>`
+      :'';
     return `<div class="ai">
       <div class="ah" onclick="togAlt('${uid}')">
         <input type="checkbox" id="chk-${uid}" onclick="event.stopPropagation();togAlt('${uid}')">
-        <span class="an">${a.n}${lisBadge}</span>
+        <span class="an">${a.n}${lisBadge}${pinBadge}</span>
       </div>
       <div class="ab" id="body-${uid}" data-name="${a.pk||a.n}" data-dm="${a.dm}" data-dir="${a.d}" data-isw="${isW}">
         ${buildAB(a,uid,isW)}
@@ -4127,6 +4534,17 @@ function syncT(){
 }
 
 function confirmRec(){
+  // ④ バリデーション
+  const _cat=document.getElementById('f-cat').value;
+  const _alts=colAlts('alt-client',_cat);
+  if(!_cat){
+    showToast('カテゴリーを選択してください','',null,2500);
+    document.getElementById('f-cat').focus();return;
+  }
+  if(!_alts.length){
+    showToast('補正項目を選択してください','',null,2500);
+    document.getElementById('alt-client').scrollIntoView({behavior:'smooth',block:'center'});return;
+  }
   const ticket=document.getElementById('f-ticket').value.trim();
   const client=document.getElementById('f-client').value.trim()||'—';
   const item=document.getElementById('f-item').value.trim()||'—';
@@ -4157,6 +4575,38 @@ function confirmRec(){
     row('納期',outDisp)+
     row('金額',priceDisp,!!price)+
     (bulkDisp?row('一括',bulkDisp):'');
+  // ② 金額未入力時に目安料金を表示
+  if(!price){
+    const _bdEl=document.getElementById('f-breakdown');
+    const _bdData=_bdEl?JSON.parse(_bdEl.dataset.items||'[]'):[];
+    const _est=document.getElementById('f-price')?.value;
+    if(_est&&parseInt(_est,10)>0){
+      const _estTotal=parseInt(_est,10);
+      let _estHtml='<div style="margin-top:10px;padding:8px 10px;background:var(--gold-bg);border:1px solid rgba(200,168,74,.3);border-radius:10px;font-size:12px">'
+        +'<span style="color:var(--gold);font-weight:700">📊 目安料金: ¥'+_estTotal.toLocaleString()+'</span>';
+      if(_bdData.length){
+        _estHtml+='<div style="margin-top:4px;color:var(--tx3);font-size:11px">'
+          +_bdData.map(b=>b.name+(b.optLabels&&b.optLabels.length?' +'+b.optLabels.join(' +'):'')
+            +' ¥'+b.total.toLocaleString()).join(' / ')+'</div>';
+      }
+      _estHtml+='</div>';
+      document.getElementById('reg-confirm-body').innerHTML+=_estHtml;
+    }
+  }
+  // C-1: リピート客検出
+  const _cl=client&&client!=='\u2014'?client.trim():'';
+  if(_cl){
+    const _past=gR().filter(r=>(r.client||'').trim()===_cl);
+    if(_past.length>0){
+      const _lr=_past.slice().sort((a,b)=>(b.inDate||'').localeCompare(a.inDate||''))[0];
+      const _la=(_lr.wAlts||_lr.cAlts||[]).slice(0,2).map(a=>a.n).join('\u30fb')||'\u2014';
+      const _ld=_lr.inDate?_lr.inDate.slice(5).replace('-','/'): '\u2014';
+      document.getElementById('reg-confirm-body').innerHTML+=
+        '<div style="margin-top:10px;padding:8px 10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;font-size:12px">'
+        +'<span style="color:var(--blue);font-weight:700">🔄 '+_past.length+'\u56de\u76ee\u306e\u6765\u5e97</span>'
+        +'<span style="color:var(--tx3);margin-left:8px">\u524d\u56de: '+_ld+'\u3000'+_la+'</span></div>';
+    }
+  }
   document.getElementById('reg-confirm-ok').onclick=()=>{closeRegConfirm();saveRec();};
   document.getElementById('ov-reg-confirm').classList.add('on');
 }
@@ -4167,6 +4617,48 @@ function closeRegConfirm(){
 // ══ CHART ══
 let _chartInst=null;
 let _curChartTab='rank';
+let _chartDrillRecs=[];
+// C-3: グラフ→履歴ドリルダウン
+function drillToHist(filterFn,fromLabel){
+  closeChartOv();
+  // 履歴フィルターをクリアしてからフィルター適用
+  document.getElementById('hf').value='';
+  document.getElementById('ht2').value='';
+  document.getElementById('srch').value='';
+  hiFil='all';
+  // カスタムフィルターをキャッシュ
+  window._drillFilter={fn:filterFn,label:fromLabel};
+  showScr('hist');
+  renderHistDrill();
+}
+function renderHistDrill(){
+  if(!window._drillFilter)return;
+  const {fn,label}=window._drillFilter;
+  let all=gR().filter(fn);
+  const el=document.getElementById('hl');
+  const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
+  const tpL=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
+  // ドリルダウンバナー
+  const banner=`<div style="padding:8px 14px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:12px;color:var(--blue);font-weight:600">📊 ${label}（${all.length}件）</span>
+    <button onclick="window._drillFilter=null;renderHist()" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer">クリア</button>
+  </div>`;
+  if(!all.length){el.innerHTML=banner+'<div class="empty"><div class="ei">📋</div>該当なし</div>';return;}
+  el.innerHTML=banner+`<table class="ht"><thead><tr>
+    <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
+    <th>客名</th><th>品名</th><th>カテゴリー</th><th>補正内容</th><th>金額</th><th>状態</th>
+  </tr></thead><tbody>
+  ${all.map(r=>`<tr onclick="openDet('${r.id}')" style="cursor:pointer">
+    <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
+    <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+r.ticket:''}</td>
+    <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
+    <td>${r.client||'—'}</td><td>${r.item||'—'}</td><td>${r.cat||'—'}</td>
+    <td>${aSum(r.cAlts)}</td>
+    <td style="font-family:var(--fm);color:var(--gold);text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
+    <td>${stL(r.status)}</td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
 
 function showChartOv(){
   // 履歴の期間フィルターを引き継ぐ
@@ -4177,6 +4669,13 @@ function showChartOv(){
   _curChartTab='rank';
   document.querySelectorAll('.chart-tab').forEach(b=>b.classList.remove('on'));
   document.getElementById('ctab-rank')?.classList.add('on');
+  const catSel=document.getElementById('chart-cat-fil');
+  if(catSel){
+    const cats=gCt();
+    catSel.innerHTML='<option value="">\u30ab\u30c6\u30b4\u30ea\u30fc\uff1a\u5168\u3066</option>'+
+      cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+    catSel.value='';
+  }
   document.getElementById('ov-chart').classList.add('on');
   setTimeout(()=>renderCurrentChart(),50);
 }
@@ -4188,6 +4687,8 @@ function closeChartOv(e){
 function clearChartFilter(){
   document.getElementById('chart-df').value='';
   document.getElementById('chart-dt').value='';
+  const cs=document.getElementById('chart-cat-fil');
+  if(cs) cs.value='';
   renderCurrentChart();
 }
 function switchChartTab(tab){
@@ -4200,13 +4701,18 @@ function renderCurrentChart(){
   if(_chartInst){_chartInst.destroy();_chartInst=null;}
   const df=document.getElementById('chart-df')?.value||'';
   const dt=document.getElementById('chart-dt')?.value||'';
+  const catFil=document.getElementById('chart-cat-fil')?.value||'';
   let recs=gR();
   if(df) recs=recs.filter(r=>r.inDate&&r.inDate>=df);
   if(dt) recs=recs.filter(r=>r.inDate&&r.inDate<=dt);
+  if(catFil) recs=recs.filter(r=>r.cat===catFil);
   const total=recs.length;
   const sumEl=document.getElementById('chart-summary');
   const legEl=document.getElementById('chart-legend');
-  sumEl.innerHTML=`<div style="font-size:11px;color:var(--tx3)">対象: <b style="color:var(--tx)">${total}件</b>${df||dt?' (期間フィルター中)':''}</div>`;
+  const filters=[];
+  if(df||dt) filters.push('期間指定');
+  if(catFil) filters.push(catFil);
+  sumEl.innerHTML=`<div style="font-size:11px;color:var(--tx3)">対象: <b style="color:var(--tx)">${total}件</b>${filters.length?' <span style="color:var(--amber)">('+filters.join('・')+')</span>':''}</div>`;
   legEl.innerHTML='';
   if(!total){
     const cv=document.getElementById('chart-canvas');
@@ -4215,10 +4721,16 @@ function renderCurrentChart(){
     legEl.textContent='データがありません';
     return;
   }
-  if(_curChartTab==='rank') renderChartRank(recs);
+  if(_curChartTab==='rank') renderChartRank(recs,catFil);
   else if(_curChartTab==='month') renderChartMonth(recs);
   else if(_curChartTab==='cat') renderChartCat(recs);
   else if(_curChartTab==='dow') renderChartDow(recs);
+  else if(_curChartTab==='hour') renderChartHour(recs);
+  else if(_curChartTab==='price') renderChartPrice(recs);
+  else if(_curChartTab==='combo') renderChartCombo(recs);
+  else if(_curChartTab==='eff')   renderChartEff(recs);
+  // C-3: ドリルダウン用のデータをチャートに紐付け
+  _chartDrillRecs=recs;
 }
 
 const _CHART_COLORS=['#c8a84a','#5b9bd5','#5aac7a','#9b72cf','#c4843a','#c05a5a','#4ab8c8','#a8c84a','#c84a8a','#4a6cc8'];
@@ -4238,7 +4750,7 @@ function _newChart(type,labels,datasets,opts={}){
 }
 
 // ── 補正ランキング（横棒）
-function renderChartRank(recs){
+function renderChartRank(recs,catFil=''){
   const cnt={};
   recs.forEach(r=>{
     (r.wAlts||r.cAlts||[]).forEach(a=>{
@@ -4293,6 +4805,11 @@ function renderChartMonth(recs){
     options:{
       responsive:true,maintainAspectRatio:true,
       plugins:{legend:{display:false}},
+      onClick:(_,els)=>{
+        if(!els.length)return;
+        const mo=keys[els[0].index];
+        drillToHist(r=>r.inDate&&r.inDate.slice(0,7)===mo, mo+'の案件');
+      },
       scales:{
         x:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}},
         y:{position:'left',ticks:{color:'#5b9bd5',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'},title:{display:true,text:'件数',color:'#5b9bd5',font:{size:10}}},
@@ -4301,7 +4818,7 @@ function renderChartMonth(recs){
     }
   });
   document.getElementById('chart-legend').innerHTML=
-    `<span style="color:#5b9bd5">■ 件数</span>&ensp;<span style="color:#c8a84a">— 売上</span>`;
+    `<span style="color:#5b9bd5">■ 件数</span>&ensp;<span style="color:#c8a84a">— 売上</span><span style="font-size:10px;color:var(--tx3);margin-left:8px">棒をタップ→履歴</span>`;
 }
 
 // ── カテゴリー構成（ドーナツ）
@@ -4320,7 +4837,12 @@ function renderChartCat(recs){
     borderWidth:2,
   }],{
     cutout:'62%',
-    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed}件 (${Math.round(ctx.parsed/total*100)}%)`}}}
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed}件 (${Math.round(ctx.parsed/total*100)}%)`}}},
+    onClick:(_,els)=>{
+      if(!els.length)return;
+      const cat=sorted[els[0].index][0];
+      drillToHist(r=>(r.cat||'未分類')===cat, cat+'の案件');
+    }
   });
   document.getElementById('chart-legend').innerHTML=
     sorted.map(([k,v],i)=>`<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">
@@ -4345,14 +4867,198 @@ function renderChartDow(recs){
     borderRadius:6,
   }],{
     plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:ctx=>`売上: ¥${price[ctx.dataIndex].toLocaleString()}`}}},
+    onClick:(_,els)=>{
+      if(!els.length)return;
+      const di=els[0].index;
+      drillToHist(r=>{
+        if(!r.inDate)return false;
+        return new Date(r.inDate).getDay()===di;
+      }, DOW[di]+'曜日の案件');
+    },
     scales:{
       x:{ticks:{color:'#efefef',font:{size:13,weight:'700'}},grid:{display:false}},
       y:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}}
     }
   });
   document.getElementById('chart-legend').innerHTML=
-    '<span style="color:#c05a5a">■ 日</span>&ensp;<span style="color:#9b72cf">■ 平日</span>&ensp;<span style="color:#5b9bd5">■ 土</span>';
+    '<span style="color:#c05a5a">■ 日</span>&ensp;<span style="color:#9b72cf">■ 平日</span>&ensp;<span style="color:#5b9bd5">■ 土</span><span style="font-size:10px;color:var(--tx3);margin-left:8px">棒をタップ→履歴</span>';
 }
+// ── 時間帯別件数（棒）
+function renderChartHour(recs){
+  const labels=[];
+  const cnt=new Array(24).fill(0);
+  const price=new Array(24).fill(0);
+  for(let h=0;h<24;h++) labels.push(h+'時');
+  recs.forEach(r=>{
+    if(!r.inTime) return;
+    const h=parseInt((r.inTime||'00:00').split(':')[0],10);
+    if(h>=0&&h<24){cnt[h]++;price[h]+=(r.price||0);}
+  });
+  const hasData=cnt.some(v=>v>0);
+  if(!hasData){document.getElementById('chart-legend').textContent='持込時刻データなし';return;}
+  // 営業時間帯（9〜19時）を強調
+  const bgColors=cnt.map((_,i)=>i>=9&&i<=19?'#c8a84acc':'#5b9bd544');
+  _newChart('bar',labels,[{
+    data:cnt,
+    backgroundColor:bgColors,
+    borderRadius:4,
+  }],{
+    plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:ctx=>`売上: ¥${price[ctx.dataIndex].toLocaleString()}`}}},
+    scales:{
+      x:{ticks:{color:'#8888a0',font:{size:10}},grid:{display:false}},
+      y:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}}
+    }
+  });
+  const peak=cnt.indexOf(Math.max(...cnt));
+  document.getElementById('chart-legend').innerHTML=
+    '<span style="color:var(--gold)">■ 営業時間帯(9～19時)</span>'
+    +(cnt[peak]>0?'&ensp;<span style="color:var(--tx3)">ピーク: '+peak+'時台 ('+cnt[peak]+'件)</span>':'');
+}
+
+
+// ── 価格帯分布（棒）
+function renderChartPrice(recs){
+  const buckets=[
+    {label:'〜¥1,999', max:1999},
+    {label:'¥2,000〜4,999', max:4999},
+    {label:'¥5,000〜9,999', max:9999},
+    {label:'¥10,000〜19,999', max:19999},
+    {label:'¥20,000〜', max:Infinity},
+  ];
+  const cnt=new Array(buckets.length).fill(0);
+  const total_price=new Array(buckets.length).fill(0);
+  recs.forEach(r=>{
+    const p=r.price||0;
+    const i=buckets.findIndex(b=>p<=b.max);
+    if(i>=0){cnt[i]++;total_price[i]+=p;}
+  });
+  const labels=buckets.map(b=>b.label);
+  const bucketMaxes=[1999,4999,9999,19999,Infinity];
+  _newChart('bar',labels,[{
+    data:cnt,
+    backgroundColor:_CHART_COLORS.map(c=>c+'cc'),
+    borderRadius:6,
+  }],{
+    plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:ctx=>`合計: ¥${total_price[ctx.dataIndex].toLocaleString()}`}}},
+    onClick:(_,els)=>{
+      if(!els.length)return;
+      const bi=els[0].index;
+      const lo=bi===0?0:bucketMaxes[bi-1]+1;
+      const hi=bucketMaxes[bi];
+      drillToHist(r=>{const p=r.price||0;return p>=lo&&p<=hi;}, labels[bi]+'の案件');
+    },
+    scales:{
+      x:{ticks:{color:'#8888a0',font:{size:10}},grid:{display:false}},
+      y:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}},
+    }
+  });
+  const peak=cnt.indexOf(Math.max(...cnt));
+  const avgPrice=recs.length?Math.round(recs.reduce((s,r)=>s+(r.price||0),0)/recs.length):0;
+  document.getElementById('chart-legend').innerHTML=
+    buckets.map((b,i)=>cnt[i]>0
+      ?`<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">`
+        +`<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${_CHART_COLORS[i%_CHART_COLORS.length]}"></span>`
+        +`${b.label} <b>${cnt[i]}</b>${i===peak?' ★':''}` 
+        +`</span>`
+      :''
+    ).join('')
+    +`<div style="margin-top:6px;color:var(--tx3)">平均単価: <b style="color:var(--gold)">¥${avgPrice.toLocaleString()}</b></div>`;
+}
+
+
+// ── 補正共起ランキング（横棒）
+function renderChartCombo(recs){
+  const pair={};
+  recs.forEach(r=>{
+    const alts=[...(r.wAlts||r.cAlts||[])].map(a=>a.n);
+    if(alts.length<2) return;
+    for(let i=0;i<alts.length;i++){
+      for(let j=i+1;j<alts.length;j++){
+        const key=[alts[i],alts[j]].sort().join(' + ');
+        pair[key]=(pair[key]||0)+1;
+      }
+    }
+  });
+  const sorted=Object.entries(pair).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  if(!sorted.length){document.getElementById('chart-legend').textContent='複数補正データなし';return;}
+  const labels=sorted.map(([k])=>k);
+  const data=sorted.map(([,v])=>v);
+  _newChart('bar',labels,[{
+    data,
+    backgroundColor:data.map((_,i)=>_CHART_COLORS[i%_CHART_COLORS.length]+'cc'),
+    borderRadius:4,
+  }],{
+    indexAxis:'y',
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}},
+      y:{ticks:{color:'#efefef',font:{size:10}},grid:{display:false}}
+    }
+  });
+  // 上位3ペアをテンプレート保存ボタン付きで表示
+  document.getElementById('chart-legend').innerHTML=
+    '<div style="margin-bottom:8px">'
+    +sorted.slice(0,5).map(([k,v],i)=>
+      `<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">`
+      +`<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${_CHART_COLORS[i%_CHART_COLORS.length]}"></span>${k} <b>${v}</b></span>`
+    ).join('')+'</div>'
+    +sorted.slice(0,3).map(([k],i)=>{
+      const names=k.split(' + ');
+      return `<button onclick="saveComboAsTmpl(${JSON.stringify(names)})" style="display:inline-block;margin:2px 4px 2px 0;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer">★ ${k} をテンプレートに</button>`;
+    }).join('');
+}
+
+function saveComboAsTmpl(names){
+  const catFil=document.getElementById('chart-cat-fil')?.value||'';
+  const name=names.join(' + ')+(catFil?' ['+catFil+']':'');
+  const tmpls=gTmpl();
+  if(tmpls.find(t=>t.name===name)){
+    showToast('「'+name+'」は登録済みです','',null,2500);return;
+  }
+  const alts=names.map(n=>({n,pk:n}));
+  tmpls.push({name,cat:catFil||'',alts});
+  sTmpl(tmpls);
+  showToast('「'+name+'」をテンプレートに保存しました','',null,2500);
+}
+
+// ── 作業時間効率（カテゴリー別 平均時給換算）
+function renderChartEff(recs){
+  const cat={};
+  recs.forEach(r=>{
+    if(!r.time||!r.price) return;
+    const c=r.cat||'未分類';
+    if(!cat[c]) cat[c]={time:0,price:0,cnt:0};
+    cat[c].time+=r.time;
+    cat[c].price+=r.price;
+    cat[c].cnt++;
+  });
+  const entries=Object.entries(cat)
+    .filter(([,v])=>v.time>0)
+    .map(([k,v])=>({k,rate:Math.round(v.price/v.time*60),cnt:v.cnt,avgP:Math.round(v.price/v.cnt)}))
+    .sort((a,b)=>b.rate-a.rate)
+    .slice(0,12);
+  if(!entries.length){document.getElementById('chart-legend').textContent='時間・金額データなし';return;}
+  const labels=entries.map(e=>e.k);
+  const data=entries.map(e=>e.rate);
+  _newChart('bar',labels,[{
+    data,
+    backgroundColor:data.map((v,i)=>v>=5000?'#5aac7acc':v>=3000?'#c8a84acc':'#c05a5acc'),
+    borderRadius:4,
+  }],{
+    indexAxis:'y',
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`時給: ¥${ctx.parsed.x.toLocaleString()}`}}},
+    scales:{
+      x:{ticks:{color:'#8888a0',font:{size:10},callback:v=>'¥'+v.toLocaleString()},grid:{color:'rgba(255,255,255,.06)'}},
+      y:{ticks:{color:'#efefef',font:{size:10}},grid:{display:false}}
+    }
+  });
+  document.getElementById('chart-legend').innerHTML=
+    '<span style="color:#5aac7a">■ ¥5,000+/h</span>&ensp;<span style="color:#c8a84a">■ ¥3,000+/h</span>&ensp;<span style="color:#c05a5a">■ ¥3,000未満</span>'
+    +'<div style="margin-top:6px;font-size:10px;color:var(--tx3)">'
+    +entries.slice(0,3).map(e=>`${e.k}: 平均¥${e.avgP.toLocaleString()}/件（${e.cnt}件）`).join(' | ')
+    +'</div>';
+}
+
 // ══ SAVE ══
 function saveRec(){
   // 5-3: 伝票No.バリデーション（数字のみ・未入力は00000）
@@ -4407,13 +5113,24 @@ function saveRec(){
   if(ticket!=='00000') localStorage.setItem('ar2_last_ticket',ticket);
   // 2-2: カテゴリー使用回数を記録
   recordCatUse(cat);
+  // B-1: 補正項目使用頻度を記録
+  recordAltUse(rec.wAlts||[]);
+  const _savedId=rec.id;
   resetForm();
   showScr('work');
-  if(bulkCount>1) showToast(bulkCount+'件を一括登録しました','',null,2500);
+  if(bulkCount>1){
+    showToast(bulkCount+'件を一括登録しました','',null,2500);
+  }else{
+    showToast('登録しました','✂️ 作業中へ',()=>{
+      const rs=gR();const i=rs.findIndex(r=>r.id===_savedId);
+      if(i>=0){rs[i].status='work';sR(rs);renderWork();}
+    },4000);
+  }
 }
 
 function resetForm(){
   _priceLocked.f=false;_priceLocked.e=false;
+  const _ch=document.getElementById('f-client-hint');if(_ch)_ch.style.display='none';
   const hint=document.getElementById('f-price-hint');
   const lb=document.getElementById('f-price-lock');
   if(hint) hint.style.display='none';
@@ -4443,17 +5160,58 @@ function resetForm(){
 
 // ══ WORK ══
 function renderWork(){
-  const all=gR().filter(r=>r.status!=='ret');
-  document.getElementById('wc').textContent=all.length?all.length+'件進行中':'案件なし';
+  const all=gR().filter(r=>r.status!=='れて');
+  // ① 今日のサマリーバー
+  const todayStr=new Date().toISOString().slice(0,10);
+  const todayRecs=gR().filter(r=>r.inDate===todayStr);
+  const todayBar=document.getElementById('today-bar');
+  if(todayBar){
+    if(todayRecs.length){
+      const todaySales=todayRecs.reduce((s,r)=>s+(r.price||0),0);
+      const todayDone=todayRecs.filter(r=>r.status==='ret'||r.status==='done').length;
+      todayBar.style.display='block';
+      todayBar.innerHTML='本日 <b style="color:var(--tx)">'+todayRecs.length+'件</b>'
+        +'　売上 <b style="color:var(--gold)">¥'+todaySales.toLocaleString()+'</b>'
+        +(todayDone?' 　完了<b style="color:var(--green)"> '+todayDone+'件</b>':'');
+    }else{
+      todayBar.style.display='none';
+    }
+  }
+  const all2=gR().filter(r=>r.status!=='ret');
+  const recvC=all2.filter(r=>r.status==='recv').length;
+  const workC=all2.filter(r=>r.status==='work').length;
+  const doneC=all2.filter(r=>r.status==='done').length;
+  const wcEl=document.getElementById('wc');
+  if(wcEl){
+    wcEl.innerHTML=all2.length
+      ?all2.length+'件'
+        +(recvC?'<span style="font-size:10px;margin-left:6px;color:var(--blue)">受'+recvC+'</span>':'')
+        +(workC?'<span style="font-size:10px;margin-left:4px;color:var(--amber)">作'+workC+'</span>':'')
+        +(doneC?'<span style="font-size:10px;margin-left:4px;color:var(--green)">完'+doneC+'</span>':'')
+      :'案件なし';
+  }
   // 3-3: 全件数を常時表示
   const totalRecs=gR().length;
   const rcEl=document.getElementById('rec-count');
   if(rcEl) rcEl.textContent='全'+totalRecs+'件';
-  const fs=[{id:'all',l:'全て'},{id:'recv',l:'受付済'},{id:'work',l:'作業中'},{id:'done',l:'完成'}];
+  const fs=[{id:'all',l:'全て'},{id:'recv',l:'受付済'},{id:'work',l:'作業中'},{id:'done',l:'完成'},{id:'star',l:'★スター'}];
   document.getElementById('wf').innerHTML=fs.map(f=>
     `<button class="fp${wkFil===f.id?' on':''}" onclick="setWF('${f.id}')">${f.l}</button>`
   ).join('');
-  const list=wkFil==='all'?all:all.filter(r=>r.status===wkFil);
+  const wq=(document.getElementById('wsrch')?.value||'').toLowerCase();
+  let list=wkFil==='star'?all2.filter(r=>r.starred):wkFil==='all'?all2:all2.filter(r=>r.status===wkFil);
+  if(wq) list=list.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff,r.note,aSum(r.wAlts),aSum(r.cAlts)].some(v=>(v||'').toLowerCase().includes(wq)));
+  // ① ソート
+  const wSortMode=document.getElementById('w-sort')?.value||'reg';
+  if(wSortMode==='due') list=[...list].sort((a,b)=>{
+    if(!a.outDate&&!b.outDate)return 0;
+    if(!a.outDate)return 1; if(!b.outDate)return -1;
+    return a.outDate.localeCompare(b.outDate);
+  });
+  else if(wSortMode==='status'){
+    const ord={recv:0,work:1,done:2};
+    list=[...list].sort((a,b)=>(ord[a.status]??9)-(ord[b.status]??9));
+  }
   const el=document.getElementById('wl');
   el.innerHTML=list.length?list.map(r=>rCard(r,selMode)).join(''):`<div class="empty"><div class="ei">✂️</div>該当する案件はありません</div>`;
   const bb=document.getElementById('bulk-btns');
@@ -4496,11 +5254,12 @@ function bulkStatus(st){
 
 // ══ HISTORY ══
 function renderHist(){
+  window._drillFilter=null; // ドリルダウン解除
   const q=(document.getElementById('srch')?.value||'').toLowerCase();
   const df=document.getElementById('hf')?.value||'';
   const dt=document.getElementById('ht2')?.value||'';
   let all=gR();
-  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff,r.note,r.cMemo,r.wMemo,r.special,aSum(r.wAlts),aSum(r.cAlts)].some(v=>(v||'').toLowerCase().includes(q)));
   if(df)all=all.filter(r=>r.inDate&&r.inDate>=df);
   if(dt)all=all.filter(r=>r.inDate&&r.inDate<=dt);
   document.getElementById('hf2').innerHTML=[{id:'all',label:'全て'},...TYPES].map(t=>
@@ -4667,6 +5426,12 @@ function closeConfirm(){
 }
 
 // ══ CARD ══
+function togStar(id){
+  const rs=gR();const i=rs.findIndex(r=>r.id===id);if(i<0)return;
+  rs[i].starred=!rs[i].starred;
+  sR(rs);renderWork();
+}
+
 function rCard(r,showSel){
   const st=STATUS.find(s=>s.id===r.status)||STATUS[0];
   const inD=r.inDate?r.inDate.slice(5).replace('-','/'):'—';
@@ -4678,10 +5443,14 @@ function rCard(r,showSel){
     :diffDays<0?';border-left:3px solid var(--red)'
     :diffDays===0?';border-left:3px solid var(--red)'
     :diffDays===1?';border-left:3px solid var(--amber)'
+    :diffDays<=7?';border-left:2px solid var(--bd2)'
     :'';
-  const urgentBadge=diffDays!==null&&diffDays<=1
-    ?`<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;background:${diffDays<1?'var(--red-bg)':'var(--amber-bg)'};color:${diffDays<1?'var(--red)':'var(--amber)'}">${diffDays<0?'超過':diffDays===0?'本日':'明日'}</span>`
-    :'';
+  const urgentBadge=diffDays===null?'':
+    diffDays<0?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;background:var(--red-bg);color:var(--red)">超過</span>':
+    diffDays===0?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;background:var(--red-bg);color:var(--red)">本日</span>':
+    diffDays===1?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;background:var(--amber-bg);color:var(--amber)">明日</span>':
+    diffDays<=7?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600;margin-left:4px;background:var(--s3);color:var(--tx3)">あと'+diffDays+'日</span>':
+    ''
   const tags=[r.cat,r.mat].filter(Boolean).map(t=>`<span class="rtg">${t}</span>`).join('');
   const altTags=(r.cAlts||[]).slice(0,4).map(a=>{
     let s=a.n+(a.dir?' '+a.dir:'');
@@ -4689,7 +5458,7 @@ function rCard(r,showSel){
     return `<span class="rtg" style="color:var(--gold);border-color:rgba(200,168,74,.3)">${s}</span>`;
   }).join('');
   const selCb=showSel?`<input type="checkbox" id="wsel-${r.id}" ${selIds.has(r.id)?'checked':''} onclick="togSelCard('${r.id}',event)" style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0;margin-right:6px;cursor:pointer">`:'';
-  return `<div class="rc" style="overflow:hidden${urgentStyle}" onclick="${showSel?`togSelCard('${r.id}',event)`:`openDet('${r.id}')`}">
+  return `<div class="rc" data-rid="${r.id}" style="overflow:hidden${urgentStyle};position:relative" onclick="${showSel?`togSelCard('${r.id}',event)`:`openDet('${r.id}')`}" ontouchstart="swipeStart(event,'${r.id}')" ontouchend="swipeEnd(event,'${r.id}')">
     <div class="rh">
       <div class="rm" style="display:flex;align-items:flex-start">
         ${selCb}
@@ -4702,16 +5471,17 @@ function rCard(r,showSel){
             <div class="rn">${r.client||r.item||'—'}${r.isStaff?' 👤':''}</div>
             <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>a.n+(a.dir?' '+a.dir:'')).join(' · ')}</div>
           </div>
-          <div class="rs">${r.store||''} ${r.item||''}</div>
+          <div class="rs">${r.store||''} ${r.item||''}${r.worker?` <span style="font-size:10px;color:var(--tx3)">✂️${r.worker}</span>`:''}</div>
         </div>
       </div>
       <span class="sbg s-${st.id}">${st.label}</span>
     </div>
     ${tags?`<div class="rb">${tags}</div>`:''}
     ${altTags?`<div class="rb">${altTags}</div>`:''}
-    <div class="rf">
-      <span class="rd">持込 ${inD} → 納品 ${outD}${urgentBadge}</span>
-      <span class="rp">${r.price?'¥'+r.price.toLocaleString():''}</span>
+    <div class="rf" style="display:flex;align-items:center;gap:6px">
+      <button onclick="event.stopPropagation();togStar('${r.id}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:0;line-height:1;flex-shrink:0">${r.starred?'★':'☆'}</button>
+      <span class="rd" style="flex:1">持込 ${inD} → 納品 ${outD}${urgentBadge}</span>
+      <span class="rp">${r.price?'\u00a5'+r.price.toLocaleString():''}</span>
     </div>
   </div>`;
 }
@@ -4831,7 +5601,8 @@ function openDet(id){
     dw('案件種別',r.typeLbl)+dw('店名',r.store)+
     dw('持ち込み',(r.inDate||'')+(r.inTime?' '+r.inTime:''))+dw('納品予定',r.outDate)+
     dw('伝票No.',r.ticket?'#'+r.ticket:'')+
-    dw('客名',r.client+(r.isStaff?' 👤スタッフ':''))+dw('担当者',r.staff)+dw('担当作業者',r.worker)+
+    (r.client?`<div class="dw"><span class="dk">客名</span><span class="dv" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>${r.client+(r.isStaff?' 👤スタッフ':'')}</span>${(()=>{const n=gR().filter(x=>x.id!==r.id&&(x.client||'').trim()===r.client.trim()).length;return n>0?`<button onclick="drillToHist(x=>(x.client||'').trim()==='${r.client.trim()}','${r.client.trim()}の全案件');closeOvBtn('ov-det')" style="font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0">📋 過去${n}件</button>`:'';})()}</span></div>`:'')+
+    dw('担当者',r.staff)+dw('担当作業者',r.worker)+
     dw('品名',r.item)+dw('カテゴリー',r.cat)+
     (r.clrH?`<div class="dw"><span class="dk">色</span><span class="dv"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${r.clrH};border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:4px"></span>${r.clrN||r.clrH}</span></div>`:'')+
     dw('柄',r.pat?r.pat.startsWith('その他:')?'その他（'+r.pat.slice(4)+'）':r.pat:'')+dw('素材',r.mat+(r.isSpm?' ⚡特殊素材':''))+
@@ -4842,7 +5613,7 @@ function openDet(id){
     dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
     dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true)+
     dw('登録日時',r.createdAt?r.createdAt.slice(0,16).replace('T',' '):null)+
-    dw('更新日時',r.updatedAt&&r.updatedAt!==r.createdAt?r.updatedAt.slice(0,16).replace('T',' '):null);
+    dw('更新日時',r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):null);
   openOv('ov-det');
 }
 function updSt(id,st){
@@ -4909,14 +5680,14 @@ function openEdit(){
       <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="e-ticket" maxlength="5" inputmode="numeric" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.ticket||''}"></div>
       <div class="fld">
         <div class="fl">客名 <button id="e-btn-staff" class="tog${r.isStaff?' on-b':''}" onclick="this.classList.toggle('on-b');document.getElementById('edit-body').dataset.estf=this.classList.contains('on-b')?'1':'0'">スタッフ</button></div>
-        <input type="text" id="e-client" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.client||''}">
+        <input type="text" id="e-client" autocomplete="off" list="client-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.client||''}">
       </div>
       <div class="fld"><div class="fl">担当者名</div><input type="text" id="e-staff" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.staff||''}"></div>
       <div class="fld"><div class="fl">担当作業者</div><select id="e-worker" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none"><option value="">（選択）</option>${gStaff().map(s=>`<option${s===r.worker?' selected':''}>${s}</option>`).join('')}</select></div>
     </div>
     <div class="sec">
       <div class="sh">👔 商品情報</div>
-      <div class="fld"><div class="fl">品名</div><input type="text" id="e-item" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.item||''}"></div>
+      <div class="fld"><div class="fl">品名</div><input type="text" id="e-item" autocomplete="off" list="item-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.item||''}"></div>
       <div class="fld"><div class="fl">カテゴリー</div><select id="e-cat" onchange="onEditCatChange()" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none">${selOpt(cats,r.cat)}</select></div>
       <div>
         <div class="fl" style="padding:10px 14px 6px">色</div>
@@ -5246,7 +6017,11 @@ function doPrint(){
     ${pr('所要時間',r.time?r.time+'分':null)}${pr('使用資材',r.materials,true)}
     ${pr('金額',r.price?'¥'+r.price.toLocaleString():null)}
     ${pr('備考',r.note,true)}
-    <div class="pf">Lis 補正記録 / 出力：${new Date().toLocaleString('ja-JP')}</div>`;
+    <div class="ps">ステータス・管理</div>
+    ${pr('ステータス',(STATUS.find(s=>s.id===r.status)||{label:'—'}).label)}
+    ${pr('登録日時',r.createdAt?r.createdAt.slice(0,16).replace('T',' '):null)}
+    ${pr('更新日時',r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):null)}
+    <div class="pf">Lis 補正記録 v${APP_VERSION} / 出力：${new Date().toLocaleString('ja-JP')}</div>`;
   window.print();
   setTimeout(()=>document.getElementById('print-area').innerHTML='',1200);
 }
@@ -5257,7 +6032,7 @@ function doHistPDF(){
   const df=document.getElementById('hf')?.value||'';
   const dt=document.getElementById('ht2')?.value||'';
   let all=gR();
-  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff,r.note,r.cMemo,r.wMemo,r.special,aSum(r.wAlts),aSum(r.cAlts)].some(v=>(v||'').toLowerCase().includes(q)));
   if(df)all=all.filter(r=>r.inDate&&r.inDate>=df);
   if(dt)all=all.filter(r=>r.inDate&&r.inDate<=dt);
   if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
@@ -5328,7 +6103,7 @@ function doCSV(){
   const df=document.getElementById('hf')?.value||'';
   const dt=document.getElementById('ht2')?.value||'';
   let all=gR();
-  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff].some(v=>(v||'').toLowerCase().includes(q)));
+  if(q)all=all.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff,r.note,r.cMemo,r.wMemo,r.special,aSum(r.wAlts),aSum(r.cAlts)].some(v=>(v||'').toLowerCase().includes(q)));
   if(df)all=all.filter(r=>r.inDate&&r.inDate>=df);
   if(dt)all=all.filter(r=>r.inDate&&r.inDate<=dt);
   if(hiFil!=='all')all=all.filter(r=>r.type===hiFil);
@@ -5878,9 +6653,11 @@ if('serviceWorker' in navigator){
       <button onclick="closeDash()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--s3);color:var(--tx1);font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer">✕</button>
     </div>
     <div style="padding:10px 16px;border-bottom:1px solid var(--bd2);flex-shrink:0;display:flex;align-items:center;gap:8px">
-      <label style="font-size:12px;color:var(--tx2);font-weight:600">月を選択</label>
+      <button onclick="moveDashMonth(-1)" style="padding:6px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:14px;font-weight:700;font-family:var(--f);cursor:pointer;flex-shrink:0">◀</button>
       <input type="month" id="dash-month" onchange="dashMonth=this.value;renderDash()"
-        style="padding:6px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx1);font-size:13px;font-family:var(--f);outline:none;flex:1">
+        style="padding:6px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx1);font-size:13px;font-family:var(--f);outline:none;flex:1;text-align:center">
+      <button onclick="moveDashMonth(1)" style="padding:6px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:14px;font-weight:700;font-family:var(--f);cursor:pointer;flex-shrink:0">▶</button>
+      <button onclick="printDashReport()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0">📄 PDF</button>
     </div>
     <div id="dash-body" style="padding:14px 16px;overflow-y:auto;flex:1"></div>
   </div>
