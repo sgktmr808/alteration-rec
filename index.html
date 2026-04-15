@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta2.1</div>
+      <div class="hv" id="app-hv">beta2.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -777,7 +777,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta2.1';
+const APP_VERSION = 'beta2.2';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -4147,6 +4147,15 @@ const PRICE_OPT={
   '袖丈_レザー:肩から詰め':5000,
   '着丈_レザー:前裾ラウンド':2000,
   'ファスナー交換_レザー:引き手革替え':1200,
+
+  // ── 袖丈_シャツ：タンザク移動（=剣ボロ移動） ──
+  '袖丈_シャツ:タンザク移動':1000,
+
+  // ── デニムダメージ残し加工：巾広（=裾上げ_パンツ:巾広と同義） ──
+  'デニムダメージ残し加工:巾広':500,
+
+  // ── 着丈_スカート：ワイド（=巾広仕上げ、フレア同等） ──
+  '着丈_スカート:ワイド':800,
 
   // ── 毛皮系 ──
   '袖丈_毛皮:カフス':2000,
