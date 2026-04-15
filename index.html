@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToTop('scr-new')" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta2.5</div>
+      <div class="hv" id="app-hv">beta2.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -781,7 +781,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta2.5';
+const APP_VERSION = 'beta2.6';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -6760,16 +6760,11 @@ function handleXLSXImport(ev){
           createdAt:cv(c,'登録日時')||'',
           updatedAt:cv(c,'更新日時')||'',
         };
-        // _importedAltsをcAltsの簡易テキスト形式に変換（テキストのみ・構造なし）
-        if(rec._importedAlts){
-          rec.cAlts=rec._importedAlts.split(/[・/／]/).map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
-          delete rec._importedAlts;
-        }
-        // _importedAltsをcAltsの簡易テキスト形式に変換
+        // 補正内容テキストをcAltsに復元（・／で分割）
         if(rec._importedAlts){
           rec.cAlts=rec._importedAlts.split(/[・\/／]/).map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
-          delete rec._importedAlts;
         }
+        delete rec._importedAlts;
         // 意味のあるデータが最低1つあるレコードのみ追加
         if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
         cur.unshift(rec);existIds.add(newId);added++;
@@ -6879,7 +6874,7 @@ function handleCSVRecImport(ev){
           mat:cv(c,'素材'),
           isSpm:cv(c,'特殊素材').includes('特殊'),
           cAlts:[],wAlts:[],
-          _importedAlts:cv(c,'客様指定補正')||'',
+          _importedAlts:cv(c,'客様指定補正')||cv(c,'実行工程')||'',
           cMemo:cv(c,'指定メモ'),
           wMemo:cv(c,'工程メモ'),
           special:cv(c,'特殊'),
@@ -6892,6 +6887,11 @@ function handleCSVRecImport(ev){
           createdAt:cv(c,'登録日時')||'',
           updatedAt:cv(c,'更新日時')||'',
         };
+        // 補正内容テキストをcAltsに復元（・／で分割）
+        if(rec._importedAlts){
+          rec.cAlts=rec._importedAlts.split(/[・\/／\s*\/\s*]/).map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
+        }
+        delete rec._importedAlts;
         // 意味のあるデータが最低1つあるレコードのみ追加
         if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
         cur.unshift(rec);existIds.add(newId);added++;
