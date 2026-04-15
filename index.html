@@ -124,6 +124,7 @@ select option{background:#1a1a24}
 .fp.on{background:var(--gold);color:#0a0a0f;border-color:var(--gold);font-weight:700}
 .cl{padding:0 16px;display:flex;flex-direction:column;gap:10px}
 .rc{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;cursor:pointer}
+.rc-bar{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:14px 0 0 14px}
 .rh{padding:10px 14px;background:var(--s2);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .rm{flex:1;min-width:0}
 .rt{display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap}
@@ -269,7 +270,7 @@ select option{background:#1a1a24}
     </div>
     <div class="sec">
       <div class="sh">👔 商品情報</div>
-      <div class="fld"><div class="fl">品名</div><input type="text" id="f-item" autocomplete="off" list="item-suggestions"><datalist id="item-suggestions"></datalist></div>
+      <div class="fld"><div class="fl">品名</div><input type="text" id="f-item" autocomplete="off" list="item-suggestions" oninput="onItemInput(this.value)"><datalist id="item-suggestions"></datalist></div>
       <div class="fld"><div class="fl">カテゴリー</div><select id="f-cat" onchange="onCatChange()"></select></div>
       <div>
         <div class="fl" style="padding:10px 14px 6px">色</div>
@@ -482,6 +483,7 @@ select option{background:#1a1a24}
         <button class="mac" style="background:var(--blue-bg);color:var(--blue);border:1px solid rgba(91,155,213,.3)" onclick="doPrint()">🖨 PDF</button>
         <button class="mac" style="background:var(--gold-bg);color:var(--gold);border:1px solid rgba(200,168,74,.3)" onclick="openEdit()">✏️ 編集</button>
         <button class="mac" style="background:var(--purple-bg);color:var(--purple);border:1px solid rgba(155,114,207,.3)" onclick="duplicateRec()">📋 複製</button>
+        <button class="mac" id="det-star-btn" onclick="togDetStar()" style="background:var(--s3);color:var(--tx2);border:1px solid var(--bd2)">☆ スター</button>
         <button class="mac" style="background:var(--red-bg);color:var(--red);border:1px solid rgba(192,90,90,.3)" onclick="doDel()">削除</button>
       </div>
       <button class="mc" onclick="closeOvBtn('ov-det')">✕ 閉じる</button>
@@ -2564,6 +2566,23 @@ function recordCatUse(cat){
   u[cat]=(u[cat]||0)+1;
   localStorage.setItem(USE_KEY,JSON.stringify(u));
 }
+// カテゴリーカラーマップ（サフィックスキーワードで照合）
+const CAT_COLORS={
+  'パンツ':'#5b9bd5','スカート':'#c84a8a','ジャケット':'#9b72cf',
+  'コート':'#4ab8c8','シャツ':'#c8a84a','ニット':'#5aac7a',
+  'スウェット':'#a8c84a','ドレス':'#c05a5a','ワンピース':'#c4843a',
+  'ブルゾン':'#4a6cc8','小物':'#8888a0','レザー':'#c8a020',
+  'Tシャツ':'#5aac7a','ベスト':'#9b72cf','ジレ':'#7272cf',
+  '毛皮':'#a0a0a0','リメイク':'#c84a4a'
+};
+function getCatColor(cat){
+  if(!cat)return null;
+  for(const[k,v]of Object.entries(CAT_COLORS)){
+    if(cat.includes(k))return v;
+  }
+  return '#8888a0';
+}
+
 const ALT_USE_KEY='ar2_alt_use';
 function gAltUse(){try{return JSON.parse(localStorage.getItem(ALT_USE_KEY)||'{}');}catch(e){return {};}}
 function recordAltUse(alts){
@@ -3024,6 +3043,40 @@ function importPriceJSON(ev){
   };
   r.readAsText(file);
 }
+// カテゴリー自動推定マップ（品名キーワード→カテゴリーサフィックス）
+const ITEM_CAT_MAP=[
+  [/パンツ|トラウザー|スラックス|デニム|ジーンズ/i,'パンツ'],
+  [/ジャケット|テーラード|スーツジャケ/i,'ジャケット'],
+  [/コート|トレンチ|ダッフル/i,'コート'],
+  [/スカート|フレア|プリーツ/i,'スカート'],
+  [/シャツ|ブラウス|カッター/i,'シャツ'],
+  [/ニット|セーター|カーディガン/i,'ニット'],
+  [/ワンピース/i,'ワンピース'],
+  [/ドレス/i,'ドレス'],
+  [/ブルゾン|ボンバー|スタジャン/i,'ブルゾン'],
+  [/レザー|レザ/i,'レザー'],
+  [/ベスト|ジレ/i,'ジャケット'],
+  [/Tシャツ|ティーシャツ/i,'Tシャツ'],
+];
+function onItemInput(val){
+  if(!val||val.length<2)return;
+  const cats=gCt();
+  for(const[re,suf]of ITEM_CAT_MAP){
+    if(re.test(val)){
+      const matched=cats.find(c=>c.includes(suf));
+      if(matched){
+        const curCat=document.getElementById('f-cat').value;
+        if(curCat===matched)return;
+        showToast('📋 カテゴリーー「'+matched+'」を提案','適用',()=>{
+          document.getElementById('f-cat').value=matched;
+          onCatChange();
+        },4000);
+        return;
+      }
+    }
+  }
+}
+
 function onClientInput(val){
   const hint=document.getElementById('f-client-hint');
   if(!hint)return;
@@ -4545,6 +4598,17 @@ function confirmRec(){
     showToast('補正項目を選択してください','',null,2500);
     document.getElementById('alt-client').scrollIntoView({behavior:'smooth',block:'center'});return;
   }
+  // ② 伝票番号重複チェック
+  const _ticketRaw=document.getElementById('f-ticket').value.trim();
+  if(_ticketRaw&&_ticketRaw!=='00000'){
+    const _tNum=_ticketRaw.replace(/[^0-9]/g,'').padStart(5,'0');
+    const _dupRec=gR().find(r=>r.ticket===_tNum&&r.status!=='ret');
+    if(_dupRec){
+      window._confirmDupCb=null;
+      showConfirm('伝票No.重複',`#${_tNum} は進行中の案件に存在します（${_dupRec.client||'—'}）。そのまま登録しますか？`,'var(--amber)','#0a0a0f',()=>_doConfirmRec());
+      window._confirmDupCb=true;return;
+    }
+  }
   const ticket=document.getElementById('f-ticket').value.trim();
   const client=document.getElementById('f-client').value.trim()||'—';
   const item=document.getElementById('f-item').value.trim()||'—';
@@ -4607,6 +4671,13 @@ function confirmRec(){
         +'<span style="color:var(--tx3);margin-left:8px">\u524d\u56de: '+_ld+'\u3000'+_la+'</span></div>';
     }
   }
+  document.getElementById('reg-confirm-ok').onclick=()=>{closeRegConfirm();saveRec();};
+  document.getElementById('ov-reg-confirm').classList.add('on');
+}
+function _doConfirmRec(){
+  window._confirmDupCb=null;
+  // バリデーション済みなのでそのまま確認画面表示
+  const priceEl=document.getElementById('f-price');
   document.getElementById('reg-confirm-ok').onclick=()=>{closeRegConfirm();saveRec();};
   document.getElementById('ov-reg-confirm').classList.add('on');
 }
@@ -5212,6 +5283,8 @@ function renderWork(){
     const ord={recv:0,work:1,done:2};
     list=[...list].sort((a,b)=>(ord[a.status]??9)-(ord[b.status]??9));
   }
+  // ① スター案件を常に先頭に固定
+  if(wkFil!=='star') list=[...list].sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
   const el=document.getElementById('wl');
   el.innerHTML=list.length?list.map(r=>rCard(r,selMode)).join(''):`<div class="empty"><div class="ei">✂️</div>該当する案件はありません</div>`;
   const bb=document.getElementById('bulk-btns');
@@ -5458,7 +5531,8 @@ function rCard(r,showSel){
     return `<span class="rtg" style="color:var(--gold);border-color:rgba(200,168,74,.3)">${s}</span>`;
   }).join('');
   const selCb=showSel?`<input type="checkbox" id="wsel-${r.id}" ${selIds.has(r.id)?'checked':''} onclick="togSelCard('${r.id}',event)" style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0;margin-right:6px;cursor:pointer">`:'';
-  return `<div class="rc" data-rid="${r.id}" style="overflow:hidden${urgentStyle};position:relative" onclick="${showSel?`togSelCard('${r.id}',event)`:`openDet('${r.id}')`}" ontouchstart="swipeStart(event,'${r.id}')" ontouchend="swipeEnd(event,'${r.id}')">
+  const catColor=getCatColor(r.cat);
+  return `<div class="rc" data-rid="${r.id}" style="overflow:hidden${urgentStyle};position:relative" onclick="${showSel?`togSelCard('${r.id}',event)`:`openDet('${r.id}')`}" ontouchstart="swipeStart(event,'${r.id}')" ontouchend="swipeEnd(event,'${r.id}')">${catColor?`<div class="rc-bar" style="background:${catColor}"></div>`:''}
     <div class="rh">
       <div class="rm" style="display:flex;align-items:flex-start">
         ${selCb}
@@ -5590,6 +5664,15 @@ function resetWAltsToClient(){
   restoreAlts('walts-alts',cat,rs[i].cAlts||[]);
 }
 
+function togDetStar(){
+  if(!curId)return;
+  const rs=gR();const i=rs.findIndex(r=>r.id===curId);if(i<0)return;
+  rs[i].starred=!rs[i].starred;sR(rs);
+  const btn=document.getElementById('det-star-btn');
+  if(btn){btn.textContent=(rs[i].starred?'★':'\u2606')+' スター';btn.style.color=rs[i].starred?'var(--gold)':'var(--tx2)';}
+  renderWork();
+}
+
 function openDet(id){
   const r=gR().find(r=>r.id===id);if(!r)return;
   curId=id;
@@ -5614,6 +5697,8 @@ function openDet(id){
     dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true)+
     dw('登録日時',r.createdAt?r.createdAt.slice(0,16).replace('T',' '):null)+
     dw('更新日時',r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):null);
+  const _sb=document.getElementById('det-star-btn');
+  if(_sb){_sb.textContent=(r.starred?'★':'☆')+' スター';_sb.style.color=r.starred?'var(--gold)':'var(--tx2)';}
   openOv('ov-det');
 }
 function updSt(id,st){
