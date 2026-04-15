@@ -224,10 +224,10 @@ select option{background:#1a1a24}
 <div id="storage-top-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9990;background:var(--red-bg);border-bottom:1px solid rgba(192,90,90,.5);padding:6px 16px;font-size:11px;color:var(--red);font-weight:700;text-align:center"></div>
 
 <div class="screen on" id="scr-new">
-  <div class="hdr">
+  <div class="hdr" onclick="scrollToTop('scr-new')" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta2.4</div>
+      <div class="hv" id="app-hv">beta2.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -243,7 +243,7 @@ select option{background:#1a1a24}
         <div style="display:flex;gap:10px;align-items:flex-end">
           <div style="flex:1.2">
             <div class="fl">持ち込み日 <button onclick="setToday('f-in-date')" class="tog" style="padding:2px 7px;font-size:10px">今日</button></div>
-            <input type="date" id="f-in-date" style="width:100%">
+            <input type="date" id="f-in-date" style="width:100%" onchange="syncOutDate(this.value)">
           </div>
           <div style="flex:1">
             <div class="fl">時刻</div>
@@ -252,13 +252,16 @@ select option{background:#1a1a24}
         </div>
       </div>
       <div class="fld">
-        <div class="fl">納品日 <button onclick="setToday('f-out-date')" class="tog" style="padding:2px 7px;font-size:10px">今日</button></div>
+        <div class="fl">納品日 <button onclick="setToday('f-out-date')" class="tog" style="padding:2px 7px;font-size:10px">今日</button> <button onclick="syncOutDate(document.getElementById('f-in-date').value)" class="tog" style="padding:2px 7px;font-size:10px">持込と同日</button></div>
         <input type="date" id="f-out-date" style="width:100%">
       </div>
     </div>
     <div class="sec" id="sec-ticket">
       <div class="sh">🏷 伝票・顧客</div>
-      <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="f-ticket" maxlength="5" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+      <div class="fld">
+        <div class="fl">伝票No.（下5桁）<button id="btn-no-ticket" onclick="setNoTicket()" class="tog" style="padding:2px 7px;font-size:10px;margin-left:4px">伝票なし</button></div>
+        <input type="text" id="f-ticket" maxlength="5" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'');clearNoTicket()">
+      </div>
       <div class="fld">
         <div class="fl">客名 <button id="btn-staff" class="tog" onclick="togStaff()">スタッフ</button></div>
         <input type="text" id="f-client" autocomplete="off" list="client-suggestions" oninput="onClientInput(this.value)">
@@ -400,7 +403,7 @@ select option{background:#1a1a24}
 </div>
 
 <div class="screen" id="scr-work">
-  <div class="hdr">
+  <div class="hdr" onclick="scrollToTop('scr-work')" style="cursor:pointer">
     <div style="min-width:0;flex:1"><div class="ht">登録済</div><div class="hv" id="wc"></div></div>
     <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
       <span id="rec-count" style="font-size:10px;color:var(--tx3);white-space:nowrap"></span>
@@ -426,8 +429,8 @@ select option{background:#1a1a24}
 </div>
 
 <div class="screen" id="scr-hist">
-  <div class="hdr">
-    <div style="min-width:0;flex:1"><div class="ht">履歴</div></div>
+  <div class="hdr" onclick="scrollToTop('scr-hist')" style="cursor:pointer">
+    <div style="min-width:0;flex:1"><div class="ht">履歴</div><div class="hv" id="hist-count"></div></div>
     <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">
       <button class="btn-g" onclick="showDash()" style="font-size:18px;padding:4px 6px;line-height:1" title="ダッシュボード">📊</button>
       <button class="btn-g" onclick="showChartOv()" style="font-size:18px;padding:4px 6px;line-height:1" title="グラフ分析">📈</button>
@@ -778,7 +781,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta2.4';
+const APP_VERSION = 'beta2.5';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -2523,6 +2526,11 @@ function setToday(fieldId){
   document.getElementById(fieldId).value=new Date().toISOString().split('T')[0];
   calcEstPrice('f');
 }
+function syncOutDate(inVal){
+  if(!inVal) return;
+  document.getElementById('f-out-date').value=inVal;
+  calcEstPrice('f');
+}
 
 // 1-14: 営業時間内デフォルト時刻を返す
 function getDefaultTime(){
@@ -3093,6 +3101,23 @@ function onClientInput(val){
   hint.innerHTML='🔄 前回: '+ld+'　'+la+lp;
 }
 
+function scrollToTop(scrId){
+  const el=document.getElementById(scrId);
+  if(el) el.scrollTo({top:0,behavior:'smooth'});
+}
+function setNoTicket(){
+  const inp=document.getElementById('f-ticket');
+  const btn=document.getElementById('btn-no-ticket');
+  if(inp) inp.value='';
+  if(btn){btn.style.background='var(--amber)';btn.style.color='#0a0a0f';btn.textContent='伝票なし ✓';}
+  inp?.setAttribute('data-no-ticket','1');
+}
+function clearNoTicket(){
+  const inp=document.getElementById('f-ticket');
+  const btn=document.getElementById('btn-no-ticket');
+  if(btn){btn.style.background='';btn.style.color='';btn.textContent='伝票なし';}
+  inp?.removeAttribute('data-no-ticket');
+}
 function setDefaults(){
   const n=new Date();
   document.getElementById('f-in-date').value=n.toISOString().split('T')[0];
@@ -3731,12 +3756,12 @@ const PRICE={
   'リベット_小物':500,
   // ── 1-1: PRICE未登録53件 一括追加 ──
   // タグ付け（全カテゴリー共通 ¥1,500）
-  'タグ付け_パンツ':1500,'タグ付け_スカート':1500,'タグ付け_ジャケット':1500,
-  'タグ付け_コート':1500,'タグ付け_シャツ':1500,'タグ付け_ニット':1500,
-  'タグ付け_スウェット':1500,'タグ付け_ドレス':1500,'タグ付け_ワンピース':1500,
-  'タグ付け_Tシャツ':1500,'タグ付け_ブルゾン':1500,'タグ付け_小物':1500,
-  'タグ付け_ジレ':1500,'タグ付け_ベスト':1500,'タグ付け_レザー':1500,
-  'タグ付け_毛皮':1500,
+  'タグ付け_パンツ':500,'タグ付け_スカート':500,'タグ付け_ジャケット':500,
+  'タグ付け_コート':500,'タグ付け_シャツ':500,'タグ付け_ニット':500,
+  'タグ付け_スウェット':500,'タグ付け_ドレス':500,'タグ付け_ワンピース':500,
+  'タグ付け_Tシャツ':500,'タグ付け_ブルゾン':500,'タグ付け_小物':500,
+  'タグ付け_ジレ':500,'タグ付け_ベスト':500,'タグ付け_レザー':500,
+  'タグ付け_毛皮':500,
   // プレス（カテゴリー別）
   'プレス_パンツ':1000,'プレス_スカート':1000,'プレス_ジャケット':1500,
   'プレス_コート':1500,'プレス_シャツ':1000,'プレス_ニット':1000,
@@ -4157,6 +4182,23 @@ const PRICE_OPT={
 
   // ── 着丈_スカート：ワイド（=巾広仕上げ、フレア同等） ──
   '着丈_スカート:ワイド':800,
+
+  // ── ボタン補強：特殊オプション ──
+  'ボタン補強_パンツ:特殊':300,
+  'ボタン補強_スカート:特殊':300,
+  'ボタン補強_ジャケット:特殊':300,
+  'ボタン補強_コート:特殊':300,
+  'ボタン補強_シャツ:特殊':300,
+  'ボタン補強_ニット:特殊':300,
+  'ボタン補強_スウェット:特殊':300,
+  'ボタン補強_ドレス:特殊':300,
+  'ボタン補強_ワンピース:特殊':300,
+  'ボタン補強_Tシャツ:特殊':300,
+  'ボタン補強_ブルゾン:特殊':300,
+  'ボタン補強_ジレ:特殊':300,
+  'ボタン補強_ベスト:特殊':300,
+  'ボタン補強_レザー:特殊':300,
+  'ボタン補強_毛皮:特殊':300,
 
   // ── 毛皮系 ──
   '袖丈_毛皮:カフス':2000,
@@ -4714,8 +4756,9 @@ function confirmRec(){
     document.getElementById('alt-client').scrollIntoView({behavior:'smooth',block:'center'});return;
   }
   // ② 伝票番号重複チェック
+  const _noTicket=document.getElementById('f-ticket')?.dataset.noTicket==='1';
   const _ticketRaw=document.getElementById('f-ticket').value.trim();
-  if(_ticketRaw&&_ticketRaw!=='00000'){
+  if(!_noTicket&&_ticketRaw&&_ticketRaw!=='00000'){
     const _tNum=_ticketRaw.replace(/[^0-9]/g,'').padStart(5,'0');
     const _dupRec=gR().find(r=>r.ticket===_tNum&&r.status!=='ret');
     if(_dupRec){
@@ -5071,19 +5114,20 @@ function renderChartDow(recs){
 }
 // ── 時間帯別件数（棒）
 function renderChartHour(recs){
+  const H_START=12,H_END=19;
   const labels=[];
-  const cnt=new Array(24).fill(0);
-  const price=new Array(24).fill(0);
-  for(let h=0;h<24;h++) labels.push(h+'時');
+  const cnt=[];
+  const price=[];
+  for(let h=H_START;h<=H_END;h++){labels.push(h+'時');cnt.push(0);price.push(0);}
   recs.forEach(r=>{
     if(!r.inTime) return;
     const h=parseInt((r.inTime||'00:00').split(':')[0],10);
-    if(h>=0&&h<24){cnt[h]++;price[h]+=(r.price||0);}
+    const idx=h-H_START;
+    if(idx>=0&&idx<cnt.length){cnt[idx]++;price[idx]+=(r.price||0);}
   });
   const hasData=cnt.some(v=>v>0);
   if(!hasData){document.getElementById('chart-legend').textContent='持込時刻データなし';return;}
-  // 営業時間帯（9〜19時）を強調
-  const bgColors=cnt.map((_,i)=>i>=9&&i<=19?'#c8a84acc':'#5b9bd544');
+  const bgColors=cnt.map(()=>'#c8a84acc');
   _newChart('bar',labels,[{
     data:cnt,
     backgroundColor:bgColors,
@@ -5097,8 +5141,8 @@ function renderChartHour(recs){
   });
   const peak=cnt.indexOf(Math.max(...cnt));
   document.getElementById('chart-legend').innerHTML=
-    '<span style="color:var(--gold)">■ 営業時間帯(9～19時)</span>'
-    +(cnt[peak]>0?'&ensp;<span style="color:var(--tx3)">ピーク: '+peak+'時台 ('+cnt[peak]+'件)</span>':'');
+    '<span style="color:var(--gold)">■ 営業時間帯('+H_START+'～'+H_END+'時)</span>'
+    +(cnt[peak]>0?'&ensp;<span style="color:var(--tx3)">ピーク: '+(peak+H_START)+'時台 ('+cnt[peak]+'件)</span>':'');
 }
 
 
@@ -5248,8 +5292,9 @@ function renderChartEff(recs){
 // ══ SAVE ══
 function saveRec(){
   // 5-3: 伝票No.バリデーション（数字のみ・未入力は00000）
-  const ticketRaw=document.getElementById('f-ticket').value.trim();
-  const ticket=ticketRaw?ticketRaw.replace(/[^0-9]/g,'').padStart(5,'0').slice(-5):'00000';
+  const _isNoTicket=document.getElementById('f-ticket')?.dataset.noTicket==='1';
+  const ticketRaw=_isNoTicket?'':document.getElementById('f-ticket').value.trim();
+  const ticket=ticketRaw?ticketRaw.replace(/[^0-9]/g,'').padStart(5,'0').slice(-5):'';
   document.getElementById('f-ticket').value=ticket;
   const client=document.getElementById('f-client').value.trim()||'—';
   const cat=document.getElementById('f-cat').value;
@@ -5352,6 +5397,10 @@ function resetForm(){
   const _pLock=document.getElementById('f-price-lock');
   if(_pLock) _pLock.style.display='none';
   _priceLocked['f']=false;
+  // 伝票なし状態リセット
+  const _ntBtn=document.getElementById('btn-no-ticket');
+  if(_ntBtn){_ntBtn.style.background='';_ntBtn.style.color='';_ntBtn.textContent='伝票なし';}
+  document.getElementById('f-ticket')?.removeAttribute('data-no-ticket');
 }
 
 // ══ WORK ══
@@ -5505,6 +5554,11 @@ function renderHist(){
   // newest は登録順（ソートなし）のまま
   // 現在のフィルター結果をキャッシュ（全選択に使用）
   window._histFilteredIds=all.map(r=>String(r.id));
+  const _hc=document.getElementById('hist-count');
+  if(_hc){
+    const _total=gR().length;
+    _hc.textContent=all.length===_total?_total+'件':all.length+'/'+_total+'件';
+  }
   const el=document.getElementById('hl');
   if(!all.length){el.innerHTML=`<div class="empty"><div class="ei">📋</div>記録がありません</div>`;updHistSelCount();return;}
   const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
