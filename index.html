@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta2.2</div>
+      <div class="hv" id="app-hv">beta2.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -404,6 +404,7 @@ select option{background:#1a1a24}
     <div style="min-width:0;flex:1"><div class="ht">登録済</div><div class="hv" id="wc"></div></div>
     <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
       <span id="rec-count" style="font-size:10px;color:var(--tx3);white-space:nowrap"></span>
+      <button class="btn-g" id="btn-bulk-ret" onclick="bulkDoneToRet()" style="font-size:11px;padding:5px 8px;white-space:nowrap;display:none">✅ 返却済に</button>
       <button class="btn-g" id="btn-sel-mode" onclick="togSelMode()" style="font-size:11px;padding:5px 8px;white-space:nowrap">選択</button>
     </div>
   </div>
@@ -777,7 +778,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta2.2';
+const APP_VERSION = 'beta2.4';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -4723,6 +4724,9 @@ function confirmRec(){
       window._confirmDupCb=true;return;
     }
   }
+  _buildConfirmBody();
+}
+function _buildConfirmBody(){
   const ticket=document.getElementById('f-ticket').value.trim();
   const client=document.getElementById('f-client').value.trim()||'—';
   const item=document.getElementById('f-item').value.trim()||'—';
@@ -4790,10 +4794,7 @@ function confirmRec(){
 }
 function _doConfirmRec(){
   window._confirmDupCb=null;
-  // バリデーション済みなのでそのまま確認画面表示
-  const priceEl=document.getElementById('f-price');
-  document.getElementById('reg-confirm-ok').onclick=()=>{closeRegConfirm();saveRec();};
-  document.getElementById('ov-reg-confirm').classList.add('on');
+  _buildConfirmBody();
 }
 function closeRegConfirm(){
   document.getElementById('ov-reg-confirm').classList.remove('on');
@@ -5389,6 +5390,14 @@ function renderWork(){
   const totalRecs=gR().length;
   const rcEl=document.getElementById('rec-count');
   if(rcEl) rcEl.textContent='全'+totalRecs+'件';
+  // 「返却済に」ボタン: 完成ステータス&納期当日以前のレコードがあれば表示
+  const _today=new Date().toISOString().slice(0,10);
+  const _doneRetC=all2.filter(r=>r.status==='done'&&r.outDate&&r.outDate<=_today).length;
+  const _bRetBtn=document.getElementById('btn-bulk-ret');
+  if(_bRetBtn){
+    _bRetBtn.style.display=_doneRetC>0?'inline-block':'none';
+    _bRetBtn.textContent='✅ 返却済に('+_doneRetC+')';
+  }
   const fs=[{id:'all',l:'全て'},{id:'recv',l:'受付済'},{id:'work',l:'作業中'},{id:'done',l:'完成'},{id:'star',l:'★スター'}];
   document.getElementById('wf').innerHTML=fs.map(f=>
     `<button class="fp${wkFil===f.id?' on':''}" onclick="setWF('${f.id}')">${f.l}</button>`
@@ -5416,6 +5425,29 @@ function renderWork(){
   updSelCount();
 }
 function setWF(f){wkFil=f;renderWork();}
+function bulkDoneToRet(){
+  const _today=new Date().toISOString().slice(0,10);
+  const _targets=gR().filter(r=>r.status==='done'&&r.outDate&&r.outDate<=_today);
+  if(!_targets.length){showToast('対象案件がありません','',null,2000);return;}
+  showConfirm(
+    '完成→返却済 一括変更',
+    '完成済・納期'+_today.slice(5).replace('-','/')+'以前の '+_targets.length+' 件を返却済にします。',
+    'var(--green)','#fff',
+    ()=>{
+      const rs=gR();
+      const now=new Date().toISOString();
+      const ids=new Set(_targets.map(r=>r.id));
+      let changed=0;
+      rs.forEach(r=>{if(ids.has(r.id)){r.status='ret';r.outDate=r.outDate||_today;r.updatedAt=now;changed++;}});
+      sR(rs);renderWork();renderHist();
+      showToast(changed+'件を返却済にしました','↩ 元に戻す',()=>{
+        const rs2=gR();
+        rs2.forEach(r=>{if(ids.has(r.id)){r.status='done';r.updatedAt=now;}});
+        sR(rs2);renderWork();renderHist();
+      },5000);
+    }
+  );
+}
 function togSelMode(){
   selMode=!selMode;selIds.clear();
   const btn=document.getElementById('btn-sel-mode');
