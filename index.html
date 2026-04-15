@@ -12,6 +12,7 @@
 <meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>AlteREC</title>
 <style>
@@ -46,6 +47,8 @@ html,body{height:100%;width:100%;max-width:100vw;overflow-x:hidden;background:va
 .hv{font-size:10px;color:var(--tx3);font-family:var(--fm);margin-top:1px}
 .btn-g{padding:8px 10px;border-radius:12px;border:1px solid var(--bd2);background:none;color:var(--tx2);font-size:18px;font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1}
 .btn-gold{padding:8px 16px;border-radius:18px;border:none;background:var(--gold);color:#0a0a0f;font-size:13px;font-weight:700;font-family:var(--f);cursor:pointer}
+.chart-tab{padding:5px 12px;border-radius:16px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-size:11px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap;transition:all .15s}
+.chart-tab.on{background:var(--gold);color:#0a0a0f;border-color:var(--gold)}
 .fb{padding:12px 16px 0}
 .sec{background:var(--s1);border:1px solid var(--bd);border-radius:14px;margin-bottom:12px;overflow:hidden}
 .sh{padding:8px 14px;background:var(--s2);border-bottom:1px solid var(--bd);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase}
@@ -373,7 +376,7 @@ select option{background:#1a1a24}
       <div class="fld"><div class="fl">備考</div><textarea id="f-note"></textarea></div>
     </div>
     <div style="display:flex;gap:10px;align-items:center">
-      <button class="save-btn" onclick="saveRec()" style="flex:1">受付を登録</button>
+      <button class="save-btn" onclick="confirmRec()" style="flex:1">受付を登録</button>
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
         <input type="number" id="f-bulk-count" min="1" max="20" value="1" step="1"
           inputmode="numeric" style="width:46px;padding:8px 4px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-size:14px;font-family:var(--fm);text-align:center;outline:none">
@@ -409,6 +412,7 @@ select option{background:#1a1a24}
     <div style="min-width:0;flex:1"><div class="ht">履歴</div></div>
     <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">
       <button class="btn-g" onclick="showDash()" style="font-size:18px;padding:4px 6px;line-height:1" title="ダッシュボード">📊</button>
+      <button class="btn-g" onclick="showChartOv()" style="font-size:18px;padding:4px 6px;line-height:1" title="グラフ分析">📈</button>
       <button class="btn-g" onclick="doCSV()" title="CSV出力" style="font-size:18px;padding:4px 6px;line-height:1">📋</button>
       <button class="btn-g" id="hist-sel-btn" onclick="togHistSelMode()" style="font-size:11px;padding:4px 8px;white-space:nowrap">選択</button>
     </div>
@@ -668,6 +672,54 @@ select option{background:#1a1a24}
 </nav>
 
 <div id="print-area"></div>
+
+<!-- グラフ分析オーバーレイ -->
+<div class="ov" id="ov-chart" onclick="closeChartOv(event)" style="z-index:700">
+  <div class="md" onclick="event.stopPropagation()" style="border-radius:20px;margin:auto;width:calc(100% - 24px);max-width:480px;max-height:90vh;display:flex;flex-direction:column;padding-bottom:20px">
+    <div class="mp"><div class="mpb"></div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 12px;flex-shrink:0">
+      <div class="mh" style="font-size:15px;padding:0;margin:0">📈 グラフ分析</div>
+      <button onclick="closeChartOv()" style="background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer;padding:0;line-height:1">✕</button>
+    </div>
+    <!-- グラフ種別タブ -->
+    <div style="display:flex;gap:6px;padding:0 16px 12px;flex-shrink:0;overflow-x:auto">
+      <button class="chart-tab on" id="ctab-rank"  onclick="switchChartTab('rank')" >補正ランキング</button>
+      <button class="chart-tab"    id="ctab-month" onclick="switchChartTab('month')">月別推移</button>
+      <button class="chart-tab"    id="ctab-cat"   onclick="switchChartTab('cat')"  >カテゴリー</button>
+      <button class="chart-tab"    id="ctab-dow"   onclick="switchChartTab('dow')"  >曜日別</button>
+    </div>
+    <!-- 期間フィルター -->
+    <div style="display:flex;gap:8px;align-items:center;padding:0 16px 10px;flex-shrink:0;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx3)">
+        <span>期間</span>
+        <input type="date" id="chart-df" onchange="renderCurrentChart()" style="font-size:11px;padding:3px 6px;border-radius:7px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-family:var(--f);outline:none">
+        <span>〜</span>
+        <input type="date" id="chart-dt" onchange="renderCurrentChart()" style="font-size:11px;padding:3px 6px;border-radius:7px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-family:var(--f);outline:none">
+      </div>
+      <button onclick="clearChartFilter()" style="font-size:10px;padding:3px 8px;border-radius:7px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer;white-space:nowrap">クリア</button>
+    </div>
+    <!-- キャンバスエリア -->
+    <div style="flex:1;overflow-y:auto;padding:0 16px">
+      <div id="chart-summary" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"></div>
+      <div style="position:relative;width:100%">
+        <canvas id="chart-canvas" style="width:100%;max-height:320px"></canvas>
+      </div>
+      <div id="chart-legend" style="margin-top:12px;font-size:11px;color:var(--tx2)"></div>
+    </div>
+  </div>
+</div>
+<!-- 受付登録確認モーダル -->
+<div class="ov" id="ov-reg-confirm" style="z-index:650">
+  <div class="md" style="border-radius:20px;margin:auto;width:calc(100% - 32px);max-width:400px;padding-bottom:20px;max-height:85vh;display:flex;flex-direction:column">
+    <div class="mp"><div class="mpb"></div></div>
+    <div class="mh" style="font-size:15px;flex-shrink:0">📋 受付内容の確認</div>
+    <div id="reg-confirm-body" style="overflow-y:auto;padding:0 16px 8px;flex:1;font-size:13px;line-height:1.7"></div>
+    <div style="display:flex;gap:8px;padding:12px 16px 0;flex-shrink:0">
+      <button onclick="closeRegConfirm()" style="flex:1;padding:13px;border-radius:12px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx2);font-size:14px;font-weight:600;font-family:var(--f);cursor:pointer">修正する</button>
+      <button id="reg-confirm-ok" style="flex:1;padding:13px;border-radius:12px;border:none;background:var(--gold);color:#0a0a0f;font-size:14px;font-weight:700;font-family:var(--f);cursor:pointer">登録する</button>
+    </div>
+  </div>
+</div>
 
 <!-- 確認モーダル（PWA Safari の confirm 代替） -->
 <div class="ov" id="ov-confirm" style="z-index:600">
@@ -4074,6 +4126,233 @@ function syncT(){
   document.getElementById('t-disp').textContent=curTime;
 }
 
+function confirmRec(){
+  const ticket=document.getElementById('f-ticket').value.trim();
+  const client=document.getElementById('f-client').value.trim()||'—';
+  const item=document.getElementById('f-item').value.trim()||'—';
+  const cat=document.getElementById('f-cat').value||'—';
+  const outDate=document.getElementById('f-out-date').value;
+  const price=document.getElementById('f-price').value;
+  const bulkCount=Math.max(1,Math.min(20,parseInt(document.getElementById('f-bulk-count')?.value||'1',10)||1));
+  const cAlts=colAlts('alt-client',document.getElementById('f-cat').value);
+  const special=document.getElementById('f-special').value.trim();
+  const mat=document.getElementById('f-material').value.trim();
+  const row=(label,val,gold=false)=>val
+    ?`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3);flex-shrink:0;width:72px;font-size:12px">${label}</span><span style="color:${gold?'var(--gold)':'var(--tx)'};font-weight:${gold?'700':'400'};flex:1;word-break:break-all">${val}</span></div>`
+    :'';
+  const altText=cAlts.length
+    ?cAlts.map(a=>a.n+(a.cnt&&a.cnt>1?'\u00d7'+a.cnt:'')+(a.dir?' '+a.dir:'')).join('\u30fb')
+    :'\uff08\u672a\u9078\u629e\uff09';
+  const outDisp=outDate?outDate.slice(5).replace('-','/'):'未設定';
+  const priceDisp=price?'\u00a5'+parseInt(price,10).toLocaleString():'未入力';
+  const bulkDisp=bulkCount>1?bulkCount+'件一括登録':'';
+  document.getElementById('reg-confirm-body').innerHTML=
+    row('伝票No.',ticket?ticket.padStart(5,'0'):'未入力')+
+    row('客名',client)+
+    row('品目',item)+
+    row('カテゴリー',cat)+
+    row('補正内容',altText,true)+
+    (mat?row('素材',mat):'')+
+    (special?row('特殊',special):'')+
+    row('納期',outDisp)+
+    row('金額',priceDisp,!!price)+
+    (bulkDisp?row('一括',bulkDisp):'');
+  document.getElementById('reg-confirm-ok').onclick=()=>{closeRegConfirm();saveRec();};
+  document.getElementById('ov-reg-confirm').classList.add('on');
+}
+function closeRegConfirm(){
+  document.getElementById('ov-reg-confirm').classList.remove('on');
+}
+
+// ══ CHART ══
+let _chartInst=null;
+let _curChartTab='rank';
+
+function showChartOv(){
+  // 履歴の期間フィルターを引き継ぐ
+  const df=document.getElementById('hf')?.value||'';
+  const dt=document.getElementById('ht2')?.value||'';
+  if(df) document.getElementById('chart-df').value=df;
+  if(dt) document.getElementById('chart-dt').value=dt;
+  _curChartTab='rank';
+  document.querySelectorAll('.chart-tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('ctab-rank')?.classList.add('on');
+  document.getElementById('ov-chart').classList.add('on');
+  setTimeout(()=>renderCurrentChart(),50);
+}
+function closeChartOv(e){
+  if(e&&e.target!==document.getElementById('ov-chart')) return;
+  if(_chartInst){_chartInst.destroy();_chartInst=null;}
+  document.getElementById('ov-chart').classList.remove('on');
+}
+function clearChartFilter(){
+  document.getElementById('chart-df').value='';
+  document.getElementById('chart-dt').value='';
+  renderCurrentChart();
+}
+function switchChartTab(tab){
+  _curChartTab=tab;
+  document.querySelectorAll('.chart-tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('ctab-'+tab)?.classList.add('on');
+  renderCurrentChart();
+}
+function renderCurrentChart(){
+  if(_chartInst){_chartInst.destroy();_chartInst=null;}
+  const df=document.getElementById('chart-df')?.value||'';
+  const dt=document.getElementById('chart-dt')?.value||'';
+  let recs=gR();
+  if(df) recs=recs.filter(r=>r.inDate&&r.inDate>=df);
+  if(dt) recs=recs.filter(r=>r.inDate&&r.inDate<=dt);
+  const total=recs.length;
+  const sumEl=document.getElementById('chart-summary');
+  const legEl=document.getElementById('chart-legend');
+  sumEl.innerHTML=`<div style="font-size:11px;color:var(--tx3)">対象: <b style="color:var(--tx)">${total}件</b>${df||dt?' (期間フィルター中)':''}</div>`;
+  legEl.innerHTML='';
+  if(!total){
+    const cv=document.getElementById('chart-canvas');
+    const ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,cv.width,cv.height);
+    legEl.textContent='データがありません';
+    return;
+  }
+  if(_curChartTab==='rank') renderChartRank(recs);
+  else if(_curChartTab==='month') renderChartMonth(recs);
+  else if(_curChartTab==='cat') renderChartCat(recs);
+  else if(_curChartTab==='dow') renderChartDow(recs);
+}
+
+const _CHART_COLORS=['#c8a84a','#5b9bd5','#5aac7a','#9b72cf','#c4843a','#c05a5a','#4ab8c8','#a8c84a','#c84a8a','#4a6cc8'];
+
+function _newChart(type,labels,datasets,opts={}){
+  const cv=document.getElementById('chart-canvas');
+  _chartInst=new Chart(cv,{
+    type,
+    data:{labels,datasets},
+    options:{
+      responsive:true,
+      maintainAspectRatio:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{}}},
+      ...opts
+    }
+  });
+}
+
+// ── 補正ランキング（横棒）
+function renderChartRank(recs){
+  const cnt={};
+  recs.forEach(r=>{
+    (r.wAlts||r.cAlts||[]).forEach(a=>{
+      const k=a.n+(a.dir?' '+a.dir:'');
+      cnt[k]=(cnt[k]||0)+(a.cnt||1);
+    });
+  });
+  const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  if(!sorted.length){document.getElementById('chart-legend').textContent='補正データなし';return;}
+  const labels=sorted.map(([k])=>k);
+  const data=sorted.map(([,v])=>v);
+  _newChart('bar',labels,[{
+    data,
+    backgroundColor:data.map((_,i)=>_CHART_COLORS[i%_CHART_COLORS.length]+'cc'),
+    borderRadius:4,
+  }],{
+    indexAxis:'y',
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}},
+      y:{ticks:{color:'#efefef',font:{size:11}},grid:{display:false}}
+    }
+  });
+  document.getElementById('chart-legend').innerHTML=
+    sorted.map(([k,v],i)=>`<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${_CHART_COLORS[i%_CHART_COLORS.length]}"></span>${k} <b>${v}</b>
+    </span>`).join('');
+}
+
+// ── 月別推移（棒＋折れ線）
+function renderChartMonth(recs){
+  const mo={};
+  recs.forEach(r=>{
+    if(!r.inDate) return;
+    const k=r.inDate.slice(0,7);
+    if(!mo[k]) mo[k]={cnt:0,price:0};
+    mo[k].cnt++;
+    mo[k].price+=(r.price||0);
+  });
+  const keys=Object.keys(mo).sort();
+  if(!keys.length){document.getElementById('chart-legend').textContent='データなし';return;}
+  const labels=keys.map(k=>k.slice(5)+' ('+mo[k].cnt+'件)');
+  const cnts=keys.map(k=>mo[k].cnt);
+  const prices=keys.map(k=>mo[k].price);
+  const cv=document.getElementById('chart-canvas');
+  _chartInst=new Chart(cv,{
+    type:'bar',
+    data:{labels,datasets:[
+      {type:'bar',label:'件数',data:cnts,backgroundColor:'#5b9bd5aa',borderRadius:4,yAxisID:'y'},
+      {type:'line',label:'売上',data:prices,borderColor:'#c8a84a',backgroundColor:'#c8a84a22',tension:0.3,pointRadius:4,pointBackgroundColor:'#c8a84a',yAxisID:'y2'},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}},
+        y:{position:'left',ticks:{color:'#5b9bd5',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'},title:{display:true,text:'件数',color:'#5b9bd5',font:{size:10}}},
+        y2:{position:'right',ticks:{color:'#c8a84a',font:{size:10},callback:v=>'¥'+v.toLocaleString()},grid:{display:false},title:{display:true,text:'売上',color:'#c8a84a',font:{size:10}}}
+      }
+    }
+  });
+  document.getElementById('chart-legend').innerHTML=
+    `<span style="color:#5b9bd5">■ 件数</span>&ensp;<span style="color:#c8a84a">— 売上</span>`;
+}
+
+// ── カテゴリー構成（ドーナツ）
+function renderChartCat(recs){
+  const cnt={};
+  recs.forEach(r=>{const c=r.cat||'未分類';cnt[c]=(cnt[c]||0)+1;});
+  const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  if(!sorted.length){document.getElementById('chart-legend').textContent='データなし';return;}
+  const labels=sorted.map(([k])=>k);
+  const data=sorted.map(([,v])=>v);
+  const total=data.reduce((s,v)=>s+v,0);
+  _newChart('doughnut',labels,[{
+    data,
+    backgroundColor:labels.map((_,i)=>_CHART_COLORS[i%_CHART_COLORS.length]+'dd'),
+    borderColor:'#1a1a2e',
+    borderWidth:2,
+  }],{
+    cutout:'62%',
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed}件 (${Math.round(ctx.parsed/total*100)}%)`}}}
+  });
+  document.getElementById('chart-legend').innerHTML=
+    sorted.map(([k,v],i)=>`<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${_CHART_COLORS[i%_CHART_COLORS.length]}"></span>${k} <b>${v}</b> (${Math.round(v/total*100)}%)
+    </span>`).join('');
+}
+
+// ── 曜日別件数（棒）
+function renderChartDow(recs){
+  const DOW=['日','月','火','水','木','金','土'];
+  const cnt=[0,0,0,0,0,0,0];
+  const price=[0,0,0,0,0,0,0];
+  recs.forEach(r=>{
+    if(!r.inDate) return;
+    const d=new Date(r.inDate).getDay();
+    cnt[d]++;
+    price[d]+=(r.price||0);
+  });
+  _newChart('bar',DOW,[{
+    data:cnt,
+    backgroundColor:DOW.map((_,i)=>i===0?'#c05a5acc':i===6?'#5b9bd5cc':'#9b72cfcc'),
+    borderRadius:6,
+  }],{
+    plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:ctx=>`売上: ¥${price[ctx.dataIndex].toLocaleString()}`}}},
+    scales:{
+      x:{ticks:{color:'#efefef',font:{size:13,weight:'700'}},grid:{display:false}},
+      y:{ticks:{color:'#8888a0',font:{size:10}},grid:{color:'rgba(255,255,255,.06)'}}
+    }
+  });
+  document.getElementById('chart-legend').innerHTML=
+    '<span style="color:#c05a5a">■ 日</span>&ensp;<span style="color:#9b72cf">■ 平日</span>&ensp;<span style="color:#5b9bd5">■ 土</span>';
+}
 // ══ SAVE ══
 function saveRec(){
   // 5-3: 伝票No.バリデーション（数字のみ・未入力は00000）
