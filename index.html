@@ -1068,10 +1068,11 @@ const PROC={
     {id:'mo',l:'モーニング',    ex:'sty',sub:[{l:'手まつり',ex:'mo_f'},{l:'ミシン',ex:'mo_f'}]},
     {id:'gc',l:'Gカット',       ex:'sty',sub:['2本ステッチ','チェーンステッチ']},
     {id:'ls',l:'ロックステッチ',ex:'sty'},
-    {id:'gm',l:'ゴム補正',      ex:'sty'},
-    {id:'hw',l:'巾広',          ex:'sty'},
+    {id:'gm',l:'ゴム補正'},
+    {id:'hw',l:'巾広'},
     {id:'pm',l:'柄合わせ'},
     {id:'bm',l:'ボタン移動'},
+    {id:'hd',l:'ほどき'},
   ]},
   'ウエスト_パンツ':{m:[
     {id:'s3',l:'3方詰め',ex:'side'},{id:'ry',l:'両脇',ex:'side'},
@@ -2355,8 +2356,11 @@ function _checkStorageInline(){
         const remain=Math.max(0,Math.floor((25000-total)/700));
         banner.textContent='⚠️ ストレージ残量わずか（'+pct+'%使用中・残り約'+remain+'件分）';
         banner.style.display='block';
-        // 1-8: バナー表示時にhdrをバナー分下にずらす
-        document.querySelectorAll('.hdr').forEach(h=>h.style.top='28px');
+        // R-4: バナー実高さを動的取得してhdrをずらす
+        requestAnimationFrame(()=>{
+          const bannerH=banner.offsetHeight;
+          document.querySelectorAll('.hdr').forEach(h=>h.style.top=bannerH+'px');
+        });
       } else {
         banner.style.display='none';
         document.querySelectorAll('.hdr').forEach(h=>h.style.top='0');
@@ -2861,7 +2865,7 @@ function onPatOther(){
 // ══ ALT ITEMS ══
 function onCatChange(){
   const cat=document.getElementById('f-cat').value;
-  buildAlts('alt-client',cat,false);
+  buildAlts('alt-client',cat,true);
 }
 function buildAlts(cid,cat,isW){
   const items=ALT[cat]||[];
@@ -2982,7 +2986,7 @@ function buildAB(a,uid,isW){
     </div>`;
   }else if(a.dm==='cnt'){
     // ボタン補強・付け替え用（個数入力）
-    const pfx=isW?'e':'f';
+    const pfx=uid.startsWith('edit-alts')||uid.startsWith('walts-alts')?'e':'f';
     h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:4px 0">
       <span style="font-size:11px;color:var(--tx3);flex-shrink:0">個数</span>
       <button onclick="adjCnt('${uid}',-1,'${pfx}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--bd2);background:var(--s2);color:var(--tx);font-size:16px;font-weight:700;font-family:var(--f);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1">−</button>
@@ -3288,6 +3292,7 @@ const PRICE_OPT={
   '裾上げ_パンツ:ゴム補正':1500,
   '裾上げ_パンツ:巾広':500,
   '裾上げ_パンツ:ロックステッチ':0,
+  '裾上げ_パンツ:ほどき':200,
 
   // ── ウエスト_パンツ ──
   // 基本料金=1方詰め¥2,500、3方詰めは¥6,000なので差額+¥3,500
@@ -4129,6 +4134,11 @@ function saveRec(){
 }
 
 function resetForm(){
+  _priceLocked.f=false;_priceLocked.e=false;
+  const hint=document.getElementById('f-price-hint');
+  const lb=document.getElementById('f-price-lock');
+  if(hint) hint.style.display='none';
+  if(lb) lb.style.display='none';
   ['f-ticket','f-client','f-staff','f-item','f-cmemo','f-wmemo',
    'f-special','f-materials','f-price','f-note'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
@@ -4146,6 +4156,10 @@ function resetForm(){
   buildTypes();buildColors();buildPats();populateSels();setDefaults();
   // 複数件数スピナーをリセット
   const bc=document.getElementById('f-bulk-count');if(bc)bc.value='1';
+  // 補正項目の検索フィルターをクリア
+  document.querySelectorAll('[id$="-search"]').forEach(el=>{
+    el.value='';filterAlts('',el.id.replace('-search',''));
+  });
 }
 
 // ══ WORK ══
@@ -4426,7 +4440,7 @@ function rCard(r,showSel){
 // ══ STRING HELPERS ══
 function aSum(alts){
   return (alts||[]).map(a=>{
-    let s=a.n+(a.dir?' '+a.dir:'');
+    let s=a.n+(a.cnt&&a.cnt>1?`（×${a.cnt}個）`:'')+( a.dir?' '+a.dir:'');
     if(a.dl)s+=' ['+a.dl+']';
     if(a.dim){
       if(typeof a.dim==='object'){
@@ -4458,7 +4472,7 @@ function machineStr(machineData){
 
 function wStr(alts){
   return (alts||[]).map(a=>{
-    let s=a.n+(a.dir?' '+a.dir:'');
+    let s=a.n+(a.cnt&&a.cnt>1?`（×${a.cnt}個）`:'')+( a.dir?' '+a.dir:'');
     const ps=a.procs||[];
     if(ps.length){
       const sb=a.subs||{};
