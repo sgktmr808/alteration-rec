@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.3</div>
+      <div class="hv" id="app-hv">beta4.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.3';
+const APP_VERSION = 'beta4.4';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -7625,7 +7625,7 @@ function parseAltText(txt, cat){
       n=name; rest=txt.slice(name.length).trim(); break;
     }
   }
-  if(!n) n=txt; // マッチしない場合はそのまま使用
+  if(!n){n=txt;rest='';}
 
   // dir（詰め/出し）の抽出
   let dir='';
@@ -7634,24 +7634,37 @@ function parseAltText(txt, cat){
 
   // dl（[カット寸法]等）の抽出
   let dl='';
-  const dlMatch=rest.match(/^\[([^\]]+)\]\s*/);
-  if(dlMatch){dl=dlMatch[1];rest=rest.slice(dlMatch[0].length);}
+  const dlMatch=rest.match(/\[([^\]]+)\]/);
+  if(dlMatch){
+    dl=dlMatch[1];
+    rest=rest.replace(dlMatch[0],'').trim();
+  }
 
-  // dim（5cm / 左3cm/右4cm）の抽出
+  // dim（左Xcm/右Ycm / 前Xcm/後Ycm / XCm / 左Xcm / 右Xcm）の抽出
   let dim=null;
-  const dimLR=rest.match(/^左([\d.]+)cm\/右([\d.]+)cm/);
-  const dimFR=rest.match(/^前([\d.]+)cm\/後([\d.]+)cm/);
+  const dimLR=rest.match(/左([\d.]+)cm[/／]右([\d.]+)cm/);
+  const dimFR=rest.match(/前([\d.]+)cm[/／]後([\d.]+)cm/);
+  const dimL=rest.match(/左([\d.]+)cm/);
+  const dimR=rest.match(/右([\d.]+)cm/);
   const dimS=rest.match(/^([\d.]+)cm/);
-  if(dimLR){dim={L:parseFloat(dimLR[1]),R:parseFloat(dimLR[2])};}
-  else if(dimFR){dim={L:parseFloat(dimFR[1]),R:parseFloat(dimFR[2])};}
-  else if(dimS){dim={L:parseFloat(dimS[1]),R:parseFloat(dimS[1])};}
+  if(dimLR)      dim={L:parseFloat(dimLR[1]),R:parseFloat(dimLR[2])};
+  else if(dimFR) dim={L:parseFloat(dimFR[1]),R:parseFloat(dimFR[2])};
+  else if(dimL&&dimR) dim={L:parseFloat(dimL[1]),R:parseFloat(dimR[1])};
+  else if(dimL)  dim={L:parseFloat(dimL[1]),R:parseFloat(dimL[1])};
+  else if(dimR)  dim={L:parseFloat(dimR[1]),R:parseFloat(dimR[1])};
+  else if(dimS)  dim={L:parseFloat(dimS[1]),R:parseFloat(dimS[1])};
 
   // pkを取得
   const altDef=catItems.find(a=>a.n===n);
   const pk=altDef?altDef.pk:n;
 
   const obj={n,pk,dir,procs:[],subs:{}};
-  if(dl) obj.dl=dl;
+  // dl と swsub を区別（swsubは平置き/ぐるり/仕上がり寸法）
+  const _swsubVals=new Set(['平置き','ぐるり','仕上がり寸法']);
+  if(dl){
+    if(_swsubVals.has(dl)) obj.swsub=dl;
+    else obj.dl=dl;
+  }
   if(dim) obj.dim=dim;
   return obj;
 }
