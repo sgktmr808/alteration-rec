@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.2</div>
+      <div class="hv" id="app-hv">beta4.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.2';
+const APP_VERSION = 'beta4.3';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -7605,6 +7605,62 @@ function doExportCSV(){
 }
 
 // ══ CSV 記録データ読み込み ══
+// aSum形式のテキスト1件をALT項目オブジェクトに変換（CSVインポート用）
+function parseAltText(txt, cat){
+  if(!txt||!txt.trim()) return null;
+  txt = txt.trim();
+  // ALT項目名一覧（長い名前を優先）
+  const catItems = ALT[cat]||[];
+  const allNames = catItems.map(a=>a.n);
+  // 全カテゴリーから補完（カテゴリー不明時）
+  if(!allNames.length){
+    Object.values(ALT).forEach(arr=>arr.forEach(a=>{if(!allNames.includes(a.n))allNames.push(a.n);}));
+  }
+  allNames.sort((a,b)=>b.length-a.length); // 長い名前を優先
+
+  // 項目名を前方一致で抽出
+  let n='', rest='';
+  for(const name of allNames){
+    if(txt===name||txt.startsWith(name+' ')||txt.startsWith(name+'　')){
+      n=name; rest=txt.slice(name.length).trim(); break;
+    }
+  }
+  if(!n) n=txt; // マッチしない場合はそのまま使用
+
+  // dir（詰め/出し）の抽出
+  let dir='';
+  const dirMatch=rest.match(/^(詰め|出し)\s*/);
+  if(dirMatch){dir=dirMatch[1];rest=rest.slice(dirMatch[0].length);}
+
+  // dl（[カット寸法]等）の抽出
+  let dl='';
+  const dlMatch=rest.match(/^\[([^\]]+)\]\s*/);
+  if(dlMatch){dl=dlMatch[1];rest=rest.slice(dlMatch[0].length);}
+
+  // dim（5cm / 左3cm/右4cm）の抽出
+  let dim=null;
+  const dimLR=rest.match(/^左([\d.]+)cm\/右([\d.]+)cm/);
+  const dimFR=rest.match(/^前([\d.]+)cm\/後([\d.]+)cm/);
+  const dimS=rest.match(/^([\d.]+)cm/);
+  if(dimLR){dim={L:parseFloat(dimLR[1]),R:parseFloat(dimLR[2])};}
+  else if(dimFR){dim={L:parseFloat(dimFR[1]),R:parseFloat(dimFR[2])};}
+  else if(dimS){dim={L:parseFloat(dimS[1]),R:parseFloat(dimS[1])};}
+
+  // pkを取得
+  const altDef=catItems.find(a=>a.n===n);
+  const pk=altDef?altDef.pk:n;
+
+  const obj={n,pk,dir,procs:[],subs:{}};
+  if(dl) obj.dl=dl;
+  if(dim) obj.dim=dim;
+  return obj;
+}
+function parseAltSummary(summaryText, cat){
+  if(!summaryText||!summaryText.trim()) return [];
+  return summaryText.split(' / ')
+    .map(s=>parseAltText(s.trim(), cat))
+    .filter(Boolean);
+}
 function handleCSVRecImport(ev){
   const file=ev.target.files[0];if(!file)return;
   // まずArrayBufferで読み込み、BOMでエンコーディングを判定してからTextDecoderで変換
@@ -7652,8 +7708,10 @@ function handleCSVRecImport(ev){
           if(_altTxt){
             const _idx=cur.findIndex(r=>r.id===existingId);
             if(_idx>=0&&!(cur[_idx].cAlts&&cur[_idx].cAlts.length)){
-              const _alts=_altTxt.split(' / ').map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
-              cur[_idx].cAlts=_alts;cur[_idx].wAlts=_alts;
+              const _cat=cur[_idx].cat||cv(c,'カテゴリー')||'';
+              const _alts=parseAltSummary(_altTxt, _cat);
+              cur[_idx].cAlts=_alts;
+              cur[_idx].wAlts=JSON.parse(JSON.stringify(_alts));
               updated=(updated||0)+1;
             }
           }
@@ -7702,9 +7760,14 @@ function handleCSVRecImport(ev){
         };
         // 補正内容テキストをcAlts・wAltsに復元（' / ' で分割）
         if(rec._importedAlts){
-          const _alts=rec._importedAlts.split(' / ').map(s=>s.trim()).filter(Boolean).map(s=>({n:s,dir:'',procs:[]}));
-          rec.cAlts=_alts;
-          rec.wAlts=_alts;
+          const _cat=rec.cat||'';
+          const _cAlts=parseAltSummary(rec._importedAlts, _cat);
+          const _wAltsText=cv(c,'実行工程')||'';
+          const _wAlts=_wAltsText&&_wAltsText!==rec._importedAlts
+            ? parseAltSummary(_wAltsText, _cat)
+            : JSON.parse(JSON.stringify(_cAlts)); // ディープコピー
+          rec.cAlts=_cAlts;
+          rec.wAlts=_wAlts;
         }
         delete rec._importedAlts;
         // 意味のあるデータが最低1つあるレコードのみ追加
