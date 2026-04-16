@@ -224,10 +224,10 @@ select option{background:#1a1a24}
 <div id="storage-top-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9990;background:var(--red-bg);border-bottom:1px solid rgba(192,90,90,.5);padding:6px 16px;font-size:11px;color:var(--red);font-weight:700;text-align:center"></div>
 
 <div class="screen on" id="scr-new">
-  <div class="hdr" onclick="scrollToTop('scr-new')" style="cursor:pointer">
+  <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta3.6</div>
+      <div class="hv" id="app-hv">beta4.1hf</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -256,7 +256,7 @@ select option{background:#1a1a24}
         </div>
       </div>
       <div class="fld">
-        <div class="fl">納品日 <button onclick="setToday('f-out-date')" class="tog" style="padding:2px 7px;font-size:10px">今日</button> <button onclick="syncOutDate(document.getElementById('f-in-date').value)" class="tog" style="padding:2px 7px;font-size:10px">持込と同日</button></div>
+        <div class="fl">納品日 <button onclick="setToday('f-out-date')" class="tog" style="padding:2px 7px;font-size:10px">今日</button> <button onclick="document.getElementById('f-out-date').value=document.getElementById('f-in-date').value;calcEstPrice('f')" class="tog" style="padding:2px 7px;font-size:10px">持込と同日</button></div>
         <input type="date" id="f-out-date" style="width:100%">
       </div>
     </div>
@@ -407,11 +407,12 @@ select option{background:#1a1a24}
 </div>
 
 <div class="screen" id="scr-work">
-  <div class="hdr" onclick="scrollToTop('scr-work')" style="cursor:pointer">
+  <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1"><div class="ht">登録済</div><div class="hv" id="wc"></div></div>
     <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
       <span id="rec-count" style="font-size:10px;color:var(--tx3);white-space:nowrap"></span>
       <button class="btn-g" id="btn-bulk-ret" onclick="event.stopPropagation();bulkDoneToRet()" style="font-size:11px;padding:5px 8px;white-space:nowrap;display:none">✅ 返却済に</button>
+      <button class="btn-g" id="btn-all-ret" onclick="event.stopPropagation();bulkAllDoneToRet()" style="font-size:11px;padding:5px 8px;white-space:nowrap;display:none">✅ 全完成→返却済</button>
       <button class="btn-g" id="btn-sel-mode" onclick="event.stopPropagation();togSelMode()" style="font-size:11px;padding:5px 8px;white-space:nowrap">選択</button>
     </div>
   </div>
@@ -428,13 +429,16 @@ select option{background:#1a1a24}
   <div class="sw2"><input class="si" type="search" placeholder="客名・品名・補正内容…" id="wsrch" oninput="renderWork()"></div>
   <div style="display:flex;align-items:center;gap:6px;padding:4px 16px 0">
     <div class="fbar" id="wf" style="flex:1;padding:0;border:none"></div>
+    <select id="w-store-fil" onchange="renderWork()" style="font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f);outline:none;flex-shrink:0;max-width:80px">
+      <option value="">全店</option>
+    </select>
     <select id="w-sort" onchange="renderWork()" style="font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f);outline:none;flex-shrink:0"><option value="reg">登録順</option><option value="due">納期順</option><option value="status">ステータス順</option></select>
   </div>
   <div class="cl" id="wl"></div>
 </div>
 
 <div class="screen" id="scr-hist">
-  <div class="hdr" onclick="scrollToTop('scr-hist')" style="cursor:pointer">
+  <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1"><div class="ht">履歴</div><div class="hv" id="hist-count"></div></div>
     <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">
       <button class="btn-g" onclick="event.stopPropagation();showDash()" style="font-size:18px;padding:4px 6px;line-height:1" title="ダッシュボード">📊</button>
@@ -561,6 +565,10 @@ select option{background:#1a1a24}
           <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">最終バックアップ：<span id="bk-ts">—</span></div>
           <div style="display:flex;gap:6px;margin-bottom:6px">
             <button onclick="exportJSON()" style="flex:1;padding:9px;border-radius:9px;border:none;background:var(--amber);color:#0a0a0f;font-size:12px;font-weight:700;font-family:var(--f);cursor:pointer">📥 バックアップ保存</button>
+            <button onclick="document.getElementById('backup-import-input').click()" style="flex:1;padding:9px;border-radius:9px;border:1px solid rgba(200,168,74,.3);background:var(--s3);color:var(--amber);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">📂 バックアップ読み込み</button>
+          </div>
+          <input type="file" id="backup-import-input" accept=".json" style="display:none" onchange="importBackupJSON(event)">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
             <button onclick="restoreBackup()" style="flex:1;padding:9px;border-radius:9px;border:1px solid rgba(196,132,58,.3);background:var(--s3);color:var(--amber);font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer">🔄 直前に戻す</button>
           </div>
           <!-- 3-1: 日付別スナップショット復元 -->
@@ -653,6 +661,15 @@ select option{background:#1a1a24}
               style="width:60px;padding:7px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx);font-size:13px;font-family:var(--fm);text-align:center;outline:none"
               onchange="localStorage.setItem('ar2_default_days',this.value)">
             <span style="font-size:11px;color:var(--tx3)">日後</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <div style="font-size:10px;color:var(--tx3);white-space:nowrap">仕事画面デフォルトソート</div>
+            <select id="biz-sort" style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx);font-size:12px;font-family:var(--f);outline:none"
+              onchange="localStorage.setItem('ar2_default_sort',this.value);applyDefaultWorkSort()">
+              <option value="reg">登録順</option>
+              <option value="due">納期順</option>
+              <option value="status">ステータス順</option>
+            </select>
           </div>
           </div><!-- /settings-sec-body -->
         </div>
@@ -793,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta3.6';
+const APP_VERSION = 'beta4.1hf';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -846,7 +863,7 @@ const ALT={
     {n:'ヒップ',   d:'both',dm:'cm',     pk:'ヒップ_パンツ'},
     {n:'スリット移動',d:'none',dm:'none',pk:'スリット移動_パンツ'},
     {n:'ファスナー交換',d:'none',dm:'none',pk:'ファスナー交換_パンツ'},
-    {n:'デニムダメージ残し加工',d:'none',dm:'len_dmg',pk:'デニムダメージ残し加工'},
+    {n:'デニムダメージ残し加工',d:'none',dm:'len',    pk:'デニムダメージ残し加工'},
     {n:'ヒザ巾',     d:'both',dm:'cm',     pk:'ヒザ巾_パンツ'},
     {n:'股リペア',   d:'none',dm:'none',   pk:'股リペア_パンツ'},
     {n:'裏地取替',   d:'none',dm:'none',   pk:'裏地取替_パンツ'},
@@ -1162,6 +1179,7 @@ const ALT={
     {n:'裏地取替',     d:'none',dm:'none',    pk:'裏地取替_ジレ'},
     {n:'付属品補修', d:'none',dm:'none',  pk:'付属品補修_ジレ'},
     {n:'タグ付け',     d:'none',dm:'none',    pk:'タグ付け_ジレ'},
+    {n:'ボタン補強',   d:'none',dm:'cnt',     pk:'ボタン補強_ジレ'},
     {n:'プレス',       d:'none',dm:'none',    pk:'プレス_ジレ'},
   ],
   'ベスト':[
@@ -1172,6 +1190,7 @@ const ALT={
     {n:'背布交換',       d:'none', dm:'none',   pk:'背布交換_ベスト'},
     {n:'付属品補修', d:'none',dm:'none',  pk:'付属品補修_ベスト'},
     {n:'タグ付け',       d:'none', dm:'none',   pk:'タグ付け_ベスト'},
+    {n:'ボタン補強',     d:'none', dm:'cnt',    pk:'ボタン補強_ベスト'},
     {n:'プレス',         d:'none', dm:'none',   pk:'プレス_ベスト'},
   ],
   'レザー・革製品':[
@@ -1228,6 +1247,10 @@ const PROC={
     {id:'pm',l:'柄合わせ'},
     {id:'bm',l:'ボタン移動'},
     {id:'hd',l:'ほどき'},
+    {id:'st',l:'スリット作成'},
+    {id:'tc',l:'手千鳥'},
+    {id:'zt',l:'靴ズレテープ一周'},
+    {id:'cs',l:'カバーステッチ'},
   ]},
   'ウエスト_パンツ':{m:[
     {id:'s3',l:'3方詰め',ex:'side'},{id:'ry',l:'両脇',ex:'side'},
@@ -1241,6 +1264,9 @@ const PROC={
     {id:'mi',l:'マチ入れ'},{id:'vs',l:'Vスリット'},{id:'kn',l:'かんぬき入れ直し'},
     {id:'kr',l:'くり直し'},{id:'bm',l:'ボタン移動'},
     {id:'fk',l:'前カン付け'},
+    {id:'pr',l:'ポケット作り直し'},
+    {id:'fe',l:'ファスナー移動（エフロン）'},{id:'fc',l:'ファスナー移動（コンシール）'},
+    {id:'tg',l:'総ゴム・脇ゴム付き'},
   ]},
   '裾幅_パンツ':{m:[
     {id:'ui',l:'内のみ',ex:'sw'},{id:'so',l:'外のみ',ex:'sw'},{id:'ry',l:'両脇',ex:'sw'},
@@ -1352,6 +1378,8 @@ const PROC={
     {id:'bl',l:'ベルト下で詰め'},
     {id:'gk2',l:'学生スカート'},
     {id:'qu',l:'キュロット'},
+    {id:'pp',l:'パイピング付き'},{id:'li',l:'裏地付き'},
+    {id:'fr',l:'フリンジ'},{id:'mk2',l:'見返し付き移動'},
   ]},
   'ウエスト_スカート':{m:[
     {id:'s3',l:'3方詰め'},{id:'ry',l:'両脇'},
@@ -1364,6 +1392,7 @@ const PROC={
     {id:'tk',l:'タック追加'},
     {id:'gt',l:'ギャザーで詰め'},
     {id:'li',l:'裏地あり'},
+    {id:'hp',l:'ヒップのみ詰め'},{id:'pg',l:'プリーツ・ギャザー'},
   ]},
   'ヒップ_スカート':{m:[{id:'wk',l:'脇縫い'},{id:'lm',l:'限界あり',fin:true}]},
   'ファスナー交換_スカート':{m:[
@@ -1394,6 +1423,8 @@ const PROC={
     {id:'hs',l:'ハンドステッチ'},
     {id:'pm',l:'アウトポケット移動'},
     {id:'pr',l:'アウトポケット作り替え'},
+    {id:'as',l:'全体ステッチ入り'},{id:'ah',l:'全体ハンドステッチ入り'},
+    {id:'cv',l:'センターベンツ'},{id:'sv',l:'サイドベンツ'},{id:'rb',l:'リブニット裾'},
   ]},
   '袖丈_ジャケット':{m:[
     {id:'ts',l:'筒袖',            ex:'sty'},
@@ -1406,7 +1437,7 @@ const PROC={
     {id:'kz',l:'飾りボタンあり'},
     {id:'li',l:'裏地あり'},
     {id:'sy',l:'袖山から詰め'},
-    {id:'sh',l:'肩山カット'},
+    {id:'sh',l:'肩山カット',sub:[{l:'肩山カット（〜2cm）',ex:'shc'},{l:'肩山カット（2.1〜3.9cm）',ex:'shc'},{l:'肩山カット（4cm〜）',ex:'shc'}]},
     {id:'hs',l:'ハンドステッチ'},
   ]},
   '身幅_ジャケット':{m:[
@@ -1415,6 +1446,7 @@ const PROC={
     {id:'dt',l:'ダーツ操作'},
     {id:'hs',l:'ハンドステッチ'},
     {id:'pm',l:'アウトポケット移動'},
+    {id:'s3',l:'三方詰め/出し'},{id:'hs2',l:'ハンドステッチ入り'},{id:'ah',l:'AH修正含む'},
     {id:'lm',l:'限界あり',fin:true},
   ]},
   'ウエスト絞り_ジャケット':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
@@ -1425,6 +1457,7 @@ const PROC={
     {id:'km',l:'肩線移動'},
     {id:'sg',l:'袖ぐり調整'},
     {id:'nm',l:'衿みつ操作'},
+    {id:'hs',l:'ハンドステッチ入り'},
   ]},
   'ベントさわり_ジャケット':{m:[
     {id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'},
@@ -1500,6 +1533,7 @@ const PROC={
     {id:'hs',l:'ハンドステッチ'},
     {id:'pm',l:'アウトポケット移動'},
     {id:'pr',l:'アウトポケット作り替え'},
+    {id:'om',l:'奥まつり'},{id:'lf',l:'ライナーファスナー移動'},
   ]},
   '袖丈_コート':{m:[
     {id:'sg',l:'シングル',    ex:'sty'},
@@ -1513,16 +1547,17 @@ const PROC={
     {id:'cn',l:'カフスなし',  ex:'cf'},
     {id:'mt',l:'まつり縫い'},
     {id:'lk',l:'ロック処理'},
-    {id:'sy',l:'袖山から詰め'},
+    {id:'sy',l:'袖山から詰め'},{id:'bm',l:'ベルト移動'},
   ]},
   '身幅_コート':{m:[
     {id:'ui',l:'内のみ'},{id:'so',l:'外のみ'},{id:'ry',l:'両脇'},
     {id:'fs',l:'折り伏せ'},{id:'fk',l:'袋縫い'},
     {id:'pm',l:'アウトポケット移動'},
+    {id:'ds',l:'ダブルステッチ入り'},{id:'ts',l:'トリプルステッチ入り'},{id:'lg',l:'10cm以上'},
     {id:'lm',l:'限界あり',fin:true},
   ]},
   'ウエスト絞り_コート':{m:[{id:'wk',l:'脇縫い'},{id:'se',l:'背縫い'},{id:'bt',l:'両方'}]},
-  '肩幅_コート':{m:[{id:'kt',l:'肩線'},{id:'sd',l:'袖付け'}]},
+  '肩幅_コート':{m:[{id:'kt',l:'肩線'},{id:'sd',l:'袖付け'},{id:'pn',l:'パネル作り直し'},{id:'hs',l:'ハンドステッチ入り'}]},
   'ベントさわり_コート':{m:[
     {id:'sv',l:'サイドベント'},{id:'cv',l:'センターベント'},
     {id:'cl',l:'ベント閉じ'},{id:'op',l:'ベント開け'},
@@ -1582,6 +1617,9 @@ const PROC={
     {id:'sl',l:'スリット移動'},
     {id:'sq',l:'スクエアに変更'},
     {id:'tg',l:'タグ移動'},
+    {id:'ss',l:'サイドスリット付移動'},
+    {id:'hr',l:'ハリツケ'},
+    {id:'tm3',l:'三角マチ付き'},
   ]},
   '袖丈_シャツ':{m:[
     {id:'aa',l:'アキあり',ex:'sty'},{id:'an',l:'アキなし',ex:'sty'},
@@ -1589,7 +1627,7 @@ const PROC={
     {id:'cn',l:'カフスなし',ex:'cf'},
     {id:'rb',l:'リブ付け'},{id:'sy',l:'袖山から詰め'},
     {id:'sh',l:'肩山カット'},
-    {id:'tz',l:'タンザク移動'},{id:'kr',l:'切り込み跡芯補強'},
+    {id:'bw',l:'袖巾調整あり'},{id:'tz',l:'タンザク移動'},{id:'kr',l:'切り込み跡芯補強'},
     {id:'lc',l:'レースカット'},{id:'lm2',l:'レース移動'},
     {id:'fl',l:'袖口フレアー切替え'},
     {id:'da',l:'袖丈出し（AH+カフス）'},
@@ -1766,6 +1804,7 @@ const PROC={
     {id:'wb',l:'ウエスト切替えで詰め（上下）'},
     {id:'pl',l:'総プリーツ'},
     {id:'mr',l:'メローロック・カバーステッチ'},
+    {id:'tm2',l:'手まつりの場合'},{id:'pb',l:'パイピング・ブレード'},
   ]},
   '袖丈_ワンピース':{m:[
     {id:'ts',l:'筒袖',   ex:'sty'},{id:'ak',l:'開き見せ',ex:'sty'},
@@ -1809,7 +1848,7 @@ const PROC={
     {id:'ah',l:'アーム〜ヒジ巾',ex:'sw'},
     {id:'as',l:'アーム〜袖口巾',ex:'sw'},
     {id:'pp',l:'パイピング入り'},
-    {id:'st',l:'ステッチ入り'},
+    {id:'st',l:'ステッチ入り'},{id:'hs',l:'ハンドステッチ入り'},
     {id:'lm',l:'限界あり',fin:true},
   ]},
 
@@ -1920,12 +1959,12 @@ const PROC={
     {id:'ry',l:'両脇'},
     {id:'rb',l:'裾リブ付き'},
     {id:'bl',l:'裾ベルト付き'},
-    {id:'lm',l:'限界あり',fin:true},
+    {id:'ts',l:'トリプルステッチ'},{id:'lm',l:'限界あり',fin:true},
   ]},
   '袖巾_ブルゾン':{m:[
     {id:'ah',l:'アーム〜ヒジ巾',ex:'sw'},
     {id:'as',l:'アーム〜袖口巾',ex:'sw'},
-    {id:'so',l:'袖口リブのみ'},
+    {id:'so',l:'袖口リブのみ'},{id:'bw',l:'身幅調整有'},{id:'ts',l:'トリプルステッチ'},
     {id:'lm',l:'限界あり',fin:true},
   ]},
   'ファスナー交換_ブルゾン':{m:[
@@ -1980,12 +2019,13 @@ const PROC={
   // ── ジレ ──
   '着丈_ジレ':{m:[
     {id:'hm',l:'裾から詰め'},
+    {id:'sh',l:'肩線詰め'},
   ]},
   '身幅_ジレ':{m:[
     {id:'ts',l:'詰め'},{id:'mi',l:'マチ入れ（生地代別）'},
     {id:'lm',l:'限界あり',fin:true},
   ]},
-  '裏地取替_ジレ':{m:[{id:'fl',l:'全取替'},{id:'pt',l:'部分補修'}]},
+  '裏地取替_ジレ':{m:[{id:'fl',l:'全取替'},{id:'pt',l:'部分補修'},{id:'bb',l:'背中ベルト有'}]},
   'タグ付け_ジレ':{m:[{id:'mc',l:'ミシン',ex:'tg'},{id:'mt',l:'まつり縫い',ex:'tg'},{id:'it',l:'糸止め',ex:'tg'}]},
   '着丈肩線詰め_ジレ':{m:[
     {id:'sh',l:'肩線から詰め'},
@@ -2304,7 +2344,7 @@ const PROC={
     {id:'cf',l:'カフス付き'},
     {id:'ak',l:'明きカフス'},
     {id:'el',l:'ひじ切替えで'},
-    {id:'sh',l:'肩でツメ'},
+    {id:'sh',l:'肩でツメ'},{id:'sc',l:'肩から詰め'},{id:'cf2',l:'カフス'},
   ]},
   '着丈_レザー':{m:[
     {id:'hm',l:'裾から'},
@@ -2330,7 +2370,7 @@ const PROC={
   'ファスナー交換_レザー':{m:[
     {id:'op',l:'オープン（ファスナー代別）'},
     {id:'sl',l:'スライダー交換のみ'},
-    {id:'lh',l:'革引き手付け替え'},
+    {id:'lh',l:'革引き手付け替え'},{id:'rh',l:'引き手革替え'},
   ]},
   'リブ交換_レザー':{m:[
     {id:'sl',l:'袖口リブ'},{id:'hm',l:'裾リブ'},
@@ -2397,7 +2437,7 @@ const PROC={
     {id:'cf',l:'カフス付き'},
     {id:'dc',l:'ダブルカフス'},
     {id:'sh',l:'肩でツメ'},
-    {id:'el',l:'ひじ切替えでツメ'},
+    {id:'el',l:'ひじ切替えでツメ'},{id:'cf2',l:'カフス'},
   ]},
   '着丈_毛皮':{m:[
     {id:'hm',l:'裾から'},
@@ -2584,6 +2624,10 @@ function init(){
   checkStorageCapacity();
 
   buildTypes();buildColors();buildPats();populateSels();setDefaults();
+  // P-2: デフォルトソートを適用
+  const _defSort=localStorage.getItem('ar2_default_sort')||'reg';
+  const _wSort=document.getElementById('w-sort');
+  if(_wSort) _wSort.value=_defSort;
   renderWork();renderHist();
   // 2-5: オフライン通知
   updateOnlineStatus();
@@ -2641,6 +2685,7 @@ function togInDateLock(){
 }
 function syncOutDate(inVal){
   if(!inVal) return;
+  if(_inDateLocked) return; // ロック中は納期を自動変更しない
   const defaultDays=parseInt(localStorage.getItem('ar2_default_days')||'3',10);
   const d=new Date(inVal);d.setDate(d.getDate()+defaultDays);
   document.getElementById('f-out-date').value=d.toISOString().slice(0,10);
@@ -2708,6 +2753,7 @@ function getCatColor(cat){
 }
 
 const ALT_USE_KEY='ar2_alt_use';
+const ALT_PIN_KEY='ar2_alt_pin';
 function gAltUse(){try{return JSON.parse(localStorage.getItem(ALT_USE_KEY)||'{}');}catch(e){return {};}}
 function recordAltUse(alts){
   if(!alts||!alts.length) return;
@@ -2715,14 +2761,33 @@ function recordAltUse(alts){
   alts.forEach(a=>{const k=a.pk||a.n;if(k) u[k]=(u[k]||0)+(a.cnt||1);});
   localStorage.setItem(ALT_USE_KEY,JSON.stringify(u));
 }
+function gAltPin(cat){
+  try{return JSON.parse(localStorage.getItem(ALT_PIN_KEY+'_'+cat)||'[]');}catch(e){return[];}
+}
+function sAltPin(cat,pins){localStorage.setItem(ALT_PIN_KEY+'_'+cat,JSON.stringify(pins));}
+function togAltPin(cat,pk){
+  const pins=gAltPin(cat);
+  const idx=pins.indexOf(pk);
+  if(idx>=0) pins.splice(idx,1);
+  else pins.push(pk);
+  sAltPin(cat,pins);
+  // 現在のチェック状態を保存してから再構築
+  const cid='alt-client';
+  const savedAlts=colAlts(cid,cat);
+  buildAlts(cid,cat,false);
+  if(savedAlts.length) restoreAlts(cid,cat,savedAlts);
+}
 function topAltPks(cat,n=3){
   const u=gAltUse();
+  const manualPins=new Set(gAltPin(cat));
   const items=ALT[cat]||[];
-  return items
-    .filter(a=>u[a.pk||a.n]>0)
+  // 手動ピンを最優先、次に使用頻度順
+  const manualPinItems=items.filter(a=>manualPins.has(a.pk||a.n));
+  const freqItems=items
+    .filter(a=>!manualPins.has(a.pk||a.n)&&u[a.pk||a.n]>0)
     .sort((a,b)=>(u[b.pk||b.n]||0)-(u[a.pk||a.n]||0))
-    .slice(0,n)
-    .map(a=>a.pk||a.n);
+    .slice(0,Math.max(0,n-manualPinItems.length));
+  return [...manualPinItems,...freqItems].map(a=>a.pk||a.n);
 }
 
 function sortedCats(cats){
@@ -2779,6 +2844,34 @@ function printDashReport(){
   const body=document.getElementById('dash-body');
   if(!body)return;
   const mo=dashMonth||'';
+  // SVGグラフ生成（カテゴリー別件数）
+  const recs=gR();
+  const [yr,mon]=mo.split('-');
+  const filtered=recs.filter(r=>{
+    if(!r.inDate)return false;
+    const [ry,rm]=r.inDate.split('-');
+    return ry===yr&&rm===mon;
+  });
+  const catCount={};
+  filtered.forEach(r=>{const c=r.cat||'未分類';catCount[c]=(catCount[c]||0)+1;});
+  const sorted=Object.entries(catCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const svgW=480,svgH=180,padL=90,padR=10,padT=10,padB=30;
+  const barW=svgW-padL-padR;
+  const barH=svgH-padT-padB;
+  const maxV=sorted[0]?.[1]||1;
+  const rowH=Math.floor(barH/sorted.length);
+  const svgBars=sorted.map(([cat,cnt],i)=>{
+    const w=Math.round(cnt/maxV*barW);
+    const y=padT+i*rowH+2;
+    const h=Math.max(4,rowH-4);
+    return `<rect x="${padL}" y="${y}" width="${w}" height="${h}" fill="#5b9bd5" rx="2"/>
+      <text x="${padL-4}" y="${y+h/2+4}" text-anchor="end" font-size="9" fill="#333">${cat.slice(0,8)}</text>
+      <text x="${padL+w+3}" y="${y+h/2+4}" font-size="9" fill="#555">${cnt}</text>`;
+  }).join('');
+  const svgGraph=`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" style="display:block;margin:12px auto;border:1px solid #eee;border-radius:8px;background:#fafafa">
+    <text x="${svgW/2}" y="9" text-anchor="middle" font-size="10" fill="#888">カテゴリー別件数</text>
+    ${svgBars}
+  </svg>`;
   const printWin=window.open('','_blank','width=600,height=800');
   printWin.document.write(
     '<html><head><meta charset="utf-8"><title>月次レポート '+mo+'</title>'
@@ -2789,10 +2882,14 @@ function printDashReport(){
     +'.tk{font-size:10px;color:#666}.tv{font-size:20px;font-weight:700}'
     +'table{width:100%;border-collapse:collapse;font-size:11px}'
     +'th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}'
-    +'th{background:#f5f5f5}</style></head><body>'
-    +'<h2>Lis \u6708\u6b21\u30ec\u30dd\u30fc\u30c8 '+mo+'</h2><hr>'
+    +'th{background:#f5f5f5}'
+    +'[style*="var(--"]{color:#111!important;background:#f0f0f0!important;border-color:#ddd!important}'
+    +'</style></head><body>'
+    +'<h2>Lis 月次レポート '+mo+'</h2><hr>'
+    +svgGraph
+    +'<hr>'
     +body.innerHTML
-    +'<hr><p style="font-size:10px;color:#999">\u51fa\u529b\u65e5\u6642: '+new Date().toLocaleString('ja-JP')+'</p>'
+    +'<hr><p style="font-size:10px;color:#999">出力日時: '+new Date().toLocaleString('ja-JP')+'</p>'
     +'</body></html>'
   );
   printWin.document.close();
@@ -2902,6 +2999,47 @@ function renderDash(){
   }
   const sorted=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
   const maxCnt=sorted[0]?.[1]||1;
+
+  // P-6: カテゴリー別SVG円グラフ生成
+  const svgColors=['#5B9BD5','#5AAC7A','#C4843A','#9B72CF','#C45A5A','#5AB8C4','#A0A022','#C45AA0','#5A7AC4','#C47A5A'];
+  function makePieChart(data, size=140){
+    if(!data.length) return '';
+    const total=data.reduce((s,[,v])=>s+v,0);
+    if(!total) return '';
+    const cx=size/2, cy=size/2, r=size*0.38, ri=size*0.22;
+    let startAngle=-Math.PI/2;
+    const slices=data.slice(0,8).map(([label,val],i)=>{
+      const angle=2*Math.PI*(val/total);
+      const endAngle=startAngle+angle;
+      const x1=cx+r*Math.cos(startAngle), y1=cy+r*Math.sin(startAngle);
+      const x2=cx+r*Math.cos(endAngle),   y2=cy+r*Math.sin(endAngle);
+      const xi1=cx+ri*Math.cos(startAngle),yi1=cy+ri*Math.sin(startAngle);
+      const xi2=cx+ri*Math.cos(endAngle),  yi2=cy+ri*Math.sin(endAngle);
+      const large=angle>Math.PI?1:0;
+      const path=`M${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${xi2},${yi2} A${ri},${ri},0,${large},0,${xi1},${yi1} Z`;
+      const color=svgColors[i%svgColors.length];
+      const midAngle=startAngle+angle/2;
+      const lx=cx+(r+8)*Math.cos(midAngle), ly=cy+(r+8)*Math.sin(midAngle);
+      startAngle=endAngle;
+      return {path,color,label,val,lx,ly,pct:Math.round(val/total*100)};
+    });
+    const paths=slices.map(s=>`<path d="${s.path}" fill="${s.color}" stroke="#1a1a2e" stroke-width="1"/>`).join('');
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg>`;
+  }
+
+  const pieHtml=sorted.length>=2?`
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+      <div style="flex-shrink:0">${makePieChart(sorted)}</div>
+      <div style="flex:1;min-width:0">
+        ${sorted.slice(0,8).map(([cat,cnt],i)=>`
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
+          <div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:${svgColors[i%svgColors.length]}"></div>
+          <span style="font-size:10px;color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(cat)}</span>
+          <span style="font-size:10px;color:var(--tx3);flex-shrink:0">${cnt}件</span>
+        </div>`).join('')}
+      </div>
+    </div>`:'';
+
   el.innerHTML=
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
     +'<div style="padding:10px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;text-align:center">'
@@ -2925,6 +3063,7 @@ function renderDash(){
     +'</div>'
     +'<div style="font-size:11px;color:var(--tx3);text-align:right;margin-bottom:10px">平均単価: ¥'+avgPrice.toLocaleString()+' '+diffBadge(avgPrice,prevAvg).replace('display:block','display:inline')+'</div>'
     +'<div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:8px">カテゴリー別件数</div>'
+    +pieHtml
     +sorted.map(([cat,cnt])=>{
       const pct=Math.round(cnt/maxCnt*100);
       const price=catPrice[cat]||0;
@@ -3309,16 +3448,40 @@ function onClientInput(val){
   if(!past.length){hint.style.display='none';return;}
   const lr=past[0];
   const ld=lr.inDate?lr.inDate.slice(5).replace('-','/'):'—';
-  const la=(lr.wAlts||lr.cAlts||[]).slice(0,2).map(a=>a.n+(a.dir?' '+a.dir:'')).join('・')||'—';
+  const la=(lr.wAlts||lr.cAlts||[]).slice(0,2).map(a=>_esc(a.n)+(a.dir?' '+a.dir:'')).join('・')||'—';
   const lp=lr.price?' ¥'+lr.price.toLocaleString():'';
   const cnt=past.length;
+  // 前回補正適用関数（クロージャ）
+  window._applyLastAlts=()=>{
+    const cat=lr.cat||document.getElementById('f-cat').value;
+    if(cat&&cat!==document.getElementById('f-cat').value){
+      document.getElementById('f-cat').value=cat;
+      onCatChange();
+      setTimeout(()=>{
+        document.querySelectorAll('#alt-client .ai input[type=checkbox]:checked').forEach(chk=>{togAlt(chk.id.replace('chk-',''));});
+        restoreAlts('alt-client',cat,lr.wAlts||lr.cAlts||[]);
+        calcEstPrice('f');
+      },100);
+    }else{
+      document.querySelectorAll('#alt-client .ai input[type=checkbox]:checked').forEach(chk=>{togAlt(chk.id.replace('chk-',''));});
+      restoreAlts('alt-client',cat,lr.wAlts||lr.cAlts||[]);
+      calcEstPrice('f');
+    }
+    showToast('前回の補正内容を適用しました','',null,2000);
+  };
   hint.style.display='block';
-  hint.innerHTML='🔄 前回: '+ld+'　'+la+lp+(cnt>1?'　<span style="color:var(--blue)">計'+cnt+'回</span>':'');
+  hint.innerHTML='🔄 前回: '+ld+'　'+la+lp+(cnt>1?'　<span style="color:var(--blue)">計'+cnt+'回</span>':'')
+    +'　<button onclick="window._applyLastAlts()" style="font-size:10px;padding:1px 7px;border-radius:6px;border:none;background:var(--blue);color:#0a0a0f;font-family:var(--f);cursor:pointer;font-weight:700">▶ 適用</button>';
 }
 
 function scrollToTop(scrId){
   const el=document.getElementById(scrId);
   if(el){el.scrollTop=0;}
+}
+function scrollToActiveTop(){
+  // アクティブな.screen要素を検知してスクロールトップ
+  const active=document.querySelector('.screen.on');
+  if(active){active.scrollTop=0;}
 }
 function setNoTicket(){
   const inp=document.getElementById('f-ticket');
@@ -3398,6 +3561,21 @@ function showScr(n){
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   document.getElementById('scr-'+n).classList.add('on');
   document.getElementById('nb-'+n).classList.add('on');
+  // 画面切替時に選択モードをリセット
+  if(n!=='hist'&&histSelMode){
+    histSelMode=false;histSelIds.clear();
+    const btn=document.getElementById('hist-sel-btn');
+    const bar=document.getElementById('hist-bulk-bar');
+    if(btn){btn.className='btn-g';btn.style.cssText='';}
+    if(bar) bar.style.display='none';
+  }
+  if(n!=='work'&&selMode){
+    selMode=false;selIds.clear();
+    const btn2=document.getElementById('btn-sel-mode');
+    const bar2=document.getElementById('bulk-bar');
+    if(btn2){btn2.className='btn-g';btn2.style.cssText='';}
+    if(bar2) bar2.style.display='none';
+  }
   if(n==='work')renderWork();
   if(n==='hist'){
     if(window._drillFilter) renderHistDrill();
@@ -3494,8 +3672,18 @@ function applyTemplate(i){
   if(t.cat&&t.cat!==cat){
     document.getElementById('f-cat').value=t.cat;
     onCatChange();
-    setTimeout(()=>{restoreAlts('alt-client',t.cat,t.alts);renderTmplBar();calcEstPrice('f');},100);
+    setTimeout(()=>{
+      // 既存チェックをクリアしてから適用
+      document.querySelectorAll('#alt-client .ai input[type=checkbox]:checked').forEach(chk=>{
+        const uid=chk.id.replace('chk-','');togAlt(uid);
+      });
+      restoreAlts('alt-client',t.cat,t.alts);renderTmplBar();calcEstPrice('f');
+    },100);
   }else{
+    // 既存チェックをクリアしてから適用
+    document.querySelectorAll('#alt-client .ai input[type=checkbox]:checked').forEach(chk=>{
+      const uid=chk.id.replace('chk-','');togAlt(uid);
+    });
     restoreAlts('alt-client',cat,t.alts);
     calcEstPrice('f');
   }
@@ -3519,22 +3707,24 @@ function swipeStart(e,id){
 function swipeEnd(e,id){
   const dx=e.changedTouches[0].clientX-_swipeX;
   const dy=e.changedTouches[0].clientY-_swipeY;
-  if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx)*0.8) return;
+  if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx)*0.6) return;
   e.stopPropagation();
   const rs=gR();const i=rs.findIndex(r=>r.id===id);if(i<0)return;
   const cur=rs[i].status;
+  const _logChange=(st)=>{
+    rs[i].changeLog=[...(rs[i].changeLog||[]),{at:new Date().toISOString(),action:'status',from:cur,to:st}].slice(-20);
+    rs[i].updatedAt=new Date().toISOString();
+  };
   if(dx>0){
-    // 右スワイプ→返却済
     if(cur==='ret') return;
-    rs[i].status='ret';
+    rs[i].status='ret';_logChange('ret');
     sR(rs);renderWork();renderHist();
     showToast('返却済に変更','↩ 元に戻す',()=>{rs[i].status=cur;sR(rs);renderWork();},4000);
   }else{
-    // 左スワイプ→次のステータス
     const idx=STATUS_ORDER.indexOf(cur);
     const next=STATUS_ORDER[idx+1];
     if(!next||next==='ret') return;
-    rs[i].status=next;
+    rs[i].status=next;_logChange(next);
     const nextLabel=(STATUS.find(s=>s.id===next)||{label:next}).label;
     sR(rs);renderWork();renderHist();
     showToast(nextLabel+'に変更','↩ 元に戻す',()=>{rs[i].status=cur;sR(rs);renderWork();},4000);
@@ -3648,14 +3838,19 @@ function buildAlts(cid,cat,isW){
     const lisBadge=LIS_ONLY_PKS.has(a.pk)
       ?`<span style="font-size:9px;background:var(--purple-bg);color:var(--purple);padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:700">★専売</span>`
       :'';
-    // B-2: よく使うバッジ
-    const pinBadge=pinPks.has(a.pk||a.n)
-      ?`<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 4px;border-radius:4px;margin-left:4px;font-weight:700">⚡</span>`
-      :'';
+  // B-2: よく使うバッジ（手動ピンは☆ボタン付き）
+  const isManualPin=cid==='alt-client'&&new Set(gAltPin(cat)).has(a.pk||a.n);
+  const pinBadge=pinPks.has(a.pk||a.n)
+    ?`<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 4px;border-radius:4px;margin-left:4px;font-weight:700">⚡</span>`
+    :'';
+  const pinBtn=cid==='alt-client'
+    ?`<button onclick="event.stopPropagation();togAltPin(${JSON.stringify(cat)},${JSON.stringify(a.pk||a.n)});buildAlts('alt-client',${JSON.stringify(cat)},false)" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 2px;color:${isManualPin?'var(--amber)':'var(--tx3)'};" title="${isManualPin?'ピン解除':'ピン固定'}">${isManualPin?'📌':'📍'}</button>`
+    :'';
     return `<div class="ai">
       <div class="ah" onclick="togAlt('${uid}')">
         <input type="checkbox" id="chk-${uid}" onclick="event.stopPropagation();togAlt('${uid}')">
-        <span class="an">${a.n}${lisBadge}${pinBadge}</span>
+        <span class="an">${_esc(a.n)}${lisBadge}${pinBadge}</span>
+        ${pinBtn}
       </div>
       <div class="ab" id="body-${uid}" data-name="${a.pk||a.n}" data-dm="${a.dm}" data-dir="${a.d}" data-isw="${isW}">
         ${buildAB(a,uid,isW)}
@@ -4011,6 +4206,7 @@ const PRICE={
   'ボタン補強_ジャケット':500,'ボタン補強_スウェット':500,'ボタン補強_スカート':500,
   'ボタン補強_ドレス':500,'ボタン補強_ニット':500,'ボタン補強_ブルゾン':500,
   'ボタン補強_ワンピース':500,'ボタン補強_Tシャツ':500,
+  'ボタン補強_ジレ':500,'ボタン補強_ベスト':500,
   // 個別未登録
   'デニムダメージ残し加工':2500,'スウェット交換':2000,
   '穴あけ':500,'バックル交換':1500,'フリンジ補修':2000,
@@ -4588,11 +4784,17 @@ function calcPriceFromRecord(r){
     let itemTotal=base;
     // cnt（個数）
     if(sa.cnt&&sa.cnt>1) itemTotal=base*sa.cnt;
-    // PROCオプション加算
+    // PROCオプション加算（subsのサブ選択も参照）
     (sa.procs||[]).forEach(label=>{
       const optKey=pk+':'+label;
       const opt=effectiveOpt[optKey];
       if(opt) itemTotal+=opt;
+      // サブ選択
+      const subVals=(sa.subs&&sa.subs[label])||[];
+      subVals.forEach(sl=>{
+        const subOpt=effectiveOpt[pk+':'+sl];
+        if(subOpt) itemTotal+=subOpt;
+      });
     });
     total+=itemTotal;
   });
@@ -4630,6 +4832,7 @@ function calcEstPrice(prefix){
   const items=ALT[cat]||[];
   const customP=gPrice()||{};
   const effectivePrice={...PRICE,...customP};
+  const effectiveOpt={...PRICE_OPT,...(gPriceOpt()||{})};
   let total=0;
   const breakdown=[];
   el.querySelectorAll('[id^="chk-"]').forEach(chk=>{
@@ -4653,10 +4856,17 @@ function calcEstPrice(prefix){
     const optLabels=[];
     if(body){
       const procs=JSON.parse(body.dataset.procs||'[]');
+      const subs=JSON.parse(body.dataset.subs||'{}');
       procs.forEach(label=>{
         const optKey=pk+':'+label;
-        const opt=PRICE_OPT[optKey];
+        const opt=effectiveOpt[optKey];
         if(opt){itemTotal+=opt;optLabels.push(`${label} +¥${opt.toLocaleString()}`);}
+        // サブ選択もPRICE_OPTを参照
+        (subs[label]||[]).forEach(sl=>{
+          const subKey=pk+':'+sl;
+          const subOpt=effectiveOpt[subKey];
+          if(subOpt){itemTotal+=subOpt;optLabels.push(`${sl} +¥${subOpt.toLocaleString()}`);}
+        });
       });
     }
     if(itemTotal>0){
@@ -5180,26 +5390,37 @@ function renderHistDrill(){
   const el=document.getElementById('hl');
   const stL=id=>(STATUS.find(s=>s.id===id)||{label:'—'}).label;
   const tpL=id=>(TYPES.find(t=>t.id===id)||{label:'—'}).label;
+  // ページネーション
+  const totalPages=Math.max(1,Math.ceil(all.length/HIST_PAGE_SIZE));
+  if(histPage>=totalPages) histPage=totalPages-1;
+  if(histPage<0) histPage=0;
+  const paged=all.slice(histPage*HIST_PAGE_SIZE,Math.min((histPage+1)*HIST_PAGE_SIZE,all.length));
   // ドリルダウンバナー
   const banner=`<div style="padding:8px 14px;background:var(--blue-bg);border:1px solid rgba(91,155,213,.3);border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
     <span style="font-size:12px;color:var(--blue);font-weight:600">📊 ${label}（${all.length}件）</span>
-    <button onclick="window._drillFilter=null;renderHist()" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer">クリア</button>
+    <button onclick="window._drillFilter=null;histPage=0;renderHist()" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--bd2);background:var(--s3);color:var(--tx3);font-family:var(--f);cursor:pointer">クリア</button>
   </div>`;
   if(!all.length){el.innerHTML=banner+'<div class="empty"><div class="ei">📋</div>該当なし</div>';return;}
+  const pgUI=totalPages<=1?'':`
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 16px;border-top:1px solid var(--bd)">
+      <button onclick="histPage=${histPage-1};renderHistDrill()" ${histPage===0?'disabled':''} style="padding:6px 14px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:${histPage===0?'var(--tx3)':'var(--tx2)'};font-size:14px;font-weight:700;font-family:var(--f);cursor:${histPage===0?'default':'pointer'}">◀</button>
+      <span style="font-size:12px;color:var(--tx2);font-family:var(--fm)">${histPage+1} / ${totalPages}</span>
+      <button onclick="histPage=${histPage+1};renderHistDrill()" ${histPage===totalPages-1?'disabled':''} style="padding:6px 14px;border-radius:8px;border:1px solid var(--bd2);background:var(--s2);color:${histPage===totalPages-1?'var(--tx3)':'var(--tx2)'};font-size:14px;font-weight:700;font-family:var(--f);cursor:${histPage===totalPages-1?'default':'pointer'}">▶</button>
+    </div>`;
   el.innerHTML=banner+`<table class="ht"><thead><tr>
     <th>持込日</th><th>納品日</th><th>伝票No.</th><th>案件</th><th>店名</th>
     <th>客名</th><th>品名</th><th>カテゴリー</th><th>補正内容</th><th>金額</th><th>状態</th>
   </tr></thead><tbody>
-  ${all.map(r=>`<tr onclick="openDet('${r.id}')" style="cursor:pointer">
+  ${paged.map(r=>`<tr onclick="openDet('${r.id}')" style="cursor:pointer">
     <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
-    <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+r.ticket:''}</td>
-    <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
-    <td>${r.client||'—'}</td><td>${r.item||'—'}</td><td>${r.cat||'—'}</td>
+    <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+_esc(r.ticket):''}</td>
+    <td>${tpL(r.type)}</td><td>${_esc(r.store||'—')}</td>
+    <td>${_esc(r.client||'—')}</td><td>${_esc(r.item||'—')}</td><td>${_esc(r.cat||'—')}</td>
     <td>${aSum(r.cAlts)}</td>
     <td style="font-family:var(--fm);color:var(--gold);text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
     <td>${stL(r.status)}</td>
   </tr>`).join('')}
-  </tbody></table>`;
+  </tbody></table>${pgUI}`;
 }
 
 function showChartOv(){
@@ -5614,6 +5835,7 @@ function saveRec(){
   const tp=TYPES.find(t=>t.id===curType);
   const now=new Date().toISOString();
   const _recAlts=colAlts('alt-client',cat);
+  const _recAltsClone=JSON.parse(JSON.stringify(_recAlts)); // wAlts用独立コピー
   const rec={
     id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
     type:curType,typeLbl:tp?.label||'',typeCls:tp?.cls||'o',
@@ -5631,7 +5853,7 @@ function saveRec(){
     mat:document.getElementById('f-material').value.trim(),
     isSpm:spmOn,
     cAlts:_recAlts,
-    wAlts:_recAlts,
+    wAlts:_recAltsClone,
     cMemo:document.getElementById('f-cmemo').value.trim(),
     wMemo:document.getElementById('f-wmemo').value.trim(),
     special:document.getElementById('f-special').value.trim(),
@@ -5649,6 +5871,9 @@ function saveRec(){
   for(let bi=0;bi<bulkCount;bi++){
     const bRec=bi===0?rec:{...rec,
       id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
+      ticket:'', // 2件目以降は伝票番号なし（別途入力）
+      cAlts:JSON.parse(JSON.stringify(_recAlts)),
+      wAlts:JSON.parse(JSON.stringify(_recAltsClone)),
       createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
     };
     rs.unshift(bRec);
@@ -5780,18 +6005,34 @@ function renderWork(){
   // 「返却済に」ボタン: 完成ステータス&納期当日以前のレコードがあれば表示
   const _today=new Date().toISOString().slice(0,10);
   const _doneRetC=all2.filter(r=>r.status==='done'&&r.outDate&&r.outDate<=_today).length;
+  const _doneAllC=all2.filter(r=>r.status==='done').length;
   const _bRetBtn=document.getElementById('btn-bulk-ret');
   if(_bRetBtn){
     _bRetBtn.style.display=_doneRetC>0?'inline-block':'none';
     _bRetBtn.textContent='✅ 返却済に('+_doneRetC+')';
+  }
+  const _bAllRetBtn=document.getElementById('btn-all-ret');
+  if(_bAllRetBtn){
+    // 「全完成」は「納期超過ぶんの返却済に」で対応できない件数がある場合のみ表示
+    _bAllRetBtn.style.display=(_doneAllC>_doneRetC)?'inline-block':'none';
+    _bAllRetBtn.textContent='✅ 全完成→返却済('+_doneAllC+')';
   }
   const fs=[{id:'all',l:'全て'},{id:'recv',l:'受付済'},{id:'work',l:'作業中'},{id:'done',l:'完成'},{id:'star',l:'★スター'}];
   document.getElementById('wf').innerHTML=fs.map(f=>
     `<button class="fp${wkFil===f.id?' on':''}" onclick="setWF('${f.id}')">${f.l}</button>`
   ).join('');
   const wq=(document.getElementById('wsrch')?.value||'').toLowerCase();
+  const wStoreFil=document.getElementById('w-store-fil')?.value||'';
   let list=wkFil==='star'?all2.filter(r=>r.starred):wkFil==='all'?all2:all2.filter(r=>r.status===wkFil);
+  if(wStoreFil) list=list.filter(r=>(r.store||'')=== wStoreFil);
   if(wq) list=list.filter(r=>[r.client,r.ticket,r.item,r.mat,r.store,r.staff,r.note,r.cMemo,r.wMemo,r.special,aSum(r.wAlts),aSum(r.cAlts)].some(v=>(v||'').toLowerCase().includes(wq)));
+  // 店名フィルターのoptions更新
+  const _wStoreEl=document.getElementById('w-store-fil');
+  if(_wStoreEl){
+    const _stores=[...new Set(all2.map(r=>r.store||'').filter(Boolean))].sort();
+    const _curStore=_wStoreEl.value;
+    _wStoreEl.innerHTML='<option value="">全店</option>'+_stores.map(s=>`<option value="${_esc(s)}"${s===_curStore?' selected':''}>${_esc(s)}</option>`).join('');
+  }
   // ① ソート
   const wSortMode=document.getElementById('w-sort')?.value||'reg';
   if(wSortMode==='due') list=[...list].sort((a,b)=>{
@@ -5826,6 +6067,30 @@ function bulkDoneToRet(){
       const ids=new Set(_targets.map(r=>r.id));
       let changed=0;
       rs.forEach(r=>{if(ids.has(r.id)){r.status='ret';r.outDate=r.outDate||_today;r.updatedAt=now;changed++;}});
+      sR(rs);renderWork();renderHist();
+      showToast(changed+'件を返却済にしました','↩ 元に戻す',()=>{
+        const rs2=gR();
+        rs2.forEach(r=>{if(ids.has(r.id)){r.status='done';r.updatedAt=now;}});
+        sR(rs2);renderWork();renderHist();
+      },5000);
+    }
+  );
+}
+function bulkAllDoneToRet(){
+  // 全完成案件（納期条件なし）を返却済に
+  const _targets=gR().filter(r=>r.status==='done');
+  if(!_targets.length){showToast('完成案件がありません','',null,2000);return;}
+  showConfirm(
+    '全完成→返却済',
+    '完成済の全'+_targets.length+' 件を返却済にします。',
+    'var(--green)','#fff',
+    ()=>{
+      const rs=gR();
+      const now=new Date().toISOString();
+      const _today=now.slice(0,10);
+      const ids=new Set(_targets.map(r=>r.id));
+      let changed=0;
+      rs.forEach(r=>{if(ids.has(r.id)){r.status='ret';r.updatedAt=now;changed++;}});
       sR(rs);renderWork();renderHist();
       showToast(changed+'件を返却済にしました','↩ 元に戻す',()=>{
         const rs2=gR();
@@ -5941,12 +6206,12 @@ function renderHist(){
     return `<tr data-rid="${sid}" onclick="${histSelMode?`histTogRow('${sid}')`:`openDet('${r.id}')`}" style="cursor:pointer;${rowSel}">
       ${selTd}
       <td>${r.inDate||'—'}</td><td>${r.outDate||'—'}</td>
-      <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+r.ticket:''}</td>
-      <td>${tpL(r.type)}</td><td>${r.store||'—'}</td>
-      <td>${r.client||'—'}${r.isStaff?' 👤':''}</td>
-      <td>${r.staff||'—'}</td><td>${r.worker||'—'}</td><td>${r.item||'—'}</td>
-      <td>${r.cat||'—'}</td>
-      <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
+      <td style="font-family:var(--fm);color:var(--tx3)">${r.ticket?'#'+_esc(r.ticket):''}</td>
+      <td>${tpL(r.type)}</td><td>${_esc(r.store||'—')}</td>
+      <td>${_esc(r.client||'—')}${r.isStaff?' 👤':''}</td>
+      <td>${_esc(r.staff||'—')}</td><td>${_esc(r.worker||'—')}</td><td>${_esc(r.item||'—')}</td>
+      <td>${_esc(r.cat||'—')}</td>
+      <td>${_esc(r.mat||'')}${r.isSpm?' ⚡':''}</td>
       <td>${aSum(r.cAlts)}</td>
       <td style="font-family:var(--fm);color:var(--gold);text-align:right">${r.price?'¥'+r.price.toLocaleString():''}</td>
       <td>${stL(r.status)}</td>
@@ -6104,9 +6369,9 @@ function rCard(r,showSel){
     diffDays===1?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;background:var(--amber-bg);color:var(--amber)">明日</span>':
     diffDays<=7?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600;margin-left:4px;background:var(--s3);color:var(--tx3)">あと'+diffDays+'日</span>':
     ''
-  const tags=[r.cat,r.mat].filter(Boolean).map(t=>`<span class="rtg">${t}</span>`).join('');
+  const tags=[r.cat,r.mat].filter(Boolean).map(t=>`<span class="rtg">${_esc(t)}</span>`).join('');
   const altTags=(r.cAlts||[]).slice(0,4).map(a=>{
-    let s=a.n+(a.dir?' '+a.dir:'');
+    let s=_esc(a.n)+(a.dir?' '+_esc(a.dir):'');
     if(a.dim){
       if(typeof a.dim==='object'){
         if(a.dim.L&&a.dim.R&&a.dim.L!==a.dim.R) s+=' 左'+a.dim.L+'cm/右'+a.dim.R+'cm';
@@ -6114,7 +6379,7 @@ function rCard(r,showSel){
         else if(a.dim.R) s+=' '+a.dim.R+'cm';
       } else { s+=' '+a.dim+'cm'; }
     }
-    if(a.dl) s+=' ['+a.dl+']';
+    if(a.dl) s+=' ['+_esc(a.dl)+']';
     return `<span class="rtg" style="color:var(--gold);border-color:rgba(200,168,74,.3)">${s}</span>`;
   }).join('');
   const selCb=showSel?`<input type="checkbox" id="wsel-${r.id}" ${selIds.has(r.id)?'checked':''} onclick="togSelCard('${r.id}',event)" style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0;margin-right:6px;cursor:pointer">`:'';
@@ -6125,14 +6390,14 @@ function rCard(r,showSel){
         ${selCb}
         <div style="flex:1;min-width:0">
           <div class="rt">
-            <span class="rno">${r.ticket?'#'+r.ticket:''}</span>
-            ${r.typeCls?`<span class="tbg ${r.typeCls}">${r.typeLbl}</span>`:''}
+            <span class="rno">${r.ticket?'#'+_esc(r.ticket):''}</span>
+            ${r.typeCls?`<span class="tbg ${r.typeCls}">${_esc(r.typeLbl)}</span>`:''}
           </div>
           <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
-            <div class="rn">${r.client||r.item||'—'}${r.isStaff?' 👤':''}</div>
-            <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>a.n+(a.dir?' '+a.dir:'')).join(' · ')}${JSON.stringify(r.wAlts)!==JSON.stringify(r.cAlts)?'<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 4px;border-radius:3px;margin-left:4px;font-weight:700">✂修正済</span>':''}</div>
+            <div class="rn">${_esc(r.client||r.item||'—')}${r.isStaff?' 👤':''}</div>
+            <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>_esc(a.n)+(a.dir?' '+_esc(a.dir):'')).join(' · ')}${JSON.stringify(r.wAlts)!==JSON.stringify(r.cAlts)?'<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 4px;border-radius:3px;margin-left:4px;font-weight:700">✂修正済</span>':''}</div>
           </div>
-          <div class="rs">${r.store||''} ${r.item||''}${r.worker?` <span style="font-size:10px;color:var(--tx3)">✂️${r.worker}</span>`:''}</div>
+          <div class="rs">${_esc(r.store||'')} ${_esc(r.item||'')}${r.worker?` <span style="font-size:10px;color:var(--tx3)">✂️${_esc(r.worker)}</span>`:''}</div>
         </div>
       </div>
       <span class="sbg s-${st.id}">${st.label}</span>
@@ -6217,9 +6482,15 @@ function wStr(alts){
     return s;
   }).join('\n');
 }
+function _esc(s){
+  if(s===null||s===undefined)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 function dw(k,v,pre=false){
   if(v===null||v===undefined||v==='')return'';
-  return `<div class="dw"><span class="dk">${k}</span><span class="${pre?'dvp':'dv'}">${v}</span></div>`;
+  // pre=trueはwStr/aSum出力（改行あり）、値をエスケープして表示
+  const sv=pre?_esc(String(v)):_esc(String(v));
+  return `<div class="dw"><span class="dk">${_esc(k)}</span><span class="${pre?'dvp':'dv'}">${sv}</span></div>`;
 }
 
 // ══ DETAIL ══
@@ -6251,6 +6522,7 @@ function saveWAltsEdit(){
   const cat=rs[i].cat;
   rs[i].wAlts=colAlts('walts-alts',cat);
   rs[i].updatedAt=new Date().toISOString();
+  rs[i].changeLog=[...(rs[i].changeLog||[]),{at:new Date().toISOString(),action:'walts'}].slice(-20);
   sR(rs);closeOvBtn('ov-walts');openDet(id);
   showToast('実行工程を更新しました','',null,2500);
 }
@@ -6281,7 +6553,7 @@ function openDet(id){
     dw('案件種別',r.typeLbl)+dw('店名',r.store)+
     dw('持ち込み',(r.inDate||'')+(r.inTime?' '+r.inTime:''))+dw('納品予定',r.outDate)+
     dw('伝票No.',r.ticket?'#'+r.ticket:'')+
-    (r.client?`<div class="dw"><span class="dk">客名</span><span class="dv" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>${r.client+(r.isStaff?' 👤スタッフ':'')}</span>${(()=>{const n=gR().filter(x=>x.id!==r.id&&(x.client||'').trim()===r.client.trim()).length;return n>0?`<button onclick="drillToHist(x=>(x.client||'').trim()==='${r.client.trim()}','${r.client.trim()}の全案件');closeOvBtn('ov-det')" style="font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0">📋 過去${n}件</button>`:'';})()}</span></div>`:'')+
+    (r.client?`<div class="dw"><span class="dk">客名</span><span class="dv" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>${_esc(r.client)}${r.isStaff?' 👤スタッフ':''}</span>${(()=>{const _cn=r.client.trim();const n=gR().filter(x=>x.id!==r.id&&(x.client||'').trim()===_cn).length;return n>0?`<button onclick="drillToHist(x=>(x.client||'').trim()===${JSON.stringify(_cn)},'${_esc(_cn)}の全案件');closeOvBtn('ov-det')" style="font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid rgba(91,155,213,.3);background:var(--blue-bg);color:var(--blue);font-family:var(--f);cursor:pointer;white-space:nowrap;flex-shrink:0">📋 過去${n}件</button>`:'';})()}</span></div>`:'')+
     dw('担当者',r.staff)+dw('担当作業者',r.worker)+
     dw('品名',r.item)+dw('カテゴリー',r.cat)+
     (r.clrH?`<div class="dw"><span class="dk">色</span><span class="dv"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${r.clrH};border:1px solid rgba(255,255,255,.2);vertical-align:middle;margin-right:4px"></span>${r.clrN||r.clrH}</span></div>`:'')+
@@ -6293,14 +6565,29 @@ function openDet(id){
     dw('所要時間',r.time?r.time+'分':null)+dw('使用資材',r.materials,true)+
     dw('金額',r.price?'¥'+r.price.toLocaleString():null)+dw('備考',r.note,true)+
     dw('登録日時',r.createdAt?r.createdAt.slice(0,16).replace('T',' '):null)+
-    dw('更新日時',r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):null);
+    dw('更新日時',r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):null)+
+    ((r.changeLog&&r.changeLog.length>0)
+      ?dw('変更履歴',r.changeLog.slice().reverse().map(function(l){
+        const d=l.at?l.at.slice(0,16).replace('T',' '):'';
+        if(l.action==='edit') return d+' 編集';
+        if(l.action==='status'){
+          const stL=function(id){return(STATUS.find(function(s){return s.id===id;})||{label:id}).label;};
+          return d+' '+stL(l.from)+'→'+stL(l.to);
+        }
+        return d+' '+l.action;
+      }).join('\n'),true)
+      :'');
   const _sb=document.getElementById('det-star-btn');
   if(_sb){const _ic=_sb.querySelector('span:first-child');const _tx=_sb.querySelector('span:last-child');if(_ic)_ic.textContent=r.starred?'★':'☆';if(_tx)_tx.textContent='スター';_sb.style.color=r.starred?'var(--gold)':'var(--tx2)';}
   openOv('ov-det');
 }
 function updSt(id,st){
   const rs=gR();const i=rs.findIndex(r=>r.id===id);if(i<0)return;
-  rs[i].status=st;sR(rs);openDet(id);renderWork();renderHist();
+  const cur=rs[i].status;
+  rs[i].status=st;
+  rs[i].changeLog=[...(rs[i].changeLog||[]),{at:new Date().toISOString(),action:'status',from:cur,to:st}].slice(-20);
+  rs[i].updatedAt=new Date().toISOString();
+  sR(rs);openDet(id);renderWork();renderHist();
 }
 
 // ══ EDIT ══
@@ -6360,17 +6647,17 @@ function openEdit(){
     </div>
     <div class="sec">
       <div class="sh">🏷 伝票・顧客</div>
-      <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="e-ticket" maxlength="5" inputmode="numeric" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.ticket||''}"></div>
+      <div class="fld"><div class="fl">伝票No.（下5桁）</div><input type="text" id="e-ticket" maxlength="5" inputmode="numeric" autocomplete="off" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${_esc(r.ticket||'')}"></div>
       <div class="fld">
         <div class="fl">客名 <button id="e-btn-staff" class="tog${r.isStaff?' on-b':''}" onclick="this.classList.toggle('on-b');document.getElementById('edit-body').dataset.estf=this.classList.contains('on-b')?'1':'0'">スタッフ</button></div>
-        <input type="text" id="e-client" autocomplete="off" list="client-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.client||''}">
+        <input type="text" id="e-client" autocomplete="off" list="client-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${_esc(r.client||'')}">
       </div>
-      <div class="fld"><div class="fl">担当者名</div><input type="text" id="e-staff" autocomplete="off" list="staff-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.staff||''}"></div>
+      <div class="fld"><div class="fl">担当者名</div><input type="text" id="e-staff" autocomplete="off" list="staff-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${_esc(r.staff||'')}"></div>
       <div class="fld"><div class="fl">担当作業者</div><select id="e-worker" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none"><option value="">（選択）</option>${gStaff().map(s=>`<option${s===r.worker?' selected':''}>${s}</option>`).join('')}</select></div>
     </div>
     <div class="sec">
       <div class="sh">👔 商品情報</div>
-      <div class="fld"><div class="fl">品名</div><input type="text" id="e-item" autocomplete="off" list="item-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${r.item||''}"></div>
+      <div class="fld"><div class="fl">品名</div><input type="text" id="e-item" autocomplete="off" list="item-suggestions" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none" value="${_esc(r.item||'')}"></div>
       <div class="fld"><div class="fl">カテゴリー</div><select id="e-cat" onchange="onEditCatChange()" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:15px;font-family:var(--f);outline:none">${selOpt(cats,r.cat)}</select></div>
       <div>
         <div class="fl" style="padding:10px 14px 6px">色</div>
@@ -6392,9 +6679,9 @@ function openEdit(){
     <div class="sec">
       <div class="sh">✂️ 補正箇所</div>
       <div class="alt-list" id="edit-alts"></div>
-      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="e-cmemo" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${r.cMemo||''}</textarea></div>
-      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="e-wmemo" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${r.wMemo||''}</textarea></div>
-      <div class="fld"><div class="fl">特殊</div><textarea id="e-special" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:52px;resize:vertical;line-height:1.6;outline:none">${r.special||''}</textarea></div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="e-cmemo" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${_esc(r.cMemo||'')}</textarea></div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="e-wmemo" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${_esc(r.wMemo||'')}</textarea></div>
+      <div class="fld"><div class="fl">特殊</div><textarea id="e-special" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:52px;resize:vertical;line-height:1.6;outline:none">${_esc(r.special||'')}</textarea></div>
     </div>
     <div class="sec">
       <div class="sh" onclick="eTogMachine()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
@@ -6417,7 +6704,7 @@ function openEdit(){
         <input class="tc" type="number" id="e-time" placeholder="直接" min="0" value="${eCurTime||''}" oninput="eSyncT()">
         <span class="tu">分</span>
       </div>
-      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">使用資材</div><textarea id="e-materials" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:52px;resize:vertical;line-height:1.6;outline:none">${r.materials||''}</textarea></div>
+      <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">使用資材</div><textarea id="e-materials" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:52px;resize:vertical;line-height:1.6;outline:none">${_esc(r.materials||'')}</textarea></div>
     </div>
     <div class="sec">
       <div class="sh">💴 金額・備考</div>
@@ -6433,7 +6720,7 @@ function openEdit(){
         </div>
         <div id="e-breakdown" style="display:none;margin-top:6px;padding:8px;background:var(--s2);border-radius:8px;border:1px solid var(--bd2);font-size:11px;color:var(--tx2)"></div>
       </div>
-      <div class="fld"><div class="fl">備考</div><textarea id="e-note" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${r.note||''}</textarea></div>
+      <div class="fld"><div class="fl">備考</div><textarea id="e-note" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${_esc(r.note||'')}</textarea></div>
     </div>
   </div>`;
   eBuildColors();
@@ -6530,6 +6817,18 @@ function eGetMachineData(){
 function onEditCatChange(){
   const cat=document.getElementById('e-cat').value;
   buildAlts('edit-alts',cat,true);
+  // カテゴリー変更時は料金ロック解除・目安料金をリセット
+  _priceLocked['e']=false;
+  const eInp=document.getElementById('e-price');
+  const eLock=document.getElementById('e-price-lock');
+  const eHint=document.getElementById('e-price-hint');
+  const eBd=document.getElementById('e-breakdown');
+  const eBdBtn=document.getElementById('e-breakdown-btn');
+  if(eInp) eInp.value='';
+  if(eLock) eLock.style.display='none';
+  if(eHint) eHint.style.display='none';
+  if(eBd){eBd.style.display='none';eBd.dataset.items='[]';}
+  if(eBdBtn){eBdBtn.style.display='none';eBdBtn.textContent='内訳 ▼';}
   calcEstPrice('e');
 }
 function restoreAlts(cid,cat,saved){
@@ -6649,6 +6948,7 @@ function saveEdit(){
     materials:gv('e-materials'),price:parseInt(gv('e-price')||0,10)||0,
     note:gv('e-note'),
     updatedAt:new Date().toISOString(),
+    changeLog:[...(rs[i].changeLog||[]),{at:new Date().toISOString(),action:'edit'}].slice(-20),
   };
   sR(rs);closeOvBtn('ov-edit');openDet(curId);renderWork();renderHist();
 }
@@ -6660,6 +6960,8 @@ function duplicateRec(){
   const today=now.slice(0,10);
   const newRec={
     ...r,
+    cAlts:JSON.parse(JSON.stringify(r.cAlts||[])),
+    wAlts:JSON.parse(JSON.stringify(r.wAlts||[])),
     id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
     ticket:'',
     inDate:today,
@@ -6721,10 +7023,10 @@ function hideToast(){
 }
 function doPrint(){
   const r=gR().find(r=>r.id===curId);if(!r)return;
-  const pr=(k,v,pre=false)=>v?`<div class="pr"><span class="pk">${k}</span><span class="${pre?'pvp':'pv'}">${v}</span></div>`:'';
+  const pr=(k,v,pre=false)=>v?`<div class="pr"><span class="pk">${_esc(k)}</span><span class="${pre?'pvp':'pv'}">${_esc(String(v))}</span></div>`:'';
   document.getElementById('print-area').innerHTML=`
     <div class="ph">
-      <div><div class="pt">補正伝票</div><div class="pn">${r.ticket?'#'+r.ticket:''} ${r.store||''}</div></div>
+      <div><div class="pt">補正伝票</div><div class="pn">${r.ticket?'#'+_esc(r.ticket):''} ${_esc(r.store||'')}</div></div>
       <div style="text-align:right;font-size:12px;color:#444">
         <div>持込：${r.inDate||'—'} ${r.inTime||''}</div><div>納品：${r.outDate||'—'}</div>
       </div>
@@ -6769,13 +7071,13 @@ function doHistPDF(){
   const rows=all.map(r=>`<tr>
     <td>${r.inDate||'—'}</td>
     <td>${r.outDate||'—'}</td>
-    <td class="no">${r.ticket?'#'+r.ticket:''}</td>
+    <td class="no">${r.ticket?'#'+_esc(r.ticket):''}</td>
     <td>${tpL(r.type)}</td>
-    <td>${r.store||'—'}</td>
-    <td>${r.client||'—'}${r.isStaff?' ★':''}</td>
-    <td>${r.item||'—'}</td>
-    <td>${r.cat||'—'}</td>
-    <td>${r.mat||''}${r.isSpm?' ⚡':''}</td>
+    <td>${_esc(r.store||'—')}</td>
+    <td>${_esc(r.client||'—')}${r.isStaff?' ★':''}</td>
+    <td>${_esc(r.item||'—')}</td>
+    <td>${_esc(r.cat||'—')}</td>
+    <td>${_esc(r.mat||'')}${r.isSpm?' ⚡':''}</td>
     <td>${wStr(r.wAlts).replace(/\n/g,' / ')}</td>
     <td class="pr">${r.price?'¥'+r.price.toLocaleString():''}</td>
     <td>${stL(r.status)}</td>
@@ -6837,7 +7139,7 @@ function doCSV(){
   const e=v=>{const s=String(v||'');return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;};
   const stL=id=>(STATUS.find(s=>s.id===id)||{label:''}).label;
   const tpL=id=>(TYPES.find(t=>t.id===id)||{label:''}).label;
-  const hd=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','スタッフ','担当者','担当作業者','品名','カテゴリー','色','柄','素材','客様指定補正','実行工程','機材','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス','登録日時','更新日時'];
+  const hd=['持込日','持込時刻','納品日','伝票No.','案件種別','店名','客名','スタッフ','担当者','担当作業者','品名','カテゴリー','色','柄','素材','客様指定補正','実行工程','機材','針番手','糸番手','糸色番号','押さえ','機材メモ','所要時間(分)','使用資材','金額','備考','ステータス','登録日時','更新日時','ID'];
   const rows=all.map(r=>[
     r.inDate,r.inTime,r.outDate,r.ticket||'',
     tpL(r.type),r.store,r.client+(r.isStaff?' [スタッフ]':''),r.isStaff?'スタッフ':'',r.staff,r.worker||'',
@@ -6847,6 +7149,7 @@ function doCSV(){
     r.time||'',r.materials,r.price||'',r.note,stL(r.status),
     r.createdAt?r.createdAt.slice(0,16).replace('T',' '):'',
     r.updatedAt?r.updatedAt.slice(0,16).replace('T',' '):'',
+    r.id||'',
   ].map(e).join(','));
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+[hd.map(e).join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'}));
@@ -6866,11 +7169,18 @@ function openMaster(){
   const bo=document.getElementById('biz-open');
   const bc=document.getElementById('biz-close');
   const bd=document.getElementById('biz-days');
+  const bs=document.getElementById('biz-sort');
   if(bo) bo.value=localStorage.getItem('ar2_biz_open')||'12:00';
   if(bc) bc.value=localStorage.getItem('ar2_biz_close')||'18:50';
   if(bd) bd.value=localStorage.getItem('ar2_default_days')||'3';
+  if(bs) bs.value=localStorage.getItem('ar2_default_sort')||'reg';
   // 設定セクション開閉の初期化
   initSettingsSections();
+}
+function applyDefaultWorkSort(){
+  const v=localStorage.getItem('ar2_default_sort')||'reg';
+  const sel=document.getElementById('w-sort');
+  if(sel){sel.value=v;renderWork();}
 }
 
 // 設定画面セクション開閉
@@ -6947,6 +7257,8 @@ function exportJSON(){
     recs: gR(),
     stores: gSt(),
     cats: gCt(),
+    customPrice: gPrice()||{},
+    customPriceOpt: gPriceOpt()||{},
     exported: new Date().toISOString(),
     version: APP_VERSION,
   };
@@ -6976,6 +7288,33 @@ function restoreBackup(){
   renderWork();renderHist();
 }
 
+function importBackupJSON(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!Array.isArray(d.recs)) throw new Error('recdsフィールドが見つかりません');
+      const msgs=[];
+      if(!confirm(`バックアップファイルを読み込みます。\n・登録データ: ${d.recs.length}件\n・保存日時: ${d.exported?d.exported.slice(0,16).replace('T',' '):'不明'}\n\n現在のデータは上書きされます。続けますか？`)){
+        ev.target.value='';return;
+      }
+      sR(d.recs);msgs.push('登録データ '+d.recs.length+'件');
+      if(Array.isArray(d.stores)&&d.stores.length){sSt(d.stores);msgs.push('店名 '+d.stores.length+'件');}
+      if(Array.isArray(d.cats)&&d.cats.length){sCt(d.cats);msgs.push('カテゴリー '+d.cats.length+'件');}
+      if(d.customPrice&&typeof d.customPrice==='object'&&Object.keys(d.customPrice).length){
+        sPrice(d.customPrice);msgs.push('カスタム料金 '+Object.keys(d.customPrice).length+'件');
+      }
+      if(d.customPriceOpt&&typeof d.customPriceOpt==='object'&&Object.keys(d.customPriceOpt).length){
+        sPriceOpt(d.customPriceOpt);msgs.push('カスタムOPT料金 '+Object.keys(d.customPriceOpt).length+'件');
+      }
+      renderWork();renderHist();renderMaster();populateSels();
+      alert('✅ バックアップを復元しました\n'+msgs.join(' / '));
+    }catch(err){alert('❌ 読み込み失敗: '+err.message);}
+    ev.target.value='';
+  };
+  reader.readAsText(file,'UTF-8');
+}
 function renderMaster(){
   document.getElementById('store-list').innerHTML=gSt().map((s,i)=>
     `<div class="mit"><span class="mn">${s}</span><button class="mdl" onclick="delStore(${i})">×</button></div>`
@@ -7055,6 +7394,8 @@ function doExportSettings(){
     type:'AlteREC_settings',version:APP_VERSION,
     exported:new Date().toISOString(),
     stores:gSt(),workers:gStaff(),cats:gCt(),
+    customPrice:gPrice()||{},
+    customPriceOpt:gPriceOpt()||{},
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
@@ -7080,6 +7421,12 @@ function handleSettingsImport(ev){
       if(Array.isArray(d.cats)&&d.cats.length){
         const v=d.cats.filter(c=>typeof c==='string'&&c.trim());
         if(v.length){sCt(v);msgs.push('カテゴリー '+v.length+'件');}
+      }
+      if(d.customPrice&&typeof d.customPrice==='object'&&Object.keys(d.customPrice).length){
+        sPrice(d.customPrice);msgs.push('カスタム料金 '+Object.keys(d.customPrice).length+'件');
+      }
+      if(d.customPriceOpt&&typeof d.customPriceOpt==='object'&&Object.keys(d.customPriceOpt).length){
+        sPriceOpt(d.customPriceOpt);msgs.push('カスタムOPT料金 '+Object.keys(d.customPriceOpt).length+'件');
       }
       if(!msgs.length){alert('設定データが見つかりませんでした');ev.target.value='';return;}
       renderMaster();populateSels();
@@ -7442,6 +7789,8 @@ if('serviceWorker' in navigator){
     <div id="dash-body" style="padding:14px 16px;overflow-y:auto;flex:1"></div>
   </div>
 </div>
+<!-- ノッチ上部タップ用透明レイヤー -->
+<div id="notch-tap" onclick="scrollToActiveTop()" style="position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);z-index:999;cursor:pointer;-webkit-tap-highlight-color:transparent"></div>
 
 </body>
 </html>
