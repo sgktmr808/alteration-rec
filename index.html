@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.1hf</div>
+      <div class="hv" id="app-hv">beta4.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.1hf';
+const APP_VERSION = 'beta4.2';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -4838,19 +4838,19 @@ function calcEstPrice(prefix){
   el.querySelectorAll('[id^="chk-"]').forEach(chk=>{
     if(!chk.checked) return;
     const uid=chk.id.replace('chk-','');
-    // uidの末尾の数字からALTインデックスを取得（DOM順インデックスより確実）
-    const aidx=parseInt(uid.split('-').pop(),10);
-    const a=items[aidx];
-    if(!a) return;
-    const pk=a.pk;
-    const itemName=a.n;
+    const body=document.getElementById('body-'+uid);
+    if(!body) return;
+    // data-nameからpkを直接取得（インデックスズレを回避）
+    const pk=body.dataset.name;
+    if(!pk) return;
+    const a=items.find(x=>(x.pk||x.n)===pk);
+    const itemName=a?a.n:pk;
     const base=effectivePrice[pk]||0;
     let itemTotal=base;
-    const body=document.getElementById('body-'+uid);
-    const dmMode=body?.dataset.dm||'none';
+    const dmMode=body.dataset.dm||'none';
     // 1-3: cnt dmモードは個数×単価
     if(dmMode==='cnt'){
-      const cnt=Math.max(1,parseInt(body?.dataset.cnt||'1',10)||1);
+      const cnt=Math.max(1,parseInt(body.dataset.cnt||'1',10)||1);
       itemTotal=base*cnt;
     }
     const optLabels=[];
@@ -4870,7 +4870,7 @@ function calcEstPrice(prefix){
       });
     }
     if(itemTotal>0){
-      const cntVal=dmMode==='cnt'?Math.max(1,parseInt(body?.dataset.cnt||'1',10)||1):1;
+      const cntVal=dmMode==='cnt'?Math.max(1,parseInt(body.dataset.cnt||'1',10)||1):1;
       const displayName=cntVal>1?`${itemName}（×${cntVal}個）`:itemName;
       breakdown.push({name:displayName,base,optLabels,total:itemTotal});
       total+=itemTotal;
@@ -6728,6 +6728,8 @@ function openEdit(){
   buildAlts('edit-alts',r.cat,true);
   restoreAlts('edit-alts',r.cat,r.wAlts||r.cAlts||[]);
   openOv('ov-edit');
+  // DOM描画後に料金計算（openOvの後で確実に実行）
+  setTimeout(()=>calcEstPrice('e'),100);
 }
 
 function eBuildColors(){
