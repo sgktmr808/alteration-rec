@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.9</div>
+      <div class="hv" id="app-hv">beta5.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.9';
+const APP_VERSION = 'beta5.0';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -6395,7 +6395,7 @@ function rCard(r,showSel){
           </div>
           <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
             <div class="rn">${_esc(r.client||r.item||'—')}${r.isStaff?' 👤':''}</div>
-            <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>_esc(a.n)+(a.dir?' '+_esc(a.dir):'')).join(' · ')}${JSON.stringify(r.wAlts)!==JSON.stringify(r.cAlts)?'<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 4px;border-radius:3px;margin-left:4px;font-weight:700">✂修正済</span>':''}</div>
+            <div style="font-size:11px;color:var(--gold);flex-shrink:0">${(r.wAlts||[]).slice(0,2).map(a=>_esc(a.n)+(a.dir?' '+_esc(a.dir):'')).join(' · ')}${((r.wAlts||[]).map(a=>a.n+'|'+(a.dir||'')).join(',')!=(r.cAlts||[]).map(a=>a.n+'|'+(a.dir||'')).join(','))?'<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 4px;border-radius:3px;margin-left:4px;font-weight:700">✂修正済</span>':''}</div>
           </div>
           <div class="rs">${_esc(r.store||'')} ${_esc(r.item||'')}${r.worker?` <span style="font-size:10px;color:var(--tx3)">✂️${_esc(r.worker)}</span>`:''}</div>
         </div>
@@ -6498,7 +6498,8 @@ function dw(k,v,pre=false){
 function dwWAlts(r){
   const cStr=aSum(r.cAlts);
   const wStr_=wStr(r.wAlts);
-  const isModified=JSON.stringify(r.wAlts)!==JSON.stringify(r.cAlts);
+  const _altKey=a=>a.n+'|'+(a.dir||'')+'|'+JSON.stringify(a.dim||null);
+  const isModified=(r.wAlts||[]).map(_altKey).join(',')!==(r.cAlts||[]).map(_altKey).join(',');
   const badge=isModified
     ?`<span style="font-size:9px;background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:700">修正済</span>`
     :'';
@@ -6598,7 +6599,9 @@ let eCurMachineTab=0;
 
 function openEdit(){
   const r=gR().find(r=>r.id===curId);if(!r)return;
-  _priceLocked['e']=false;
+  // 保存済み金額がある場合はロックして自動計算で上書きしない
+  // （🔓解除ボタンで解除可能）
+  _priceLocked['e']=!!(r.price&&r.price>0);
   closeOvBtn('ov-det');
   eClrState={h:r.clrH||'',n:r.clrN||''};
   ePatState=r.pat||'';
@@ -7687,11 +7690,20 @@ function parseAltText(txt, cat){
   // 項目名を前方一致で抽出
   let n='', rest='';
   for(const name of allNames){
-    if(txt===name||txt.startsWith(name+' ')||txt.startsWith(name+'　')){
+    if(txt===name
+      ||txt.startsWith(name+' ')
+      ||txt.startsWith(name+'　')
+      ||txt.startsWith(name+'（')  // ボタン補強（×10個）対応
+      ||txt.startsWith(name+'(')){ // 半角カッコ対応
       n=name; rest=txt.slice(name.length).trim(); break;
     }
   }
   if(!n){n=txt;rest='';}
+
+  // cnt（個数）の抽出: （×N個）または（×N）
+  let cnt=null;
+  const cntM=rest.match(/^[\(（]×(\d+)個?[\)）]\s*/);
+  if(cntM){cnt=parseInt(cntM[1],10);rest=rest.slice(cntM[0].length);}
 
   // dir（詰め/出し）の抽出
   let dir='';
@@ -7780,6 +7792,7 @@ function parseAltText(txt, cat){
     else obj.dl=dl;
   }
   if(dim) obj.dim=dim;
+  if(cnt&&cnt>1) obj.cnt=cnt;  // 個数
   return obj;
 }
 function parseAltSummary(summaryText, cat){
@@ -7889,15 +7902,26 @@ function handleCSVRecImport(ev){
         // 補正内容テキストをcAlts・wAltsに復元（' / ' で分割）
         if(rec._importedCAlts||rec._importedWAlts){
           const _cat=rec.cat||'';
-          // cAlts: aSum形式（客様指定補正列）から復元
-          const _cAlts=rec._importedCAlts?parseAltSummary(rec._importedCAlts,_cat):[];
-          // wAlts: wStr形式（実行工程列）から復元（procsを含む）
-          // wStr出力は'\n'区切り、各行がaSum+procs+dim情報を持つ
           const _wAltsRaw=rec._importedWAlts||rec._importedCAlts||'';
-          const _wAlts=_wAltsRaw
-            ? parseAltSummary(_wAltsRaw.replace(/\n/g,' / '),_cat)
-            : JSON.parse(JSON.stringify(_cAlts));
-          rec.cAlts=_cAlts.length?_cAlts:_wAlts.map(a=>({...a,procs:[],subs:{}}));
+          const _cAltsRaw=rec._importedCAlts||_wAltsRaw;
+          // wAlts: wStr形式（実行工程列）→ procs/subs/dim/cnt全て復元
+          const _wAlts=_wAltsRaw?parseAltSummary(_wAltsRaw.replace(/\n/g,' / '),_cat):[];
+          // cAlts: 客様指定補正列から復元（列があればそちら優先、なければwAltsと同じ）
+          // 客様指定補正はprocs情報を含まないaSum形式だが、
+          // wAltsの対応する項目のn/dir/dim/cnt情報と統合する
+          let _cAlts;
+          if(rec._importedCAlts&&rec._importedCAlts!==_wAltsRaw){
+            const _cAltsBase=parseAltSummary(_cAltsRaw,_cat);
+            // cAltsの各項目をwAltsで補完（n一致する項目のprocsは引き継がない=客様指定のまま）
+            _cAlts=_cAltsBase.map(ca=>{
+              const wa=_wAlts.find(w=>w.n===ca.n&&w.pk===ca.pk);
+              return wa?{...ca,dim:wa.dim||ca.dim,dl:wa.dl||ca.dl,cnt:wa.cnt||ca.cnt}:ca;
+            });
+          }else{
+            // 客様指定補正列がない場合はwAltsをベースにprocs除去
+            _cAlts=_wAlts.map(a=>({n:a.n,pk:a.pk,dir:a.dir||'',procs:[],subs:{},...(a.dim?{dim:a.dim}:{}),...(a.dl?{dl:a.dl}:{}),...(a.cnt&&a.cnt>1?{cnt:a.cnt}:{})}));
+          }
+          rec.cAlts=_cAlts;
           rec.wAlts=_wAlts;
         }
         delete rec._importedCAlts;
