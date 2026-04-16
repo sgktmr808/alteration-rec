@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.4</div>
+      <div class="hv" id="app-hv">beta4.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.4';
+const APP_VERSION = 'beta4.5';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -6678,6 +6678,16 @@ function openEdit(){
     </div>
     <div class="sec">
       <div class="sh">✂️ 補正箇所</div>
+      ${(()=>{
+        const _cStr=aSum(r.cAlts);
+        const _wStr=wStr(r.wAlts);
+        if(!_cStr&&!_wStr) return '';
+        return '<div style="margin:0 14px 10px;padding:8px 10px;background:var(--s2);border:1px solid var(--bd2);border-radius:8px">'
+          +'<div style="font-size:10px;color:var(--tx3);font-weight:600;margin-bottom:4px">📋 保存済みの補正内容（参照用）</div>'
+          +(_cStr?'<div style="font-size:11px;color:var(--tx2);white-space:pre-wrap;line-height:1.6">客様指定: '+_esc(_cStr)+'</div>':'')
+          +(_wStr&&_wStr!==_cStr?'<div style="font-size:11px;color:var(--gold);white-space:pre-wrap;line-height:1.6;margin-top:3px">実行工程: '+_esc(_wStr)+'</div>':'')
+          +'</div>';
+      })()}
       <div class="alt-list" id="edit-alts"></div>
       <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">補足メモ</div><textarea id="e-cmemo" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${_esc(r.cMemo||'')}</textarea></div>
       <div class="fld" style="border-top:1px solid var(--bd)"><div class="fl">工程メモ</div><textarea id="e-wmemo" style="width:100%;background:var(--s3);border:1px solid var(--bd2);border-radius:9px;padding:9px 12px;color:var(--tx);font-size:14px;font-family:var(--f);min-height:60px;resize:vertical;line-height:1.6;outline:none">${_esc(r.wMemo||'')}</textarea></div>
@@ -7632,6 +7642,27 @@ function parseAltText(txt, cat){
   const dirMatch=rest.match(/^(詰め|出し)\s*/);
   if(dirMatch){dir=dirMatch[1];rest=rest.slice(dirMatch[0].length);}
 
+  // procs解析: [シングル/手まつり] 形式（wStr出力）
+  // aSum出力には含まれないがwStr出力には含まれる
+  let procs=[];
+  const procsMatch=rest.match(/^\[([^\]]+)\]\s*/);
+  if(procsMatch){
+    // PROC定義のラベルと照合して抽出
+    const procStr=procsMatch[1];
+    const altDef2=catItems.find(a=>a.n===n);
+    const pk2=altDef2?altDef2.pk:n;
+    const pm=typeof PROC!=='undefined'?PROC[pk2]:null;
+    if(pm&&pm.m){
+      // procStrを'/'で分割し、各部分がPROCラベルに一致するか確認
+      procStr.split('/').forEach(part=>{
+        const label=part.replace(/\([^)]*\)/,'').trim(); // サブ選択のカッコを除去
+        if(pm.m.find(x=>x.l===label)) procs.push(label);
+      });
+    }
+    // procsが取れた場合のみrestから除去
+    if(procs.length) rest=rest.slice(procsMatch[0].length);
+  }
+
   // dl（[カット寸法]等）の抽出
   let dl='';
   const dlMatch=rest.match(/\[([^\]]+)\]/);
@@ -7658,7 +7689,7 @@ function parseAltText(txt, cat){
   const altDef=catItems.find(a=>a.n===n);
   const pk=altDef?altDef.pk:n;
 
-  const obj={n,pk,dir,procs:[],subs:{}};
+  const obj={n,pk,dir,procs,subs:{}};
   // dl と swsub を区別（swsubは平置き/ぐるり/仕上がり寸法）
   const _swsubVals=new Set(['平置き','ぐるり','仕上がり寸法']);
   if(dl){
@@ -7758,7 +7789,8 @@ function handleCSVRecImport(ev){
           mat:cv(c,'素材'),
           isSpm:cv(c,'特殊素材').includes('特殊'),
           cAlts:[],wAlts:[],
-          _importedAlts:cv(c,'客様指定補正')||cv(c,'実行工程')||'',
+          _importedCAlts:cv(c,'客様指定補正')||'',
+          _importedWAlts:cv(c,'実行工程')||cv(c,'客様指定補正')||'',
           cMemo:cv(c,'指定メモ'),
           wMemo:cv(c,'工程メモ'),
           special:cv(c,'特殊'),
@@ -7772,17 +7804,21 @@ function handleCSVRecImport(ev){
           updatedAt:cv(c,'更新日時')||'',
         };
         // 補正内容テキストをcAlts・wAltsに復元（' / ' で分割）
-        if(rec._importedAlts){
+        if(rec._importedCAlts||rec._importedWAlts){
           const _cat=rec.cat||'';
-          const _cAlts=parseAltSummary(rec._importedAlts, _cat);
-          const _wAltsText=cv(c,'実行工程')||'';
-          const _wAlts=_wAltsText&&_wAltsText!==rec._importedAlts
-            ? parseAltSummary(_wAltsText, _cat)
-            : JSON.parse(JSON.stringify(_cAlts)); // ディープコピー
-          rec.cAlts=_cAlts;
+          // cAlts: aSum形式（客様指定補正列）から復元
+          const _cAlts=rec._importedCAlts?parseAltSummary(rec._importedCAlts,_cat):[];
+          // wAlts: wStr形式（実行工程列）から復元（procsを含む）
+          // wStr出力は'\n'区切り、各行がaSum+procs+dim情報を持つ
+          const _wAltsRaw=rec._importedWAlts||rec._importedCAlts||'';
+          const _wAlts=_wAltsRaw
+            ? parseAltSummary(_wAltsRaw.replace(/\n/g,' / '),_cat)
+            : JSON.parse(JSON.stringify(_cAlts));
+          rec.cAlts=_cAlts.length?_cAlts:_wAlts.map(a=>({...a,procs:[],subs:{}}));
           rec.wAlts=_wAlts;
         }
-        delete rec._importedAlts;
+        delete rec._importedCAlts;
+        delete rec._importedWAlts;
         // 意味のあるデータが最低1つあるレコードのみ追加
         if(!rec.client&&!rec.item&&!rec.ticket&&!rec.store&&!rec.inDate){skipped++;continue;}
         cur.unshift(rec);existIds.add(newId);added++;
