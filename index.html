@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.6</div>
+      <div class="hv" id="app-hv">beta4.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.6';
+const APP_VERSION = 'beta4.7';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -6738,9 +6738,8 @@ function openEdit(){
   buildAlts('edit-alts',r.cat,true);
   restoreAlts('edit-alts',r.cat,r.wAlts||r.cAlts||[]);
   openOv('ov-edit');
-  // DOM描画完了後に料金計算・procs再適用
+  // DOM描画完了後に料金計算・procs最終確認
   setTimeout(()=>{
-    // procsを確実に再適用（DOM描画後）
     const _saved=r.wAlts||r.cAlts||[];
     const _items=ALT[r.cat]||[];
     _saved.forEach(sa=>{
@@ -6749,17 +6748,30 @@ function openEdit(){
       if(_idx<0)return;
       const _uid='edit-alts-'+_idx;
       const procKey=_items[_idx].pk||sa.n;
+      const pm=PROC[procKey];if(!pm)return;
+      const _body=document.getElementById('body-'+_uid);
+      if(!_body)return;
+      // 現在のdataset.procsと照合して差分のみ適用
+      const curProcs=JSON.parse(_body.dataset.procs||'[]');
       sa.procs.forEach(p=>{
-        const pm=PROC[procKey];if(!pm)return;
-        const m=pm.m.find(x=>x.l===p);if(!m)return;
-        const b=document.getElementById('pb-'+_uid+'-'+m.id);
-        if(b&&!b.classList.contains('on')){
-          togProc(_uid,m.id,procKey);
+        if(!curProcs.includes(p)){
+          const m=pm.m.find(x=>x.l===p);if(!m)return;
+          const b=document.getElementById('pb-'+_uid+'-'+m.id);
+          if(b){
+            curProcs.push(p);
+            b.classList.add('on');
+          }
         }
+      });
+      _body.dataset.procs=JSON.stringify(curProcs);
+      // PROCボタン全体を最新状態に同期
+      pm.m.forEach(x=>{
+        const b=document.getElementById('pb-'+_uid+'-'+x.id);
+        if(b) b.classList.toggle('on',curProcs.includes(x.l));
       });
     });
     calcEstPrice('e');
-  },150);
+  },200);
 }
 
 function eBuildColors(){
@@ -6885,15 +6897,34 @@ function restoreAlts(cid,cat,saved){
     }
     if(sa.procs&&sa.procs.length){
       const procKey=items[idx].pk||sa.n;
-      sa.procs.forEach(p=>{
-        const pm=PROC[procKey];if(!pm)return;
-        const m=pm.m.find(x=>x.l===p);
-        if(m)togProc(uid,m.id,procKey);
-      });
-      if(sa.subs){
-        body.dataset.subs=JSON.stringify(sa.subs);
-        const procs=JSON.parse(body.dataset.procs||'[]');
-        updSubs(uid,procKey,procs);
+      const pm=PROC[procKey];
+      if(pm){
+        // dataset.procsに直接セット
+        body.dataset.procs=JSON.stringify(sa.procs);
+        // 各PROCボタンのクラスを直接更新
+        pm.m.forEach(x=>{
+          const b=document.getElementById('pb-'+uid+'-'+x.id);
+          if(b) b.classList.toggle('on',sa.procs.includes(x.l));
+        });
+        // サブ選択も復元
+        if(sa.subs&&Object.keys(sa.subs).length){
+          body.dataset.subs=JSON.stringify(sa.subs);
+          updSubs(uid,procKey,sa.procs);
+        }
+        // ダブル選択時のW幅入力欄表示
+        const wwEl=document.getElementById('wwidth-'+uid);
+        if(wwEl) wwEl.style.display=sa.procs.includes('ダブル')?'flex':'none';
+        // ウエストダウン補正
+        const wdEl=document.getElementById('koko-wd-'+uid);
+        if(wdEl) wdEl.style.display=sa.procs.includes('ウエストダウン補正')?'block':'none';
+        // モーニング
+        const moEl=document.getElementById('morning-diff-'+uid);
+        if(moEl) moEl.style.display=sa.procs.includes('モーニング')?'flex':'none';
+        // 3方詰め/両脇
+        const wk3El=document.getElementById('wk-s3-'+uid);
+        if(wk3El) wk3El.style.display=sa.procs.includes('3方詰め')?'block':'none';
+        const wkRyEl=document.getElementById('wk-ry-'+uid);
+        if(wkRyEl) wkRyEl.style.display=sa.procs.includes('両脇')?'block':'none';
       }
     }
     if(sa.ww){body.dataset.ww=sa.ww;const el=document.getElementById('ww-'+uid);if(el)el.value=sa.ww;}
