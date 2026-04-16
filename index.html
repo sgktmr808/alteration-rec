@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.5</div>
+      <div class="hv" id="app-hv">beta4.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.5';
+const APP_VERSION = 'beta4.6';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -6738,8 +6738,28 @@ function openEdit(){
   buildAlts('edit-alts',r.cat,true);
   restoreAlts('edit-alts',r.cat,r.wAlts||r.cAlts||[]);
   openOv('ov-edit');
-  // DOM描画後に料金計算（openOvの後で確実に実行）
-  setTimeout(()=>calcEstPrice('e'),100);
+  // DOM描画完了後に料金計算・procs再適用
+  setTimeout(()=>{
+    // procsを確実に再適用（DOM描画後）
+    const _saved=r.wAlts||r.cAlts||[];
+    const _items=ALT[r.cat]||[];
+    _saved.forEach(sa=>{
+      if(!sa.procs||!sa.procs.length)return;
+      const _idx=_items.findIndex(a=>a.n===sa.n);
+      if(_idx<0)return;
+      const _uid='edit-alts-'+_idx;
+      const procKey=_items[_idx].pk||sa.n;
+      sa.procs.forEach(p=>{
+        const pm=PROC[procKey];if(!pm)return;
+        const m=pm.m.find(x=>x.l===p);if(!m)return;
+        const b=document.getElementById('pb-'+_uid+'-'+m.id);
+        if(b&&!b.classList.contains('on')){
+          togProc(_uid,m.id,procKey);
+        }
+      });
+    });
+    calcEstPrice('e');
+  },150);
 }
 
 function eBuildColors(){
