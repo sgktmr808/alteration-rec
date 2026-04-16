@@ -227,7 +227,7 @@ select option{background:#1a1a24}
   <div class="hdr" onclick="scrollToActiveTop()" style="cursor:pointer">
     <div style="min-width:0;flex:1">
       <div class="ht">AlteREC</div>
-      <div class="hv" id="app-hv">beta4.7</div>
+      <div class="hv" id="app-hv">beta4.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="online-badge" style="font-size:11px;color:var(--amber);display:none">📵</span>
@@ -810,7 +810,7 @@ select option{background:#1a1a24}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = 'beta4.7';
+const APP_VERSION = 'beta4.8';
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.querySelector('.hv');
   if(el) el.textContent=APP_VERSION;
@@ -6744,7 +6744,9 @@ function openEdit(){
     const _items=ALT[r.cat]||[];
     _saved.forEach(sa=>{
       if(!sa.procs||!sa.procs.length)return;
-      const _idx=_items.findIndex(a=>a.n===sa.n);
+      let _idx=-1;
+      if(sa.pk) _idx=_items.findIndex(a=>(a.pk||a.n)===sa.pk);
+      if(_idx<0) _idx=_items.findIndex(a=>a.n===sa.n);
       if(_idx<0)return;
       const _uid='edit-alts-'+_idx;
       const procKey=_items[_idx].pk||sa.n;
@@ -6878,7 +6880,12 @@ function onEditCatChange(){
 function restoreAlts(cid,cat,saved){
   const items=ALT[cat]||[];
   saved.forEach(sa=>{
-    const idx=items.findIndex(a=>a.n===sa.n);
+    // pk優先でインデックスを検索（同名項目が複数ある場合に正確に特定）
+    let idx=-1;
+    if(sa.pk){
+      idx=items.findIndex(a=>(a.pk||a.n)===sa.pk);
+    }
+    if(idx<0) idx=items.findIndex(a=>a.n===sa.n);
     if(idx<0)return;
     const uid=cid+'-'+idx;
     const chk=document.getElementById('chk-'+uid);
