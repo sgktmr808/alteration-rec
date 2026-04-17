@@ -713,6 +713,7 @@
 </div>
 
 <script>
+
 // ─────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────
@@ -1185,3 +1186,288 @@ function renderStats() {
 }
 
 
+
+function filterByPeriod(recs, period, y, m) {
+  return recs.filter(function(r) {
+    var rd = new Date(r.date+'T00:00:00');
+    if (period === 'year') return rd.getFullYear() === y;
+    return rd.getFullYear()===y && rd.getMonth()===m;
+  });
+}
+
+function getWeeksOfMonth(y, m) {
+  var weeks=[], cur=new Date(y,m,1), lastDay=new Date(y,m+1,0), wn=1;
+  while(cur<=lastDay){
+    var wStart=new Date(cur);
+    var daysToSun=6-((cur.getDay()+6)%7);
+    var wEnd=new Date(cur); wEnd.setDate(wEnd.getDate()+daysToSun);
+    if(wEnd>lastDay) wEnd=new Date(lastDay);
+    weeks.push({label:'第'+wn+'週', start:wStart, end:wEnd});
+    cur=new Date(wEnd); cur.setDate(cur.getDate()+1); wn++;
+  }
+  return weeks;
+}
+
+var diffLabelPlugin = {
+  id: 'diffLabels',
+  afterDatasetsDraw: function(chart) {
+    var opts = chart.options.plugins && chart.options.plugins.diffLabels;
+    var prevData = (opts && opts.prevData) ? opts.prevData : [];
+    if (!prevData.length) return;
+    var chartCtx = chart.ctx;
+    var dataset = chart.data.datasets[0];
+    var xScale = chart.scales['x'];
+    var yScale = chart.scales['y'];
+    if (!xScale || !yScale || !dataset) return;
+    for (var i=0; i<dataset.data.length; i++) {
+      var val = dataset.data[i];
+      var prev = (prevData[i] !== undefined) ? prevData[i] : 0;
+      if (val===0 && prev===0) continue;
+      var txt, clr;
+      if (prev===0 && val>0) { txt='NEW'; clr='#5cc896'; }
+      else if (prev===0) { continue; }
+      else {
+        var pct = Math.round(((val-prev)/prev)*100);
+        if (pct===0) { txt='±0'; clr='#5c5f66'; }
+        else if (pct>0) { txt='+'+pct+'%'; clr='#5cc896'; }
+        else { txt=pct+'%'; clr='#e05c5c'; }
+      }
+      var xPos = xScale.getPixelForValue(i);
+      var yPos = yScale.getPixelForValue(val);
+      chartCtx.save();
+      chartCtx.font = 'bold 9px monospace';
+      chartCtx.fillStyle = clr;
+      chartCtx.textAlign = 'center';
+      chartCtx.fillText(txt, xPos, yPos-5);
+      chartCtx.restore();
+    }
+  }
+};
+Chart.register(diffLabelPlugin);
+
+function makeChartOpts(prevData) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 18 } },
+    plugins: {
+      legend: { display: false },
+      diffLabels: { prevData: prevData || [] }
+    },
+    scales: {
+      x: { grid: { color: '#2e3035' }, ticks: { color: '#5c5f66', font: { size: 10 } } },
+      y: { grid: { color: '#2e3035' }, ticks: { color: '#5c5f66', font: { size: 10 } }, beginAtZero: true }
+    }
+  };
+}
+
+function renderBarWithDiff(canvasId, labels, data, prevData) {
+  if (chartCount) { chartCount.destroy(); chartCount=null; }
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  chartCount = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: 'rgba(200,169,110,0.7)', borderColor: 'rgba(200,169,110,1)', borderWidth: 1, borderRadius: 4 }] },
+    options: makeChartOpts(prevData)
+  });
+}
+
+function renderLineWithDiff(canvasId, labels, data, prevData) {
+  if (chartTime) { chartTime.destroy(); chartTime=null; }
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  chartTime = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels: labels, datasets: [{ data: data, borderColor: '#5c9ce0', backgroundColor: 'rgba(92,156,224,0.2)', fill: true, tension: 0.3, pointRadius: 3 }] },
+    options: makeChartOpts(prevData)
+  });
+}
+
+function renderDonut(recs) {
+  if (chartType) { chartType.destroy(); chartType=null; }
+  var canvas = document.getElementById('chart-type');
+  if (!canvas) return;
+  var counts = {};
+  recs.forEach(function(r){ counts[r.content]=(counts[r.content]||0)+1; });
+  var entries = Object.keys(counts).map(function(k){return [k,counts[k]];});
+  entries.sort(function(a,b){return b[1]-a[1];});
+  entries = entries.slice(0,8);
+  var labels = entries.map(function(x){return x[0];});
+  var data   = entries.map(function(x){return x[1];});
+  var colors = ['#c8a96e','#5c9ce0','#5cc896','#e05c5c','#a85ce0','#e0a85c','#5ce0c8','#9a9da4'];
+  chartType = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#9a9da4', font:{size:11}, padding: 8 } },
+        diffLabels: { prevData: [] }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// CSV
+// ─────────────────────────────────────────────
+function exportCSV() {
+  if (records.length === 0) { showToast('記録がありません', 'error'); return; }
+  var header = 'id,date,type,content,duration,difficulty';
+  var rows = records.map(function(r) {
+    return [r.id, r.date, '"'+r.type+'"', '"'+r.content+'"', r.duration, r.difficulty].join(',');
+  });
+  var csv = [header].concat(rows).join('\n');
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#0e0f11;display:flex;flex-direction:column;padding:10px;gap:8px;';
+  var msg = document.createElement('div');
+  msg.textContent = 'テキストを長押し→全選択→コピーしてメモに保存';
+  msg.style.cssText = 'color:#c8a96e;font-size:13px;text-align:center;padding:8px;';
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '閉じる';
+  closeBtn.style.cssText = 'padding:12px;background:#2e3035;color:#e8e9eb;border:none;border-radius:8px;font-size:14px;';
+  closeBtn.onclick = function(){ document.body.removeChild(overlay); };
+  var ta = document.createElement('textarea');
+  ta.style.cssText = 'flex:1;background:#1e2023;color:#e8e9eb;border:1px solid #2e3035;border-radius:8px;padding:10px;font-size:11px;resize:none;-webkit-user-select:text;user-select:text;';
+  ta.value = csv;
+  ta.readOnly = false;
+  overlay.appendChild(msg);
+  overlay.appendChild(ta);
+  overlay.appendChild(closeBtn);
+  document.body.appendChild(overlay);
+  setTimeout(function(){ ta.focus(); ta.select(); ta.setSelectionRange(0,99999); }, 100);
+}
+
+function importCSV(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var text = e.target.result.replace(/^\uFEFF/,'');
+      var lines = text.trim().split('\n');
+      var imported = [];
+      for (var i=1; i<lines.length; i++) {
+        var vals = parseCSVLine(lines[i]);
+        if (vals.length < 6) continue;
+        imported.push({
+          id: vals[0] || uid(),
+          date: vals[1],
+          type: vals[2],
+          content: vals[3],
+          duration: parseInt(vals[4]) || 15,
+          difficulty: parseInt(vals[5]) || 1
+        });
+      }
+      var existingIds = {};
+      records.forEach(function(r){ existingIds[r.id]=true; });
+      var newRecs = imported.filter(function(r){ return !existingIds[r.id]; });
+      records = newRecs.concat(records);
+      records.sort(function(a,b){ return b.date.localeCompare(a.date); });
+      saveRecords();
+      renderHistory();
+      showToast(newRecs.length+'件インポートしました', 'success');
+    } catch(err) {
+      showToast('CSVの読み込みに失敗しました', 'error');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  input.value = '';
+}
+
+function parseCSVLine(line) {
+  var result=[], cur='', inQuote=false;
+  for (var i=0; i<line.length; i++) {
+    var ch=line[i];
+    if (ch==='"') { inQuote=!inQuote; }
+    else if (ch===',' && !inQuote) { result.push(cur); cur=''; }
+    else cur+=ch;
+  }
+  result.push(cur);
+  return result;
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────────
+function openSettings() {
+  renderCustomItems();
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function renderCustomItems() {
+  var list = document.getElementById('custom-items-list');
+  if (!list) return;
+  if (customContents.length === 0) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px 0">追加項目なし</div>';
+    return;
+  }
+  list.innerHTML = customContents.map(function(item,i){
+    return '<div class="custom-item-row"><span class="custom-item-name">'+item+'</span><button class="del-btn" onclick="removeCustomItem('+i+')">✕</button></div>';
+  }).join('');
+}
+
+function addCustomItem() {
+  var input = document.getElementById('new-item-input');
+  var val = input.value.trim();
+  if (!val) return;
+  if (allContents().indexOf(val) >= 0) { showToast('既に存在する項目です','error'); return; }
+  customContents.push(val);
+  localStorage.setItem('ar_customs', JSON.stringify(customContents));
+  rebuildContentSelect('case-content');
+  rebuildContentSelect('edit-content');
+  input.value = '';
+  renderCustomItems();
+  showToast('項目を追加しました','success');
+}
+
+function removeCustomItem(idx) {
+  customContents.splice(idx,1);
+  localStorage.setItem('ar_customs', JSON.stringify(customContents));
+  rebuildContentSelect('case-content');
+  rebuildContentSelect('edit-content');
+  renderCustomItems();
+  showToast('項目を削除しました');
+}
+
+function clearAllData() {
+  var dlg = document.getElementById('confirm-dialog');
+  if (dlg) dlg.style.display = 'flex';
+}
+
+function closeConfirm() {
+  var dlg = document.getElementById('confirm-dialog');
+  if (dlg) dlg.style.display = 'none';
+}
+
+function execClearAll() {
+  records=[]; customContents=[]; dateLocked=false;
+  localStorage.clear();
+  rebuildContentSelect('case-content');
+  rebuildContentSelect('edit-content');
+  document.getElementById('work-date').value = todayStr();
+  applyLockUI(false);
+  closeConfirm();
+  closeModal('settings-modal');
+  showToast('全データを削除しました');
+}
+
+// ─────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─────────────────────────────────────────────
+// START
+// ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
