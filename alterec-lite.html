@@ -350,7 +350,7 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
           <div class="cal-month-label" id="cal-month-label">—</div>
           <div class="nav-btn disabled" id="btn-next" onclick="shiftCalMonth(1)">›</div>
         </div>
-        <div class="boost-toggle" id="cal-boost-toggle" onclick="toggleCalBoost()">実質</div>
+        <div class="boost-toggle on" id="cal-boost-toggle" onclick="toggleCalBoost()">実質</div>
       </div>
       <div class="cnt-legend" id="cnt-legend">
         <div class="leg-sw" style="background:var(--bg4);border:1px solid var(--border);"></div><span>0件</span>
@@ -576,7 +576,7 @@ const CHART_COLORS=['#c8a96e','#5c9ce0','#5cc896','#e05c5c','#a85ce0','#e0a85c',
 const GRID='#2e3035',TICK='#5c5f66';
 const DIFF_RATE={1:1.0,2:1.5,3:3.0,4:4.0,5:6.0};
 let rankPeriod='week';
-let calY,calM,selectedWeek=null,selectedDay=null,boostMode=false;
+let calY,calM,selectedWeek=null,selectedDay=null,boostMode=true;
 
 function renderStats(){
   const now=new Date();
@@ -617,30 +617,31 @@ function renderKPI(){
     document.getElementById('kpi-week-label').textContent='今週の合計';
     document.getElementById('kpi-month-label').textContent='今月の合計';
   } else {
-    const lastDay=new Date(calY,calM+1,0).getDate();
     const peakRecs=records.filter(r=>r.date&&r.date.startsWith(`${calY}-${String(calM+1).padStart(2,'0')}-`));
     const dayCounts={};peakRecs.forEach(r=>{dayCounts[r.date]=(dayCounts[r.date]||0)+1;});
     const peakEntry=Object.entries(dayCounts).sort((a,b)=>b[1]-a[1])[0];
-    const peakD=peakEntry?parseInt(peakEntry[0].slice(8)):lastDay;
-    const peakDate=new Date(calY,calM,peakD);
-    document.getElementById('kpi-today-label').textContent=`最多日 ${calM+1}/${peakD}`;
-    const firstDow2=(new Date(calY,calM,1).getDay()+6)%7;
-    const lastWIdx2=Math.floor((lastDay+firstDow2-1)/7);
-    let wS=null,wE=null;
-    for(let d=1;d<=lastDay;d++){if(Math.floor((d+firstDow2-1)/7)===lastWIdx2){if(wS===null)wS=d;wE=d;}}
-    document.getElementById('kpi-week-label').textContent=wS!==null?`最終週 ${calM+1}/${wS}–${wE}`:'最終週';
-    document.getElementById('kpi-month-label').textContent=`${calY}年${calM+1}月`;
+    const peakD=peakEntry?parseInt(peakEntry[0].slice(8)):null;
+    // 月の日平均（稼働日ベース）
+    const mWorkDaysPast=Object.keys(dayCounts).length;
+    const mDayAvgPast=mWorkDaysPast>0?(peakRecs.length/mWorkDaysPast).toFixed(1):'—';
+    // 年間の日平均（稼働日ベース）
+    const yRecs=records.filter(r=>r.date&&r.date.startsWith(`${calY}-`));
+    const yWorkDays=new Set(yRecs.map(r=>r.date)).size;
+    const yDayAvgPast=yWorkDays>0?(yRecs.length/yWorkDays).toFixed(1):'—';
+    document.getElementById('kpi-today-label').textContent=peakD?`最多日 ${calM+1}/${peakD}`:'最多日 —';
+    document.getElementById('kpi-week-label').textContent=`${calM+1}月 日平均`;
+    document.getElementById('kpi-month-label').textContent=`${calY}年 日平均`;
   }
 
   // 値
   const todayRecs=records.filter(r=>r.date===today);
-  document.getElementById('kpi-today').textContent=isNow?todayRecs.length:'—';
+  document.getElementById('kpi-today').textContent=isNow?todayRecs.length:(peakD?peakEntry[1]:'—');
 
   const allWorkDays=new Set(records.map(r=>r.date)).size;
   const avgAll=allWorkDays>0?(records.length/allWorkDays).toFixed(1):'—';
   document.getElementById('kpi-avg').textContent='平均 '+avgAll;
 
-  // 今週合計
+  // 今週合計 or 月平均
   const dow=(now.getDay()+6)%7;
   const weekStart=new Date(now);weekStart.setDate(now.getDate()-dow);
   const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
@@ -648,21 +649,31 @@ function renderKPI(){
   const lastWeekStart=new Date(weekStart);lastWeekStart.setDate(weekStart.getDate()-7);
   const lastWeekEnd=new Date(weekEnd);lastWeekEnd.setDate(weekEnd.getDate()-7);
   const lastWeekRecs=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=lastWeekStart&&rd<=lastWeekEnd;});
-  document.getElementById('kpi-week').textContent=isNow?weekRecs.length:'—';
-  const wom=lastWeekRecs.length>0?Math.round((weekRecs.length-lastWeekRecs.length)/lastWeekRecs.length*100):null;
   const ws=document.getElementById('kpi-week-sub');
-  if(isNow&&wom!==null){ws.textContent=(wom>=0?'▲+':'▼')+wom+'%';ws.style.color=wom>=0?'var(--green)':'var(--red)';}
-  else{ws.textContent='';}
+  if(isNow){
+    document.getElementById('kpi-week').textContent=weekRecs.length;
+    const wom=lastWeekRecs.length>0?Math.round((weekRecs.length-lastWeekRecs.length)/lastWeekRecs.length*100):null;
+    if(wom!==null){ws.textContent=(wom>=0?'▲+':'▼')+wom+'%';ws.style.color=wom>=0?'var(--green)':'var(--red)';}
+    else{ws.textContent='';}
+  } else {
+    document.getElementById('kpi-week').textContent=mDayAvgPast;
+    ws.textContent=mWorkDaysPast>0?`稼働 ${mWorkDaysPast}日`:'';ws.style.color='var(--text3)';
+  }
 
-  // 今月合計
+  // 今月合計 or 年平均
   const mRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===calY&&d.getMonth()===calM;});
   const prevM=calM===0?11:calM-1,prevY=calM===0?calY-1:calY;
   const prevRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===prevY&&d.getMonth()===prevM;});
-  const mom=prevRecs.length>0?Math.round((mRecs.length-prevRecs.length)/prevRecs.length*100):null;
-  document.getElementById('kpi-month').textContent=mRecs.length||'—';
   const ms=document.getElementById('kpi-month-sub');
-  if(mom!==null){ms.textContent=(mom>=0?'▲+':'▼')+mom+'%';ms.style.color=mom>=0?'var(--green)':'var(--red)';}
-  else{ms.textContent='';}
+  if(isNow){
+    const mom=prevRecs.length>0?Math.round((mRecs.length-prevRecs.length)/prevRecs.length*100):null;
+    document.getElementById('kpi-month').textContent=mRecs.length||'—';
+    if(mom!==null){ms.textContent=(mom>=0?'▲+':'▼')+mom+'%';ms.style.color=mom>=0?'var(--green)':'var(--red)';}
+    else{ms.textContent='';}
+  } else {
+    document.getElementById('kpi-month').textContent=yDayAvgPast;
+    ms.textContent=yWorkDays>0?`稼働 ${yWorkDays}日`:'';ms.style.color='var(--text3)';
+  }
 }
 
 // ── 年間グラフ ──
