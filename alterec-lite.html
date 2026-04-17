@@ -6,1461 +6,610 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AlteREC Lite</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"><\/script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
-
-  :root {
-    --bg: #0e0f11;
-    --bg2: #161719;
-    --bg3: #1e2023;
-    --bg4: #26282c;
-    --border: #2e3035;
-    --text: #e8e9eb;
-    --text2: #9a9da4;
-    --text3: #5c5f66;
-    --accent: #c8a96e;
-    --accent2: #a8874e;
-    --accent-dim: rgba(200,169,110,0.12);
-    --accent-dim2: rgba(200,169,110,0.06);
-    --red: #e05c5c;
-    --green: #5cc896;
-    --blue: #5c9ce0;
-    --radius: 10px;
-    --radius-sm: 6px;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
-  body {
-    font-family: 'Noto Sans JP', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
-    overflow-x: hidden;
-  }
-
-  /* ── HEADER ── */
-  .app-header {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-    padding: env(safe-area-inset-top, 0) 0 0;
-  }
-  .header-inner {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px;
-  }
-  .app-title {
-    font-family: 'DM Mono', monospace;
-    font-size: 15px; font-weight: 500;
-    color: var(--accent); letter-spacing: 0.08em;
-  }
-  .header-actions { display: flex; gap: 8px; }
-  .icon-btn {
-    width: 36px; height: 36px;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: var(--text2); font-size: 16px;
-    transition: all 0.15s;
-  }
-  .icon-btn:active { background: var(--bg4); color: var(--accent); }
-
-  /* ── TAB BAR ── */
-  .tab-bar {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-    background: var(--bg);
-    border-top: 1px solid var(--border);
-    padding: 0 0 env(safe-area-inset-bottom, 0);
-    display: flex;
-  }
-  .tab-item {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 10px 0 8px;
-    cursor: pointer; color: var(--text3);
-    font-size: 10px; gap: 4px;
-    transition: color 0.15s;
-    border: none; background: none;
-  }
-  .tab-item .tab-icon { font-size: 20px; line-height: 1; }
-  .tab-item.active { color: var(--accent); }
-
-  /* ── MAIN CONTENT ── */
-  .main-content {
-    padding-top: calc(60px + env(safe-area-inset-top, 0));
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0));
-    min-height: 100vh;
-  }
-  .tab-pane { display: none; padding: 12px 14px; }
-  .tab-pane.active { display: block; }
-
-  /* ── SECTION LABEL ── */
-  .section-label {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.15em;
-    color: var(--text3); text-transform: uppercase;
-    margin-bottom: 6px; margin-top: 12px;
-  }
-  .section-label:first-child { margin-top: 0; }
-
-  .rec-bottom-row {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    margin-top: 12px; gap: 12px;
-  }
-  .rec-bottom-col {
-    display: flex; flex-direction: column; gap: 6px;
-  }
-
-  /* ── FORM ELEMENTS ── */
-  .form-group { margin-bottom: 4px; }
-
-  /* Date row */
-  .date-row {
-    display: flex; align-items: center; gap: 8px;
-  }
-  .date-input {
-    flex: 1;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius); color: var(--text);
-    font-family: 'DM Mono', monospace; font-size: 16px;
-    padding: 12px 14px;
-    appearance: none; -webkit-appearance: none;
-    transition: border-color 0.15s;
-  }
-  .date-input:focus { outline: none; border-color: var(--accent); }
-  .date-input.locked { border-color: var(--accent2); color: var(--accent); }
-
-  .lock-toggle {
-    width: 44px; height: 44px; flex-shrink: 0;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 18px;
-    transition: all 0.15s;
-  }
-  .lock-toggle.locked {
-    background: var(--accent-dim); border-color: var(--accent2);
-  }
-
-  /* Radio pills */
-  .radio-group { display: flex; gap: 8px; }
-  .radio-pill {
-    flex: 1; padding: 9px 8px; text-align: center;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius); cursor: pointer;
-    font-size: 14px; color: var(--text2);
-    transition: all 0.15s; user-select: none;
-  }
-  .radio-pill.selected {
-    background: var(--accent-dim); border-color: var(--accent);
-    color: var(--accent); font-weight: 500;
-  }
-
-  /* Select */
-  .form-select {
-    width: 100%;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius); color: var(--text);
-    font-family: 'Noto Sans JP', sans-serif; font-size: 15px;
-    padding: 12px 14px;
-    appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235c5f66' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 14px center;
-    padding-right: 36px;
-  }
-  .form-select:focus { outline: none; border-color: var(--accent); }
-
-  /* Duration grid */
-  .duration-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-  }
-  .dur-btn {
-    padding: 9px 4px; text-align: center;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); cursor: pointer;
-    font-family: 'DM Mono', monospace; font-size: 13px;
-    color: var(--text2); transition: all 0.15s; user-select: none;
-  }
-  .dur-btn.selected {
-    background: var(--accent-dim); border-color: var(--accent);
-    color: var(--accent); font-weight: 500;
-  }
-
-  /* Stars */
-  .star-row { display: flex; gap: 8px; }
-  .star {
-    font-size: 24px; cursor: pointer; line-height: 1;
-    color: var(--bg4); transition: color 0.1s, transform 0.1s;
-    user-select: none;
-  }
-  .star.filled { color: var(--accent); }
-  .star:active { transform: scale(0.9); }
-
-  /* Save buttons */
-  .btn-primary {
-    width: 100%; padding: 15px;
-    background: var(--accent); border: none; border-radius: var(--radius);
-    color: #0e0f11; font-family: 'Noto Sans JP', sans-serif;
-    font-size: 15px; font-weight: 700; cursor: pointer;
-    transition: all 0.15s; letter-spacing: 0.05em;
-  }
-  .btn-primary:active { background: var(--accent2); transform: scale(0.99); }
-
-  .btn-secondary {
-    width: 100%; padding: 13px;
-    background: var(--bg3); border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    color: var(--accent); font-family: 'Noto Sans JP', sans-serif;
-    font-size: 14px; font-weight: 500; cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-secondary:active { background: var(--accent-dim); }
-
-  .btn-row { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-
-  /* ── TOAST ── */
-  .toast {
-    position: fixed; bottom: calc(80px + env(safe-area-inset-bottom, 0));
-    left: 50%; transform: translateX(-50%) translateY(20px);
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 10px 20px;
-    font-size: 13px; color: var(--text2);
-    opacity: 0; transition: all 0.25s; pointer-events: none;
-    white-space: nowrap; z-index: 200;
-  }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .toast.success { border-color: var(--green); color: var(--green); }
-  .toast.error { border-color: var(--red); color: var(--red); }
-
-  /* ── HISTORY ── */
-  .history-toolbar {
-    display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
-  }
-  .toolbar-btn {
-    flex: 1; min-width: 0;
-    padding: 10px 8px; text-align: center;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); cursor: pointer;
-    font-size: 12px; color: var(--text2);
-    transition: all 0.15s; white-space: nowrap;
-  }
-  .toolbar-btn:active { background: var(--bg4); }
-  .toolbar-btn.accent { border-color: var(--accent); color: var(--accent); }
-
-  /* ── HISTORY ── */
-  .month-group { margin-bottom: 4px; }
-  .month-header {
-    font-family: 'DM Mono', monospace; font-size: 11px;
-    color: var(--text3); letter-spacing: 0.08em;
-    padding: 8px 10px;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 2px; cursor: pointer;
-    display: flex; justify-content: space-between; align-items: center;
-    user-select: none;
-    transition: border-color 0.15s;
-  }
-  .month-header:active { border-color: var(--accent); }
-  .month-header-left { display: flex; align-items: center; gap: 8px; }
-  .month-chevron { font-size: 10px; color: var(--text3); transition: transform 0.2s; }
-  .month-chevron.open { transform: rotate(90deg); }
-  .month-body { display: none; }
-  .month-body.open { display: block; }
-
-  .record-card {
-    background: var(--bg2); border-left: 2px solid var(--border);
-    margin-left: 8px; padding: 7px 10px;
-    cursor: pointer; transition: border-color 0.15s;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .record-card:active { border-color: var(--accent); }
-  .record-card:last-child { margin-bottom: 6px; }
-  .record-date {
-    font-family: 'DM Mono', monospace; font-size: 11px;
-    color: var(--text3); flex-shrink: 0; width: 36px;
-  }
-  .record-content { flex: 1; font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .record-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .record-dur { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
-  .record-stars { font-size: 10px; color: var(--accent); letter-spacing: -1px; }
-  .record-type-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .record-type-dot.store { background: var(--accent); }
-  .record-type-dot.other { background: var(--text3); }
-
-  .empty-state {
-    text-align: center; padding: 60px 20px;
-    color: var(--text3); font-size: 14px; line-height: 2;
-  }
-
-  /* ── STATS ── */
-  .stats-header {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
-  }
-  .period-tabs {
-    flex: 1; display: flex; background: var(--bg3); border-radius: var(--radius);
-    padding: 3px; gap: 2px;
-  }
-  .year-select {
-    flex-shrink: 0;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius); color: var(--accent);
-    font-family: 'DM Mono', monospace; font-size: 13px;
-    padding: 8px 10px; appearance: none; -webkit-appearance: none;
-    text-align: center; min-width: 72px;
-  }
-  .year-select:focus { outline: none; border-color: var(--accent); }
-  .period-tab {
-    flex: 1; padding: 8px 4px; text-align: center;
-    border-radius: 8px; cursor: pointer;
-    font-size: 13px; color: var(--text3);
-    transition: all 0.15s;
-  }
-  .period-tab.active {
-    background: var(--bg); color: var(--accent);
-    font-weight: 500;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  }
-
-  .stat-card {
-    background: var(--bg2); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px;
-    margin-bottom: 12px;
-  }
-  .stat-card-title {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
-    color: var(--text3); text-transform: uppercase; margin-bottom: 14px;
-  }
-  .chart-wrap { position: relative; height: 200px; }
-
-  .summary-row {
-    display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
-    margin-bottom: 12px;
-  }
-  .summary-box {
-    background: var(--bg2); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 14px 10px; text-align: center;
-  }
-  .summary-num {
-    font-family: 'DM Mono', monospace;
-    font-size: 22px; font-weight: 500; color: var(--accent);
-  }
-  .summary-label { font-size: 10px; color: var(--text3); margin-top: 3px; }
-  .summary-compare {
-    font-size: 11px; font-weight: 700; margin-top: 6px;
-    padding: 3px 7px; border-radius: 20px; display: inline-block;
-    letter-spacing: 0.03em;
-  }
-  .cmp-up   { color: var(--green); background: rgba(92,200,150,0.12); }
-  .cmp-down { color: var(--red);   background: rgba(224,92,92,0.12); }
-  .cmp-flat { color: var(--text3); background: var(--bg4); }
-  .compare-label { font-size: 10px; color: var(--text3); margin-top: 2px; }
-
-  /* ── MODAL ── */
-  .modal-overlay {
-    position: fixed; inset: 0; z-index: 300;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
-    display: none; align-items: flex-end;
-  }
-  .modal-overlay.open { display: flex; }
-  .modal-sheet {
-    width: 100%; background: var(--bg2);
-    border-radius: 16px 16px 0 0;
-    border-top: 1px solid var(--border);
-    padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0));
-    max-height: 85vh; overflow-y: auto;
-    animation: slideUp 0.25s ease;
-  }
-  @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-  .modal-title {
-    font-size: 16px; font-weight: 700; margin-bottom: 20px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .modal-close {
-    width: 28px; height: 28px; background: var(--bg4);
-    border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 14px; color: var(--text3); border: none;
-  }
-
-  /* Edit modal specific */
-  .edit-field { margin-bottom: 14px; }
-  .edit-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
-
-  .btn-danger {
-    width: 100%; padding: 13px; margin-top: 8px;
-    background: transparent; border: 1px solid var(--red);
-    border-radius: var(--radius);
-    color: var(--red); font-family: 'Noto Sans JP', sans-serif;
-    font-size: 14px; cursor: pointer; transition: all 0.15s;
-  }
-  .btn-danger:active { background: rgba(224,92,92,0.1); }
-
-  /* Settings modal */
-  .setting-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 0; border-bottom: 1px solid var(--border);
-  }
-  .setting-row:last-child { border-bottom: none; }
-  .setting-label { font-size: 14px; }
-  .setting-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-
-  .custom-items-list { margin-top: 12px; }
-  .custom-item-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 0; border-bottom: 1px solid var(--border);
-    font-size: 14px;
-  }
-  .custom-item-row:last-child { border-bottom: none; }
-  .custom-item-name { flex: 1; }
-  .del-btn {
-    width: 28px; height: 28px; background: var(--bg4);
-    border-radius: 50%; border: none; color: var(--red);
-    font-size: 14px; cursor: pointer; display: flex;
-    align-items: center; justify-content: center;
-  }
-  .add-item-row { display: flex; gap: 8px; margin-top: 12px; }
-  .add-item-input {
-    flex: 1; background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); color: var(--text);
-    font-family: 'Noto Sans JP', sans-serif; font-size: 14px;
-    padding: 10px 12px;
-  }
-  .add-item-input:focus { outline: none; border-color: var(--accent); }
-  .add-item-btn {
-    padding: 10px 16px; background: var(--accent-dim);
-    border: 1px solid var(--accent); border-radius: var(--radius-sm);
-    color: var(--accent); font-size: 14px; cursor: pointer;
-  }
-
-  /* ── RECORD FORM COMPACT ── */
-  .form-row {
-    display: flex; align-items: stretch; gap: 8px;
-  }
-  .dur-scroll {
-    display: flex; gap: 6px;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-    padding-bottom: 4px; scrollbar-width: none;
-  }
-  .dur-scroll::-webkit-scrollbar { display: none; }
-  .dur-scroll .dur-btn {
-    flex-shrink: 0; padding: 9px 12px;
-    font-size: 12px; white-space: nowrap;
-    border-radius: var(--radius-sm);
-  }
-  .star { font-size: 24px; }
-
-  /* Count input */
-  .count-row {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 10px 14px;
-  }
-  .count-label { font-size: 14px; color: var(--text2); flex-shrink: 0; }
-  .count-controls { display: flex; align-items: center; gap: 10px; margin-left: auto; }
-  .count-btn {
-    width: 34px; height: 34px; background: var(--bg4);
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    color: var(--text); font-size: 18px; line-height: 1;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; user-select: none; transition: all 0.15s;
-  }
-  .count-btn:active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-  .count-num {
-    font-family: 'DM Mono', monospace; font-size: 22px;
-    font-weight: 500; color: var(--accent); min-width: 32px; text-align: center;
-  }
-  .count-unit { font-size: 13px; color: var(--text3); }
-
-  /* CSV hidden input */
-  #csv-file-input { display: none; }
-
-  /* Divider */
-  .divider {
-    height: 1px; background: var(--border); margin: 16px 0;
-  }
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#0e0f11; --bg2:#161719; --bg3:#1e2023; --bg4:#26282c;
+  --border:#2e3035; --text:#e8e9eb; --text2:#9a9da4; --text3:#5c5f66;
+  --accent:#c8a96e; --accent2:#a8874e; --accent-dim:rgba(200,169,110,0.12);
+  --red:#e05c5c; --green:#5cc896; --radius:10px; --radius-sm:6px;
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; min-height:-webkit-fill-available; overflow-x:hidden; }
+.app-header { position:fixed; top:0; left:0; right:0; z-index:100; background:var(--bg); border-bottom:1px solid var(--border); padding:env(safe-area-inset-top,0) 0 0; }
+.header-inner { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; }
+.app-title { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; color:var(--accent); letter-spacing:0.08em; }
+.icon-btn { width:36px; height:36px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text2); font-size:16px; }
+.icon-btn:active { background:var(--bg4); color:var(--accent); }
+.tab-bar { position:fixed; bottom:0; left:0; right:0; z-index:100; background:var(--bg); border-top:1px solid var(--border); padding:0 0 env(safe-area-inset-bottom,0); display:flex; }
+.tab-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 0 8px; cursor:pointer; color:var(--text3); font-size:10px; gap:4px; border:none; background:none; }
+.tab-item .tab-icon { font-size:20px; line-height:1; }
+.tab-item.active { color:var(--accent); }
+.main-content { padding-top:calc(60px + env(safe-area-inset-top,0)); padding-bottom:calc(72px + env(safe-area-inset-bottom,0)); min-height:100vh; }
+.tab-pane { display:none; padding:12px 14px; }
+.tab-pane.active { display:block; }
+.section-label { font-size:10px; font-weight:700; letter-spacing:0.15em; color:var(--text3); text-transform:uppercase; margin-bottom:6px; margin-top:12px; }
+.section-label:first-child { margin-top:0; }
+.date-row { display:flex; align-items:center; gap:8px; }
+.date-input { flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:'DM Mono',monospace; font-size:16px; padding:12px 14px; appearance:none; -webkit-appearance:none; }
+.date-input:focus { outline:none; border-color:var(--accent); }
+.date-input.locked { border-color:var(--accent2); color:var(--accent); }
+.lock-toggle { width:44px; height:44px; flex-shrink:0; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; }
+.lock-toggle.locked { background:var(--accent-dim); border-color:var(--accent2); }
+.radio-group { display:flex; gap:8px; }
+.radio-pill { flex:1; padding:9px 8px; text-align:center; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:14px; color:var(--text2); user-select:none; }
+.radio-pill.selected { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); font-weight:500; }
+.form-select { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:'Noto Sans JP',sans-serif; font-size:15px; padding:12px 14px; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235c5f66' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; }
+.form-select:focus { outline:none; border-color:var(--accent); }
+.duration-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.dur-btn { padding:9px 4px; text-align:center; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; font-family:'DM Mono',monospace; font-size:13px; color:var(--text2); user-select:none; }
+.dur-btn.selected { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); font-weight:500; }
+.star-row { display:flex; gap:8px; }
+.star { font-size:24px; cursor:pointer; line-height:1; color:var(--bg4); user-select:none; }
+.star.filled { color:var(--accent); }
+.rec-bottom-row { display:flex; justify-content:space-between; align-items:flex-start; margin-top:12px; gap:12px; }
+.rec-bottom-col { display:flex; flex-direction:column; gap:6px; }
+.count-controls { display:flex; align-items:center; gap:10px; }
+.count-btn { width:34px; height:34px; background:var(--bg4); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; }
+.count-btn:active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.count-num { font-family:'DM Mono',monospace; font-size:22px; font-weight:500; color:var(--accent); min-width:28px; text-align:center; }
+.count-unit { font-size:13px; color:var(--text3); }
+.btn-primary { width:100%; padding:15px; background:var(--accent); border:none; border-radius:var(--radius); color:#0e0f11; font-family:'Noto Sans JP',sans-serif; font-size:15px; font-weight:700; cursor:pointer; }
+.btn-primary:active { background:var(--accent2); }
+.btn-row { margin-top:12px; }
+.history-toolbar { display:flex; gap:8px; margin-bottom:12px; }
+.toolbar-btn { flex:1; padding:10px 8px; text-align:center; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; font-size:12px; color:var(--text2); }
+.toolbar-btn.accent { border-color:var(--accent); color:var(--accent); }
+.month-group { margin-bottom:4px; }
+.month-header { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); padding:8px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:2px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none; }
+.month-header-left { display:flex; align-items:center; gap:8px; }
+.month-chevron { font-size:10px; color:var(--text3); transition:transform 0.2s; }
+.month-chevron.open { transform:rotate(90deg); }
+.month-body { display:none; }
+.month-body.open { display:block; }
+.record-card { background:var(--bg2); border-left:2px solid var(--border); margin-left:8px; padding:7px 10px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+.record-card:active { border-color:var(--accent); }
+.record-card:last-child { margin-bottom:6px; }
+.record-type-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.record-type-dot.store { background:var(--accent); }
+.record-type-dot.other { background:var(--text3); }
+.record-date { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); flex-shrink:0; width:36px; }
+.record-content { flex:1; font-size:13px; font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.record-right { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.record-dur { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); }
+.record-stars { font-size:10px; color:var(--accent); letter-spacing:-1px; }
+.empty-state { text-align:center; padding:60px 20px; color:var(--text3); font-size:14px; line-height:2; }
+.stats-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.period-tabs { flex:1; display:flex; background:var(--bg3); border-radius:var(--radius); padding:3px; gap:2px; }
+.period-tab { flex:1; padding:8px 4px; text-align:center; border-radius:8px; cursor:pointer; font-size:13px; color:var(--text3); }
+.period-tab.active { background:var(--bg); color:var(--accent); font-weight:500; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+.year-select { flex-shrink:0; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); color:var(--accent); font-family:'DM Mono',monospace; font-size:13px; padding:8px 10px; appearance:none; -webkit-appearance:none; text-align:center; min-width:72px; }
+.month-select-row { margin-bottom:10px; }
+.summary-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+.summary-box { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 10px; text-align:center; }
+.summary-num { font-family:'DM Mono',monospace; font-size:22px; font-weight:500; color:var(--accent); }
+.summary-label { font-size:10px; color:var(--text3); margin-top:3px; }
+.stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+.stat-card-title { font-size:11px; font-weight:700; letter-spacing:0.12em; color:var(--text3); text-transform:uppercase; margin-bottom:14px; }
+.chart-wrap { position:relative; height:200px; }
+.modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:none; align-items:flex-end; }
+.modal-overlay.open { display:flex; }
+.modal-sheet { width:100%; background:var(--bg2); border-radius:16px 16px 0 0; border-top:1px solid var(--border); padding:20px 20px calc(20px + env(safe-area-inset-bottom,0)); max-height:85vh; overflow-y:auto; animation:slideUp 0.25s ease; }
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-title { font-size:16px; font-weight:700; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; }
+.modal-close { width:28px; height:28px; background:var(--bg4); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; color:var(--text3); border:none; }
+.edit-field { margin-bottom:14px; }
+.edit-label { font-size:11px; color:var(--text3); margin-bottom:6px; }
+.btn-danger { width:100%; padding:13px; margin-top:8px; background:transparent; border:1px solid var(--red); border-radius:var(--radius); color:var(--red); font-family:'Noto Sans JP',sans-serif; font-size:14px; cursor:pointer; }
+.setting-row { display:flex; justify-content:space-between; align-items:center; padding:14px 0; border-bottom:1px solid var(--border); }
+.setting-row:last-child { border-bottom:none; }
+.setting-label { font-size:14px; }
+.setting-sub { font-size:11px; color:var(--text3); margin-top:2px; }
+.custom-items-list { margin-top:12px; }
+.custom-item-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px; }
+.custom-item-row:last-child { border-bottom:none; }
+.custom-item-name { flex:1; }
+.del-btn { width:28px; height:28px; background:var(--bg4); border-radius:50%; border:none; color:var(--red); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.add-item-row { display:flex; gap:8px; margin-top:12px; }
+.add-item-input { flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); font-family:'Noto Sans JP',sans-serif; font-size:14px; padding:10px 12px; }
+.add-item-input:focus { outline:none; border-color:var(--accent); }
+.add-item-btn { padding:10px 16px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:var(--radius-sm); color:var(--accent); font-size:14px; cursor:pointer; }
+.divider { height:1px; background:var(--border); margin:16px 0; }
+.toast { position:fixed; bottom:calc(80px + env(safe-area-inset-bottom,0)); left:50%; transform:translateX(-50%) translateY(20px); background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:10px 20px; font-size:13px; color:var(--text2); opacity:0; transition:all 0.25s; pointer-events:none; white-space:nowrap; z-index:200; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.success { border-color:var(--green); color:var(--green); }
+.toast.error { border-color:var(--red); color:var(--red); }
+#csv-file-input { display:none; }
 </style>
 </head>
 <body>
-
-<!-- HEADER -->
 <header class="app-header">
   <div class="header-inner">
     <div class="app-title">AlteREC Lite</div>
-    <div class="header-actions">
-      <div class="icon-btn" onclick="openSettings()" title="設定">⚙️</div>
-    </div>
+    <div class="icon-btn" onclick="openSettings()">&#9881;&#65039;</div>
   </div>
 </header>
-
-<!-- MAIN -->
 <main class="main-content">
-
-  <!-- ① 記録タブ -->
   <div id="pane-record" class="tab-pane active">
-
-    <div class="section-label">作業日</div>
+    <div class="section-label">&#20316;&#26989;&#26085;</div>
     <div class="date-row">
       <input type="date" id="work-date" class="date-input">
-      <div class="lock-toggle" id="lock-toggle" onclick="toggleLock()">🔓</div>
+      <div class="lock-toggle" id="lock-toggle" onclick="toggleLock()">&#128275;</div>
     </div>
-
-    <div class="section-label">案件タイプ</div>
+    <div class="section-label">&#26696;&#20214;&#12479;&#12452;&#12503;</div>
     <div class="radio-group" id="case-type-group">
-      <div class="radio-pill selected" data-val="店舗案件" onclick="selectType(this)">店舗案件</div>
-      <div class="radio-pill" data-val="その他" onclick="selectType(this)">その他</div>
+      <div class="radio-pill selected" data-val="&#24215;&#33303;&#26696;&#20214;" onclick="selectType(this)">&#24215;&#33303;&#26696;&#20214;</div>
+      <div class="radio-pill" data-val="&#12381;&#12398;&#20182;" onclick="selectType(this)">&#12381;&#12398;&#20182;</div>
     </div>
-
-    <div class="section-label">案件内容</div>
+    <div class="section-label">&#26696;&#20214;&#20869;&#23481;</div>
     <select id="case-content" class="form-select"></select>
-
-    <div class="section-label">所要時間</div>
+    <div class="section-label">&#25152;&#35201;&#26178;&#38291;</div>
     <div class="duration-grid" id="duration-grid">
-      <div class="dur-btn selected" data-val="5"   onclick="selectDur(this)">5分</div>
-      <div class="dur-btn" data-val="10"  onclick="selectDur(this)">10分</div>
-      <div class="dur-btn" data-val="15"  onclick="selectDur(this)">15分</div>
-      <div class="dur-btn" data-val="20"  onclick="selectDur(this)">20分</div>
-      <div class="dur-btn" data-val="30"  onclick="selectDur(this)">30分</div>
-      <div class="dur-btn" data-val="60"  onclick="selectDur(this)">1h</div>
-      <div class="dur-btn" data-val="90"  onclick="selectDur(this)">1.5h</div>
+      <div class="dur-btn selected" data-val="5" onclick="selectDur(this)">5&#20998;</div>
+      <div class="dur-btn" data-val="10" onclick="selectDur(this)">10&#20998;</div>
+      <div class="dur-btn" data-val="15" onclick="selectDur(this)">15&#20998;</div>
+      <div class="dur-btn" data-val="20" onclick="selectDur(this)">20&#20998;</div>
+      <div class="dur-btn" data-val="30" onclick="selectDur(this)">30&#20998;</div>
+      <div class="dur-btn" data-val="60" onclick="selectDur(this)">1h</div>
+      <div class="dur-btn" data-val="90" onclick="selectDur(this)">1.5h</div>
       <div class="dur-btn" data-val="120" onclick="selectDur(this)">2h</div>
       <div class="dur-btn" data-val="180" onclick="selectDur(this)">3h</div>
       <div class="dur-btn" data-val="240" onclick="selectDur(this)">4h</div>
       <div class="dur-btn" data-val="300" onclick="selectDur(this)">5h</div>
     </div>
-
     <div class="rec-bottom-row">
       <div class="rec-bottom-col">
-        <div class="section-label" style="margin-top:0">難易度</div>
+        <div class="section-label" style="margin-top:0">&#38243;&#26131;&#24230;</div>
         <div class="star-row" id="star-row">
-          <div class="star" data-v="1" onclick="selectStar(1)">★</div>
-          <div class="star" data-v="2" onclick="selectStar(2)">★</div>
-          <div class="star" data-v="3" onclick="selectStar(3)">★</div>
-          <div class="star" data-v="4" onclick="selectStar(4)">★</div>
-          <div class="star" data-v="5" onclick="selectStar(5)">★</div>
+          <div class="star" onclick="selectStar(1)">&#9733;</div>
+          <div class="star" onclick="selectStar(2)">&#9733;</div>
+          <div class="star" onclick="selectStar(3)">&#9733;</div>
+          <div class="star" onclick="selectStar(4)">&#9733;</div>
+          <div class="star" onclick="selectStar(5)">&#9733;</div>
         </div>
       </div>
       <div class="rec-bottom-col" style="align-items:flex-end">
-        <div class="section-label" style="margin-top:0">件数</div>
+        <div class="section-label" style="margin-top:0">&#20214;&#25968;</div>
         <div class="count-controls">
-          <div class="count-btn" onclick="changeCount(-1)">－</div>
+          <div class="count-btn" onclick="changeCount(-1)">&#65293;</div>
           <div class="count-num" id="count-display">1</div>
-          <div class="count-unit">件</div>
-          <div class="count-btn" onclick="changeCount(1)">＋</div>
+          <div class="count-unit">&#20214;</div>
+          <div class="count-btn" onclick="changeCount(1)">&#65291;</div>
         </div>
       </div>
     </div>
-
     <div class="btn-row">
-      <button class="btn-primary" id="save-btn" onclick="saveRecord()">保存</button>
+      <button class="btn-primary" id="save-btn" onclick="saveRecord()">&#20445;&#23384;</button>
     </div>
-
   </div>
-
-  <!-- ② 履歴タブ -->
   <div id="pane-history" class="tab-pane">
     <div class="history-toolbar">
-      <div class="toolbar-btn accent" onclick="exportCSV()">📤 CSV出力</div>
-      <div class="toolbar-btn" onclick="document.getElementById('csv-file-input').click()">📥 CSV読込</div>
+      <div class="toolbar-btn accent" onclick="exportCSV()">&#128228; CSV&#20986;&#21147;</div>
+      <div class="toolbar-btn" onclick="document.getElementById('csv-file-input').click()">&#128229; CSV&#35501;&#36796;</div>
     </div>
     <input type="file" id="csv-file-input" accept=".csv" onchange="importCSV(this)">
     <div id="history-list"></div>
   </div>
-
-  <!-- ③ 統計タブ -->
   <div id="pane-stats" class="tab-pane">
     <div class="stats-header">
       <div class="period-tabs">
-        <div class="period-tab active" data-period="week" onclick="setPeriod(this)">週間</div>
-        <div class="period-tab" data-period="month" onclick="setPeriod(this)">月間</div>
-        <div class="period-tab" data-period="year" onclick="setPeriod(this)">年間</div>
+        <div class="period-tab active" data-period="week" onclick="setPeriod(this)">今週</div>
+        <div class="period-tab" data-period="month" onclick="setPeriod(this)">&#26376;&#38291;</div>
+        <div class="period-tab" data-period="year" onclick="setPeriod(this)">&#24180;&#38291;</div>
       </div>
       <select id="year-select" class="year-select" onchange="renderStats()"></select>
     </div>
-    <div id="period-selectors" style="display:flex;gap:8px;margin-bottom:12px;">
-      <select id="month-select" class="year-select" style="flex:1;display:none" onchange="renderStats()"></select>
+    <div class="month-select-row" id="month-select-row" style="display:none">
+      <select id="month-select" class="form-select" onchange="renderStats()"></select>
     </div>
     <div class="summary-row" id="summary-row"></div>
     <div class="stat-card">
-      <div class="stat-card-title">📊 案件数</div>
+      <div class="stat-card-title">&#128202; &#26696;&#20214;&#25968;</div>
       <div class="chart-wrap"><canvas id="chart-count"></canvas></div>
     </div>
     <div class="stat-card">
-      <div class="stat-card-title">⏱ 所要時間（分）</div>
+      <div class="stat-card-title">&#9201; &#25152;&#35201;&#26178;&#38291;&#65288;&#20998;&#65289;</div>
       <div class="chart-wrap"><canvas id="chart-time"></canvas></div>
     </div>
     <div class="stat-card">
-      <div class="stat-card-title">🧵 案件種別</div>
+      <div class="stat-card-title">&#129525; &#26696;&#20214;&#31278;&#21029;</div>
       <div class="chart-wrap"><canvas id="chart-type"></canvas></div>
     </div>
   </div>
-
 </main>
-
-<!-- TAB BAR -->
 <nav class="tab-bar">
-  <button class="tab-item active" data-tab="record" onclick="switchTab('record', this)">
-    <span class="tab-icon">✏️</span>記録
-  </button>
-  <button class="tab-item" data-tab="history" onclick="switchTab('history', this)">
-    <span class="tab-icon">📋</span>履歴
-  </button>
-  <button class="tab-item" data-tab="stats" onclick="switchTab('stats', this)">
-    <span class="tab-icon">📈</span>統計
-  </button>
+  <button class="tab-item active" onclick="switchTab('record',this)"><span class="tab-icon">&#9999;&#65039;</span>&#35352;&#37682;</button>
+  <button class="tab-item" onclick="switchTab('history',this)"><span class="tab-icon">&#128203;</span>&#23653;&#27508;</button>
+  <button class="tab-item" onclick="switchTab('stats',this)"><span class="tab-icon">&#128200;</span>&#32113;&#35336;</button>
 </nav>
-
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
-
-
-<!-- EDIT MODAL -->
-<div class="modal-overlay" id="edit-modal" onclick="closeEditModal(event)">
+<div class="modal-overlay" id="edit-modal" onclick="closeModalOverlay(event)">
   <div class="modal-sheet">
-    <div class="modal-title">
-      記録を編集
-      <button class="modal-close" onclick="closeModal('edit-modal')">✕</button>
-    </div>
+    <div class="modal-title">記録を編集<button class="modal-close" onclick="closeModal('edit-modal')">&#10005;</button></div>
+    <div class="edit-field"><div class="edit-label">&#20316;&#26989;&#26085;</div><input type="date" id="edit-date" class="date-input"></div>
     <div class="edit-field">
-      <div class="edit-label">作業日</div>
-      <input type="date" id="edit-date" class="date-input">
-    </div>
-    <div class="edit-field">
-      <div class="edit-label">案件タイプ</div>
+      <div class="edit-label">&#26696;&#20214;&#12479;&#12452;&#12503;</div>
       <div class="radio-group" id="edit-type-group">
-        <div class="radio-pill selected" data-val="店舗案件" onclick="editSelectType(this)">店舗案件</div>
-        <div class="radio-pill" data-val="その他" onclick="editSelectType(this)">その他</div>
+        <div class="radio-pill selected" data-val="&#24215;&#33303;&#26696;&#20214;" onclick="editSelectType(this)">&#24215;&#33303;&#26696;&#20214;</div>
+        <div class="radio-pill" data-val="&#12381;&#12398;&#20182;" onclick="editSelectType(this)">&#12381;&#12398;&#20182;</div>
       </div>
     </div>
+    <div class="edit-field"><div class="edit-label">&#26696;&#20214;&#20869;&#23481;</div><select id="edit-content" class="form-select"></select></div>
     <div class="edit-field">
-      <div class="edit-label">案件内容</div>
-      <select id="edit-content" class="form-select"></select>
-    </div>
-    <div class="edit-field">
-      <div class="edit-label">所要時間</div>
+      <div class="edit-label">&#25152;&#35201;&#26178;&#38291;</div>
       <select id="edit-duration" class="form-select">
-        <option value="5">5分</option>
-        <option value="10">10分</option>
-        <option value="15">15分</option>
-        <option value="20">20分</option>
-        <option value="30">30分</option>
-        <option value="60">1時間</option>
-        <option value="90">1時間30分</option>
-        <option value="120">2時間</option>
-        <option value="180">3時間</option>
-        <option value="240">4時間</option>
-        <option value="300">5時間</option>
+        <option value="5">5&#20998;</option><option value="10">10&#20998;</option><option value="15">15&#20998;</option>
+        <option value="20">20&#20998;</option><option value="30">30&#20998;</option><option value="60">1&#26178;&#38291;</option>
+        <option value="90">1&#26178;&#38291;30&#20998;</option><option value="120">2&#26178;&#38291;</option>
+        <option value="180">3&#26178;&#38291;</option><option value="240">4&#26178;&#38291;</option><option value="300">5&#26178;&#38291;</option>
       </select>
     </div>
     <div class="edit-field">
-      <div class="edit-label">難易度</div>
+      <div class="edit-label">&#38243;&#26131;&#24230;</div>
       <div class="star-row" id="edit-star-row">
-        <div class="star" onclick="editSelectStar(1)">★</div>
-        <div class="star" onclick="editSelectStar(2)">★</div>
-        <div class="star" onclick="editSelectStar(3)">★</div>
-        <div class="star" onclick="editSelectStar(4)">★</div>
-        <div class="star" onclick="editSelectStar(5)">★</div>
+        <div class="star" onclick="editSelectStar(1)">&#9733;</div><div class="star" onclick="editSelectStar(2)">&#9733;</div>
+        <div class="star" onclick="editSelectStar(3)">&#9733;</div><div class="star" onclick="editSelectStar(4)">&#9733;</div>
+        <div class="star" onclick="editSelectStar(5)">&#9733;</div>
       </div>
     </div>
-    <button class="btn-primary" style="margin-top:16px" onclick="updateRecord()">更新</button>
-    <button class="btn-danger" onclick="deleteRecord()">削除</button>
+    <button class="btn-primary" style="margin-top:16px" onclick="updateRecord()">&#26356;&#26032;</button>
+    <button class="btn-danger" onclick="deleteRecord()">&#21066;&#38500;</button>
   </div>
 </div>
-
-<!-- CONFIRM DIALOG -->
-<div class="modal-overlay" id="confirm-dialog" style="display:none;align-items:center;justify-content:center;z-index:400;">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px 20px;width:80vw;max-width:300px;">
-    <div style="font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text)">全データを削除</div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6">全記録・設定を消去します。この操作は取り消せません。</div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="closeConfirm()" style="flex:1;padding:12px;background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);color:var(--text2);font-size:14px;cursor:pointer;">キャンセル</button>
-      <button onclick="execClearAll()" style="flex:1;padding:12px;background:transparent;border:1px solid var(--red);border-radius:var(--radius);color:var(--red);font-size:14px;font-weight:700;cursor:pointer;">削除</button>
-    </div>
-  </div>
-</div>
-
-<!-- SETTINGS MODAL -->
-<div class="modal-overlay" id="settings-modal" onclick="closeEditModal(event)">
+<div class="modal-overlay" id="settings-modal" onclick="closeModalOverlay(event)">
   <div class="modal-sheet">
-    <div class="modal-title">
-      設定
-      <button class="modal-close" onclick="closeModal('settings-modal')">✕</button>
-    </div>
-    <div class="section-label" style="margin-top:0">案件内容カスタム項目</div>
+    <div class="modal-title">&#35373;&#23450;<button class="modal-close" onclick="closeModal('settings-modal')">&#10005;</button></div>
+    <div class="section-label" style="margin-top:0">&#26696;&#20214;&#20869;&#23481;&#12459;&#12473;&#12479;&#12512;&#39178;&#30446;</div>
     <div id="custom-items-list" class="custom-items-list"></div>
     <div class="add-item-row">
-      <input type="text" id="new-item-input" class="add-item-input" placeholder="項目名を入力">
-      <button class="add-item-btn" onclick="addCustomItem()">追加</button>
+      <input type="text" id="new-item-input" class="add-item-input" placeholder="&#39178;&#30446;&#21517;&#12434;&#20837;&#21147;">
+      <button class="add-item-btn" onclick="addCustomItem()">&#36861;&#21152;</button>
     </div>
     <div class="divider"></div>
     <div class="setting-row">
-      <div>
-        <div class="setting-label">データをすべて削除</div>
-        <div class="setting-sub">全記録・設定を消去します</div>
-      </div>
-      <button class="btn-danger" style="width:auto;padding:8px 14px;font-size:12px;margin-top:0" onclick="clearAllData()">消去</button>
+      <div><div class="setting-label">&#12487;&#12540;&#12479;&#12434;&#12377;&#12409;&#12390;&#21066;&#38500;</div><div class="setting-sub">&#20840;&#35352;&#37682;&#12539;&#35373;&#23450;&#12434;&#28040;&#21435;&#12375;&#12414;&#12377;</div></div>
+      <button class="btn-danger" style="width:auto;padding:8px 14px;font-size:12px;margin-top:0" onclick="showConfirm()">&#28040;&#21435;</button>
     </div>
     <div class="setting-row">
-      <div>
-        <div class="setting-label">バージョン</div>
-        <div class="setting-sub">AlteREC Lite v1.0</div>
-      </div>
+      <div><div class="setting-label">&#12496;&#12540;&#12472;&#12519;&#12531;</div><div class="setting-sub">AlteREC Lite v1.1</div></div>
     </div>
   </div>
 </div>
-
+<div id="confirm-dialog" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px 20px;width:80vw;max-width:300px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:8px">&#20840;&#12487;&#12540;&#12479;&#12434;&#21066;&#38500;</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6">&#20840;&#35352;&#37682;&#12539;&#35373;&#23450;&#12434;&#28040;&#21435;&#12375;&#12414;&#12377;&#12290;&#12371;&#12398;&#25805;&#20316;&#12399;&#21462;&#12426;&#28040;&#12379;&#12414;&#12379;&#12435;&#12290;</div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeConfirm()" style="flex:1;padding:12px;background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);color:var(--text2);font-size:14px;cursor:pointer">&#12461;&#12515;&#12531;&#12475;&#12523;</button>
+      <button onclick="execClearAll()" style="flex:1;padding:12px;background:transparent;border:1px solid var(--red);border-radius:var(--radius);color:var(--red);font-size:14px;font-weight:700;cursor:pointer">&#21066;&#38500;</button>
+    </div>
+  </div>
+</div>
+<div id="csv-modal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.7);align-items:flex-end;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0));width:100%;max-height:80vh;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:15px;font-weight:700;">📤 CSV出力</div>
+      <button onclick="closeCsvModal()" style="width:28px;height:28px;background:var(--bg4);border-radius:50%;border:none;color:var(--text3);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.6;">iOSのPWA環境ではファイル保存できないため、以下のテキストをコピーして別アプリ（メモ帳など）に貼り付けてください。</div>
+    <textarea id="csv-text-area" readonly style="flex:1;min-height:160px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text2);font-family:'DM Mono',monospace;font-size:11px;padding:10px;resize:none;line-height:1.5;"></textarea>
+    <button onclick="copyCsvText()" style="width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius);color:#0e0f11;font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;">📋 テキストをコピー</button>
+  </div>
+</div>
+<div id="delete-confirm-dialog" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px 20px;width:80vw;max-width:300px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:8px">記録を削除</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6">この記録を削除します。この操作は取り消せません。</div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeDeleteConfirm()" style="flex:1;padding:12px;background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);color:var(--text2);font-size:14px;cursor:pointer">キャンセル</button>
+      <button onclick="execDeleteRecord()" style="flex:1;padding:12px;background:transparent;border:1px solid var(--red);border-radius:var(--radius);color:var(--red);font-size:14px;font-weight:700;cursor:pointer">削除</button>
+    </div>
+  </div>
+</div>
 <script>
+const DEFAULT_CONTENTS=['裾処理シングル','裾処理ダブル','ウエスト補正','Gカット','デニム特殊','裾処理特殊','ファスナー交換','シャツ袖丈','シャツ着丈','タグ付け','ボタン補強','付属品補正','ほつれ直し','プレス','その他補正'];
+let records=[],customContents=[],dateLocked=false,selectedDuration=5,selectedDifficulty=1,selectedCount=1,currentPeriod='week',editingId=null,editDifficulty=1,chartCount=null,chartTime=null,chartType=null;
 
-// ─────────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────────
-const DEFAULT_CONTENTS = [
-  '裾処理シングル','裾処理ダブル','ウエスト補正','Gカット',
-  'デニム特殊','裾処理特殊','ファスナー交換','シャツ袖丈',
-  'シャツ着丈','タグ付け','ボタン補強','付属品補正',
-  'ほつれ直し','プレス','その他補正'
-];
-
-let records = [];
-let customContents = [];
-let dateLocked = false;
-let selectedDuration = 5;
-let selectedDifficulty = 1;
-let selectedCount = 1;
-let currentPeriod = 'week';
-let editingId = null;
-let editDifficulty = 1;
-let chartCount = null, chartTime = null, chartType = null;
-let chartDataCache = { labels:[], counts:[], times:[], prevCounts:[], prevTimes:[] };
-
-// ─────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────
-function init() {
-  records = JSON.parse(localStorage.getItem('ar_records') || '[]');
-  customContents = JSON.parse(localStorage.getItem('ar_customs') || '[]');
-  dateLocked = JSON.parse(localStorage.getItem('ar_locked') || 'false');
-
-  const savedDate = localStorage.getItem('ar_locked_date');
-  const today = todayStr();
-  document.getElementById('work-date').value = (dateLocked && savedDate) ? savedDate : today;
-
-  if (dateLocked) applyLockUI(true);
-
+function init(){
+  records=JSON.parse(localStorage.getItem('ar_records')||'[]');
+  customContents=JSON.parse(localStorage.getItem('ar_customs')||'[]');
+  dateLocked=JSON.parse(localStorage.getItem('ar_locked')||'false');
+  const savedDate=localStorage.getItem('ar_locked_date');
+  document.getElementById('work-date').value=(dateLocked&&savedDate)?savedDate:todayStr();
+  if(dateLocked)applyLockUI(true);
   rebuildContentSelect('case-content');
   rebuildContentSelect('edit-content');
   renderStars(1);
   updateSaveBtn();
-  // 統計セレクタの初期化
-  buildYearSelect();
-  buildMonthSelect(new Date().getFullYear());
-  showPeriodSelectors();
 }
-
-function todayStr() {
-  const d = new Date();
-  return d.getFullYear() + '-' +
-    String(d.getMonth()+1).padStart(2,'0') + '-' +
-    String(d.getDate()).padStart(2,'0');
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function allContents(){return[...DEFAULT_CONTENTS,...customContents];}
+function rebuildContentSelect(id){
+  const sel=document.getElementById(id);if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML=allContents().map(c=>`<option value="${c}">${c}</option>`).join('');
+  if(prev&&allContents().includes(prev))sel.value=prev;
 }
-
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+function toggleLock(){
+  dateLocked=!dateLocked;applyLockUI(dateLocked);
+  if(dateLocked)localStorage.setItem('ar_locked_date',document.getElementById('work-date').value);
+  else{localStorage.removeItem('ar_locked_date');document.getElementById('work-date').value=todayStr();}
+  localStorage.setItem('ar_locked',JSON.stringify(dateLocked));
+  showToast(dateLocked?'🔒 日付を固定しました':'🔓 固定を解除しました');
 }
-
-// ─────────────────────────────────────────────
-// CONTENT SELECT
-// ─────────────────────────────────────────────
-function allContents() {
-  return [...DEFAULT_CONTENTS, ...customContents];
+function applyLockUI(locked){
+  const toggle=document.getElementById('lock-toggle'),input=document.getElementById('work-date');
+  toggle.textContent=locked?'🔒':'🔓';
+  toggle.classList.toggle('locked',locked);
+  input.classList.toggle('locked',locked);
+  input.readOnly=locked;
 }
-
-function rebuildContentSelect(id) {
-  const sel = document.getElementById(id);
-  const prev = sel.value;
-  sel.innerHTML = '';
-  allContents().forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    sel.appendChild(opt);
-  });
-  if (prev && allContents().includes(prev)) sel.value = prev;
-}
-
-// ─────────────────────────────────────────────
-// LOCK
-// ─────────────────────────────────────────────
-function toggleLock() {
-  dateLocked = !dateLocked;
-  applyLockUI(dateLocked);
-  if (dateLocked) {
-    localStorage.setItem('ar_locked_date', document.getElementById('work-date').value);
-  } else {
-    localStorage.removeItem('ar_locked_date');
-    document.getElementById('work-date').value = todayStr();
-  }
-  localStorage.setItem('ar_locked', JSON.stringify(dateLocked));
-  showToast(dateLocked ? '🔒 日付を固定しました' : '🔓 固定を解除しました');
-}
-
-function applyLockUI(locked) {
-  const toggle = document.getElementById('lock-toggle');
-  const input = document.getElementById('work-date');
-  toggle.textContent = locked ? '🔒' : '🔓';
-  toggle.classList.toggle('locked', locked);
-  input.classList.toggle('locked', locked);
-  input.readOnly = locked;
-}
-
-// ─────────────────────────────────────────────
-// FORM SELECTION
-// ─────────────────────────────────────────────
-function selectType(el) {
-  document.querySelectorAll('#case-type-group .radio-pill').forEach(p => p.classList.remove('selected'));
-  el.classList.add('selected');
-}
-
-function selectDur(el) {
-  document.querySelectorAll('#duration-grid .dur-btn').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedDuration = parseInt(el.dataset.val);
-}
-
-function selectStar(n) {
-  selectedDifficulty = n;
-  renderStars(n);
-}
-
-function renderStars(n) {
-  document.querySelectorAll('#star-row .star').forEach((s,i) => {
-    s.classList.toggle('filled', i < n);
-  });
-}
-
-// ─────────────────────────────────────────────
-// COUNT
-// ─────────────────────────────────────────────
-function changeCount(delta) {
-  selectedCount = Math.max(1, Math.min(99, selectedCount + delta));
-  document.getElementById('count-display').textContent = selectedCount;
-  updateSaveBtn();
-}
-
-function updateSaveBtn() {
-  const btn = document.getElementById('save-btn');
-  if (btn) btn.textContent = selectedCount > 1 ? `${selectedCount}件まとめて保存` : '保存';
-}
-
-// ─────────────────────────────────────────────
-// SAVE
-// ─────────────────────────────────────────────
-function saveRecord() {
-  const date = document.getElementById('work-date').value;
-  const type = document.querySelector('#case-type-group .radio-pill.selected')?.dataset.val || '店舗案件';
-  const content = document.getElementById('case-content').value;
-  if (!date || !content) { showToast('日付と案件内容を選択してください', 'error'); return; }
-
-  for (let i = 0; i < selectedCount; i++) {
-    records.unshift({ id: uid(), date, type, content, duration: selectedDuration, difficulty: selectedDifficulty });
-  }
+function selectType(el){document.querySelectorAll('#case-type-group .radio-pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');}
+function selectDur(el){document.querySelectorAll('#duration-grid .dur-btn').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');selectedDuration=parseInt(el.dataset.val);}
+function selectStar(n){selectedDifficulty=n;renderStars(n);}
+function renderStars(n){document.querySelectorAll('#star-row .star').forEach((s,i)=>s.classList.toggle('filled',i<n));}
+function changeCount(d){selectedCount=Math.max(1,Math.min(99,selectedCount+d));document.getElementById('count-display').textContent=selectedCount;updateSaveBtn();}
+function updateSaveBtn(){const btn=document.getElementById('save-btn');if(btn)btn.textContent=selectedCount>1?selectedCount+'件まとめて保存':'保存';}
+function saveRecord(){
+  const date=document.getElementById('work-date').value;
+  const type=document.querySelector('#case-type-group .radio-pill.selected')?.dataset.val||'店舗案件';
+  const content=document.getElementById('case-content').value;
+  if(!date||!content){showToast('日付と案件内容を選択してください','error');return;}
+  for(let i=0;i<selectedCount;i++)records.unshift({id:uid(),date,type,content,duration:selectedDuration,difficulty:selectedDifficulty});
   saveRecords();
-
-  const msg = selectedCount > 1 ? `✅ ${selectedCount}件保存しました` : '✅ 保存しました';
-  showToast(msg, 'success');
-
-  // リセット
-  if (!dateLocked) document.getElementById('work-date').value = todayStr();
-  document.getElementById('case-content').value = allContents()[0];
-  selectStar(1);
-  selectedCount = 1;
-  document.getElementById('count-display').textContent = '1';
-  updateSaveBtn();
+  if(!dateLocked)document.getElementById('work-date').value=todayStr();
+  document.getElementById('case-content').value=allContents()[0];
+  selectStar(1);selectedCount=1;document.getElementById('count-display').textContent='1';updateSaveBtn();
+  showToast('✅ 保存しました','success');
 }
-
-function showRepeatBtn(show) {} // 後方互換のため残す
-
-function saveRecords() {
-  localStorage.setItem('ar_records', JSON.stringify(records));
+function saveRecords(){localStorage.setItem('ar_records',JSON.stringify(records));}
+function switchTab(tab,el){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pane-'+tab).classList.add('active');el.classList.add('active');
+  if(tab==='history')renderHistory();
+  if(tab==='stats')renderStats();
 }
-
-// ─────────────────────────────────────────────
-// TABS
-// ─────────────────────────────────────────────
-function switchTab(tab, el) {
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-  document.getElementById('pane-' + tab).classList.add('active');
-  el.classList.add('active');
-  if (tab === 'history') renderHistory();
-  if (tab === 'stats') renderStats();
-}
-
-// ─────────────────────────────────────────────
-// HISTORY
-// ─────────────────────────────────────────────
-function renderHistory() {
-  var container = document.getElementById('history-list');
-  if (records.length === 0) {
-    container.innerHTML = '<div class="empty-state">記録がありません<br>「記録」タブから追加してください</div>';
-    return;
-  }
-
-  var grouped = {};
-  records.forEach(function(r) {
-    var ym = r.date.slice(0,7);
-    if (!grouped[ym]) grouped[ym] = [];
-    grouped[ym].push(r);
-  });
-
-  var keys = Object.keys(grouped).sort(function(a,b){return b.localeCompare(a);});
-
-  container.innerHTML = keys.map(function(ym, idx) {
-    var parts = ym.split('-');
-    var y = parts[0], m = parts[1];
-    var isOpen = idx === 0; // 最新月だけ最初から開く
-    var rows = grouped[ym].map(function(r) {
-      var stars = '';
-      for(var s=0;s<r.difficulty;s++) stars+='★';
-      return '<div class="record-card" onclick="openEditModal(\'' + r.id + '\')">'+  
-        '<div class="record-type-dot '+(r.type==='店舗案件'?'store':'other')+'"></div>' +
-        '<div class="record-date">'+r.date.slice(5).replace('-','/')+'</div>' +
-        '<div class="record-content">'+r.content+'</div>' +
-        '<div class="record-right">' +
-          '<span class="record-dur">'+formatDur(r.duration)+'</span>' +
-          '<span class="record-stars">'+stars+'</span>' +
-        '</div>' +
-      '</div>';
+function renderHistory(){
+  const container=document.getElementById('history-list');
+  if(records.length===0){container.innerHTML='<div class="empty-state">記録がありません<br>「記録」タブから追加してください</div>';return;}
+  const grouped={};
+  records.forEach(r=>{const ym=r.date.slice(0,7);if(!grouped[ym])grouped[ym]=[];grouped[ym].push(r);});
+  container.innerHTML=Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map((ym,idx)=>{
+    const[y,m]=ym.split('-');const isOpen=idx===0;
+    const rows=grouped[ym].map(r=>{
+      let stars='';for(let s=0;s<r.difficulty;s++)stars+='★';
+      return `<div class="record-card" onclick="openEditModal('${r.id}')"><div class="record-type-dot ${r.type==='店舗案件'?'store':'other'}"></div><div class="record-date">${r.date.slice(5).replace('-','/')}</div><div class="record-content">${r.content}</div><div class="record-right"><span class="record-dur">${formatDur(r.duration)}</span><span class="record-stars">${stars}</span></div></div>`;
     }).join('');
-    return '<div class="month-group">' +
-      '<div class="month-header" onclick="toggleMonth(this)">' +
-        '<div class="month-header-left">' +
-          '<span class="month-chevron'+(isOpen?' open':'')+'">▶</span>' +
-          '<span>'+y+'年 '+parseInt(m)+'月</span>' +
-        '</div>' +
-        '<span style="color:var(--text3);font-size:11px">'+grouped[ym].length+'件</span>' +
-      '</div>' +
-      '<div class="month-body'+(isOpen?' open':'')+'">' + rows + '</div>' +
-    '</div>';
+    return `<div class="month-group"><div class="month-header" onclick="toggleMonth(this)"><div class="month-header-left"><span class="month-chevron${isOpen?' open':''}">▶</span><span>${y}年 ${parseInt(m)}月</span></div><span style="color:var(--text3);font-size:11px">${grouped[ym].length}件</span></div><div class="month-body${isOpen?' open':''}">${rows}</div></div>`;
   }).join('');
 }
-
-function toggleMonth(header) {
-  var chevron = header.querySelector('.month-chevron');
-  var body = header.nextElementSibling;
-  var isOpen = body.classList.contains('open');
-  if (isOpen) {
-    body.classList.remove('open');
-    chevron.classList.remove('open');
-  } else {
-    body.classList.add('open');
-    chevron.classList.add('open');
-  }
-}
-
-function formatDur(min) {
-  if (min < 60) return min + '分';
-  const h = Math.floor(min/60), m = min%60;
-  return h + '時間' + (m ? m+'分' : '');
-}
-
-// ─────────────────────────────────────────────
-// EDIT MODAL
-// ─────────────────────────────────────────────
-function openEditModal(id) {
-  const r = records.find(x => x.id === id);
-  if (!r) return;
-  editingId = id;
-  editDifficulty = r.difficulty;
-
-  document.getElementById('edit-date').value = r.date;
-  document.querySelectorAll('#edit-type-group .radio-pill').forEach(p => {
-    p.classList.toggle('selected', p.dataset.val === r.type);
-  });
-  rebuildContentSelect('edit-content');
-  document.getElementById('edit-content').value = r.content;
-  document.getElementById('edit-duration').value = r.duration;
-  renderEditStars(r.difficulty);
-
+function toggleMonth(header){const chevron=header.querySelector('.month-chevron'),body=header.nextElementSibling,isOpen=body.classList.contains('open');body.classList.toggle('open',!isOpen);chevron.classList.toggle('open',!isOpen);}
+function formatDur(min){if(min<60)return min+'分';const h=Math.floor(min/60),m=min%60;return h+'h'+(m?m+'m':'');}
+function openEditModal(id){
+  const r=records.find(x=>x.id===id);if(!r)return;
+  editingId=id;editDifficulty=r.difficulty;
+  document.getElementById('edit-date').value=r.date;
+  document.querySelectorAll('#edit-type-group .radio-pill').forEach(p=>p.classList.toggle('selected',p.dataset.val===r.type));
+  rebuildContentSelect('edit-content');document.getElementById('edit-content').value=r.content;
+  document.getElementById('edit-duration').value=r.duration;
+  document.querySelectorAll('#edit-star-row .star').forEach((s,i)=>s.classList.toggle('filled',i<r.difficulty));
   document.getElementById('edit-modal').classList.add('open');
 }
-
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+function editSelectType(el){document.querySelectorAll('#edit-type-group .radio-pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');}
+function editSelectStar(n){editDifficulty=n;document.querySelectorAll('#edit-star-row .star').forEach((s,i)=>s.classList.toggle('filled',i<n));}
+function updateRecord(){
+  const idx=records.findIndex(x=>x.id===editingId);if(idx<0)return;
+  records[idx]={...records[idx],date:document.getElementById('edit-date').value,type:document.querySelector('#edit-type-group .radio-pill.selected')?.dataset.val||'店舗案件',content:document.getElementById('edit-content').value,duration:parseInt(document.getElementById('edit-duration').value),difficulty:editDifficulty};
+  saveRecords();closeModal('edit-modal');renderHistory();showToast('✅ 更新しました','success');
 }
-function closeEditModal(e) {
-  if (e.target.classList.contains('modal-overlay')) closeModal(e.target.id);
+function deleteRecord(){showDeleteConfirm();}
+function showDeleteConfirm(){document.getElementById('delete-confirm-dialog').style.display='flex';}
+function closeDeleteConfirm(){document.getElementById('delete-confirm-dialog').style.display='none';}
+function execDeleteRecord(){
+  records=records.filter(x=>x.id!==editingId);
+  saveRecords();closeDeleteConfirm();closeModal('edit-modal');renderHistory();showToast('削除しました');
 }
-
-function editSelectType(el) {
-  document.querySelectorAll('#edit-type-group .radio-pill').forEach(p => p.classList.remove('selected'));
-  el.classList.add('selected');
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function closeModalOverlay(e){if(e.target.classList.contains('modal-overlay'))closeModal(e.target.id);}
+function setPeriod(el){
+  document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');currentPeriod=el.dataset.period;renderStats();
 }
-function editSelectStar(n) {
-  editDifficulty = n;
-  renderEditStars(n);
+function buildYearSelect(){
+  const sel=document.getElementById('year-select');
+  const thisYear=new Date().getFullYear();
+  const years=new Set([thisYear]);
+  records.forEach(r=>{if(r.date)years.add(parseInt(r.date.slice(0,4)));});
+  const sorted=Array.from(years).sort((a,b)=>b-a);
+  const prev=sel.value?parseInt(sel.value):thisYear;
+  const match=sorted.includes(prev)?prev:sorted[0];
+  sel.innerHTML=sorted.map(y=>`<option value="${y}"${y===match?' selected':''}>${y}年</option>`).join('');
 }
-function renderEditStars(n) {
-  document.querySelectorAll('#edit-star-row .star').forEach((s,i) => {
-    s.classList.toggle('filled', i < n);
-  });
+function buildMonthSelect(y){
+  const sel=document.getElementById('month-select');
+  const now=new Date();
+  const maxM=y===now.getFullYear()?now.getMonth():11;
+  const prev=sel.value!==''?(parseInt(sel.value)||0):(y===now.getFullYear()?now.getMonth():0);
+  const clamp=Math.min(prev,maxM);
+  const names=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  sel.innerHTML='';
+  for(let m=0;m<=maxM;m++){const opt=document.createElement('option');opt.value=m;opt.textContent=names[m];if(m===clamp)opt.selected=true;sel.appendChild(opt);}
 }
-
-function updateRecord() {
-  const idx = records.findIndex(x => x.id === editingId);
-  if (idx < 0) return;
-  records[idx] = {
-    ...records[idx],
-    date: document.getElementById('edit-date').value,
-    type: document.querySelector('#edit-type-group .radio-pill.selected')?.dataset.val || '店舗案件',
-    content: document.getElementById('edit-content').value,
-    duration: parseInt(document.getElementById('edit-duration').value),
-    difficulty: editDifficulty
-  };
-  saveRecords();
-  closeModal('edit-modal');
-  renderHistory();
-  showToast('✅ 更新しました', 'success');
-}
-
-function deleteRecord() {
-  if (!confirm('この記録を削除しますか？')) return;
-  records = records.filter(x => x.id !== editingId);
-  saveRecords();
-  closeModal('edit-modal');
-  renderHistory();
-  showToast('削除しました');
-}
-
-// ─────────────────────────────────────────────
-// STATS
-// ─────────────────────────────────────────────
-function getAvailableYears() {
-  var thisYear = new Date().getFullYear();
-  var years = [thisYear];
-  records.forEach(function(r) {
-    if (r.date) {
-      var y = parseInt(r.date.slice(0,4));
-      if (years.indexOf(y) === -1) years.push(y);
-    }
-  });
-  years.sort(function(a,b){return b-a;});
-  return years;
-}
-
-function buildYearSelect() {
-  var sel = document.getElementById('year-select');
-  if (!sel) return;
-  var years = getAvailableYears();
-  var prev = sel.value ? parseInt(sel.value) : new Date().getFullYear();
-  var match = years.indexOf(prev) >= 0 ? prev : years[0];
-  sel.innerHTML = years.map(function(y){
-    return '<option value="'+y+'"'+(y===match?' selected':'')+'>'+y+'年</option>';
-  }).join('');
-}
-
-function buildMonthSelect(y) {
-  var sel = document.getElementById('month-select');
-  if (!sel) return;
-  var now = new Date();
-  var maxM = (y === now.getFullYear()) ? now.getMonth() : 11;
-  var prev = (sel.value !== '') ? parseInt(sel.value) : (y===now.getFullYear() ? now.getMonth() : 0);
-  if (prev > maxM) prev = maxM;
-  var names = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-  sel.innerHTML = '';
-  for (var m=0; m<=maxM; m++) {
-    var opt = document.createElement('option');
-    opt.value = m; opt.textContent = names[m];
-    if (m === prev) opt.selected = true;
-    sel.appendChild(opt);
-  }
-}
-
-function getSelectedYear() {
-  var sel = document.getElementById('year-select');
-  return sel ? (parseInt(sel.value)||new Date().getFullYear()) : new Date().getFullYear();
-}
-
-function getSelectedMonth() {
-  var sel = document.getElementById('month-select');
-  return (sel && sel.value !== '') ? parseInt(sel.value) : new Date().getMonth();
-}
-
-function showPeriodSelectors() {
-  var mSel = document.getElementById('month-select');
-  if (!mSel) return;
-  // 週間・月間は月選択を表示、年間は非表示
-  mSel.style.display = (currentPeriod === 'year') ? 'none' : 'block';
-}
-
-function setPeriod(el) {
-  document.querySelectorAll('.period-tab').forEach(function(t){t.classList.remove('active');});
-  el.classList.add('active');
-  currentPeriod = el.dataset.period;
-  showPeriodSelectors();
-  renderStats();
-}
-
-function renderStats() {
+function renderStats(){
   buildYearSelect();
-  var y = getSelectedYear();
-  buildMonthSelect(y);
-  showPeriodSelectors();
-  var m = getSelectedMonth();
-  var now = new Date();
-
-  if (records.length === 0) {
-    document.getElementById('summary-row').innerHTML = '<div class="empty-state" style="padding:20px;font-size:13px;color:var(--text3)">記録がありません</div>';
-    return;
+  const y=parseInt(document.getElementById('year-select').value)||new Date().getFullYear();
+  const monthRow=document.getElementById('month-select-row');
+  if(currentPeriod==='month'){monthRow.style.display='block';buildMonthSelect(y);}
+  else{monthRow.style.display='none';}
+  const m=parseInt(document.getElementById('month-select').value)||new Date().getMonth();
+  let filtered=[];
+  if(currentPeriod==='week'){
+    // 当週（月曜起点）のみ表示
+    const today=new Date();today.setHours(0,0,0,0);
+    const dow=(today.getDay()+6)%7; // 0=月...6=日
+    const weekStart=new Date(today);weekStart.setDate(today.getDate()-dow);
+    const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
+    filtered=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=weekStart&&rd<=weekEnd;});
+  } else if(currentPeriod==='month'){
+    filtered=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd.getFullYear()===y&&rd.getMonth()===m;});
+  }else{
+    filtered=records.filter(r=>new Date(r.date+'T00:00:00').getFullYear()===y);
   }
-
-  // 対象データ
-  var filtered = filterByPeriod(records, currentPeriod, y, m);
-  var totalCount = filtered.length;
-  var totalMin   = filtered.reduce(function(s,r){return s+r.duration;}, 0);
-  var avgDiff    = filtered.length ? (filtered.reduce(function(s,r){return s+r.difficulty;},0)/filtered.length).toFixed(1) : '-';
-
-  // 1日平均：稼働日数（1件以上あった日）で割る
-  var avgPerDay = '-';
-  if (filtered.length > 0) {
-    var workDays = {};
-    filtered.forEach(function(r){ workDays[r.date] = true; });
-    var workDayCount = Object.keys(workDays).length;
-    avgPerDay = workDayCount > 0 ? (totalCount / workDayCount).toFixed(1) : '-';
+  const totalCount=filtered.length;
+  const totalMin=filtered.reduce((s,r)=>s+r.duration,0);
+  const workDays=new Set(filtered.map(r=>r.date)).size;
+  const avgPerDay=workDays>0?(totalCount/workDays).toFixed(1):'-';
+  document.getElementById('summary-row').innerHTML=
+    `<div class="summary-box"><div class="summary-num">${totalCount}</div><div class="summary-label">件数</div></div>`+
+    `<div class="summary-box"><div class="summary-num">${formatDur(totalMin)}</div><div class="summary-label">合計時間</div></div>`+
+    `<div class="summary-box"><div class="summary-num">${avgPerDay}</div><div class="summary-label">稼働日平均</div></div>`;
+  let labels=[],counts=[],times=[];
+  if(currentPeriod==='week'){
+    labels=['月','火','水','木','金','土','日'];counts=[0,0,0,0,0,0,0];times=[0,0,0,0,0,0,0];
+    filtered.forEach(r=>{const dw=(new Date(r.date+'T00:00:00').getDay()+6)%7;counts[dw]++;times[dw]+=r.duration;});
+  }else if(currentPeriod==='month'){
+    const weeks=getWeeksOfMonth(y,m);
+    labels=weeks.map(w=>w.label);counts=weeks.map(()=>0);times=weeks.map(()=>0);
+    filtered.forEach(r=>{const rd=new Date(r.date+'T00:00:00');for(let wi=0;wi<weeks.length;wi++){if(rd>=weeks[wi].start&&rd<=weeks[wi].end){counts[wi]++;times[wi]+=r.duration;break;}}});
+  }else{
+    labels=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    counts=new Array(12).fill(0);times=new Array(12).fill(0);
+    filtered.forEach(r=>{const mo=parseInt(r.date.slice(5,7))-1;if(mo>=0&&mo<12){counts[mo]++;times[mo]+=r.duration;}});
   }
-
-  document.getElementById('summary-row').innerHTML =
-    '<div class="summary-box"><div class="summary-num">'+totalCount+'</div><div class="summary-label">件数</div></div>' +
-    '<div class="summary-box"><div class="summary-num">'+totalMin+'</div><div class="summary-label">合計分</div></div>' +
-    '<div class="summary-box"><div class="summary-num">'+avgPerDay+'</div><div class="summary-label">稼働日平均</div></div>';
-
-  // グラフデータ
-  var labels=[], counts=[], times=[];
-
-  if (currentPeriod === 'week') {
-    // 選択年・選択月の曜日別（月〜日）
-    labels = ['月','火','水','木','金','土','日'];
-    counts = [0,0,0,0,0,0,0];
-    times  = [0,0,0,0,0,0,0];
-    filtered.forEach(function(r){
-      var dw = (new Date(r.date+'T00:00:00').getDay()+6)%7;
-      counts[dw]++; times[dw]+=r.duration;
-    });
-
-  } else if (currentPeriod === 'month') {
-    // 選択年・選択月の週別
-    var weeks = getWeeksOfMonth(y, m);
-    labels = weeks.map(function(w){return w.label;});
-    counts = weeks.map(function(){return 0;});
-    times  = weeks.map(function(){return 0;});
-    filtered.forEach(function(r){
-      var rd = new Date(r.date+'T00:00:00');
-      for (var wi=0;wi<weeks.length;wi++){
-        if(rd>=weeks[wi].start&&rd<=weeks[wi].end){counts[wi]++;times[wi]+=r.duration;break;}
-      }
-    });
-
-  } else {
-    // 年間：1〜12月
-    labels = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-    counts = [0,0,0,0,0,0,0,0,0,0,0,0];
-    times  = [0,0,0,0,0,0,0,0,0,0,0,0];
-    filtered.forEach(function(r){
-      var mo = parseInt(r.date.slice(5,7))-1;
-      if(mo>=0&&mo<12){counts[mo]++;times[mo]+=r.duration;}
-    });
-  }
-
-  renderBarWithDiff('chart-count', labels, counts, []);
-  renderLineWithDiff('chart-time', labels, times, []);
+  renderChart('chart-count','bar',labels,counts,chartCount,c=>{chartCount=c;},'rgba(200,169,110,0.7)','rgba(200,169,110,1)');
+  renderChart('chart-time','line',labels,times,chartTime,c=>{chartTime=c;},'#5c9ce0','#5c9ce0');
   renderDonut(filtered);
 }
-
-
-
-function filterByPeriod(recs, period, y, m) {
-  return recs.filter(function(r) {
-    var rd = new Date(r.date+'T00:00:00');
-    if (period === 'year') return rd.getFullYear() === y;
-    return rd.getFullYear()===y && rd.getMonth()===m;
-  });
-}
-
-function getWeeksOfMonth(y, m) {
-  var weeks=[], cur=new Date(y,m,1), lastDay=new Date(y,m+1,0), wn=1;
+function getWeeksOfMonth(y,m){
+  const weeks=[],lastDay=new Date(y,m+1,0);let cur=new Date(y,m,1),wn=1;
   while(cur<=lastDay){
-    var wStart=new Date(cur);
-    var daysToSun=6-((cur.getDay()+6)%7);
-    var wEnd=new Date(cur); wEnd.setDate(wEnd.getDate()+daysToSun);
-    if(wEnd>lastDay) wEnd=new Date(lastDay);
-    weeks.push({label:'第'+wn+'週', start:wStart, end:wEnd});
-    cur=new Date(wEnd); cur.setDate(cur.getDate()+1); wn++;
+    const wStart=new Date(cur),wEnd=new Date(cur);wEnd.setDate(wEnd.getDate()+(6-((cur.getDay()+6)%7)));
+    if(wEnd>lastDay)wEnd.setTime(lastDay.getTime());
+    weeks.push({label:'第'+wn+'週',start:wStart,end:wEnd});
+    cur=new Date(wEnd);cur.setDate(cur.getDate()+1);wn++;
   }
   return weeks;
 }
-
-var diffLabelPlugin = {
-  id: 'diffLabels',
-  afterDatasetsDraw: function(chart) {
-    var opts = chart.options.plugins && chart.options.plugins.diffLabels;
-    var prevData = (opts && opts.prevData) ? opts.prevData : [];
-    if (!prevData.length) return;
-    var chartCtx = chart.ctx;
-    var dataset = chart.data.datasets[0];
-    var xScale = chart.scales['x'];
-    var yScale = chart.scales['y'];
-    if (!xScale || !yScale || !dataset) return;
-    for (var i=0; i<dataset.data.length; i++) {
-      var val = dataset.data[i];
-      var prev = (prevData[i] !== undefined) ? prevData[i] : 0;
-      if (val===0 && prev===0) continue;
-      var txt, clr;
-      if (prev===0 && val>0) { txt='NEW'; clr='#5cc896'; }
-      else if (prev===0) { continue; }
-      else {
-        var pct = Math.round(((val-prev)/prev)*100);
-        if (pct===0) { txt='±0'; clr='#5c5f66'; }
-        else if (pct>0) { txt='+'+pct+'%'; clr='#5cc896'; }
-        else { txt=pct+'%'; clr='#e05c5c'; }
-      }
-      var xPos = xScale.getPixelForValue(i);
-      var yPos = yScale.getPixelForValue(val);
-      chartCtx.save();
-      chartCtx.font = 'bold 9px monospace';
-      chartCtx.fillStyle = clr;
-      chartCtx.textAlign = 'center';
-      chartCtx.fillText(txt, xPos, yPos-5);
-      chartCtx.restore();
-    }
+function renderChart(canvasId,type,labels,data,existing,setRef,bg,border){
+  if(existing)existing.destroy();
+  const canvas=document.getElementById(canvasId);if(!canvas)return;
+  const isBar=type==='bar';
+  setRef(new Chart(canvas.getContext('2d'),{
+    type,
+    data:{labels,datasets:[{data,backgroundColor:isBar?bg:bg+'33',borderColor:border,borderWidth:isBar?1:2,borderRadius:isBar?4:0,fill:!isBar,tension:0.3,pointRadius:isBar?0:3}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:8}},plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2e3035'},ticks:{color:'#5c5f66',font:{size:10}}},y:{grid:{color:'#2e3035'},ticks:{color:'#5c5f66',font:{size:10}},beginAtZero:true}}}
+  }));
+}
+function renderDonut(recs){
+  if(chartType){chartType.destroy();chartType=null;}
+  const canvas=document.getElementById('chart-type');if(!canvas)return;
+  const counts={};recs.forEach(r=>{counts[r.content]=(counts[r.content]||0)+1;});
+  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const colors=['#c8a96e','#5c9ce0','#5cc896','#e05c5c','#a85ce0','#e0a85c','#5ce0c8','#9a9da4'];
+  chartType=new Chart(canvas.getContext('2d'),{type:'doughnut',data:{labels:entries.map(x=>x[0]),datasets:[{data:entries.map(x=>x[1]),backgroundColor:colors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#9a9da4',font:{size:11},padding:8}}}}});
+}
+function exportCSV(){
+  if(records.length===0){showToast('記録がありません','error');return;}
+  const header='id,date,type,content,duration,difficulty';
+  const rows=records.map(r=>[r.id,r.date,`"${r.type}"`,`"${r.content}"`,r.duration,r.difficulty].join(','));
+  const csv='\uFEFF'+[header].concat(rows).join('\n');
+  // まずBlob方式を試みる（デスクトップ・Android）
+  try{
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`alterec_${todayStr()}.csv`;a.setAttribute('target','_blank');
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showToast('📤 CSVを出力しました','success');
+  }catch(e){
+    // フォールバック：コピーモーダルを表示
+    showCsvModal(csv);
   }
-};
-Chart.register(diffLabelPlugin);
-
-function makeChartOpts(prevData) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: { padding: { top: 18 } },
-    plugins: {
-      legend: { display: false },
-      diffLabels: { prevData: prevData || [] }
-    },
-    scales: {
-      x: { grid: { color: '#2e3035' }, ticks: { color: '#5c5f66', font: { size: 10 } } },
-      y: { grid: { color: '#2e3035' }, ticks: { color: '#5c5f66', font: { size: 10 } }, beginAtZero: true }
-    }
+  // iOS PWA判定：Blobクリック後も実際にはダウンロードされないため
+  // navigator.standalone = true の場合はモーダルも一緒に開く
+  if(navigator.standalone){showCsvModal(csv);}
+}
+function showCsvModal(csv){
+  document.getElementById('csv-text-area').value=csv;
+  document.getElementById('csv-modal').style.display='flex';
+}
+function closeCsvModal(){document.getElementById('csv-modal').style.display='none';}
+function copyCsvText(){
+  const ta=document.getElementById('csv-text-area');
+  ta.select();
+  try{
+    document.execCommand('copy');
+    showToast('📋 クリップボードにコピーしました','success');
+  }catch(e){
+    navigator.clipboard&&navigator.clipboard.writeText(ta.value).then(()=>showToast('📋 コピーしました','success')).catch(()=>showToast('手動でコピーしてください'));
+  }
+}
+function importCSV(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const text=e.target.result.replace(/^﻿/,'');
+      const lines=text.trim().split('\n');
+      const imported=[];
+      for(let i=1;i<lines.length;i++){
+        const vals=parseCSVLine(lines[i]);
+        if(vals.length<6)continue;
+        imported.push({id:vals[0]||uid(),date:vals[1],type:vals[2],content:vals[3],duration:parseInt(vals[4])||15,difficulty:parseInt(vals[5])||1});
+      }
+      const existingIds=new Set(records.map(r=>r.id));
+      const newRecs=imported.filter(r=>!existingIds.has(r.id));
+      records=[...newRecs,...records].sort((a,b)=>b.date.localeCompare(a.date));
+      saveRecords();renderHistory();
+      showToast(`📥 ${newRecs.length}件インポートしました`,'success');
+    }catch(err){showToast('CSVの読み込みに失敗しました','error');}
   };
+  reader.readAsText(file,'UTF-8');input.value='';
 }
-
-function renderBarWithDiff(canvasId, labels, data, prevData) {
-  if (chartCount) { chartCount.destroy(); chartCount=null; }
-  var canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  chartCount = new Chart(canvas.getContext('2d'), {
-    type: 'bar',
-    data: { labels: labels, datasets: [{ data: data, backgroundColor: 'rgba(200,169,110,0.7)', borderColor: 'rgba(200,169,110,1)', borderWidth: 1, borderRadius: 4 }] },
-    options: makeChartOpts(prevData)
-  });
+function parseCSVLine(line){
+  const result=[];let cur='',inQuote=false;
+  for(let i=0;i<line.length;i++){const c=line[i];if(c==='"')inQuote=!inQuote;else if(c===','&&!inQuote){result.push(cur);cur='';}else cur+=c;}
+  result.push(cur);return result;
 }
-
-function renderLineWithDiff(canvasId, labels, data, prevData) {
-  if (chartTime) { chartTime.destroy(); chartTime=null; }
-  var canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  chartTime = new Chart(canvas.getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ data: data, borderColor: '#5c9ce0', backgroundColor: 'rgba(92,156,224,0.2)', fill: true, tension: 0.3, pointRadius: 3 }] },
-    options: makeChartOpts(prevData)
-  });
+function openSettings(){renderCustomItems();document.getElementById('settings-modal').classList.add('open');}
+function renderCustomItems(){
+  const list=document.getElementById('custom-items-list');if(!list)return;
+  list.innerHTML=customContents.length===0?'<div style="font-size:12px;color:var(--text3);padding:8px 0">追加項目なし</div>':customContents.map((c,i)=>`<div class="custom-item-row"><span class="custom-item-name">${c}</span><button class="del-btn" onclick="removeCustomItem(${i})">✕</button></div>`).join('');
 }
-
-function renderDonut(recs) {
-  if (chartType) { chartType.destroy(); chartType=null; }
-  var canvas = document.getElementById('chart-type');
-  if (!canvas) return;
-  var counts = {};
-  recs.forEach(function(r){ counts[r.content]=(counts[r.content]||0)+1; });
-  var entries = Object.keys(counts).map(function(k){return [k,counts[k]];});
-  entries.sort(function(a,b){return b[1]-a[1];});
-  entries = entries.slice(0,8);
-  var labels = entries.map(function(x){return x[0];});
-  var data   = entries.map(function(x){return x[1];});
-  var colors = ['#c8a96e','#5c9ce0','#5cc896','#e05c5c','#a85ce0','#e0a85c','#5ce0c8','#9a9da4'];
-  chartType = new Chart(canvas.getContext('2d'), {
-    type: 'doughnut',
-    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 0 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { color: '#9a9da4', font:{size:11}, padding: 8 } },
-        diffLabels: { prevData: [] }
-      }
-    }
-  });
+function addCustomItem(){
+  const input=document.getElementById('new-item-input');const val=input.value.trim();
+  if(!val)return;
+  if(allContents().includes(val)){showToast('既に存在する項目です','error');return;}
+  customContents.push(val);localStorage.setItem('ar_customs',JSON.stringify(customContents));
+  rebuildContentSelect('case-content');rebuildContentSelect('edit-content');
+  input.value='';renderCustomItems();showToast('項目を追加しました','success');
 }
-
-// ─────────────────────────────────────────────
-// CSV
-// ─────────────────────────────────────────────
-function exportCSV() {
-  if (records.length === 0) { showToast('記録がありません', 'error'); return; }
-  var header = 'id,date,type,content,duration,difficulty';
-  var rows = records.map(function(r) {
-    return [r.id, r.date, '"'+r.type+'"', '"'+r.content+'"', r.duration, r.difficulty].join(',');
-  });
-  var csv = [header].concat(rows).join('\n');
-  var overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#0e0f11;display:flex;flex-direction:column;padding:10px;gap:8px;';
-  var msg = document.createElement('div');
-  msg.textContent = 'テキストを長押し→全選択→コピーしてメモに保存';
-  msg.style.cssText = 'color:#c8a96e;font-size:13px;text-align:center;padding:8px;';
-  var closeBtn = document.createElement('button');
-  closeBtn.textContent = '閉じる';
-  closeBtn.style.cssText = 'padding:12px;background:#2e3035;color:#e8e9eb;border:none;border-radius:8px;font-size:14px;';
-  closeBtn.onclick = function(){ document.body.removeChild(overlay); };
-  var ta = document.createElement('textarea');
-  ta.style.cssText = 'flex:1;background:#1e2023;color:#e8e9eb;border:1px solid #2e3035;border-radius:8px;padding:10px;font-size:11px;resize:none;-webkit-user-select:text;user-select:text;';
-  ta.value = csv;
-  ta.readOnly = false;
-  overlay.appendChild(msg);
-  overlay.appendChild(ta);
-  overlay.appendChild(closeBtn);
-  document.body.appendChild(overlay);
-  setTimeout(function(){ ta.focus(); ta.select(); ta.setSelectionRange(0,99999); }, 100);
+function removeCustomItem(idx){
+  customContents.splice(idx,1);localStorage.setItem('ar_customs',JSON.stringify(customContents));
+  rebuildContentSelect('case-content');rebuildContentSelect('edit-content');
+  renderCustomItems();showToast('項目を削除しました');
 }
-
-function importCSV(input) {
-  var file = input.files[0];
-  if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      var text = e.target.result.replace(/^\uFEFF/,'');
-      var lines = text.trim().split('\n');
-      var imported = [];
-      for (var i=1; i<lines.length; i++) {
-        var vals = parseCSVLine(lines[i]);
-        if (vals.length < 6) continue;
-        imported.push({
-          id: vals[0] || uid(),
-          date: vals[1],
-          type: vals[2],
-          content: vals[3],
-          duration: parseInt(vals[4]) || 15,
-          difficulty: parseInt(vals[5]) || 1
-        });
-      }
-      var existingIds = {};
-      records.forEach(function(r){ existingIds[r.id]=true; });
-      var newRecs = imported.filter(function(r){ return !existingIds[r.id]; });
-      records = newRecs.concat(records);
-      records.sort(function(a,b){ return b.date.localeCompare(a.date); });
-      saveRecords();
-      renderHistory();
-      showToast(newRecs.length+'件インポートしました', 'success');
-    } catch(err) {
-      showToast('CSVの読み込みに失敗しました', 'error');
-    }
-  };
-  reader.readAsText(file, 'UTF-8');
-  input.value = '';
-}
-
-function parseCSVLine(line) {
-  var result=[], cur='', inQuote=false;
-  for (var i=0; i<line.length; i++) {
-    var ch=line[i];
-    if (ch==='"') { inQuote=!inQuote; }
-    else if (ch===',' && !inQuote) { result.push(cur); cur=''; }
-    else cur+=ch;
-  }
-  result.push(cur);
-  return result;
-}
-
-// ─────────────────────────────────────────────
-// SETTINGS
-// ─────────────────────────────────────────────
-function openSettings() {
-  renderCustomItems();
-  document.getElementById('settings-modal').classList.add('open');
-}
-
-function renderCustomItems() {
-  var list = document.getElementById('custom-items-list');
-  if (!list) return;
-  if (customContents.length === 0) {
-    list.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px 0">追加項目なし</div>';
-    return;
-  }
-  list.innerHTML = customContents.map(function(item,i){
-    return '<div class="custom-item-row"><span class="custom-item-name">'+item+'</span><button class="del-btn" onclick="removeCustomItem('+i+')">✕</button></div>';
-  }).join('');
-}
-
-function addCustomItem() {
-  var input = document.getElementById('new-item-input');
-  var val = input.value.trim();
-  if (!val) return;
-  if (allContents().indexOf(val) >= 0) { showToast('既に存在する項目です','error'); return; }
-  customContents.push(val);
-  localStorage.setItem('ar_customs', JSON.stringify(customContents));
-  rebuildContentSelect('case-content');
-  rebuildContentSelect('edit-content');
-  input.value = '';
-  renderCustomItems();
-  showToast('項目を追加しました','success');
-}
-
-function removeCustomItem(idx) {
-  customContents.splice(idx,1);
-  localStorage.setItem('ar_customs', JSON.stringify(customContents));
-  rebuildContentSelect('case-content');
-  rebuildContentSelect('edit-content');
-  renderCustomItems();
-  showToast('項目を削除しました');
-}
-
-function clearAllData() {
-  var dlg = document.getElementById('confirm-dialog');
-  if (dlg) dlg.style.display = 'flex';
-}
-
-function closeConfirm() {
-  var dlg = document.getElementById('confirm-dialog');
-  if (dlg) dlg.style.display = 'none';
-}
-
-function execClearAll() {
-  records=[]; customContents=[]; dateLocked=false;
-  localStorage.clear();
-  rebuildContentSelect('case-content');
-  rebuildContentSelect('edit-content');
-  document.getElementById('work-date').value = todayStr();
-  applyLockUI(false);
-  closeConfirm();
-  closeModal('settings-modal');
+function showConfirm(){document.getElementById('confirm-dialog').style.display='flex';}
+function closeConfirm(){document.getElementById('confirm-dialog').style.display='none';}
+function execClearAll(){
+  records=[];customContents=[];dateLocked=false;localStorage.clear();
+  rebuildContentSelect('case-content');rebuildContentSelect('edit-content');
+  document.getElementById('work-date').value=todayStr();
+  applyLockUI(false);closeConfirm();closeModal('settings-modal');
   showToast('全データを削除しました');
 }
-
-// ─────────────────────────────────────────────
-// TOAST
-// ─────────────────────────────────────────────
 let toastTimer;
-function showToast(msg, type='') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (type ? ' '+type : '');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');t.textContent=msg;
+  t.className='toast show'+(type?' '+type:'');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
-
-// ─────────────────────────────────────────────
-// START
-// ─────────────────────────────────────────────
 init();
+
 </script>
 </body>
 </html>
