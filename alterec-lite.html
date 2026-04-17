@@ -1122,26 +1122,19 @@ function renderStats() {
   var totalMin   = filtered.reduce(function(s,r){return s+r.duration;}, 0);
   var avgDiff    = filtered.length ? (filtered.reduce(function(s,r){return s+r.difficulty;},0)/filtered.length).toFixed(1) : '-';
 
-  // 1日あたり平均件数を計算
+  // 1日平均：稼働日数（1件以上あった日）で割る
   var avgPerDay = '-';
   if (filtered.length > 0) {
-    var days = 1;
-    if (currentPeriod === 'week') {
-      // 選択月の日数
-      days = new Date(y, m+1, 0).getDate();
-    } else if (currentPeriod === 'month') {
-      days = new Date(y, m+1, 0).getDate();
-    } else {
-      // 年間：選択年の日数
-      days = ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365;
-    }
-    avgPerDay = (totalCount / days).toFixed(1);
+    var workDays = {};
+    filtered.forEach(function(r){ workDays[r.date] = true; });
+    var workDayCount = Object.keys(workDays).length;
+    avgPerDay = workDayCount > 0 ? (totalCount / workDayCount).toFixed(1) : '-';
   }
 
   document.getElementById('summary-row').innerHTML =
     '<div class="summary-box"><div class="summary-num">'+totalCount+'</div><div class="summary-label">件数</div></div>' +
     '<div class="summary-box"><div class="summary-num">'+totalMin+'</div><div class="summary-label">合計分</div></div>' +
-    '<div class="summary-box"><div class="summary-num">'+avgPerDay+'</div><div class="summary-label">1日平均</div></div>';
+    '<div class="summary-box"><div class="summary-num">'+avgPerDay+'</div><div class="summary-label">稼働日平均</div></div>';
 
   // グラフデータ
   var labels=[], counts=[], times=[];
