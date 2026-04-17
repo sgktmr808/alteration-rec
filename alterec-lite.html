@@ -1394,31 +1394,27 @@ function exportCSV() {
   if (records.length === 0) { showToast('記録がありません', 'error'); return; }
   var header = 'id,date,type,content,duration,difficulty';
   var rows = records.map(function(r) {
-    return [r.id, r.date, '"'+r.type+'"', '"'+r.content+'"', r.duration, r.difficulty].join(',');
+    return [r.id, r.date, r.type, r.content, r.duration, r.difficulty].join('|');
   });
-  var csv = [header].concat(rows).join('\n');
+  var data = [header].concat(rows).join('\n');
   var overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#0e0f11;display:flex;flex-direction:column;padding:10px;';
-  var btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#0e0f11;display:flex;flex-direction:column;padding:10px;gap:8px;';
+  var msg = document.createElement('div');
+  msg.textContent = 'テキストを長押し→全選択→コピーしてメモに保存';
+  msg.style.cssText = 'color:#c8a96e;font-size:13px;text-align:center;padding:8px;';
   var closeBtn = document.createElement('button');
   closeBtn.textContent = '閉じる';
-  closeBtn.style.cssText = 'flex:1;padding:10px;background:#2e3035;color:#e8e9eb;border:none;border-radius:8px;font-size:14px;';
+  closeBtn.style.cssText = 'padding:12px;background:#2e3035;color:#e8e9eb;border:none;border-radius:8px;font-size:14px;';
   closeBtn.onclick = function(){ document.body.removeChild(overlay); };
-  var selBtn = document.createElement('button');
-  selBtn.textContent = '全選択してコピー';
-  selBtn.style.cssText = 'flex:2;padding:10px;background:#c8a96e;color:#0e0f11;border:none;border-radius:8px;font-size:14px;font-weight:700;';
-  selBtn.onclick = function(){ ta.select(); ta.setSelectionRange(0,99999); document.execCommand("copy"); showToast("コピーしました","success"); };
-  btnRow.appendChild(closeBtn);
-  btnRow.appendChild(selBtn);
   var ta = document.createElement('textarea');
-  ta.style.cssText = 'flex:1;background:#1e2023;color:#9a9da4;border:1px solid #2e3035;border-radius:8px;padding:10px;font-size:10px;resize:none;';
-  ta.value = csv;
-  overlay.appendChild(btnRow);
+  ta.style.cssText = 'flex:1;background:#1e2023;color:#e8e9eb;border:1px solid #2e3035;border-radius:8px;padding:10px;font-size:11px;resize:none;-webkit-user-select:text;user-select:text;';
+  ta.value = data;
+  ta.readOnly = false;
+  overlay.appendChild(msg);
   overlay.appendChild(ta);
+  overlay.appendChild(closeBtn);
   document.body.appendChild(overlay);
-  ta.select();
-  ta.setSelectionRange(0,99999);
+  setTimeout(function(){ ta.focus(); ta.select(); ta.setSelectionRange(0,99999); }, 100);
 }
 
 function importCSV(input) {
