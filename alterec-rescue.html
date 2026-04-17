@@ -3,91 +3,67 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AlteREC データ救出</title>
+<title>AlteREC 診断</title>
 <style>
-  body { font-family: sans-serif; background: #0e0f11; color: #e8e9eb; padding: 30px 20px; text-align: center; }
-  h2 { color: #c8a96e; margin-bottom: 10px; }
-  p { color: #9a9da4; font-size: 14px; line-height: 1.8; margin-bottom: 24px; }
-  .btn { display: block; width: 100%; padding: 16px; margin-bottom: 12px;
-    border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; }
-  .btn-csv { background: #c8a96e; color: #0e0f11; }
-  .btn-json { background: transparent; border: 1px solid #c8a96e; color: #c8a96e; }
-  .count { font-size: 32px; font-weight: 700; color: #c8a96e; margin: 16px 0 4px; }
-  .count-label { font-size: 13px; color: #5c5f66; }
-  .status { margin-top: 20px; font-size: 14px; color: #5cc896; min-height: 24px; }
-  .error { color: #e05c5c; }
+  body { font-family: sans-serif; background: #0e0f11; color: #e8e9eb; padding: 20px; }
+  h2 { color: #c8a96e; }
+  pre { background: #1e2023; padding: 12px; border-radius: 8px; font-size: 11px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; color: #9a9da4; margin-bottom: 12px; }
+  .btn { display: block; width: 100%; padding: 14px; margin-bottom: 10px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; background: #c8a96e; color: #0e0f11; }
+  .label { font-size: 12px; color: #5c5f66; margin-bottom: 4px; margin-top: 16px; }
 </style>
 </head>
 <body>
-<h2>🔄 AlteREC データ救出</h2>
-
-<div class="count" id="count">0</div>
-<div class="count-label">件のデータが見つかりました</div>
-
-<p style="margin-top:24px">ボタンをタップしてデータを保存してください</p>
-
-<button class="btn btn-csv" onclick="downloadCSV()">📤 CSVで保存（推奨）</button>
-<button class="btn btn-json" onclick="downloadJSON()">📦 JSONで保存（バックアップ用）</button>
-
-<div class="status" id="status"></div>
-
+<h2>データ診断</h2>
+<div class="label">localStorage 全キー</div>
+<pre id="keys-display">読み込み中...</pre>
+<div class="label">ar_records の状態</div>
+<pre id="records-display">読み込み中...</pre>
+<button class="btn" id="dl-btn" onclick="downloadCSV()" style="display:none">CSVで保存</button>
+<button class="btn" style="background:transparent;border:1px solid #c8a96e;color:#c8a96e;margin-top:8px" onclick="showAll()">全データを表示</button>
+<div class="label" id="all-label" style="display:none">全データ（コピー用）</div>
+<pre id="all-display" style="display:none"></pre>
 <script>
 var records = [];
-
-try {
+window.onload = function() {
+  var keys = [];
+  for (var i=0; i<localStorage.length; i++) keys.push(localStorage.key(i));
+  document.getElementById('keys-display').textContent = keys.length===0 ? '（キーなし）' : keys.join('\n');
   var raw = localStorage.getItem('ar_records');
   if (raw) {
-    records = JSON.parse(raw);
-    document.getElementById('count').textContent = records.length;
+    try {
+      records = JSON.parse(raw);
+      document.getElementById('records-display').textContent = records.length + '件見つかりました';
+      document.getElementById('dl-btn').style.display = 'block';
+    } catch(e) {
+      document.getElementById('records-display').textContent = 'パースエラー: ' + e.message;
+    }
   } else {
-    document.getElementById('status').textContent = 'データが見つかりません';
-    document.getElementById('status').className = 'status error';
+    var msg = 'ar_records キーが見つかりません';
+    for (var i=0; i<localStorage.length; i++) {
+      var k=localStorage.key(i), v=localStorage.getItem(k);
+      if (v && v.length>100) msg += '\n「'+k+'」に大きなデータあり（'+v.length+'文字）';
+    }
+    document.getElementById('records-display').textContent = msg;
   }
-} catch(e) {
-  document.getElementById('status').textContent = 'データの読み込みに失敗しました';
-  document.getElementById('status').className = 'status error';
+};
+function showAll() {
+  var all={};
+  for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);all[k]=localStorage.getItem(k);}
+  document.getElementById('all-label').style.display='block';
+  document.getElementById('all-display').style.display='block';
+  document.getElementById('all-display').textContent=JSON.stringify(all,null,2);
 }
-
 function downloadCSV() {
-  if (records.length === 0) {
-    document.getElementById('status').textContent = 'データがありません';
-    return;
-  }
-  var header = 'id,date,type,content,duration,difficulty';
-  var rows = records.map(function(r) {
-    return [r.id, r.date, '"'+(r.type||'')+'"', '"'+(r.content||'')+'"', r.duration||0, r.difficulty||1].join(',');
-  });
-  var csv = [header].concat(rows).join('\r\n');
-  var blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  var d = new Date();
-  a.download = 'alterec_backup_' + d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  document.getElementById('status').textContent = '✅ ' + records.length + '件を保存しました';
-}
-
-function downloadJSON() {
-  if (records.length === 0) {
-    document.getElementById('status').textContent = 'データがありません';
-    return;
-  }
-  var json = JSON.stringify(records, null, 2);
-  var blob = new Blob([json], {type:'application/json'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  var d = new Date();
-  a.download = 'alterec_backup_' + d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  document.getElementById('status').textContent = '✅ JSONを保存しました';
+  if (records.length===0) return;
+  var header='id,date,type,content,duration,difficulty';
+  var rows=records.map(function(r){return [r.id,r.date,'"'+(r.type||'')+'"','"'+(r.content||'')+'"',r.duration||0,r.difficulty||1].join(',');});
+  var csv=[header].concat(rows).join('\r\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;
+  var d=new Date();
+  a.download='alterec_backup_'+d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 </script>
 </body>
