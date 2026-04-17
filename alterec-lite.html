@@ -80,19 +80,88 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
 .record-dur { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); }
 .record-stars { font-size:10px; color:var(--accent); letter-spacing:-1px; }
 .empty-state { text-align:center; padding:60px 20px; color:var(--text3); font-size:14px; line-height:2; }
-.stats-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-.period-tabs { flex:1; display:flex; background:var(--bg3); border-radius:var(--radius); padding:3px; gap:2px; }
-.period-tab { flex:1; padding:8px 4px; text-align:center; border-radius:8px; cursor:pointer; font-size:13px; color:var(--text3); }
-.period-tab.active { background:var(--bg); color:var(--accent); font-weight:500; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
-.year-select { flex-shrink:0; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); color:var(--accent); font-family:'DM Mono',monospace; font-size:13px; padding:8px 10px; appearance:none; -webkit-appearance:none; text-align:center; min-width:72px; }
-.month-select-row { margin-bottom:10px; }
-.summary-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
-.summary-box { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 10px; text-align:center; }
-.summary-num { font-family:'DM Mono',monospace; font-size:22px; font-weight:500; color:var(--accent); }
-.summary-label { font-size:10px; color:var(--text3); margin-top:3px; }
-.stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
-.stat-card-title { font-size:11px; font-weight:700; letter-spacing:0.12em; color:var(--text3); text-transform:uppercase; margin-bottom:14px; }
-.chart-wrap { position:relative; height:200px; }
+/* ── 統計内タブ ── */
+.stats-inner-tabs { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:3px; gap:2px; margin-bottom:14px; }
+.stats-inner-tab { flex:1; padding:9px 8px; text-align:center; border-radius:8px; cursor:pointer; font-size:13px; color:var(--text3); border:none; background:none; font-family:'Noto Sans JP',sans-serif; }
+.stats-inner-tab.active { background:var(--bg); color:var(--accent); font-weight:500; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+.stats-panel { display:none; }
+.stats-panel.active { display:block; }
+/* ── 累計バナー ── */
+.total-banner { background:var(--accent-dim); border:1px solid rgba(200,169,110,0.25); border-radius:var(--radius); padding:14px 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.total-banner-num { font-family:'DM Mono',monospace; font-size:30px; font-weight:500; color:var(--accent); line-height:1; }
+.total-banner-unit { font-size:12px; color:var(--accent2); margin-left:3px; }
+.total-banner-sub { font-size:10px; color:var(--text3); margin-top:4px; }
+.total-banner-sub span { color:var(--text2); }
+.total-banner-right { text-align:right; font-size:10px; color:var(--text3); }
+.total-banner-right .val { font-family:'DM Mono',monospace; font-size:13px; color:var(--text2); display:block; margin-top:2px; }
+.total-banner-right .val.up { color:var(--green); }
+/* ── クイックサマリー ── */
+.quick-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+.quick-box { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 10px; text-align:center; }
+.quick-num { font-family:'DM Mono',monospace; font-size:20px; font-weight:500; color:var(--text); }
+.quick-label { font-size:10px; color:var(--text3); margin-top:3px; }
+.quick-sub { font-size:9px; color:var(--text3); margin-top:2px; }
+/* ── セクション共通 ── */
+.stat-section { margin-bottom:16px; }
+.stat-section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.stat-section-title { font-size:10px; font-weight:700; letter-spacing:0.15em; color:var(--text3); text-transform:uppercase; display:flex; align-items:center; gap:6px; }
+.stat-section-title::before { content:''; width:3px; height:12px; background:var(--accent); border-radius:2px; display:block; }
+.stat-section-meta { font-size:10px; color:var(--text3); font-family:'DM Mono',monospace; }
+.stat-section-badge { font-family:'DM Mono',monospace; font-size:11px; color:var(--accent); background:var(--accent-dim); border:1px solid rgba(200,169,110,0.2); border-radius:4px; padding:2px 7px; }
+.stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 14px 12px; }
+.chart-wrap { position:relative; }
+/* ── 今週カード ── */
+.week-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.week-strip { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--border); }
+.week-strip-day { padding:8px 4px 6px; text-align:center; border-right:1px solid var(--border); }
+.week-strip-day:last-child { border-right:none; }
+.week-strip-day.today { background:var(--accent-dim); }
+.wsd-name { font-size:9px; color:var(--text3); font-family:'DM Mono',monospace; margin-bottom:2px; }
+.wsd-count { font-size:16px; font-weight:500; color:var(--text); font-family:'DM Mono',monospace; display:block; }
+.week-strip-day.today .wsd-count { color:var(--accent); }
+.wsd-dot { width:4px; height:4px; border-radius:50%; background:var(--accent); margin:3px auto 0; opacity:0; }
+.week-strip-day.has-data .wsd-dot { opacity:1; }
+.week-chart-area { padding:10px 12px 8px; position:relative; }
+.week-compare { display:flex; gap:8px; padding:8px 14px 12px; border-top:1px solid var(--border); }
+.wc-item { flex:1; }
+.wc-label { font-size:9px; color:var(--text3); margin-bottom:4px; }
+.wc-bar-wrap { height:4px; background:var(--bg4); border-radius:2px; overflow:hidden; }
+.wc-bar { height:100%; border-radius:2px; }
+.wc-bar.this { background:var(--accent); }
+.wc-bar.last { background:var(--text3); }
+.wc-num { font-family:'DM Mono',monospace; font-size:11px; margin-top:3px; }
+.wc-num.this { color:var(--accent); }
+.wc-num.last { color:var(--text3); }
+/* ── 年セレクト ── */
+.year-sel { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--accent); font-family:'DM Mono',monospace; font-size:12px; padding:5px 10px; appearance:none; -webkit-appearance:none; }
+/* ── ランキング ── */
+.rank-list { display:flex; flex-direction:column; gap:10px; }
+.rank-row { display:flex; align-items:center; gap:8px; }
+.rank-num { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); width:14px; text-align:right; flex-shrink:0; }
+.rank-name { font-size:12px; color:var(--text2); width:96px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rank-bar-wrap { flex:1; height:6px; background:var(--bg4); border-radius:3px; overflow:hidden; }
+.rank-bar { height:100%; border-radius:3px; }
+.rank-count { font-family:'DM Mono',monospace; font-size:12px; color:var(--text); width:26px; text-align:right; flex-shrink:0; }
+.rank-delta { font-family:'DM Mono',monospace; font-size:10px; width:34px; text-align:right; flex-shrink:0; }
+.rank-delta.up { color:var(--green); }
+.rank-delta.down { color:var(--red); }
+.rank-delta.flat { color:var(--text3); }
+/* ── 期間トグル ── */
+.period-toggle { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:2px; gap:2px; }
+.period-btn { padding:5px 12px; border-radius:4px; font-size:11px; color:var(--text3); cursor:pointer; border:none; background:none; font-family:'Noto Sans JP',sans-serif; }
+.period-btn.active { background:var(--bg); color:var(--accent); font-weight:500; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+/* ── 折れ線凡例 ── */
+.trend-legend { display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px; }
+.tl-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--text3); }
+.tl-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+/* ── ドーナツ ── */
+.donut-wrap { display:flex; align-items:center; gap:16px; }
+.donut-chart-area { position:relative; width:130px; height:130px; flex-shrink:0; }
+.donut-legend { flex:1; display:flex; flex-direction:column; gap:7px; }
+.dl-row { display:flex; align-items:center; gap:7px; }
+.dl-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+.dl-name { font-size:11px; color:var(--text2); flex:1; line-height:1.2; }
+.dl-pct { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); }
 .modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:none; align-items:flex-end; }
 .modal-overlay.open { display:flex; }
 .modal-sheet { width:100%; background:var(--bg2); border-radius:16px 16px 0 0; border-top:1px solid var(--border); padding:20px 20px calc(20px + env(safe-area-inset-bottom,0)); max-height:85vh; overflow-y:auto; animation:slideUp 0.25s ease; }
@@ -192,30 +261,114 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
     <div id="history-list"></div>
   </div>
   <div id="pane-stats" class="tab-pane">
-    <div class="stats-header">
-      <div class="period-tabs">
-        <div class="period-tab active" data-period="week" onclick="setPeriod(this)">今週</div>
-        <div class="period-tab" data-period="month" onclick="setPeriod(this)">&#26376;&#38291;</div>
-        <div class="period-tab" data-period="year" onclick="setPeriod(this)">&#24180;&#38291;</div>
+
+    <!-- 内タブ -->
+    <div class="stats-inner-tabs">
+      <button class="stats-inner-tab active" onclick="switchStatsInnerTab('count',this)">📊 件数</button>
+      <button class="stats-inner-tab" onclick="switchStatsInnerTab('content',this)">🧵 補正内容</button>
+    </div>
+
+    <!-- ━ 件数パネル ━ -->
+    <div class="stats-panel active" id="spanel-count">
+      <!-- 累計バナー -->
+      <div class="total-banner">
+        <div>
+          <div style="font-size:10px;letter-spacing:0.15em;color:var(--accent2);font-weight:700;margin-bottom:2px">TOTAL</div>
+          <div><span class="total-banner-num" id="tot-num">0</span><span class="total-banner-unit">件</span></div>
+          <div class="total-banner-sub">稼働 <span id="tot-days">-</span>日 / 記録開始 <span id="tot-start">-</span></div>
+        </div>
+        <div class="total-banner-right">
+          <div style="margin-bottom:2px">稼働日平均</div>
+          <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent);line-height:1"><span id="tot-avg">-</span><span style="font-size:11px;color:var(--accent2);margin-left:2px">件/日</span></div>
+          <div style="margin-top:6px">先月比</div><span class="val up" id="tot-mom">-</span>
+        </div>
       </div>
-      <select id="year-select" class="year-select" onchange="renderStats()"></select>
+      <!-- クイックサマリー -->
+      <div class="quick-row">
+        <div class="quick-box"><div class="quick-num" id="q-today">-</div><div class="quick-label">今日</div><div class="quick-sub" id="q-today-sub"></div></div>
+        <div class="quick-box"><div class="quick-num" id="q-week">-</div><div class="quick-label">今週</div><div class="quick-sub" id="q-week-sub"></div></div>
+        <div class="quick-box"><div class="quick-num" id="q-month">-</div><div class="quick-label">今月</div><div class="quick-sub" id="q-month-sub"></div></div>
+      </div>
+      <!-- 今週カード -->
+      <div class="stat-section">
+        <div class="stat-section-head">
+          <div class="stat-section-title">今週</div>
+          <div class="stat-section-meta" id="week-range-label"></div>
+        </div>
+        <div class="week-card">
+          <div class="week-strip" id="week-strip"></div>
+          <div class="week-chart-area" style="height:118px"><canvas id="chart-week"></canvas></div>
+          <div class="week-compare">
+            <div class="wc-item">
+              <div class="wc-label" id="wc-this-label">今週</div>
+              <div class="wc-bar-wrap"><div class="wc-bar this" id="wc-this-bar" style="width:0%"></div></div>
+              <div class="wc-num this" id="wc-this-num">-</div>
+            </div>
+            <div class="wc-item">
+              <div class="wc-label" id="wc-last-label">先週</div>
+              <div class="wc-bar-wrap"><div class="wc-bar last" id="wc-last-bar" style="width:0%"></div></div>
+              <div class="wc-num last" id="wc-last-num">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 今月 -->
+      <div class="stat-section">
+        <div class="stat-section-head">
+          <div class="stat-section-title">今月</div>
+          <div class="stat-section-badge" id="month-badge">-</div>
+        </div>
+        <div class="stat-card"><div class="chart-wrap" style="height:140px"><canvas id="chart-month"></canvas></div></div>
+      </div>
+      <!-- 年間 -->
+      <div class="stat-section">
+        <div class="stat-section-head">
+          <div class="stat-section-title">年間</div>
+          <select id="year-select" class="year-sel" onchange="renderCountPanel()"></select>
+        </div>
+        <div class="stat-card"><div class="chart-wrap" style="height:150px"><canvas id="chart-year"></canvas></div></div>
+      </div>
     </div>
-    <div class="month-select-row" id="month-select-row" style="display:none">
-      <select id="month-select" class="form-select" onchange="renderStats()"></select>
+
+    <!-- ━ 補正内容パネル ━ -->
+    <div class="stats-panel" id="spanel-content">
+      <!-- ランキング -->
+      <div class="stat-section">
+        <div class="stat-section-head">
+          <div class="stat-section-title">補正内容ランキング</div>
+          <div class="period-toggle">
+            <button class="period-btn active" onclick="switchRankPeriod('week',this)">今週</button>
+            <button class="period-btn" onclick="switchRankPeriod('month',this)">今月</button>
+          </div>
+        </div>
+        <div class="stat-card"><div class="rank-list" id="rank-list"></div></div>
+      </div>
+      <!-- 月次推移 -->
+      <div class="stat-section">
+        <div class="stat-section-head">
+          <div class="stat-section-title">上位5種の月次推移</div>
+          <select id="trend-year-select" class="year-sel" onchange="renderContentPanel()"></select>
+        </div>
+        <div class="stat-card">
+          <div class="trend-legend" id="trend-legend"></div>
+          <div class="chart-wrap" style="height:180px"><canvas id="chart-trend"></canvas></div>
+        </div>
+      </div>
+      <!-- 累計ドーナツ -->
+      <div class="stat-section">
+        <div class="stat-section-head">
+          <div class="stat-section-title">累計構成比</div>
+          <div class="stat-section-meta" id="donut-total-label"></div>
+        </div>
+        <div class="stat-card">
+          <div class="donut-wrap">
+            <div class="donut-chart-area"><canvas id="chart-donut"></canvas></div>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="summary-row" id="summary-row"></div>
-    <div class="stat-card">
-      <div class="stat-card-title">&#128202; &#26696;&#20214;&#25968;</div>
-      <div class="chart-wrap"><canvas id="chart-count"></canvas></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card-title">&#9201; &#25152;&#35201;&#26178;&#38291;&#65288;&#20998;&#65289;</div>
-      <div class="chart-wrap"><canvas id="chart-time"></canvas></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card-title">&#129525; &#26696;&#20214;&#31278;&#21029;</div>
-      <div class="chart-wrap"><canvas id="chart-type"></canvas></div>
-    </div>
+
   </div>
 </main>
 <nav class="tab-bar">
@@ -309,7 +462,7 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
 </div>
 <script>
 const DEFAULT_CONTENTS=['裾処理シングル','裾処理ダブル','ウエスト補正','Gカット','デニム特殊','裾処理特殊','ファスナー交換','シャツ袖丈','シャツ着丈','タグ付け','ボタン補強','付属品補正','ほつれ直し','プレス','その他補正'];
-let records=[],customContents=[],dateLocked=false,selectedDuration=5,selectedDifficulty=1,selectedCount=1,currentPeriod='week',editingId=null,editDifficulty=1,chartCount=null,chartTime=null,chartType=null;
+let records=[],customContents=[],dateLocked=false,selectedDuration=5,selectedDifficulty=1,selectedCount=1,editingId=null,editDifficulty=1;
 
 function init(){
   records=JSON.parse(localStorage.getItem('ar_records')||'[]');
@@ -414,10 +567,26 @@ function execDeleteRecord(){
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closeModalOverlay(e){if(e.target.classList.contains('modal-overlay'))closeModal(e.target.id);}
-function setPeriod(el){
-  document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');currentPeriod=el.dataset.period;renderStats();
+// ── 統計変数 ──
+let chartWeek=null,chartMonth=null,chartYear=null,chartTrend=null,chartDonut=null;
+const CHART_COLORS=['#c8a96e','#5c9ce0','#5cc896','#e05c5c','#a85ce0','#e0a85c','#5ce0c8','#9a9da4'];
+const GRID='#2e3035',TICK='#5c5f66';
+let rankPeriod='week';
+
+function switchStatsInnerTab(tab,btn){
+  document.querySelectorAll('.stats-inner-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.stats-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('spanel-'+tab).classList.add('active');
+  if(tab==='count')renderCountPanel();
+  else renderContentPanel();
 }
+
+function renderStats(){
+  renderCountPanel();
+}
+
+// ── 件数パネル ──
 function buildYearSelect(){
   const sel=document.getElementById('year-select');
   const thisYear=new Date().getFullYear();
@@ -428,61 +597,139 @@ function buildYearSelect(){
   const match=sorted.includes(prev)?prev:sorted[0];
   sel.innerHTML=sorted.map(y=>`<option value="${y}"${y===match?' selected':''}>${y}年</option>`).join('');
 }
-function buildMonthSelect(y){
-  const sel=document.getElementById('month-select');
-  const now=new Date();
-  const maxM=y===now.getFullYear()?now.getMonth():11;
-  const prev=sel.value!==''?(parseInt(sel.value)||0):(y===now.getFullYear()?now.getMonth():0);
-  const clamp=Math.min(prev,maxM);
-  const names=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-  sel.innerHTML='';
-  for(let m=0;m<=maxM;m++){const opt=document.createElement('option');opt.value=m;opt.textContent=names[m];if(m===clamp)opt.selected=true;sel.appendChild(opt);}
-}
-function renderStats(){
+
+function renderCountPanel(){
   buildYearSelect();
-  const y=parseInt(document.getElementById('year-select').value)||new Date().getFullYear();
-  const monthRow=document.getElementById('month-select-row');
-  if(currentPeriod==='month'){monthRow.style.display='block';buildMonthSelect(y);}
-  else{monthRow.style.display='none';}
-  const m=parseInt(document.getElementById('month-select').value)||new Date().getMonth();
-  let filtered=[];
-  if(currentPeriod==='week'){
-    // 当週（月曜起点）のみ表示
-    const today=new Date();today.setHours(0,0,0,0);
-    const dow=(today.getDay()+6)%7; // 0=月...6=日
-    const weekStart=new Date(today);weekStart.setDate(today.getDate()-dow);
-    const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
-    filtered=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=weekStart&&rd<=weekEnd;});
-  } else if(currentPeriod==='month'){
-    filtered=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd.getFullYear()===y&&rd.getMonth()===m;});
-  }else{
-    filtered=records.filter(r=>new Date(r.date+'T00:00:00').getFullYear()===y);
+  const now=new Date();now.setHours(0,0,0,0);
+  const todayStr2=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const today=todayStr2(now);
+
+  // 累計
+  const total=records.length;
+  const workDaysAll=new Set(records.map(r=>r.date)).size;
+  const avgAll=workDaysAll>0?(total/workDaysAll).toFixed(1):'-';
+  const startDate=records.length?records.map(r=>r.date).sort()[0]:'-';
+  document.getElementById('tot-num').textContent=total.toLocaleString();
+  document.getElementById('tot-days').textContent=workDaysAll;
+  document.getElementById('tot-avg').textContent=avgAll;
+  document.getElementById('tot-start').textContent=startDate;
+
+  // 先月比
+  const thisM=now.getMonth(),thisY=now.getFullYear();
+  const lastM=thisM===0?11:thisM-1,lastY=thisM===0?thisY-1:thisY;
+  const cntThis=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===thisY&&d.getMonth()===thisM;}).length;
+  const cntLast=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===lastY&&d.getMonth()===lastM;}).length;
+  const mom=cntLast>0?Math.round((cntThis-cntLast)/cntLast*100):null;
+  document.getElementById('tot-mom').textContent=mom===null?'-':mom>=0?'▲ +'+mom+'%':'▼ '+mom+'%';
+  document.getElementById('tot-mom').className='val'+(mom===null?'':mom>=0?' up':' down');
+
+  // 今週
+  const dow=(now.getDay()+6)%7;
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()-dow);
+  const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
+  const lastWeekStart=new Date(weekStart);lastWeekStart.setDate(weekStart.getDate()-7);
+  const lastWeekEnd=new Date(weekEnd);lastWeekEnd.setDate(weekEnd.getDate()-7);
+  const fmt=d=>`${d.getMonth()+1}/${d.getDate()}`;
+  document.getElementById('week-range-label').textContent=fmt(weekStart)+' – '+fmt(weekEnd);
+
+  const thisWeekRecs=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=weekStart&&rd<=weekEnd;});
+  const lastWeekRecs=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=lastWeekStart&&rd<=lastWeekEnd;});
+  const thisWeekCounts=[0,0,0,0,0,0,0];
+  thisWeekRecs.forEach(r=>{const dw=(new Date(r.date+'T00:00:00').getDay()+6)%7;thisWeekCounts[dw]++;});
+  const lastWeekCounts=[0,0,0,0,0,0,0];
+  lastWeekRecs.forEach(r=>{const dw=(new Date(r.date+'T00:00:00').getDay()+6)%7;lastWeekCounts[dw]++;});
+
+  // 曜日ストリップ
+  const dayNames=['月','火','水','木','金','土','日'];
+  const stripDates=dayNames.map((_,i)=>{const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);return d;});
+  document.getElementById('week-strip').innerHTML=stripDates.map((d,i)=>{
+    const isToday=todayStr2(d)===today;
+    const cnt=thisWeekCounts[i];
+    const hasData=cnt>0;
+    return `<div class="week-strip-day${isToday?' today':''}${hasData?' has-data':''}">
+      <div class="wsd-name">${dayNames[i]}</div>
+      <span class="wsd-count">${hasData?cnt:'—'}</span>
+      <div class="wsd-dot"></div>
+    </div>`;
+  }).join('');
+
+  // 今週棒グラフ（先週を重ねる）
+  if(chartWeek)chartWeek.destroy();
+  const wCtx=document.getElementById('chart-week');
+  if(wCtx){
+    chartWeek=new Chart(wCtx.getContext('2d'),{
+      type:'bar',
+      data:{
+        labels:dayNames,
+        datasets:[
+          {label:'先週',data:lastWeekCounts,backgroundColor:'rgba(92,92,96,0.3)',borderColor:'rgba(92,92,96,0.5)',borderWidth:1,borderRadius:3},
+          {label:'今週',data:thisWeekCounts,
+            backgroundColor:thisWeekCounts.map((_,i)=>i===dow?'rgba(200,169,110,0.95)':'rgba(200,169,110,0.6)'),
+            borderColor:'rgba(200,169,110,1)',borderWidth:1,borderRadius:3}
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:4}},
+        plugins:{legend:{display:true,position:'top',align:'end',labels:{color:TICK,font:{size:9},boxWidth:8,padding:8}}},
+        scales:{x:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}}},y:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}},beginAtZero:true}}}
+    });
   }
-  const totalCount=filtered.length;
-  const totalMin=filtered.reduce((s,r)=>s+r.duration,0);
-  const workDays=new Set(filtered.map(r=>r.date)).size;
-  const avgPerDay=workDays>0?(totalCount/workDays).toFixed(1):'-';
-  document.getElementById('summary-row').innerHTML=
-    `<div class="summary-box"><div class="summary-num">${totalCount}</div><div class="summary-label">件数</div></div>`+
-    `<div class="summary-box"><div class="summary-num">${formatDur(totalMin)}</div><div class="summary-label">合計時間</div></div>`+
-    `<div class="summary-box"><div class="summary-num">${avgPerDay}</div><div class="summary-label">稼働日平均</div></div>`;
-  let labels=[],counts=[],times=[];
-  if(currentPeriod==='week'){
-    labels=['月','火','水','木','金','土','日'];counts=[0,0,0,0,0,0,0];times=[0,0,0,0,0,0,0];
-    filtered.forEach(r=>{const dw=(new Date(r.date+'T00:00:00').getDay()+6)%7;counts[dw]++;times[dw]+=r.duration;});
-  }else if(currentPeriod==='month'){
-    const weeks=getWeeksOfMonth(y,m);
-    labels=weeks.map(w=>w.label);counts=weeks.map(()=>0);times=weeks.map(()=>0);
-    filtered.forEach(r=>{const rd=new Date(r.date+'T00:00:00');for(let wi=0;wi<weeks.length;wi++){if(rd>=weeks[wi].start&&rd<=weeks[wi].end){counts[wi]++;times[wi]+=r.duration;break;}}});
-  }else{
-    labels=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-    counts=new Array(12).fill(0);times=new Array(12).fill(0);
-    filtered.forEach(r=>{const mo=parseInt(r.date.slice(5,7))-1;if(mo>=0&&mo<12){counts[mo]++;times[mo]+=r.duration;}});
+
+  // 先週比バー
+  const twTot=thisWeekRecs.length,lwTot=lastWeekRecs.length;
+  const maxWk=Math.max(twTot,lwTot,1);
+  document.getElementById('wc-this-label').textContent='今週（'+dayNames[dow]+'まで）';
+  document.getElementById('wc-last-label').textContent='先週（同曜日まで）';
+  document.getElementById('wc-this-bar').style.width=Math.round(twTot/maxWk*100)+'%';
+  document.getElementById('wc-last-bar').style.width=Math.round(lwTot/maxWk*100)+'%';
+  document.getElementById('wc-this-num').textContent=twTot+'件';
+  document.getElementById('wc-last-num').textContent=lwTot+'件';
+
+  // クイックサマリー
+  const todayRecs=records.filter(r=>r.date===today);
+  document.getElementById('q-today').textContent=todayRecs.length;
+  document.getElementById('q-today-sub').textContent='平均 '+avgAll;
+  document.getElementById('q-week').textContent=twTot;
+  document.getElementById('q-week-sub').textContent='先週 '+lwTot;
+  document.getElementById('q-month').textContent=cntThis;
+  document.getElementById('q-month-sub').textContent='先月 '+cntLast;
+
+  // 今月グラフ
+  document.getElementById('month-badge').textContent=cntThis+'件';
+  const weeks=getWeeksOfMonth(thisY,thisM);
+  const monthCounts=weeks.map(()=>0);
+  records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===thisY&&d.getMonth()===thisM;})
+    .forEach(r=>{const rd=new Date(r.date+'T00:00:00');for(let wi=0;wi<weeks.length;wi++){if(rd>=weeks[wi].start&&rd<=weeks[wi].end){monthCounts[wi]++;break;}}});
+  if(chartMonth)chartMonth.destroy();
+  const mCtx=document.getElementById('chart-month');
+  if(mCtx){
+    chartMonth=new Chart(mCtx.getContext('2d'),{type:'bar',
+      data:{labels:weeks.map(w=>w.label),datasets:[{data:monthCounts,backgroundColor:'rgba(200,169,110,0.7)',borderColor:'rgba(200,169,110,1)',borderWidth:1,borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:4}},plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}}},y:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}},beginAtZero:true}}}
+    });
   }
-  renderChart('chart-count','bar',labels,counts,chartCount,c=>{chartCount=c;},'rgba(200,169,110,0.7)','rgba(200,169,110,1)');
-  renderChart('chart-time','line',labels,times,chartTime,c=>{chartTime=c;},'#5c9ce0','#5c9ce0');
-  renderDonut(filtered);
+
+  // 年間グラフ
+  const y=parseInt(document.getElementById('year-select').value)||thisY;
+  const yearCounts=new Array(12).fill(0);
+  records.filter(r=>new Date(r.date+'T00:00:00').getFullYear()===y)
+    .forEach(r=>{const mo=parseInt(r.date.slice(5,7))-1;if(mo>=0&&mo<12)yearCounts[mo]++;});
+  const futureIdx=y===thisY?thisM+1:12;
+  if(chartYear)chartYear.destroy();
+  const yCtx=document.getElementById('chart-year');
+  if(yCtx){
+    chartYear=new Chart(yCtx.getContext('2d'),{type:'bar',
+      data:{labels:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+        datasets:[{data:yearCounts,
+          backgroundColor:yearCounts.map((_,i)=>i<futureIdx?'rgba(200,169,110,0.7)':'rgba(46,48,53,0.4)'),
+          borderColor:yearCounts.map((_,i)=>i<futureIdx?'rgba(200,169,110,1)':'rgba(46,48,53,0.6)'),
+          borderWidth:1,borderRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:4}},plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}}},y:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}},beginAtZero:true}}}
+    });
+  }
 }
+
 function getWeeksOfMonth(y,m){
   const weeks=[],lastDay=new Date(y,m+1,0);let cur=new Date(y,m,1),wn=1;
   while(cur<=lastDay){
@@ -493,23 +740,137 @@ function getWeeksOfMonth(y,m){
   }
   return weeks;
 }
-function renderChart(canvasId,type,labels,data,existing,setRef,bg,border){
-  if(existing)existing.destroy();
-  const canvas=document.getElementById(canvasId);if(!canvas)return;
-  const isBar=type==='bar';
-  setRef(new Chart(canvas.getContext('2d'),{
-    type,
-    data:{labels,datasets:[{data,backgroundColor:isBar?bg:bg+'33',borderColor:border,borderWidth:isBar?1:2,borderRadius:isBar?4:0,fill:!isBar,tension:0.3,pointRadius:isBar?0:3}]},
-    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:8}},plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2e3035'},ticks:{color:'#5c5f66',font:{size:10}}},y:{grid:{color:'#2e3035'},ticks:{color:'#5c5f66',font:{size:10}},beginAtZero:true}}}
-  }));
+
+// ── 補正内容パネル ──
+function buildTrendYearSelect(){
+  const sel=document.getElementById('trend-year-select');
+  if(!sel)return;
+  const thisYear=new Date().getFullYear();
+  const years=new Set([thisYear]);
+  records.forEach(r=>{if(r.date)years.add(parseInt(r.date.slice(0,4)));});
+  const sorted=Array.from(years).sort((a,b)=>b-a);
+  const prev=sel.value?parseInt(sel.value):thisYear;
+  const match=sorted.includes(prev)?prev:sorted[0];
+  sel.innerHTML=sorted.map(y=>`<option value="${y}"${y===match?' selected':''}>${y}年</option>`).join('');
 }
-function renderDonut(recs){
-  if(chartType){chartType.destroy();chartType=null;}
-  const canvas=document.getElementById('chart-type');if(!canvas)return;
-  const counts={};recs.forEach(r=>{counts[r.content]=(counts[r.content]||0)+1;});
-  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const colors=['#c8a96e','#5c9ce0','#5cc896','#e05c5c','#a85ce0','#e0a85c','#5ce0c8','#9a9da4'];
-  chartType=new Chart(canvas.getContext('2d'),{type:'doughnut',data:{labels:entries.map(x=>x[0]),datasets:[{data:entries.map(x=>x[1]),backgroundColor:colors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#9a9da4',font:{size:11},padding:8}}}}});
+
+function renderContentPanel(){
+  buildTrendYearSelect();
+  renderRanking();
+  renderTrend();
+  renderDonut();
+}
+
+function switchRankPeriod(period,btn){
+  rankPeriod=period;
+  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRanking();
+}
+
+function renderRanking(){
+  const now=new Date();
+  const dow=(now.getDay()+6)%7;
+  const weekStart=new Date(now);weekStart.setHours(0,0,0,0);weekStart.setDate(now.getDate()-dow);
+  const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
+  const lastWeekStart=new Date(weekStart);lastWeekStart.setDate(weekStart.getDate()-7);
+  const lastWeekEnd=new Date(weekEnd);lastWeekEnd.setDate(weekEnd.getDate()-7);
+  const thisM=now.getMonth(),thisY=now.getFullYear();
+  const lastM=thisM===0?11:thisM-1,lastY=thisM===0?thisY-1:thisY;
+
+  let curRecs,prevRecs;
+  if(rankPeriod==='week'){
+    curRecs=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=weekStart&&rd<=weekEnd;});
+    prevRecs=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=lastWeekStart&&rd<=lastWeekEnd;});
+  }else{
+    curRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===thisY&&d.getMonth()===thisM;});
+    prevRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===lastY&&d.getMonth()===lastM;});
+  }
+  const curCounts={},prevCounts={};
+  curRecs.forEach(r=>{curCounts[r.content]=(curCounts[r.content]||0)+1;});
+  prevRecs.forEach(r=>{prevCounts[r.content]=(prevCounts[r.content]||0)+1;});
+  const entries=Object.entries(curCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const max=entries[0]?entries[0][1]:1;
+  const list=document.getElementById('rank-list');
+  if(!list)return;
+  if(entries.length===0){list.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;text-align:center">データがありません</div>';return;}
+  list.innerHTML=entries.map((e,i)=>{
+    const pct=Math.round(e[1]/max*100);
+    const color=CHART_COLORS[i]||CHART_COLORS[7];
+    const prev=prevCounts[e[0]]||0;
+    const delta=e[1]-prev;
+    let dStr='—',dCls='flat';
+    if(delta>0){dStr='▲+'+delta;dCls='up';}
+    else if(delta<0){dStr='▼'+delta;dCls='down';}
+    return `<div class="rank-row">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name">${e[0]}</div>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%;background:${color}"></div></div>
+      <div class="rank-count">${e[1]}</div>
+      <div class="rank-delta ${dCls}">${dStr}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTrend(){
+  const y=parseInt(document.getElementById('trend-year-select').value)||new Date().getFullYear();
+  const yearRecs=records.filter(r=>new Date(r.date+'T00:00:00').getFullYear()===y);
+  // 上位5種を集計
+  const totals={};yearRecs.forEach(r=>{totals[r.content]=(totals[r.content]||0)+1;});
+  const top5=Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
+  // 月別集計
+  const monthData=top5.map(name=>{
+    const data=new Array(12).fill(0);
+    yearRecs.filter(r=>r.content===name).forEach(r=>{const mo=parseInt(r.date.slice(5,7))-1;if(mo>=0&&mo<12)data[mo]++;});
+    return {name,data};
+  });
+  // 凡例
+  const legend=document.getElementById('trend-legend');
+  if(legend){
+    legend.innerHTML=top5.map((name,i)=>`<div class="tl-item"><div class="tl-dot" style="background:${CHART_COLORS[i]}"></div>${name.length>6?name.slice(0,6)+'…':name}</div>`).join('');
+  }
+  if(chartTrend)chartTrend.destroy();
+  const ctx=document.getElementById('chart-trend');
+  if(!ctx)return;
+  chartTrend=new Chart(ctx.getContext('2d'),{
+    type:'line',
+    data:{
+      labels:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      datasets:monthData.map((d,i)=>({
+        label:d.name,data:d.data,
+        borderColor:CHART_COLORS[i],backgroundColor:CHART_COLORS[i]+'18',
+        borderWidth:2,pointRadius:2,pointHoverRadius:4,tension:0.35,fill:false
+      }))
+    },
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:4}},
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}}},y:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}},beginAtZero:true}}}
+  });
+}
+
+function renderDonut(){
+  const counts={};records.forEach(r=>{counts[r.content]=(counts[r.content]||0)+1;});
+  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const top=entries.slice(0,5);
+  const otherSum=entries.slice(5).reduce((s,e)=>s+e[1],0);
+  if(otherSum>0)top.push(['その他',otherSum]);
+  const total=records.length;
+  document.getElementById('donut-total-label').textContent='全期間 '+total.toLocaleString()+'件';
+  const legend=document.getElementById('donut-legend');
+  if(legend){
+    legend.innerHTML=top.map((e,i)=>`<div class="dl-row">
+      <div class="dl-dot" style="background:${CHART_COLORS[i]||CHART_COLORS[7]}"></div>
+      <div class="dl-name">${e[0]}</div>
+      <div class="dl-pct">${Math.round(e[1]/total*100)}%</div>
+    </div>`).join('');
+  }
+  if(chartDonut)chartDonut.destroy();
+  const ctx=document.getElementById('chart-donut');if(!ctx)return;
+  chartDonut=new Chart(ctx.getContext('2d'),{
+    type:'doughnut',
+    data:{labels:top.map(e=>e[0]),datasets:[{data:top.map(e=>e[1]),backgroundColor:top.map((_,i)=>CHART_COLORS[i]||CHART_COLORS[7]),borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false}}}
+  });
 }
 function exportCSV(){
   if(records.length===0){showToast('記録がありません','error');return;}
