@@ -181,6 +181,18 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
 .rank-style-toggle { display:flex; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; margin-left:6px; }
 .rank-style-btn { padding:3px 7px; font-size:11px; color:var(--text3); background:none; border:none; cursor:pointer; line-height:1; font-family:'DM Mono',monospace; letter-spacing:0; }
 .rank-style-btn.active { background:var(--bg); color:var(--accent); }
+/* ── 期間スライダーUI ── */
+.line-range-ui { padding:8px 0 4px; display:none; }
+.line-range-ui.visible { display:block; }
+.line-range-labels { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.line-range-label { font-family:'DM Mono',monospace; font-size:11px; color:var(--accent); }
+.line-range-sep { font-size:10px; color:var(--text3); }
+.line-range-track { position:relative; height:28px; display:flex; align-items:center; }
+.line-range-track input[type=range] { position:absolute; width:100%; height:4px; -webkit-appearance:none; appearance:none; background:transparent; pointer-events:none; }
+.line-range-track input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); pointer-events:all; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.4); }
+.line-range-track input[type=range]::-webkit-slider-runnable-track { background:transparent; }
+.line-range-fill { position:absolute; height:4px; background:var(--accent); opacity:0.5; border-radius:2px; pointer-events:none; }
+.line-range-bg { position:absolute; width:100%; height:4px; background:var(--bg4); border-radius:2px; pointer-events:none; }
 #rank-chart-wrap { position:relative; width:100%; }
 /* ── 期間トグル ── */
 .period-toggle { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:2px; gap:2px; }
@@ -345,8 +357,10 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
         </div>
         <div id="rank-header-right" style="display:flex;align-items:center;gap:3px;flex-wrap:nowrap;">
           <div class="period-toggle" id="rank-period-toggle">
-            <button class="period-btn active" onclick="switchRankPeriod('week',this)">今週</button>
-            <button class="period-btn" onclick="switchRankPeriod('month',this)">今月</button>
+            <button class="period-btn active" id="rp-week" onclick="switchRankPeriod('week',this)">週</button>
+            <button class="period-btn" id="rp-month" onclick="switchRankPeriod('month',this)">月</button>
+            <button class="period-btn" id="rp-year" onclick="switchRankPeriod('year',this)">年</button>
+            <button class="period-btn" id="rp-all" onclick="switchRankPeriod('all',this)">累計</button>
           </div>
           <div class="rank-style-toggle">
             <button class="rank-style-btn active" id="rs-bar" onclick="switchRankStyle('bar')">bar</button>
@@ -359,6 +373,19 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
       <div class="rank-list" id="rank-list"></div>
       <!-- line -->
       <div id="rank-line-wrap" style="display:none;">
+        <div class="line-range-ui" id="line-range-ui">
+          <div class="line-range-labels">
+            <span class="line-range-label" id="line-range-from">—</span>
+            <span class="line-range-sep">〜</span>
+            <span class="line-range-label" id="line-range-to">—</span>
+          </div>
+          <div class="line-range-track">
+            <div class="line-range-bg"></div>
+            <div class="line-range-fill" id="line-range-fill"></div>
+            <input type="range" id="line-slider-from" min="0" max="100" value="0" oninput="onLineRangeInput()">
+            <input type="range" id="line-slider-to" min="0" max="100" value="100" oninput="onLineRangeInput()">
+          </div>
+        </div>
         <div style="position:relative;height:240px;margin-top:4px;"><canvas id="rank-line-chart"></canvas></div>
       </div>
       <!-- donut -->
@@ -607,6 +634,10 @@ const DIFF_RATE={1:1.0,2:1.5,3:3.0,4:4.0,5:6.0};
 let rankPeriod='week';
 let rankStyle='bar';
 let chartRank=null;
+let rankTotalMode=false; // 累計全期間モード
+let lineRangeMonths=[]; // 累計lineモード用の月リスト
+let lineRangeFrom=0;
+let lineRangeTo=0;
 let calY,calM,selectedWeek=null,selectedDay=null,boostMode=true;
 
 function renderStats(){
@@ -638,6 +669,7 @@ function onYearSelect(){
     calM=0;
   }
   selectedWeek=null;selectedDay=null;
+  rankTotalMode=false;rankPeriod='week';syncPeriodBtns();
   updateCalNav();
   renderKPI();
   renderYear();
@@ -814,6 +846,7 @@ function renderYear(){
         calY=parseInt(document.getElementById('year-select').value);
         calM=els[0].index;
         selectedWeek=null;selectedDay=null;
+        rankTotalMode=false;rankPeriod='week';syncPeriodBtns();
         updateCalNav();buildCalGrid();renderKPI();
         setRankCardMode('normal');renderRanking();
       }
@@ -823,10 +856,10 @@ function renderYear(){
 
 // ── 補正内容ランキング ──
 function onTotalCountTap(){
-  // 補正内容カードをdonutモードに切替して全期間データで描画
-  switchRankStyle('donut');
-  // カードまでスクロール
-  const el=document.getElementById('rank-donut-wrap');
+  // 累計ボタンをアクティブにして同じ動作
+  const btn=document.getElementById('rp-all');
+  if(btn) switchRankPeriod('all',btn);
+  const el=document.querySelector('.stat-card:nth-of-type(2)');
   if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
@@ -836,14 +869,24 @@ function switchRankStyle(style){
     const b=document.getElementById('rs-'+s);
     if(b) b.className='rank-style-btn'+(s===style?' active':'');
   });
-  renderRanking();
+  if(rankTotalMode) renderRanking(records,[],'累計 全期間');
+  else renderRanking();
+}
+
+function syncPeriodBtns(){
+  ['week','month','year','all'].forEach(p=>{
+    const b=document.getElementById('rp-'+p);
+    if(b) b.className='period-btn'+(p===rankPeriod?' active':'');
+  });
 }
 
 function switchRankPeriod(period,btn){
   rankPeriod=period;
+  rankTotalMode=(period==='all');
   document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  renderRanking();
+  if(rankTotalMode) renderRanking(records,[],'累計 全期間');
+  else renderRanking();
 }
 
 function setRankCardMode(mode,label){
@@ -880,17 +923,24 @@ function renderRanking(overrideRecs,overridePrev,lockLabel){
     const lastM=calM===0?11:calM-1,lastY=calM===0?calY-1:calY;
     if(rankPeriod==='week'){
       if(isCurrentView){
-        // 現在月表示時：今週 vs 先週
         curRecs=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=weekStart&&rd<=weekEnd;});
         prevRecs=records.filter(r=>{const rd=new Date(r.date+'T00:00:00');return rd>=lastWeekStart&&rd<=lastWeekEnd;});
       } else {
-        // 過去月表示時：その月全体 vs 前月
         curRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===calY&&d.getMonth()===calM;});
         prevRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===lastY&&d.getMonth()===lastM;});
       }
-    } else {
+    } else if(rankPeriod==='month'){
       curRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===calY&&d.getMonth()===calM;});
       prevRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===lastY&&d.getMonth()===lastM;});
+    } else if(rankPeriod==='year'){
+      curRecs=records.filter(r=>r.date&&r.date.startsWith(`${calY}-`));
+      const prevY2=calY-1;
+      prevRecs=records.filter(r=>r.date&&r.date.startsWith(`${prevY2}-`));
+      setRankCardMode('locked',`${calY}年`);
+    } else {
+      // all: 全期間
+      curRecs=records.slice();prevRecs=[];
+      setRankCardMode('locked','累計 全期間');
     }
   }
   const curC={},prevC={};
@@ -967,13 +1017,74 @@ function renderRanking(overrideRecs,overridePrev,lockLabel){
 let chartRankLine=null;
 function renderRankLine(filteredRecs,periodLabel){
   const y=calY||new Date().getFullYear();
-  // 全期間の上位5種を確定（並び順の基準として使用）
   const allC={};
   records.forEach(r=>{allC[r.content]=(allC[r.content]||0)+1;});
   const top5=Object.entries(allC).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
   const MONTHS=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   const TICK='rgba(180,170,150,0.5)';
-  // filteredRecs指定時：その期間の日別データをx軸に、指定なし時：月別推移
+
+  // 累計モード（filteredRecs=records全件 かつ rankTotalMode）: 月単位の全期間ビュー
+  const ui=document.getElementById('line-range-ui');
+  if(rankTotalMode&&(!filteredRecs||filteredRecs.length===records.length)){
+    // 全月リストを生成（データのある範囲）
+    const allDates=records.map(r=>r.date).filter(Boolean).sort();
+    if(allDates.length){
+      const first=allDates[0],last=allDates[allDates.length-1];
+      const fy=parseInt(first.slice(0,4)),fm=parseInt(first.slice(5,7))-1;
+      const ly=parseInt(last.slice(0,4)),lm=parseInt(last.slice(5,7))-1;
+      const months=[];
+      for(let y2=fy,m2=fm;;){
+        months.push({y:y2,m:m2,label:`${y2}/${m2+1}`});
+        if(y2===ly&&m2===lm)break;
+        m2++;if(m2>11){m2=0;y2++;}
+      }
+      lineRangeMonths=months;
+      // スライダー初期化（初回のみ）
+      const sfrom=document.getElementById('line-slider-from');
+      const sto=document.getElementById('line-slider-to');
+      if(sfrom&&sto){
+        const max=months.length-1;
+        sfrom.max=max;sto.max=max;
+        if(parseInt(sfrom.value)>max)sfrom.value=0;
+        if(parseInt(sto.value)>max||parseInt(sto.value)<parseInt(sfrom.value))sto.value=max;
+        lineRangeFrom=parseInt(sfrom.value);
+        lineRangeTo=parseInt(sto.value);
+        updateLineRangeUI();
+      }
+    }
+    if(ui)ui.classList.add('visible');
+    // スライダー範囲でフィルタして月集計
+    const fromM=lineRangeMonths[lineRangeFrom]||lineRangeMonths[0];
+    const toM=lineRangeMonths[lineRangeTo]||lineRangeMonths[lineRangeMonths.length-1];
+    const slicedMonths=lineRangeMonths.slice(lineRangeFrom,lineRangeTo+1);
+    const xLabels=slicedMonths.map(m=>m.label);
+    const datasets2=top5.map((name,i)=>{
+      const color=CHART_COLORS[i]||CHART_COLORS[7];
+      const data=slicedMonths.map(({y:y2,m:m2})=>
+        records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===y2&&d.getMonth()===m2&&r.content===name;}).length
+      );
+      if(data.every(v=>v===0))return null;
+      const ac=color+'b3';
+      return {label:name,data,borderColor:ac,backgroundColor:'transparent',borderWidth:0.8,pointBackgroundColor:ac,pointRadius:slicedMonths.length>24?1:2,pointHoverRadius:4,tension:0.25,fill:false};
+    }).filter(Boolean);
+    const canvas=document.getElementById('rank-line-chart');
+    if(chartRankLine){chartRankLine.destroy();chartRankLine=null;}
+    chartRankLine=new Chart(canvas,{
+      type:'line',
+      data:{labels:xLabels,datasets:datasets2},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'top',align:'start',labels:{color:'rgba(180,170,150,0.8)',font:{size:10},boxWidth:8,padding:8}}},
+        scales:{
+          x:{ticks:{color:TICK,font:{size:9},maxRotation:45,autoSkip:true,maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.05)'}},
+          y:{ticks:{color:TICK,font:{size:10}},grid:{color:'rgba(255,255,255,0.07)'},beginAtZero:true}
+        }
+      }
+    });
+    return;
+  }
+  if(ui)ui.classList.remove('visible');
+
   let datasets;
   if(filteredRecs){
     // 日付別集計（ユニーク日付をx軸に）
@@ -1015,6 +1126,35 @@ function renderRankLine(filteredRecs,periodLabel){
       }
     }
   });
+}
+
+function updateLineRangeUI(){
+  const sfrom=document.getElementById('line-slider-from');
+  const sto=document.getElementById('line-slider-to');
+  const fill=document.getElementById('line-range-fill');
+  if(!sfrom||!sto||!lineRangeMonths.length)return;
+  const max=lineRangeMonths.length-1;
+  const fromPct=lineRangeFrom/max*100;
+  const toPct=lineRangeTo/max*100;
+  if(fill){fill.style.left=fromPct+'%';fill.style.width=(toPct-fromPct)+'%';}
+  const fl=document.getElementById('line-range-from');
+  const tl=document.getElementById('line-range-to');
+  const fm=lineRangeMonths[lineRangeFrom],tm=lineRangeMonths[lineRangeTo];
+  if(fl&&fm)fl.textContent=`${fm.y}年${fm.m+1}月`;
+  if(tl&&tm)tl.textContent=`${tm.y}年${tm.m+1}月`;
+}
+
+function onLineRangeInput(){
+  const sfrom=document.getElementById('line-slider-from');
+  const sto=document.getElementById('line-slider-to');
+  if(!sfrom||!sto)return;
+  let f=parseInt(sfrom.value),t=parseInt(sto.value);
+  // 交差しないよう制約（最低1ヶ月の幅）
+  if(f>t-1){if(sfrom===document.activeElement)sfrom.value=t-1;else sto.value=f+1;}
+  lineRangeFrom=parseInt(sfrom.value);
+  lineRangeTo=parseInt(sto.value);
+  updateLineRangeUI();
+  renderRankLine(records,[],'累計 全期間');
 }
 
 // ── ドーナツ：累計構成比 ──
@@ -1074,6 +1214,7 @@ function shiftCalMonth(dir){
   if(calM<0){calM=11;calY--;}
   if(calM>11){calM=0;calY++;}
   selectedWeek=null;selectedDay=null;
+  rankTotalMode=false;rankPeriod='week';syncPeriodBtns();
   updateCalNav();buildCalGrid();renderKPI();
   setRankCardMode('normal');renderRanking();
   // 年セレクトを合わせる
