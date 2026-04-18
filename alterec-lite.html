@@ -178,9 +178,10 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
 .rank-delta.up { color:var(--green); }
 .rank-delta.down { color:var(--red); }
 .rank-delta.flat { color:var(--text3); }
-.rank-style-toggle { display:flex; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; margin-left:6px; }
-.rank-style-btn { padding:3px 7px; font-size:11px; color:var(--text3); background:none; border:none; cursor:pointer; line-height:1; font-family:'DM Mono',monospace; letter-spacing:0; }
-.rank-style-btn.active { background:var(--bg); color:var(--accent); }
+.rank-style-toggle { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:2px; gap:2px; }
+.rank-style-btn { padding:5px 10px; border-radius:4px; font-size:11px; color:var(--text3); cursor:pointer; border:none; background:none; font-family:'DM Mono',monospace; letter-spacing:0; }
+.rank-style-btn.active { background:var(--bg); color:var(--accent); font-weight:500; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+.rank-sel { background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--accent); font-family:'DM Mono',monospace; font-size:11px; font-weight:500; padding:5px 8px; appearance:none; -webkit-appearance:none; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
 /* ── 期間スライダーUI ── */
 .line-range-ui { padding:8px 0 4px; display:none; }
 .line-range-ui.visible { display:block; }
@@ -350,15 +351,12 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
     <!-- ③ 補正内容ランキング -->
     <!-- ③ 補正内容 -->
     <div class="stat-card" style="margin-bottom:14px;">
-      <div class="stat-section-head">
-        <div>
-          <div class="stat-section-title">補正内容</div>
-          <div id="rank-period-label" style="font-size:11px;color:var(--accent);margin-top:3px;display:none;"></div>
-        </div>
-        <div id="rank-header-right" style="display:flex;align-items:center;gap:3px;flex-wrap:nowrap;">
+      <!-- 1行目：タイトル | 期間ボタン + グラフ切替 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="stat-section-title">補正内容</div>
+        <div style="display:flex;align-items:center;gap:5px;">
           <div class="period-toggle" id="rank-period-toggle">
-            <button class="period-btn active" id="rp-week" onclick="switchRankPeriod('week',this)">週</button>
-            <button class="period-btn" id="rp-month" onclick="switchRankPeriod('month',this)">月</button>
+            <button class="period-btn active" id="rp-month" onclick="switchRankPeriod('month',this)">月</button>
             <button class="period-btn" id="rp-year" onclick="switchRankPeriod('year',this)">年</button>
             <button class="period-btn" id="rp-all" onclick="switchRankPeriod('all',this)">累計</button>
           </div>
@@ -368,6 +366,17 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--
             <button class="rank-style-btn" id="rs-donut" onclick="switchRankStyle('donut')">pie</button>
           </div>
         </div>
+      </div>
+      <!-- 2行目：セレクト（月/年モード時のみ表示） -->
+      <div id="rank-sel-row" style="display:none;align-items:center;gap:5px;margin-bottom:8px;">
+        <select id="rank-sel-year" class="rank-sel" style="display:none;" onchange="onRankSelChange()"></select>
+        <select id="rank-sel-month" class="rank-sel" style="display:none;" onchange="onRankSelChange()">
+          <option value="0">1月</option><option value="1">2月</option><option value="2">3月</option>
+          <option value="3">4月</option><option value="4">5月</option><option value="5">6月</option>
+          <option value="6">7月</option><option value="7">8月</option><option value="8">9月</option>
+          <option value="9">10月</option><option value="10">11月</option><option value="11">12月</option>
+        </select>
+        <span id="rank-period-label" style="font-size:11px;color:var(--accent);display:none;"></span>
       </div>
       <!-- bar -->
       <div class="rank-list" id="rank-list"></div>
@@ -631,10 +640,12 @@ let chartYear=null;
 const CHART_COLORS=['#c8a96e','#5c9ce0','#5cc896','#e05c5c','#a85ce0','#e0a85c','#5ce0c8','#9a9da4'];
 const GRID='#2e3035',TICK='#5c5f66';
 const DIFF_RATE={1:1.0,2:1.5,3:3.0,4:4.0,5:6.0};
-let rankPeriod='week';
+let rankPeriod='month';
 let rankStyle='bar';
 let chartRank=null;
 let rankTotalMode=false; // 累計全期間モード
+let rankSelY=null; // 月・年モード用選択年
+let rankSelM=null; // 月モード用選択月
 let lineRangeMonths=[]; // 累計lineモード用の月リスト
 let lineRangeFrom=0;
 let lineRangeTo=0;
@@ -647,6 +658,7 @@ function renderStats(){
   updateCalNav();
   renderKPI();
   renderYear();
+  updateRankSelUI();
   renderRanking();
   buildCalGrid();
 }
@@ -669,11 +681,11 @@ function onYearSelect(){
     calM=0;
   }
   selectedWeek=null;selectedDay=null;
-  rankTotalMode=false;rankPeriod='week';syncPeriodBtns();
+  rankTotalMode=false;rankPeriod='month';syncPeriodBtns();
   updateCalNav();
   renderKPI();
   renderYear();
-  setRankCardMode('normal');renderRanking();
+  updateRankSelUI(true);setRankCardMode('normal');renderRanking();
   buildCalGrid();
 }
 
@@ -846,7 +858,7 @@ function renderYear(){
         calY=parseInt(document.getElementById('year-select').value);
         calM=els[0].index;
         selectedWeek=null;selectedDay=null;
-        rankTotalMode=false;rankPeriod='week';syncPeriodBtns();
+        rankTotalMode=false;rankPeriod='month';syncPeriodBtns();
         updateCalNav();buildCalGrid();renderKPI();
         setRankCardMode('normal');renderRanking();
       }
@@ -874,7 +886,7 @@ function switchRankStyle(style){
 }
 
 function syncPeriodBtns(){
-  ['week','month','year','all'].forEach(p=>{
+  ['month','year','all'].forEach(p=>{
     const b=document.getElementById('rp-'+p);
     if(b) b.className='period-btn'+(p===rankPeriod?' active':'');
   });
@@ -885,17 +897,85 @@ function switchRankPeriod(period,btn){
   rankTotalMode=(period==='all');
   document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  updateRankSelUI();
   if(rankTotalMode) renderRanking(records,[],'累計 全期間');
   else renderRanking();
+}
+
+function updateRankSelUI(syncFromCal){
+  const ySel=document.getElementById('rank-sel-year');
+  const mSel=document.getElementById('rank-sel-month');
+  if(!ySel||!mSel)return;
+  const selRow=document.getElementById('rank-sel-row');
+  if(rankPeriod==='month'||rankPeriod==='year'){
+    if(selRow)selRow.style.display='flex';
+    // 年セレクト生成
+    const years=new Set([new Date().getFullYear()]);
+    records.forEach(r=>{if(r.date)years.add(parseInt(r.date.slice(0,4)));});
+    const sorted=[...years].sort((a,b)=>b-a);
+    // カレンダー連動時 or 初期化時はcalYを使用
+    const curY=syncFromCal?calY:(rankSelY||calY||new Date().getFullYear());
+    ySel.innerHTML=sorted.map(y=>`<option value="${y}"${y===curY?' selected':''}>${y}年</option>`).join('');
+    ySel.style.display='';
+    rankSelY=parseInt(ySel.value);
+    if(rankPeriod==='month'){
+      mSel.style.display='';
+      const curM=syncFromCal?calM:(rankSelM!==null?rankSelM:calM);
+      mSel.value=String(curM);
+      rankSelM=parseInt(mSel.value);
+    } else {
+      mSel.style.display='none';
+      rankSelM=null;
+    }
+  } else {
+    ySel.style.display='none';
+    mSel.style.display='none';
+    if(selRow)selRow.style.display='none';
+  }
+}
+
+function onRankSelChange(){
+  const ySel=document.getElementById('rank-sel-year');
+  const mSel=document.getElementById('rank-sel-month');
+  if(ySel) rankSelY=parseInt(ySel.value);
+  if(mSel&&rankPeriod==='month') rankSelM=parseInt(mSel.value);
+
+  // カレンダーに逆同期
+  if(rankPeriod==='month'&&rankSelY!=null&&rankSelM!=null){
+    calY=rankSelY; calM=rankSelM;
+  } else if(rankPeriod==='year'&&rankSelY!=null){
+    calY=rankSelY;
+    // 年モード：その年のデータがある最新月にジャンプ
+    const yDates=records.filter(r=>r.date&&r.date.startsWith(`${rankSelY}-`)).map(r=>parseInt(r.date.slice(5,7))-1);
+    const now=new Date();
+    const maxAvail=rankSelY===now.getFullYear()?now.getMonth():11;
+    calM=yDates.length>0?Math.min(Math.max(...yDates),maxAvail):maxAvail;
+  }
+  selectedWeek=null; selectedDay=null;
+  updateCalNav(); buildCalGrid(); renderKPI();
+  // 年間グラフの年セレクトも同期
+  const mainSel=document.getElementById('year-select');
+  if(mainSel&&parseInt(mainSel.value)!==calY){mainSel.value=String(calY);renderYear();}
+
+  renderRanking();
 }
 
 function setRankCardMode(mode,label){
   const periodToggle=document.getElementById('rank-period-toggle');
   const pLabel=document.getElementById('rank-period-label');
+  const ySel=document.getElementById('rank-sel-year');
+  const mSel=document.getElementById('rank-sel-month');
   if(!pLabel)return;
   if(mode==='locked'){
     if(periodToggle)periodToggle.style.display='none';
-    pLabel.textContent=label;pLabel.style.display='block';
+    // month/yearモードはセレクト自体がラベルなのでtextラベルは使わない
+    if(rankPeriod==='month'||rankPeriod==='year'){
+      pLabel.style.display='none';
+    } else {
+      if(ySel)ySel.style.display='none';
+      if(mSel)mSel.style.display='none';
+      pLabel.textContent=label;pLabel.style.display='inline';
+    }
   } else {
     if(periodToggle)periodToggle.style.display='';
     pLabel.style.display='none';
@@ -910,10 +990,10 @@ function renderRanking(overrideRecs,overridePrev,lockLabel){
     setRankCardMode('locked',lockLabel||'');
   } else {
     const isCurrentView=(calY===now.getFullYear()&&calM===now.getMonth());
-    if(isCurrentView){
-      setRankCardMode('normal');
-    } else {
-      setRankCardMode('locked',`${calY}年${calM+1}月`);
+    // month/yearモードはセレクトUIで制御するのでlockedラベルはsetRankCardMode内で設定
+    if(rankPeriod!=='month'&&rankPeriod!=='year'){
+      if(isCurrentView) setRankCardMode('normal');
+      else setRankCardMode('locked',`${calY}年${calM+1}月`);
     }
     const dow=(now.getDay()+6)%7;
     const weekStart=new Date(now);weekStart.setDate(now.getDate()-dow);
@@ -930,13 +1010,16 @@ function renderRanking(overrideRecs,overridePrev,lockLabel){
         prevRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===lastY&&d.getMonth()===lastM;});
       }
     } else if(rankPeriod==='month'){
-      curRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===calY&&d.getMonth()===calM;});
-      prevRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===lastY&&d.getMonth()===lastM;});
+      const sy=rankSelY||calY,sm=rankSelM!==null?rankSelM:calM;
+      const pm=sm===0?11:sm-1,py=sm===0?sy-1:sy;
+      curRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===sy&&d.getMonth()===sm;});
+      prevRecs=records.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getFullYear()===py&&d.getMonth()===pm;});
+      setRankCardMode('locked',`${sy}年${sm+1}月`);
     } else if(rankPeriod==='year'){
-      curRecs=records.filter(r=>r.date&&r.date.startsWith(`${calY}-`));
-      const prevY2=calY-1;
-      prevRecs=records.filter(r=>r.date&&r.date.startsWith(`${prevY2}-`));
-      setRankCardMode('locked',`${calY}年`);
+      const sy2=rankSelY||calY;
+      curRecs=records.filter(r=>r.date&&r.date.startsWith(`${sy2}-`));
+      prevRecs=records.filter(r=>r.date&&r.date.startsWith(`${sy2-1}-`));
+      setRankCardMode('locked',`${sy2}年`);
     } else {
       // all: 全期間
       curRecs=records.slice();prevRecs=[];
@@ -977,9 +1060,21 @@ function renderRanking(overrideRecs,overridePrev,lockLabel){
     if(periodToggle)periodToggle.style.display='';
     if(chartRankLine){chartRankLine.destroy();chartRankLine=null;}
     if(chartRankDonut){chartRankDonut.destroy();chartRankDonut=null;}
+    const totalAll=vals.reduce((a,b)=>a+b,0);
     list.innerHTML=entries.map((e,i)=>{
       const pct=Math.round(e[1]/max*100);
       const color=colors[i];
+      if(rankTotalMode){
+        // 累計モード：比率(%)を表示
+        const share=totalAll>0?Math.round(e[1]/totalAll*100):0;
+        return `<div class="rank-row">
+          <div class="rank-num">${i+1}</div>
+          <div class="rank-name">${e[0]}</div>
+          <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%;background:${color}"></div></div>
+          <div class="rank-count">${e[1]}</div>
+          <div class="rank-delta" style="color:var(--text3);">${share}%</div>
+        </div>`;
+      }
       const prev=prevC[e[0]]||0;
       const delta=e[1]-prev;
       const dStr=delta>0?'▲+'+delta:delta<0?'▼'+delta:'—';
@@ -1214,9 +1309,9 @@ function shiftCalMonth(dir){
   if(calM<0){calM=11;calY--;}
   if(calM>11){calM=0;calY++;}
   selectedWeek=null;selectedDay=null;
-  rankTotalMode=false;rankPeriod='week';syncPeriodBtns();
+  rankTotalMode=false;rankPeriod='month';syncPeriodBtns();
   updateCalNav();buildCalGrid();renderKPI();
-  setRankCardMode('normal');renderRanking();
+  updateRankSelUI(true);setRankCardMode('normal');renderRanking();
   // 年セレクトを合わせる
   const sel=document.getElementById('year-select');
   if(sel&&parseInt(sel.value)!==calY){sel.value=String(calY);renderYear();}
