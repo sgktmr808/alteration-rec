@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Chord Link</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0d10;--surf:#141418;--surf2:#1c1c22;
+  --bdr:rgba(255,255,255,0.07);--bdr2:rgba(255,255,255,0.13);
+  --acc:#e8c547;--text:#e8e8ec;--dim:#62626e;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--bg);color:var(--text);}
+body{font-family:'Noto Sans JP',sans-serif;display:flex;flex-direction:column;
+  padding:calc(var(--safe-t)+0px) 0 calc(var(--safe-b)+0px);}
+
+.hdr{padding:32px 24px 20px;border-bottom:1px solid var(--bdr);}
+.hdr-title{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;
+  color:var(--acc);letter-spacing:.1em;}
+.hdr-sub{font-size:11px;color:var(--dim);margin-top:5px;letter-spacing:.05em;}
+
+.cards{padding:20px 16px;display:flex;flex-direction:column;gap:12px;flex:1;}
+
+.card{display:flex;align-items:center;gap:16px;
+  background:var(--surf);border:1px solid var(--bdr2);border-radius:8px;
+  padding:18px 18px;text-decoration:none;color:inherit;
+  transition:border-color .15s,background .15s;}
+.card:active{background:var(--surf2);border-color:var(--acc);}
+
+.card-icon{font-size:28px;flex-shrink:0;width:44px;text-align:center;}
+.card-body{flex:1;}
+.card-title{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;
+  color:var(--text);letter-spacing:.06em;margin-bottom:4px;}
+.card-desc{font-size:11px;color:var(--dim);line-height:1.5;}
+.card-arr{font-size:18px;color:var(--dim);flex-shrink:0;}
+
+.footer{padding:16px 24px;border-top:1px solid var(--bdr);}
+.footer-txt{font-family:'DM Mono',monospace;font-size:9px;
+  color:var(--dim);letter-spacing:.1em;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-title">CHORD LINK</div>
+  <div class="hdr-sub">Guitar chord reference tools</div>
+</div>
+
+<div class="cards">
+
+  <a class="card" href="chord-ref.html">
+    <div class="card-icon">🎸</div>
+    <div class="card-body">
+      <div class="card-title">CHORD REF</div>
+      <div class="card-desc">コードフォーム辞典。12ルート×25タイプ、DB＋アルゴリズム生成で最大16ポジション。度数・フレット番号表示。</div>
+    </div>
+    <div class="card-arr">›</div>
+  </a>
+
+  <a class="card" href="chord-map.html">
+    <div class="card-icon">🗺</div>
+    <div class="card-body">
+      <div class="card-title">CHORD MAP</div>
+      <div class="card-desc">コード進行マップ。選択コードを中心に関連コードをサークル表示。ダイアトニック・5度圏・モーダル等6カテゴリ。フレットポジション連動。</div>
+    </div>
+    <div class="card-arr">›</div>
+  </a>
+
+</div>
+
+<div class="footer">
+  <div class="footer-txt">CHORD LINK — sgktmr808</div>
+</div>
+
+</body>
+</html>
