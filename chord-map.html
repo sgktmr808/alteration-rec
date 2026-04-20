@@ -1482,6 +1482,16 @@ let lastTap={idx:-1,t:0};
 let rafId=null;
 let dirty=true; // needs redraw
 
+// ── COSMIC FX ──
+const FX={
+  particles:[],    // [{x,y,vx,vy,life,col}]
+  trail:[],        // [{x,y,t}]
+  pulses:[],       // [{x,y,r,maxR,life,col}] — center ripples
+  wobbleTick:0,    // for node position wobble
+  swipeLastHit:null,
+  swipeAccum:0,
+};
+
 function getL(){
   const wrap=document.getElementById('map-wrap');
   const dpr=window.devicePixelRatio||1;
@@ -1506,6 +1516,82 @@ function invalidate(){dirty=true;}
 // ═══════════════════════
 // CANVAS DRAW (60fps RAF loop)
 // ═══════════════════════
+// ═══════════════════════
+// COSMIC FX FUNCTIONS
+// ═══════════════════════
+function fxSpawnParticles(x,y,col){
+  const count=8;
+  for(let i=0;i<count;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=1.0+Math.random()*2.5;
+    FX.particles.push({
+      x,y,
+      vx:Math.cos(angle)*speed,
+      vy:Math.sin(angle)*speed,
+      life:1.0,
+      decay:0.022+Math.random()*0.018,
+      col,
+      r:1.5+Math.random()*2.0,
+    });
+  }
+}
+
+function fxSpawnPulse(x,y,col){
+  FX.pulses.push({x,y,r:20,maxR:65,life:1.0,decay:0.035,col});
+}
+
+function fxAddTrail(x,y){
+  FX.trail.push({x,y,t:Date.now()});
+  if(FX.trail.length>80)FX.trail.shift();
+}
+
+function fxDrawAndUpdate(ctx){
+  const now=Date.now();
+
+  // ── Trail ──
+  for(let i=1;i<FX.trail.length;i++){
+    const a=FX.trail[i-1],b=FX.trail[i];
+    const age=(now-b.t)/550;
+    const alpha=Math.max(0,0.32*(1-age));
+    if(alpha<=0)continue;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle=`rgba(136,200,255,${alpha})`;
+    ctx.lineWidth=1.5;ctx.stroke();
+  }
+  // Remove old trail points
+  const cutoff=now-600;
+  while(FX.trail.length&&FX.trail[0].t<cutoff)FX.trail.shift();
+
+  // ── Pulses (ripples from center/node) ──
+  for(let i=FX.pulses.length-1;i>=0;i--){
+    const p=FX.pulses[i];
+    p.r+=(p.maxR-p.r)*0.12;
+    p.life-=p.decay;
+    if(p.life<=0){FX.pulses.splice(i,1);continue;}
+    const[rr,gg,bb]=parseHex(p.col||'#e8c547');
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${rr},${gg},${bb},${p.life*0.45})`;
+    ctx.lineWidth=1.2;ctx.stroke();
+  }
+
+  // ── Particles ──
+  for(let i=FX.particles.length-1;i>=0;i--){
+    const p=FX.particles[i];
+    p.x+=p.vx;p.y+=p.vy;
+    p.vy+=0.06; // gravity
+    p.vx*=0.97;
+    p.life-=p.decay;
+    if(p.life<=0){FX.particles.splice(i,1);continue;}
+    const[rr,gg,bb]=parseHex(p.col||'#e8c547');
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${rr},${gg},${bb},${p.life*0.9})`;
+    ctx.fill();
+  }
+
+  // Keep dirty while FX active
+  if(FX.particles.length||FX.pulses.length||FX.trail.length)dirty=true;
+}
+
 function drawFrame(){
   rafId=requestAnimationFrame(drawFrame);
   // Always tick slider easing — keeps animation alive even when dirty=false
@@ -1568,7 +1654,13 @@ function drawFrame(){
     const frac=idx/Math.max(cnt-1,1);
     const pull=node.mb/40;
     const r=mr+(MR-mr)*(0.15+frac*0.85)*(1-pull*0.25);
-    const tx=cx+r*Math.cos(angle),ty=cy+r*Math.sin(angle);
+    // Wobble: ±1.5px organic drift per node
+    FX.wobbleTick+=0.00015;
+    const wSeed=ri2*1.7+idx*0.9;
+    const wx=Math.sin(FX.wobbleTick*55+wSeed)*1.5;
+    const wy=Math.cos(FX.wobbleTick*43+wSeed*1.3)*1.2;
+    const tx=cx+r*Math.cos(angle)+wx,ty=cy+r*Math.sin(angle)+wy;
+    dirty=true; // wobble keeps RAF active
     if(node.dx===undefined){node.dx=tx;node.dy=ty;}
     else{node.dx+=(tx-node.dx)*EASE;node.dy+=(ty-node.dy)*EASE;}
     const x=node.dx,y=node.dy;
@@ -1753,6 +1845,9 @@ function drawFrame(){
   }
   // ── AUTO PLAY overlay (always on top) ──
   drawAutoOverlay(ctx);
+
+  // ── COSMIC FX (topmost) ──
+  fxDrawAndUpdate(ctx);
 }
 
 function deg2r(d){return(d-90)*Math.PI/180;}
@@ -1784,6 +1879,8 @@ function initCanvas(){
 
   canvas.addEventListener('pointerdown',e=>{
     const{x,y}=canvasXY(e);
+    fxAddTrail(x,y);
+    FX.swipeAccum=0;FX.swipeLastHit=null;
     const dist=distFromCenter(x,y);
     const angle=angleFromCenter(x,y);
 
@@ -1819,16 +1916,31 @@ function initCanvas(){
   });
 
   canvas.addEventListener('pointermove',e=>{
-    if(!drag)return;
-    e.preventDefault();
     const{x,y}=canvasXY(e);
+    fxAddTrail(x,y);invalidate();
+
+    if(!drag){
+      // スワイプ連続発音
+      const dx=x-(FX.swipeLastHit?FX.swipeLastHit.x||0:x);
+      const dy=y-(FX.swipeLastHit?FX.swipeLastHit.y||0:y);
+      FX.swipeAccum+=Math.sqrt(dx*dx+dy*dy);
+      if(FX.swipeAccum>28){
+        FX.swipeAccum=0;
+        const hit=hitNode(x,y);
+        if(hit&&hit!==FX.swipeLastHit){
+          FX.swipeLastHit=hit;
+          if(MAP_MODE==='radial')moveToChord(hit.root,hit.type);
+          else if(MAP_MODE==='link')toggleLinkSelect(hit.root,hit.type);
+        }
+      }
+      return;
+    }
+    e.preventDefault();
     const angle=angleFromCenter(x,y);
     let delta=angle-drag.startAngle;
     if(delta>180)delta-=360;if(delta<-180)delta+=360;
-    // Continuous value during drag (no quantization), snap to 0 only near center
     const nv=Math.max(-1,Math.min(1,drag.startVal+delta/ARC_HALF));
     SL[drag.idx].val=Math.abs(nv)<0.04?0:nv;
-    // Throttle relCache reset: only rebuild score every ~80ms during drag
     const now=Date.now();
     if(!drag.lastRel||now-drag.lastRel>80){relCache=null;drag.lastRel=now;}
     invalidate();
@@ -2392,6 +2504,12 @@ function drawAutoOverlay(ctx){
 }
 
 function moveToChord(root,type){
+  // FX: パーティクルとパルスをトリガー
+  const hitN=nodeHits.find(n=>n.root===root&&n.type===type);
+  const fx_x=hitN?hitN.x:L.cx, fx_y=hitN?hitN.y:L.cy;
+  const fx_col=getRHEX()[relCache?.find(n=>n.root===root&&n.type===type)?.rtype]||'#e8c547';
+  fxSpawnParticles(fx_x,fx_y,fx_col);
+  fxSpawnPulse(L.cx,L.cy,'#e8c547');
   // コード変更時はボイシングをリセット → renderPosZone後に最高評価を自動選択
   S.voicing=null;
   S.root=root;S.type=type;
