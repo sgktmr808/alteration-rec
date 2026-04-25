@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Swipe Test v2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;touch-action:manipulation;}
+html,body{height:100%;overflow:hidden;background:#0d0d10;color:#e8e8ec;
+  font-family:'DM Mono',monospace;}
+
+.app-shell{width:100%;height:100%;overflow:hidden;position:relative;}
+
+/* slide-containerは高さ200%、transformで位置制御 */
+.slide-container{
+  width:100%;height:200%;
+  display:flex;flex-direction:column;
+  /* transitionはJS制御（指追従中はなし、離したときだけ付ける） */
+  will-change:transform;
+}
+
+.screen-map{
+  flex:0 0 50%;
+  position:relative;background:#0d0d10;
+  display:flex;align-items:center;justify-content:center;
+}
+.circle-mock{
+  width:240px;height:240px;border-radius:50%;
+  border:1px solid rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+.chord-node{
+  width:52px;height:52px;border-radius:50%;
+  background:#e8c547;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:500;color:#111;
+}
+.node-small{
+  position:absolute;width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:#fff;
+}
+
+/* インジケーター：スワイプ量に応じてopacity変化 */
+.swipe-hint{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  pointer-events:none;transition:opacity .2s;
+}
+.swipe-hint-bar{
+  width:36px;height:3px;border-radius:2px;
+  background:rgba(255,255,255,0.35);
+}
+.swipe-hint-label{font-size:8px;letter-spacing:.1em;color:rgba(255,255,255,0.35);}
+
+.screen-ctrl{
+  flex:0 0 50%;overflow-y:auto;
+  background:#0d0d10;display:flex;flex-direction:column;
+}
+.back-handle{
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  padding:7px 0;background:#141418;border-bottom:1px solid rgba(255,255,255,0.07);
+  cursor:pointer;
+}
+.back-handle-bar{
+  width:36px;height:3px;border-radius:2px;background:rgba(232,197,71,0.5);
+}
+.ctrl-section{
+  flex-shrink:0;padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.07);
+}
+.ctrl-label{font-size:8px;letter-spacing:.12em;color:#62626e;text-transform:uppercase;margin-bottom:8px;}
+.voicing-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
+.voicing-row::-webkit-scrollbar{display:none;}
+.voicing-card{
+  flex-shrink:0;width:90px;height:80px;
+  border:1px solid rgba(255,255,255,0.13);border-radius:6px;
+  background:#141418;display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:#62626e;text-align:center;line-height:1.6;
+}
+.voicing-card.sel{border-color:#e8c547;color:#e8c547;}
+.path-row{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;}
+.path-row::-webkit-scrollbar{display:none;}
+.path-chip{flex-shrink:0;font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,0.13);border-radius:3px;color:#62626e;}
+.path-chip.cur{border-color:#e8c547;color:#e8c547;background:rgba(232,197,71,0.08);}
+.ctrl-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.ctrl-btn{font-size:9px;padding:4px 10px;border:1px solid rgba(255,255,255,0.13);border-radius:3px;color:#62626e;background:#141418;cursor:pointer;}
+.ctrl-btn.on{border-color:#e8c547;color:#e8c547;background:rgba(232,197,71,0.08);}
+.bpm-row{display:flex;align-items:center;gap:8px;}
+.bpm-slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:rgba(255,255,255,0.13);accent-color:#e8c547;}
+.bpm-val{font-size:9px;color:#e8c547;width:24px;}
+</style>
+</head>
+<body>
+<div class="app-shell" id="app">
+  <div class="slide-container" id="slider">
+
+    <div class="screen-map" id="screen-map">
+      <div class="circle-mock">
+        <div class="chord-node">Am9</div>
+        <div class="node-small" style="background:#4aaa72;top:20px;right:30px;">Em7</div>
+        <div class="node-small" style="background:#4aaa72;bottom:30px;left:20px;">Dm9</div>
+        <div class="node-small" style="background:#4a90d4;top:40px;left:10px;">C</div>
+        <div class="node-small" style="background:#4a90d4;bottom:20px;right:20px;">G7</div>
+      </div>
+      <div class="swipe-hint" id="swipe-hint">
+        <div class="swipe-hint-bar"></div>
+        <div class="swipe-hint-label">↑ SWIPE</div>
+      </div>
+    </div>
+
+    <div class="screen-ctrl" id="screen-ctrl">
+      <div class="back-handle" id="back-handle">
+        <div class="back-handle-bar"></div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-label">VOICINGS</div>
+        <div class="voicing-row">
+          <div class="voicing-card sel">OPEN<br>3-5fr</div>
+          <div class="voicing-card">BARRE<br>5fr</div>
+          <div class="voicing-card">BARRE<br>7fr</div>
+          <div class="voicing-card">BARRE<br>12fr</div>
+        </div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-label">PATH</div>
+        <div class="path-row">
+          <span class="path-chip cur">Am9</span>
+          <span style="color:#62626e;font-size:10px;">›</span>
+          <span class="path-chip">Dm9</span>
+          <span style="color:#62626e;font-size:10px;">›</span>
+          <span class="path-chip">G7</span>
+        </div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-label">REC / MIDI</div>
+        <div class="ctrl-btns">
+          <div class="ctrl-btn">● REC</div>
+          <div class="ctrl-btn">↓ MIDI</div>
+        </div>
+        <div style="font-size:8px;color:#62626e;">MIDI off — tap REC to capture chords</div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-label">AUTO</div>
+        <div class="ctrl-btns">
+          <div class="ctrl-btn">▶ AUTO</div>
+          <div class="ctrl-btn on">FREE</div>
+          <div class="ctrl-btn">— PHRASE</div>
+          <div class="ctrl-btn">CRYSTAL</div>
+          <div class="ctrl-btn on">SYNTH</div>
+        </div>
+        <div class="bpm-row">
+          <span style="font-size:8px;color:#62626e;">BPM</span>
+          <input type="range" class="bpm-slider" min="40" max="180" value="72">
+          <span class="bpm-val">72</span>
+        </div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-label">SECTORS ▾</div>
+        <div class="ctrl-btns">
+          <div class="ctrl-btn on">THEORY</div>
+          <div class="ctrl-btn">JAZZ</div>
+          <div class="ctrl-btn">POP</div>
+          <div class="ctrl-btn">BLUES</div>
+          <div class="ctrl-btn">MODAL</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  const slider    = document.getElementById('slider');
+  const screenMap = document.getElementById('screen-map');
+  const screenCtrl= document.getElementById('screen-ctrl');
+  const backHandle= document.getElementById('back-handle');
+  const hint      = document.getElementById('swipe-hint');
+
+  // 状態
+  let isCtrl   = false;   // 現在の確定状態
+  let pxOffset = 0;       // 現在のtranslateY px（0=マップ, -screenH=コントロール）
+  let screenH  = window.innerHeight;
+
+  // スワイプ追従用
+  let tsY=0, tsX=0;
+  let dragging=false;
+  let dragStartOffset=0;
+  let dirLocked=false;   // 方向確定フラグ
+  let isVertical=false;
+
+  window.addEventListener('resize',()=>{ screenH=window.innerHeight; snap(isCtrl,false); });
+
+  /* ── transform適用 ── */
+  function applyTransform(px, animated){
+    if(animated){
+      slider.style.transition='transform .32s cubic-bezier(.4,0,.2,1)';
+    } else {
+      slider.style.transition='none';
+    }
+    slider.style.transform=`translateY(${px}px)`;
+    pxOffset=px;
+
+    // ヒント透明度：マップ→コントロール方向の進捗に応じてフェード
+    const progress = Math.min(1, Math.abs(px)/screenH);
+    hint.style.opacity = String(1-progress*2);
+  }
+
+  /* ── スナップ（確定） ── */
+  function snap(toCtrl, animated=true){
+    isCtrl=toCtrl;
+    const target = toCtrl ? -screenH : 0;
+    applyTransform(target, animated);
+  }
+
+  /* ── ドラッグ中のリアルタイム追従 ── */
+  function onDragMove(rawDy){
+    // 現在の確定位置からの相対移動量
+    let next = dragStartOffset + rawDy;
+    // 上限・下限にバネ抵抗を加える（オーバーシュートを減衰）
+    const min = -screenH;
+    const max = 0;
+    if(next > max)      next = max + (next-max)*0.25;
+    else if(next < min) next = min + (next-min)*0.25;
+    applyTransform(next, false);
+  }
+
+  /* ── タッチ開始 ── */
+  function onStart(e){
+    tsY = e.touches[0].clientY;
+    tsX = e.touches[0].clientX;
+    dragStartOffset = pxOffset;
+    dragging  = false;
+    dirLocked = false;
+    isVertical= false;
+    // アニメーション中断
+    slider.style.transition='none';
+  }
+
+  /* ── タッチ移動 ── */
+  function onMove(e){
+    const dy = e.touches[0].clientY - tsY;
+    const dx = e.touches[0].clientX - tsX;
+
+    // 方向確定（最初の8px移動で縦か横かを判定）
+    if(!dirLocked && (Math.abs(dy)>8 || Math.abs(dx)>8)){
+      dirLocked=true;
+      isVertical = Math.abs(dy) > Math.abs(dx)*1.2;
+    }
+    if(!dirLocked || !isVertical) return;
+
+    dragging=true;
+    onDragMove(dy);
+  }
+
+  /* ── タッチ終了 ── */
+  function onEnd(e){
+    if(!dragging){ dirLocked=false; return; }
+    const dy    = e.changedTouches[0].clientY - tsY;
+    const vel   = dy; // 単純に移動量で判定（velocityの近似）
+    const half  = screenH * 0.35; // 35%を超えたら確定
+
+    if(!isCtrl){
+      // マップ→コントロール：上スワイプ（dyがマイナス）
+      snap(dy < -half || vel < -80);
+    } else {
+      // コントロール→マップ：下スワイプ（dyがプラス）
+      snap(!(dy > half || vel > 80));
+    }
+    dragging=false; dirLocked=false;
+  }
+
+  /* ── イベント登録 ── */
+  // マップ画面
+  screenMap.addEventListener('touchstart', onStart, {passive:true});
+  screenMap.addEventListener('touchmove',  onMove,  {passive:true});
+  screenMap.addEventListener('touchend',   onEnd,   {passive:true});
+
+  // コントロール画面（スクロール最上部のみ下スワイプを受け付ける）
+  screenCtrl.addEventListener('touchstart', e=>{
+    if(screenCtrl.scrollTop>2) return;
+    onStart(e);
+  }, {passive:true});
+  screenCtrl.addEventListener('touchmove', e=>{
+    if(!dirLocked && screenCtrl.scrollTop>2){ return; }
+    if(dirLocked && !isVertical) return;
+    onMove(e);
+  }, {passive:true});
+  screenCtrl.addEventListener('touchend', onEnd, {passive:true});
+
+  // 戻るハンドルタップ
+  backHandle.addEventListener('click', ()=>snap(false));
+
+  // 初期状態
+  snap(false, false);
+})();
+</script>
+</body>
+</html>
