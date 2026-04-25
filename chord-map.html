@@ -31,8 +31,8 @@
   --diag-str-h:13px;   /* 弦間隔 */
   --diag-node-r:5px;   /* ノード半径 */
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;touch-action:manipulation;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+html,body{height:100%;overflow:hidden;}
 body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
 .hdr{flex-shrink:0;background:var(--surf);border-bottom:1px solid var(--bdr);
   padding:calc(var(--safe-t)+10px) 14px 10px;display:flex;align-items:center;gap:10px;}
@@ -404,7 +404,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <div class="pr-wrap">
         <div class="pr-hdr">
           <span class="pr-hdr-l">PIANO ROLL</span>
-          <div class="pr-oct-btns">
+          <div class="fb-capo on" id="pr-lock-btn" style="font-size:7px;letter-spacing:.05em;margin-right:4px;">🔒 LOCK</div>
+          <div class="pr-oct-btns" id="pr-oct-btns" style="display:none;">
             <div class="pr-oct-btn on" data-oct="3">C3–B4</div>
             <div class="pr-oct-btn" data-oct="4">C4–B5</div>
             <div class="pr-oct-btn" data-oct="5">C5–B6</div>
@@ -3444,6 +3445,7 @@ let   fbCapo=0;
 let   prOctave=3;    // ピアノロール表示オクターブ (C3=3)
 let   fbPosIdx=0;    // 選択中ポジションIndex
 let   fbMode='fret'; // 'fret'=フレット移動モード(デフォルト) / 'capo'=オープン+カポモード
+let   prLock=true;   // PIANOROLLポジションロック（デフォルト：ロック）
 
 
 // ── ヘルパー ──
@@ -3583,9 +3585,9 @@ function drawFretboard(){
     // ══ ポジション表示モード: 押弦ドット + 開放◯ + ミュート× ══
     const frets=curPos.f; // [s0..s5] -1=ミュート,0=開放,n=フレット
     for(let s=0;s<6;s++){
-      const y=ST+s*sH;
-      const thickness=0.5+(5-s)*0.28;
-      const brightness=0.22+(5-s)*0.05;
+      const y=ST+(5-s)*sH;           // 逆転: s=0(E)が下、s=5(e)が上
+      const thickness=0.5+s*0.28;   // 逆転: s=0(E)が最も太い
+      const brightness=0.22+s*0.05;
 
       // 弦線（FRETモードは左端から、CAPOモードはnutXから）
       const lineStartX=fbMode==='fret'?FB_SL:nutX;
@@ -3673,9 +3675,9 @@ function drawFretboard(){
   } else {
     // ══ 全コードトーン表示モード（従来） ══
     for(let s=0;s<6;s++){
-      const y=ST+s*sH;
-      const thickness=0.5+(5-s)*0.28;
-      const brightness=0.22+(5-s)*0.05;
+      const y=ST+(5-s)*sH;           // 逆転: s=0(E)が下、s=5(e)が上
+      const thickness=0.5+s*0.28;   // 逆転: s=0(E)が最も太い
+      const brightness=0.22+s*0.05;
 
       const lineStartX2=fbMode==='fret'?FB_SL:nutX;
       ctx.beginPath();ctx.moveTo(lineStartX2,y);ctx.lineTo(lineStartX2+FB_FRETS*fW,y);
@@ -3873,7 +3875,6 @@ function drawPianoRoll(){
 
   const ri=ni(S.root);
   const ivSet=chordIvSet(S.type);
-  const startMidi=12*(prOctave+1); // C(prOctave) のMIDIノート
 
   // ポジションモード: 選択ポジションのMIDIノートセットを構築
   const vArr2=getVoicings(S.root,S.type);
@@ -3888,13 +3889,31 @@ function drawPianoRoll(){
     });
   }
 
+  // ロックモード: startMidiをポジションの実MIDIノートから自動決定
+  let startMidi;
+  if(prLock && curPos2){
+    // 実際の押弦MIDIノートを収集
+    const realMidis=curPos2.f.map((f,s)=>f<0?null:MIDI_OPEN[s]+(f===0?0:f)).filter(m=>m!==null);
+    if(realMidis.length>0){
+      const minM=Math.min(...realMidis);
+      // minMが含まれるオクターブの先頭に合わせる
+      const oct=Math.floor(minM/12)-1;
+      startMidi=oct*12;
+    } else {
+      startMidi=12*(prOctave+1);
+    }
+  } else {
+    startMidi=12*(prOctave+1); // 通常モード
+  }
+
   // ── 白鍵 ──
   const wkHits=[];
   for(let oct=0;oct<OCTAVES;oct++){
     WK_SEMI.forEach((semi,wIdx)=>{
       const midi=startMidi+oct*12+semi;
       const iv=((midi%12)-ri+12)%12;
-      const isChord=curPos2?posMidiSet.has(midi):ivSet.has(iv);
+      // ロック時: 実MIDIノートのみ / 解除時: 音程マッチ
+      const isChord=prLock&&curPos2?posMidiSet.has(midi):curPos2?posMidiSet.has(midi):ivSet.has(iv);
       const isRoot=iv===0;
       const kx=(oct*7+wIdx)*wW;
 
@@ -3950,7 +3969,7 @@ function drawPianoRoll(){
     bkDef.forEach(({wIdx,semi})=>{
       const midi=startMidi+oct*12+semi;
       const iv=((midi%12)-ri+12)%12;
-      const isChord=curPos2?posMidiSet.has(midi):ivSet.has(iv);
+      const isChord=prLock&&curPos2?posMidiSet.has(midi):curPos2?posMidiSet.has(midi):ivSet.has(iv);
       // 黒鍵X: 白鍵の右端から bW/2 左にずらす
       const bx=(oct*7+wIdx)*wW + wW - bW/2;
 
@@ -4019,9 +4038,25 @@ document.getElementById('pr-canvas').addEventListener('pointerdown',e=>{
   c._prTimer=setTimeout(()=>drawPianoRoll(),160);
 },{passive:false});
 
+// ポジションロック切り替え
+function updatePrLockUI(){
+  const btn=document.getElementById('pr-lock-btn');
+  const octBtns=document.getElementById('pr-oct-btns');
+  if(!btn)return;
+  btn.classList.toggle('on',prLock);
+  btn.textContent=prLock?'🔒 LOCK':'🔓 LOCK';
+  octBtns.style.display=prLock?'none':'flex';
+}
+document.getElementById('pr-lock-btn').addEventListener('click',()=>{
+  prLock=!prLock;
+  updatePrLockUI();
+  drawPianoRoll();
+});
+
 // オクターブ切り替え
 document.querySelectorAll('.pr-oct-btn').forEach(b=>{
   b.addEventListener('click',()=>{
+    if(prLock)return; // ロック中は無効
     prOctave=parseInt(b.dataset.oct);
     document.querySelectorAll('.pr-oct-btn').forEach(x=>x.classList.remove('on'));
     b.classList.add('on');
@@ -4323,6 +4358,7 @@ drawFrame();
 document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
 renderPath();
 renderPosZone();
+updatePrLockUI();
 
 // ── TAB 切り替え ──
 document.querySelectorAll('.tab').forEach(function(tab){
