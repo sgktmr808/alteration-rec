@@ -3406,6 +3406,7 @@ function renderRoots(){
     document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
     relCache=null;invalidate();S.voicing=null;fbPosIdx=0;
     Object.keys(VCACHE).forEach(k=>delete VCACHE[k]);
+    renderRoots();renderPosZone();
     refreshChordVisuals();
   }));
 }
