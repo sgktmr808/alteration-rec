@@ -4075,6 +4075,18 @@ drawFrame();
 document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
 renderPath();
 renderPosZone();
+
+// ── TAB 切り替え ──
+document.querySelectorAll('.tab').forEach(function(tab){
+  tab.addEventListener('click',function(){
+    var target=this.dataset.tab;
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+    document.querySelectorAll('.pane').forEach(function(p){p.classList.remove('show');});
+    this.classList.add('on');
+    document.getElementById('pane-'+target).classList.add('show');
+    if(target==='select') setTimeout(initChordVisuals,80);
+  });
+});
 </script>
 </body>
 </html>
