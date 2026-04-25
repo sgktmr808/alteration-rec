@@ -53,10 +53,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .main{flex:1;overflow:hidden;position:relative;}
 .pane{display:none;width:100%;height:100%;flex-direction:column;}
 .pane.show{display:flex;}
-
-/* MAP: canvas fills the flex space */
-#map-wrap{flex:1;position:relative;overflow:hidden;}
-#map-canvas{width:100%;height:100%;display:block;touch-action:none;}
+#pane-map{overflow:hidden;height:100%;}
 
 /* ── スワイプ切り替え ── */
 #pane-map{overflow:hidden;}
@@ -66,11 +63,21 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   will-change:transform;
 }
 #map-screen{
-  flex:0 0 50%;position:relative;
-  display:flex;flex-direction:column;overflow:hidden;
+  flex:0 0 50%;
+  height:50%;         /* 親200%の50% = 画面1枚分 */
+  position:relative;
+  display:flex;flex-direction:column;
+  overflow:hidden;
 }
+#map-wrap{
+  flex:1;position:relative;overflow:hidden;
+  width:100%;height:100%;
+}
+#map-canvas{width:100%;height:100%;display:block;touch-action:none;}
 #ctrl-screen{
-  flex:0 0 50%;overflow-y:auto;
+  flex:0 0 50%;
+  height:50%;
+  overflow-y:auto;
   display:flex;flex-direction:column;
   background:var(--bg);
 }
