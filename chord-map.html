@@ -58,12 +58,29 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 #map-wrap{flex:1;position:relative;overflow:hidden;}
 #map-canvas{width:100%;height:100%;display:block;touch-action:none;}
 
+/* PATH オーバーレイ（canvas下端に重ねる） */
+.path-bar{position:absolute;bottom:0;left:0;right:0;z-index:5;
+  background:rgba(13,13,16,0.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  border-top:1px solid rgba(255,255,255,0.07);
+  padding:4px 10px;display:flex;gap:5px;overflow-x:auto;align-items:center;min-height:30px;scrollbar-width:none;}
+.path-bar::-webkit-scrollbar{display:none;}
+.ph-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);flex-shrink:0;letter-spacing:.1em;}
+.ph{font-family:var(--fm);font-size:10px;padding:2px 7px;border:1px solid var(--bdr2);
+  border-radius:var(--r);color:var(--dim);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:border-color .15s,color .15s;}
+.ph.cur{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
+.ph-arr{color:var(--dim);font-size:10px;flex-shrink:0;}
+.ph-midi-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;flex-shrink:0;margin-left:auto;
+  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);cursor:pointer;
+  background:var(--surf);white-space:nowrap;transition:border-color .15s,color .15s;}
+.ph-midi-btn:hover,.ph-midi-btn:active{border-color:var(--acc);color:var(--acc);}
+
 /* VOICINGS */
 .pos-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
-.pos-hdr{display:flex;align-items:center;justify-content:space-between;
-  padding:5px 12px 4px;cursor:pointer;user-select:none;}
-.pos-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
-.pos-tog{font-size:9px;color:var(--dim);}
+.pos-hdr{display:flex;align-items:center;gap:6px;
+  padding:5px 10px 4px;cursor:pointer;user-select:none;}
+.pos-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;flex-shrink:0;}
+.pos-tog{font-size:9px;color:var(--dim);flex-shrink:0;}
+.pos-hdr-nav{display:flex;align-items:center;gap:3px;margin-left:auto;}
 .pos-wrap{overflow:hidden;transition:max-height .2s;}
 .pos-wrap.open{max-height:130px;}
 .pos-wrap.closed{max-height:0;}
@@ -77,21 +94,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .pos-stars{display:flex;gap:1px;margin-top:2px;justify-content:center;}
 .pos-star{font-size:10px;cursor:pointer;color:rgba(255,255,255,0.18);line-height:1;padding:1px 0;}
 .pos-star.on{color:#e8c547;}
-
-/* PATH */
-.path-bar{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);
-  padding:5px 10px;display:flex;gap:5px;overflow-x:auto;align-items:center;min-height:34px;scrollbar-width:none;}
-.path-bar::-webkit-scrollbar{display:none;}
-.ph-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);flex-shrink:0;letter-spacing:.1em;}
-.ph{font-family:var(--fm);font-size:10px;padding:2px 7px;border:1px solid var(--bdr2);
-  border-radius:var(--r);color:var(--dim);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:border-color .15s,color .15s;}
-.ph.cur{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
-.ph-arr{color:var(--dim);font-size:10px;flex-shrink:0;}
-/* PATH内MIDIボタン */
-.ph-midi-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;flex-shrink:0;margin-left:auto;
-  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);cursor:pointer;
-  background:var(--surf);white-space:nowrap;transition:border-color .15s,color .15s;}
-.ph-midi-btn:hover,.ph-midi-btn:active{border-color:var(--acc);color:var(--acc);}
 
 /* SELECTOR */
 .sel-view{flex:1;overflow-y:auto;padding:12px 14px;}
@@ -119,34 +121,43 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:rgba(13,13,16,0.9);cursor:pointer;letter-spacing:.05em;white-space:nowrap;transition:border-color .15s,color .15s;}
 .mode-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
 
-/* AUTO BAR */
-.auto-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;
-  padding:5px 12px;background:var(--surf2);border-top:1px solid var(--bdr);}
-.auto-btn{font-family:var(--fm);font-size:9px;padding:3px 10px;
+/* AUTO BAR（1行に統合） */
+.auto-bar{flex-shrink:0;display:flex;align-items:center;gap:6px;
+  padding:4px 10px;background:var(--surf2);border-top:1px solid var(--bdr);}
+.auto-btn{font-family:var(--fm);font-size:9px;padding:3px 8px;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
   background:var(--surf);cursor:pointer;letter-spacing:.1em;flex-shrink:0;transition:border-color .15s,color .15s;}
 .auto-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
-.auto-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);flex-shrink:0;}
+.auto-lbl{font-family:var(--fm);font-size:7px;color:var(--dim);flex-shrink:0;}
 .auto-bpm{flex:1;-webkit-appearance:none;appearance:none;height:3px;
-  border-radius:2px;background:var(--bdr2);accent-color:var(--acc);cursor:pointer;}
-.auto-bpm-val{font-family:var(--fm);font-size:9px;color:var(--acc);
-  width:28px;text-align:right;flex-shrink:0;}
+  border-radius:2px;background:var(--bdr2);accent-color:var(--acc);cursor:pointer;min-width:40px;}
+.auto-bpm-val{font-family:var(--fm);font-size:8px;color:var(--acc);
+  width:24px;text-align:right;flex-shrink:0;}
 .auto-sel{font-family:var(--fm);font-size:8px;padding:2px 4px;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--acc);
   background:var(--surf);cursor:pointer;-webkit-appearance:none;appearance:none;
-  flex-shrink:0;min-width:52px;text-align:center;accent-color:var(--acc);}
+  flex-shrink:0;min-width:48px;text-align:center;accent-color:var(--acc);}
 .auto-sel.wide{min-width:120px;flex:1;}
 .prog-bar{flex-shrink:0;display:flex;align-items:center;gap:6px;
   padding:4px 12px;background:var(--surf2);border-top:1px solid var(--bdr);}
+/* RECボタン（auto-bar内） */
+.midi-rec-btn{font-family:var(--fm);font-size:8px;padding:2px 6px;flex-shrink:0;
+  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
+  background:var(--surf);cursor:pointer;letter-spacing:.06em;transition:all .15s;}
+.midi-rec-btn.rec{border-color:#d44a6a;color:#d44a6a;background:rgba(212,74,106,0.1);}
+/* midi-barは非表示（auto-barに統合） */
+.midi-bar{display:none!important;}
+.midi-action-btn{font-family:var(--fm);font-size:8px;padding:2px 6px;flex-shrink:0;
+  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
+  background:var(--surf);cursor:pointer;transition:all .15s;}
+.midi-action-btn:active{border-color:var(--acc);color:var(--acc);}
 
 /* SECTOR PANEL */
 .sector-panel{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);
   overflow:hidden;transition:max-height .2s;}
 .sector-panel.open{max-height:160px;}
 .sector-panel.closed{max-height:0;}
-.sector-hdr{display:flex;align-items:center;justify-content:space-between;
-  padding:5px 12px 4px;cursor:pointer;border-top:1px solid var(--bdr);}
-.sector-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);}
+.sector-hdr{display:none;}/* SECTORSはauto-barのボタンで開閉 */
 .preset-row{display:flex;gap:4px;padding:4px 10px 2px;overflow-x:auto;scrollbar-width:none;}
 .preset-row::-webkit-scrollbar{display:none;}
 .preset-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;
@@ -192,21 +203,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .pr-oct-btn.on{border-color:var(--acc);color:var(--acc);}
 #pr-canvas{display:block;width:100%;cursor:pointer;touch-action:manipulation;}
 
-/* ── 課題3: MIDI RECORDING バー ── */
-.midi-bar{flex-shrink:0;display:flex;align-items:center;gap:6px;
-  padding:4px 10px;background:var(--surf2);border-top:1px solid var(--bdr);}
-.midi-rec-btn{font-family:var(--fm);font-size:8px;padding:2px 9px;flex-shrink:0;
-  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
-  background:var(--surf);cursor:pointer;letter-spacing:.08em;transition:all .15s;}
-.midi-rec-btn.rec{border-color:#d44a6a;color:#d44a6a;background:rgba(212,74,106,0.1);}
-.midi-status{font-family:var(--fm);font-size:7.5px;color:var(--dim);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
-.midi-status.rec{color:#d44a6a;}
-.midi-action-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;flex-shrink:0;
-  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
-  background:var(--surf);cursor:pointer;transition:all .15s;}
-.midi-action-btn:hover{border-color:var(--acc);color:var(--acc);}
-
-/* ── 課題4: 学習インジケータ ── */
+/* ── 学習インジケータ ── */
 .learn-bar{flex-shrink:0;display:none;align-items:center;gap:5px;
   padding:3px 10px;background:var(--surf2);border-top:1px solid var(--bdr);overflow-x:auto;scrollbar-width:none;}
 .learn-bar::-webkit-scrollbar{display:none;}
@@ -214,7 +211,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .learn-chip{font-family:var(--fm);font-size:8px;padding:1px 6px;flex-shrink:0;
   border:1px solid rgba(232,197,71,0.3);border-radius:var(--r);color:var(--acc);background:var(--acc-a);}
 
-/* ── 課題5: DB バナー ── */
+/* ── DB バナー ── */
 .db-banner{font-family:var(--fm);font-size:8px;padding:4px 12px;
   background:rgba(212,130,58,0.12);border-top:1px solid rgba(212,130,58,0.3);
   color:rgba(212,130,58,0.9);display:none;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
@@ -222,6 +219,10 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .db-load-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;
   border:1px solid rgba(212,130,58,0.5);border-radius:var(--r);
   color:rgba(212,130,58,0.9);background:transparent;cursor:pointer;flex-shrink:0;}
+
+/* セーフエリア対応 */
+.auto-bar:last-child{padding-bottom:calc(4px + env(safe-area-inset-bottom,0px));}
+.pos-zone:last-child .pos-hdr{padding-bottom:calc(4px + env(safe-area-inset-bottom,0px));}
 </style>
 </head>
 <body>
@@ -259,53 +260,33 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div class="mode-btn" data-mode="bridge">BRIDGE</div>
         </div>
       </div>
+      <!-- PATH オーバーレイ（canvas下端） -->
+      <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
     </div>
+    <!-- VOICINGSゾーン：ヘッダーにpos-navを統合 -->
     <div class="pos-zone">
       <div class="pos-hdr" id="pos-hdr">
+        <span class="pos-tog" id="pos-tog">▼</span>
         <span class="pos-hdr-l">VOICINGS</span>
-        <span class="pos-tog" id="pos-tog">▲</span>
+        <div class="pos-hdr-nav">
+          <div class="fb-capo" id="fb-pos-dec" style="min-width:20px;text-align:center;padding:1px 4px;">◀</div>
+          <span id="fb-pos-lbl" style="font-family:var(--fm);font-size:8px;color:var(--acc);min-width:44px;text-align:center;">Pos 1/1</span>
+          <div class="fb-capo" id="fb-pos-inc" style="min-width:20px;text-align:center;padding:1px 4px;">▶</div>
+          <div class="fb-capo on" id="pr-lock-btn" style="font-size:10px;padding:1px 5px;margin-left:2px;">🔒</div>
+        </div>
       </div>
-      <div class="pos-wrap open" id="pos-wrap">
+      <div class="pos-wrap closed" id="pos-wrap">
         <div class="pos-scroll" id="pos-scroll">
           <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);padding:16px">…</span>
         </div>
       </div>
     </div>
-    <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
-    <!-- 課題3: MIDI録音バー -->
-    <div class="midi-bar" id="midi-bar">
-      <div class="midi-rec-btn" id="midi-rec-btn" onclick="toggleMidiRec()">● REC</div>
-      <div class="midi-status" id="midi-status">MIDI off — tap REC to capture chords</div>
-      <div class="midi-action-btn" id="midi-export-btn" style="display:none" onclick="exportMidi()">↓ MIDI</div>
-      <div class="midi-action-btn" id="midi-clear-btn" style="display:none" onclick="clearMidi()">✕</div>
-    </div>
-    <!-- 課題4: 学習インジケータバー -->
-    <div class="learn-bar" id="learn-bar">
-      <span class="learn-lbl">LEARNED</span>
-      <div id="learn-chips"></div>
-    </div>
+    <!-- AUTO + BPM + REC + SECTORS を1行に統合 -->
     <div class="auto-bar" id="auto-bar">
       <div class="auto-btn" id="auto-btn" onclick="autoPlay?stopAuto():startAuto()">▶ AUTO</div>
       <select class="auto-sel" id="auto-mode-sel">
         <option value="free">FREE</option>
         <option value="pattern">PATTERN</option>
-      </select>
-      <select class="auto-sel" id="phrase-mode-sel">
-        <option value="off">— PHRASE</option>
-        <option value="melody">MELODY</option>
-        <option value="adlib">ADLIB</option>
-      </select>
-      <select class="auto-sel" id="phrase-timbre-sel">
-        <option value="crystal">CRYSTAL</option>
-        <option value="celeste">CELESTE</option>
-        <option value="bell">BELL</option>
-        <option value="piano">PIANO</option>
-        <option value="marimba">MARIMBA</option>
-        <option value="koto">KOTO</option>
-        <option value="plucksynth">PLUCK</option>
-        <option value="acid">ACID</option>
-        <option value="detroit">DETROIT</option>
-        <option value="synth">SYNTH</option>
       </select>
       <select class="auto-sel" id="timbre-sel">
         <optgroup label="─ MELODIC ─">
@@ -349,22 +330,53 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <option value="deephouse">DEEP HOUSE</option>
         </optgroup>
       </select>
+      <select class="auto-sel" id="phrase-mode-sel">
+        <option value="off">— PHRASE</option>
+        <option value="melody">MELODY</option>
+        <option value="adlib">ADLIB</option>
+      </select>
       <span class="auto-lbl">BPM</span>
       <input type="range" class="auto-bpm" id="auto-bpm" min="40" max="180" step="4" value="72">
       <span class="auto-bpm-val" id="auto-bpm-val">72</span>
+      <div class="midi-rec-btn" id="midi-rec-btn" onclick="toggleMidiRec()">● REC</div>
+      <div class="midi-action-btn" id="midi-export-btn" style="display:none" onclick="exportMidi()">↓</div>
+      <div class="midi-action-btn" id="midi-clear-btn" style="display:none" onclick="clearMidi()">✕</div>
+      <div class="auto-btn" id="sectors-btn">SECT</div>
     </div>
     <div class="prog-bar" id="prog-bar" style="display:none">
       <select class="auto-sel" id="prog-genre-sel"></select>
       <select class="auto-sel wide" id="prog-name-sel"></select>
     </div>
-    <div class="sector-hdr" id="sector-hdr">
-      <span class="sector-hdr-l">SECTORS ▾</span>
-    </div>
+    <!-- SECTORS パネル（sector-hdrは非表示、auto-barのSECTボタンで開閉） -->
     <div class="sector-panel closed" id="sector-panel">
       <div class="preset-row" id="preset-row"></div>
       <div class="weight-row" id="weight-row"></div>
     </div>
-    <!-- 課題5: guitar-db バナー -->
+    <!-- 学習インジケータ -->
+    <div class="learn-bar" id="learn-bar">
+      <span class="learn-lbl">LEARNED</span>
+      <div id="learn-chips"></div>
+    </div>
+    <!-- 旧midi-bar（CSS非表示、ID参照のため残す） -->
+    <div class="midi-bar" id="midi-bar" style="display:none!important">
+      <div class="midi-status" id="midi-status">MIDI off</div>
+    </div>
+    <!-- sector-hdr（CSS非表示、JS参照のため残す） -->
+    <div id="sector-hdr" style="display:none"><span class="sector-hdr-l">SECTORS ▾</span></div>
+    <!-- phrase-timbre-sel（JS参照のため隠しフィールドとして残す） -->
+    <select id="phrase-timbre-sel" style="display:none">
+      <option value="crystal">CRYSTAL</option>
+      <option value="celeste">CELESTE</option>
+      <option value="bell">BELL</option>
+      <option value="piano">PIANO</option>
+      <option value="marimba">MARIMBA</option>
+      <option value="koto">KOTO</option>
+      <option value="plucksynth">PLUCK</option>
+      <option value="acid">ACID</option>
+      <option value="detroit">DETROIT</option>
+      <option value="synth">SYNTH</option>
+    </select>
+    <!-- guitar-db バナー -->
     <div class="db-banner" id="db-banner">
       <span id="db-banner-msg">⚡ guitar-db-filtered.js があればより多くのボイシングが使えます</span>
       <button class="db-load-btn" onclick="loadGuitarDB()">LOAD</button>
@@ -381,13 +393,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <div class="fb-wrap">
         <div class="fb-hdr">
           <span class="fb-hdr-l">FRETBOARD</span>
-          <div class="fb-pos-nav" id="fb-pos-nav" style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center;">
-            <div class="fb-capo" id="fb-pos-dec" style="min-width:22px;text-align:center;">◀</div>
-            <span id="fb-pos-lbl" style="font-family:var(--fm);font-size:8px;color:var(--acc);min-width:40px;text-align:center;">Pos 1/1</span>
-            <div class="fb-capo" id="fb-pos-inc" style="min-width:22px;text-align:center;">▶</div>
-            <div class="fb-capo on" id="pr-lock-btn" style="font-size:7px;letter-spacing:.05em;">🔒</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;margin-left:auto;">
             <div class="fb-capo on" id="fb-mode-fret" style="font-size:7px;letter-spacing:.05em;">FRET</div>
             <div class="fb-capo" id="fb-mode-capo" style="font-size:7px;letter-spacing:.05em;">CAPO</div>
           </div>
@@ -2428,7 +2434,7 @@ function makeDiag(frets,ri){
   s+=`</svg>`;return s;
 }
 
-let posOpen=true;
+let posOpen=false;
 function renderPosZone(){
   const scroll=document.getElementById('pos-scroll');
   scroll.innerHTML='<span style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--dim);padding:16px">…</span>';
@@ -2478,7 +2484,8 @@ function renderPosZone(){
     });
   },10);
 }
-document.getElementById('pos-hdr').addEventListener('click',()=>{
+document.getElementById('pos-hdr').addEventListener('click',e=>{
+  if(e.target.classList.contains('fb-capo'))return; // ◀▶🔒はバブルしない
   posOpen=!posOpen;
   document.getElementById('pos-wrap').className='pos-wrap '+(posOpen?'open':'closed');
   document.getElementById('pos-tog').textContent=posOpen?'▲':'▼';
@@ -3400,6 +3407,12 @@ document.getElementById('sector-hdr').addEventListener('click',()=>{
   document.getElementById('sector-panel').className='sector-panel '+(sectorOpen?'open':'closed');
   document.getElementById('sector-hdr').querySelector('.sector-hdr-l').textContent=
     'SECTORS '+(sectorOpen?'▴':'▾');
+});
+// SECTボタン（auto-bar内）
+document.getElementById('sectors-btn').addEventListener('click',()=>{
+  sectorOpen=!sectorOpen;
+  document.getElementById('sector-panel').className='sector-panel '+(sectorOpen?'open':'closed');
+  document.getElementById('sectors-btn').classList.toggle('on',sectorOpen);
 });
 renderPresetBtns();renderWeightSliders();
 function setMode(mode){
