@@ -178,17 +178,27 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .mode-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
 
 /* AUTO BAR */
-.auto-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;
-  padding:5px 12px;background:var(--surf2);border-top:1px solid var(--bdr);}
+.auto-bar{flex-shrink:0;display:flex;flex-direction:column;gap:0;
+  background:var(--surf2);border-top:1px solid var(--bdr);}
+.auto-row1{display:flex;align-items:center;gap:8px;padding:6px 12px 4px;}
+.auto-row2{display:flex;align-items:center;gap:6px;padding:4px 12px 6px;border-top:1px solid rgba(255,255,255,0.05);}
 .auto-btn{font-family:var(--fm);font-size:9px;padding:3px 10px;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
   background:var(--surf);cursor:pointer;letter-spacing:.1em;flex-shrink:0;transition:border-color .15s,color .15s;}
 .auto-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
 .auto-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);flex-shrink:0;}
-.auto-bpm{flex:1;-webkit-appearance:none;appearance:none;height:3px;
+.auto-bpm{flex:1;-webkit-appearance:none;appearance:none;height:4px;
   border-radius:2px;background:var(--bdr2);accent-color:var(--acc);cursor:pointer;}
+.auto-bpm::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--acc);cursor:pointer;}
 .auto-bpm-val{font-family:var(--fm);font-size:9px;color:var(--acc);
-  width:28px;text-align:right;flex-shrink:0;}
+  width:26px;text-align:center;flex-shrink:0;}
+.auto-bpm-step{font-family:var(--fm);font-size:11px;color:var(--dim);
+  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf);
+  cursor:pointer;flex-shrink:0;user-select:none;-webkit-user-select:none;
+  transition:border-color .12s,color .12s;}
+.auto-bpm-step:active{border-color:var(--acc);color:var(--acc);}
 .auto-sel{font-family:var(--fm);font-size:8px;padding:2px 4px;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--acc);
   background:var(--surf);cursor:pointer;-webkit-appearance:none;appearance:none;
@@ -216,8 +226,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .weight-lbl{font-family:var(--fm);font-size:6px;color:var(--dim);margin-bottom:2px;text-align:center;}
 .weight-sl{width:100%;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
   background:var(--bdr2);outline:none;cursor:pointer;}
-.weight-sl::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;
-  border-radius:50%;cursor:pointer;}
+.weight-sl::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--acc);cursor:pointer;}
 .csv-btn{font-family:var(--fm);font-size:9px;padding:5px 12px;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);cursor:pointer;
   margin:12px 0 0;display:inline-block;background:var(--surf2);transition:border-color .15s,color .15s;}
@@ -257,7 +267,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
   background:var(--surf);cursor:pointer;letter-spacing:.08em;transition:all .15s;}
 .midi-rec-btn.rec{border-color:#d44a6a;color:#d44a6a;background:rgba(212,74,106,0.1);}
-.midi-status{font-family:var(--fm);font-size:7.5px;color:var(--dim);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.midi-status{font-family:var(--fm);font-size:7.5px;color:var(--dim);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;}
 .midi-status.rec{color:#d44a6a;}
 .midi-action-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;flex-shrink:0;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
@@ -349,7 +359,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
         <div class="midi-bar" id="midi-bar">
           <div class="midi-rec-btn" id="midi-rec-btn" onclick="toggleMidiRec()">● REC</div>
-          <div class="midi-status" id="midi-status">MIDI off — tap REC to capture chords</div>
+          <div class="midi-status" id="midi-status">MIDI off</div>
           <div class="midi-action-btn" id="midi-export-btn" style="display:none" onclick="exportMidi()">↓ MIDI</div>
           <div class="midi-action-btn" id="midi-clear-btn" style="display:none" onclick="clearMidi()">✕</div>
         </div>
@@ -358,73 +368,79 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="learn-chips"></div>
         </div>
         <div class="auto-bar" id="auto-bar">
-          <div class="auto-btn" id="auto-btn" onclick="autoPlay?stopAuto():startAuto()">▶ AUTO</div>
-          <select class="auto-sel" id="auto-mode-sel">
-            <option value="free">FREE</option>
-            <option value="pattern">PATTERN</option>
-          </select>
-          <select class="auto-sel" id="phrase-mode-sel">
-            <option value="off">— PHRASE</option>
-            <option value="melody">MELODY</option>
-            <option value="adlib">ADLIB</option>
-          </select>
-          <select class="auto-sel" id="phrase-timbre-sel">
-            <option value="crystal">CRYSTAL</option>
-            <option value="celeste">CELESTE</option>
-            <option value="bell">BELL</option>
-            <option value="piano">PIANO</option>
-            <option value="marimba">MARIMBA</option>
-            <option value="koto">KOTO</option>
-            <option value="plucksynth">PLUCK</option>
-            <option value="acid">ACID</option>
-            <option value="detroit">DETROIT</option>
-            <option value="synth">SYNTH</option>
-          </select>
-          <select class="auto-sel" id="timbre-sel">
-            <optgroup label="─ MELODIC ─">
-              <option value="synth">SYNTH</option>
-              <option value="piano">PIANO</option>
-              <option value="organ">ORGAN</option>
-              <option value="guitar">GUITAR</option>
-              <option value="marimba">MARIMBA</option>
+          <div class="auto-row1">
+            <div class="auto-btn" id="auto-btn" onclick="autoPlay?stopAuto():startAuto()">▶ AUTO</div>
+            <select class="auto-sel" id="auto-mode-sel">
+              <option value="free">FREE</option>
+              <option value="pattern">PATTERN</option>
+            </select>
+            <span class="auto-lbl">BPM</span>
+            <div class="auto-bpm-step" id="auto-bpm-minus">−</div>
+            <input type="range" class="auto-bpm" id="auto-bpm" min="40" max="180" step="4" value="72">
+            <div class="auto-bpm-step" id="auto-bpm-plus">+</div>
+            <span class="auto-bpm-val" id="auto-bpm-val">72</span>
+          </div>
+          <div class="auto-row2">
+            <select class="auto-sel" id="phrase-mode-sel">
+              <option value="off">— PHRASE</option>
+              <option value="melody">MELODY</option>
+              <option value="adlib">ADLIB</option>
+            </select>
+            <select class="auto-sel" id="phrase-timbre-sel">
+              <option value="crystal">CRYSTAL</option>
               <option value="celeste">CELESTE</option>
               <option value="bell">BELL</option>
+              <option value="piano">PIANO</option>
+              <option value="marimba">MARIMBA</option>
               <option value="koto">KOTO</option>
-              <option value="oud">OUD</option>
-            </optgroup>
-            <optgroup label="─ AMBIENT ─">
-              <option value="ambient">AMBIENT</option>
-              <option value="pad">PAD</option>
-              <option value="strings">STRINGS</option>
-              <option value="crystal">CRYSTAL</option>
-              <option value="drone">DRONE</option>
-              <option value="cosmos">COSMOS</option>
-            </optgroup>
-            <optgroup label="─ WORLD/ETHNIC ─">
-              <option value="tibetan">TIBETAN</option>
-              <option value="throat">THROAT</option>
-              <option value="rainforest">RAINFOREST</option>
-              <option value="waterphone">WATERPHONE</option>
-            </optgroup>
-            <optgroup label="─ ELECTRONIC ─">
-              <option value="braindance">BRAINDANCE</option>
-              <option value="acid">ACID 303</option>
-              <option value="reese">REESE BASS</option>
-              <option value="technopad">TECHNO PAD</option>
-              <option value="housechord">HOUSE CHORD</option>
-              <option value="supersaw">SUPERSAW</option>
               <option value="plucksynth">PLUCK</option>
-              <option value="bass808">808 BASS</option>
-              <option value="ravestab">RAVE STAB</option>
+              <option value="acid">ACID</option>
               <option value="detroit">DETROIT</option>
-              <option value="junglestab">JUNGLE STAB</option>
-              <option value="trancelead">TRANCE LEAD</option>
-              <option value="deephouse">DEEP HOUSE</option>
-            </optgroup>
-          </select>
-          <span class="auto-lbl">BPM</span>
-          <input type="range" class="auto-bpm" id="auto-bpm" min="40" max="180" step="4" value="72">
-          <span class="auto-bpm-val" id="auto-bpm-val">72</span>
+              <option value="synth">SYNTH</option>
+            </select>
+            <select class="auto-sel" id="timbre-sel" style="flex:1;min-width:0;">
+              <optgroup label="─ MELODIC ─">
+                <option value="synth">SYNTH</option>
+                <option value="piano">PIANO</option>
+                <option value="organ">ORGAN</option>
+                <option value="guitar">GUITAR</option>
+                <option value="marimba">MARIMBA</option>
+                <option value="celeste">CELESTE</option>
+                <option value="bell">BELL</option>
+                <option value="koto">KOTO</option>
+                <option value="oud">OUD</option>
+              </optgroup>
+              <optgroup label="─ AMBIENT ─">
+                <option value="ambient">AMBIENT</option>
+                <option value="pad">PAD</option>
+                <option value="strings">STRINGS</option>
+                <option value="crystal">CRYSTAL</option>
+                <option value="drone">DRONE</option>
+                <option value="cosmos">COSMOS</option>
+              </optgroup>
+              <optgroup label="─ WORLD/ETHNIC ─">
+                <option value="tibetan">TIBETAN</option>
+                <option value="throat">THROAT</option>
+                <option value="rainforest">RAINFOREST</option>
+                <option value="waterphone">WATERPHONE</option>
+              </optgroup>
+              <optgroup label="─ ELECTRONIC ─">
+                <option value="braindance">BRAINDANCE</option>
+                <option value="acid">ACID 303</option>
+                <option value="reese">REESE BASS</option>
+                <option value="technopad">TECHNO PAD</option>
+                <option value="housechord">HOUSE CHORD</option>
+                <option value="supersaw">SUPERSAW</option>
+                <option value="plucksynth">PLUCK</option>
+                <option value="bass808">808 BASS</option>
+                <option value="ravestab">RAVE STAB</option>
+                <option value="detroit">DETROIT</option>
+                <option value="junglestab">JUNGLE STAB</option>
+                <option value="trancelead">TRANCE LEAD</option>
+                <option value="deephouse">DEEP HOUSE</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
         <div class="prog-bar" id="prog-bar" style="display:none">
           <select class="auto-sel" id="prog-genre-sel"></select>
@@ -4177,6 +4193,31 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
   if(autoMode==='pattern'){renderProgGenre();renderProgNames();}
   autoStepIdx=0;
 });
+
+// BPM スライダー・±ボタン
+(function(){
+  const sl=document.getElementById('auto-bpm');
+  const val=document.getElementById('auto-bpm-val');
+  const minus=document.getElementById('auto-bpm-minus');
+  const plus=document.getElementById('auto-bpm-plus');
+  function setBpm(v){
+    v=Math.max(40,Math.min(180,Math.round(v/4)*4));
+    autoBpm=v; sl.value=v; val.textContent=v;
+  }
+  sl.addEventListener('input',()=>setBpm(parseInt(sl.value)));
+  minus.addEventListener('click',()=>setBpm(autoBpm-4));
+  plus.addEventListener('click',()=>setBpm(autoBpm+4));
+})();
+
+// timbre-sel
+(function(){
+  const sel=document.getElementById('timbre-sel');
+  if(sel){ sel.value=TIMBRE; sel.addEventListener('change',e=>{TIMBRE=e.target.value;}); }
+  const pms=document.getElementById('phrase-mode-sel');
+  if(pms){ pms.value=phraseMode; pms.addEventListener('change',e=>{phraseMode=e.target.value;}); }
+  const pts=document.getElementById('phrase-timbre-sel');
+  if(pts){ pts.value=phraseTIMBRE; pts.addEventListener('change',e=>{phraseTIMBRE=e.target.value;}); }
+})();
 document.getElementById('prog-genre-sel')?.addEventListener('change',e=>{
   autoProgGenre=e.target.value;autoProgIdx=0;autoStepIdx=0;renderProgNames();
 });
@@ -4213,10 +4254,8 @@ function toggleMidiRec(){
       st.textContent=`${n} notes — ready to export`;
       expBtn.style.display='';clrBtn.style.display='';
     } else {
-      st.textContent='MIDI off — tap REC to capture chords';
-    }
-  }
-}
+      st.textContent='MIDI off';
+
 function recordMidiChord(root,type,voicing){
   if(!midiRec)return;
   // MIDI_OPEN はグローバル定数 [40,45,50,55,59,64] を参照
@@ -4241,7 +4280,7 @@ function clearMidi(){
   midiRec=false;midiEvs=[];midiTick=0;
   document.getElementById('midi-rec-btn').textContent='● REC';
   document.getElementById('midi-rec-btn').classList.remove('rec');
-  document.getElementById('midi-status').textContent='MIDI off — tap REC to capture chords';
+  document.getElementById('midi-status').textContent='MIDI off';
   document.getElementById('midi-status').classList.remove('rec');
   document.getElementById('midi-export-btn').style.display='none';
   document.getElementById('midi-clear-btn').style.display='none';
