@@ -385,6 +385,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <div class="fb-capo" id="fb-pos-dec" style="min-width:22px;text-align:center;">◀</div>
             <span id="fb-pos-lbl" style="font-family:var(--fm);font-size:8px;color:var(--acc);min-width:40px;text-align:center;">Pos 1/1</span>
             <div class="fb-capo" id="fb-pos-inc" style="min-width:22px;text-align:center;">▶</div>
+            <div class="fb-capo on" id="pr-lock-btn" style="font-size:7px;letter-spacing:.05em;">🔒</div>
           </div>
           <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
             <div class="fb-capo on" id="fb-mode-fret" style="font-size:7px;letter-spacing:.05em;">FRET</div>
@@ -404,7 +405,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <div class="pr-wrap">
         <div class="pr-hdr">
           <span class="pr-hdr-l">PIANO ROLL</span>
-          <div class="fb-capo on" id="pr-lock-btn" style="font-size:7px;letter-spacing:.05em;margin-right:4px;">🔒 LOCK</div>
           <div class="pr-oct-btns" id="pr-oct-btns" style="display:none;">
             <div class="pr-oct-btn on" data-oct="3">C3–B4</div>
             <div class="pr-oct-btn" data-oct="4">C4–B5</div>
@@ -2319,17 +2319,28 @@ const T2DB={major:'major',minor:'minor',dom7:'7',m7:'m7',maj7:'maj7',m9:'m9','9'
 function posLbl(v){const pr=v.filter(f=>f>0),ho=v.some(f=>f===0);if(ho&&(pr.length===0||Math.min(...pr)<=5))return'Open';return(pr.length>0?Math.min(...pr):0)+'fr';}
 function scoreV(v,ri,ivSet){
   let sc=100;const pr=v.filter(f=>f>0),so=v.filter(f=>f>=0);
-  sc-=(pr.length>0?Math.max(...pr)-Math.min(...pr):0)*7;
+  const hasOpen=v.some(f=>f===0);
+  const span=pr.length>0?Math.max(...pr)-Math.min(...pr):0;
   const mf=pr.length>0?Math.min(...pr):0;
-  if(mf===0)sc+=18;else if(mf<=4)sc+=12;else if(mf>7)sc-=(mf-7)*3;
+  // フレット幅ペナルティ
+  sc-=span*7;
+  // ポジション帯域ボーナス（オープン優遇は低め、低ポジション適度に）
+  if(mf===0)sc+=10;else if(mf<=4)sc+=8;else if(mf>7)sc-=(mf-7)*2;
+  // ベース音判定（最低音弦のルート優遇）
   const lo=v.findIndex(f=>f>=0);
   if(lo>=0){const f=v[lo];const n=f===0?OPEN_S[lo]%12:ntAt(lo,f);const iv=((n-ri)+12)%12;if(iv===0)sc+=25;else if(iv===7)sc+=5;else sc-=12;}
+  // 構成音の網羅性
   const piv=new Set(v.map((f,s)=>f<0?-1:f===0?OPEN_S[s]%12:ntAt(s,f)).filter(n=>n>=0).map(n=>((n-ri)+12)%12));
-  sc+=[...ivSet].filter(iv=>piv.has(iv)).length*8;
-  if(piv.has(3)||piv.has(4))sc+=6;if(piv.has(10)||piv.has(11))sc+=6;
-  if(so.length===5)sc+=8;else if(so.length===4)sc+=4;
+  sc+=[...ivSet].filter(iv=>piv.has(iv)).length*10;
+  // 3rd・7th含有ボーナス
+  if(piv.has(3)||piv.has(4))sc+=8;if(piv.has(10)||piv.has(11))sc+=8;
+  // 弦数ボーナス
+  if(so.length===6)sc+=10;else if(so.length===5)sc+=6;else if(so.length===4)sc+=2;
+  // 途中ミュートペナルティ
   let fi=-1,li=-1;for(let i=0;i<6;i++){if(v[i]>=0){if(fi<0)fi=i;li=i;}}
   if(fi>=0){for(let i=fi;i<=li;i++){if(v[i]<0){sc-=18;break;}}}
+  // ハイポジションで開放弦混入ペナルティ
+  if(hasOpen&&mf>=5)sc-=40;
   return sc;
 }
 const VCACHE={};
@@ -2348,10 +2359,17 @@ function getVoicings(root,type){
     for(let f=1;f<=15;f++){if(ivSet.has(((ntAt(s,f)-ri)+12)%12))o.push(f);}strO.push(o);}
   const raw=[];
   for(let ws=0;ws<=12;ws++){
-    const we=ws+4;const wo=strO.map(o=>o.filter(f=>f===-1||f===0||(f>=ws+1&&f<=we)));
+    const we=ws+3; // 3フレット窓（より密なポジションに）
+    // ws>=5のハイポジションは開放弦を除外（純バレー専用）
+    const allowOpen=ws<5;
+    const wo=strO.map(o=>o.filter(f=>f===-1||(allowOpen&&f===0)||(f>=ws+1&&f<=we)));
     function cb(si,cur){
-      if(si===6){const pr=cur.filter(f=>f>0);if(cur.filter(f=>f>=0).length<3)return;
-        if(pr.length>0&&Math.max(...pr)-Math.min(...pr)>4)return;
+      if(si===6){
+        const pr=cur.filter(f=>f>0);
+        if(cur.filter(f=>f>=0).length<3)return;
+        if(pr.length>0&&Math.max(...pr)-Math.min(...pr)>3)return; // 3フレット窓を厳守
+        // ハイポジションで開放弦混入は除外
+        if(ws>=5&&cur.some(f=>f===0))return;
         const pv=new Set(cur.map((f,s)=>f<0?-1:f===0?OPEN_S[s]%12:ntAt(s,f)).filter(n=>n>=0).map(n=>((n-ri)+12)%12));
         if(!pv.has(0)||pv.size<2)return;raw.push([...cur]);return;}
       for(const f of wo[si]){cur.push(f);cb(si+1,cur);cur.pop();}
@@ -2362,8 +2380,8 @@ function getVoicings(root,type){
   raw.forEach(v=>{const kk=v.join(',');if(!seen.has(kk)){seen.add(kk);all.push({v,d:false});}});
   // スコア順全件 → フレット帯域ごとに代表を選び、合計最大16件
   all.sort((a,b)=>(scoreV(b.v,ri,ivSet)+(b.d?5:0))-(scoreV(a.v,ri,ivSet)+(a.d?5:0)));
-  // 帯域別バケット: 0=オープン混じり(0-4fr), 1=5-8fr純押弦, 2=9-12fr純押弦, 3=13-15fr純押弦
-  // 「純押弦」= 開放弦(0)を含まない、かつ全押弦が4フレット窓内
+  // 帯域別バケット: 0=オープン帯域(0-4fr or 開放弦あり), 1=5-8fr純バレー, 2=9-12fr純バレー, 3=13-15fr純バレー
+  // 「純バレー」= 開放弦(0)を含まない、かつ全押弦が3フレット窓内
   const buckets=[[],[],[],[]];
   all.forEach(({v})=>{
     const pr=v.filter(f=>f>0);
@@ -2373,13 +2391,12 @@ function getVoicings(root,type){
     const span=maxF-minF;
     // 開放弦あり or 低ポジション → バケット0
     if(hasOpen||minF<=4){buckets[0].push(v);return;}
-    // 純押弦かつ4フレット窓内のみ帯域バケットへ
-    if(span<=4){
+    // 純バレー（3フレット窓内）のみ帯域バケットへ
+    if(span<=3){
       const bi=minF<=8?1:minF<=12?2:3;
       buckets[bi].push(v);
-    } else {
-      buckets[0].push(v); // 窓をはみ出るものはバケット0へ
     }
+    // 窓をはみ出るものは捨てる（不自然なポジションなので）
   });
   // 各バケットから上位4件ずつ確保（合計最大16件）
   const res=[];
@@ -4044,7 +4061,7 @@ function updatePrLockUI(){
   const octBtns=document.getElementById('pr-oct-btns');
   if(!btn)return;
   btn.classList.toggle('on',prLock);
-  btn.textContent=prLock?'🔒 LOCK':'🔓 LOCK';
+  btn.textContent=prLock?'🔒':'🔓';
   octBtns.style.display=prLock?'none':'flex';
 }
 document.getElementById('pr-lock-btn').addEventListener('click',()=>{
