@@ -55,8 +55,31 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .pane.show{display:flex;}
 
 /* MAP: canvas fills the flex space */
-#map-wrap{flex:1;position:relative;overflow:hidden;}
+#map-wrap{
+  position:relative;overflow:hidden;
+  transition:height .32s cubic-bezier(.4,0,.2,1);
+  flex-shrink:0;
+}
+#map-wrap.map-full{height:100%;}   /* JS で付与 */
 #map-canvas{width:100%;height:100%;display:block;touch-action:none;}
+
+/* コントロールパネル（スワイプで展開） */
+#ctrl-panel{
+  flex:1;overflow-y:auto;
+  display:flex;flex-direction:column;
+  transition:opacity .25s;
+}
+#pane-map{display:flex;flex-direction:column;overflow:hidden;}
+
+/* スワイプインジケーター */
+.swipe-handle{
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  padding:4px 0 2px;background:var(--surf2);border-top:1px solid var(--bdr);
+  cursor:pointer;
+}
+.swipe-handle-bar{
+  width:36px;height:3px;border-radius:2px;background:rgba(255,255,255,0.18);
+}
 
 /* VOICINGS */
 .pos-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
@@ -259,6 +282,12 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         </div>
       </div>
     </div>
+    <!-- スワイプハンドル -->
+    <div class="swipe-handle" id="swipe-handle">
+      <div class="swipe-handle-bar"></div>
+    </div>
+    <!-- コントロールパネル（上スワイプで展開） -->
+    <div id="ctrl-panel">
     <div class="pos-zone">
       <div class="pos-hdr" id="pos-hdr">
         <span class="pos-hdr-l">VOICINGS</span>
@@ -365,6 +394,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <span id="db-banner-msg">⚡ guitar-db-filtered.js があればより多くのボイシングが使えます</span>
       <button class="db-load-btn" onclick="loadGuitarDB()">LOAD</button>
     </div>
+    </div><!-- /#ctrl-panel -->
   </div>
   <div id="pane-select" class="pane">
     <div class="sel-view">
@@ -4372,6 +4402,96 @@ document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
 renderPath();
 renderPosZone();
 updatePrLockUI();
+
+// ── MAP スワイプ切り替え ──
+(function(){
+  const pane=document.getElementById('pane-map');
+  const mapWrap=document.getElementById('map-wrap');
+  const ctrlPanel=document.getElementById('ctrl-panel');
+  const handle=document.getElementById('swipe-handle');
+  let ctrlExpanded=false;
+  let swipeStartY=0,swipeStartX=0,sweeping=false;
+  const THRESHOLD=40; // スワイプ判定px
+
+  function setCtrlExpanded(expanded){
+    ctrlExpanded=expanded;
+    if(expanded){
+      // コントロール全画面（サークル非表示）
+      mapWrap.style.display='none';
+      ctrlPanel.style.overflowY='auto';
+      handle.querySelector('.swipe-handle-bar').style.background='rgba(232,197,71,0.5)';
+    } else {
+      // サークル全画面
+      mapWrap.style.display='';
+      mapWrap.style.flex='1';
+      ctrlPanel.style.overflowY='hidden';
+      handle.querySelector('.swipe-handle-bar').style.background='rgba(255,255,255,0.18)';
+      setTimeout(()=>{ if(typeof initCanvas==='function')initCanvas(); },50);
+    }
+  }
+
+  // ハンドルタップでもトグル
+  handle.addEventListener('click',()=>setCtrlExpanded(!ctrlExpanded));
+
+  // ハンドル上のスワイプ
+  handle.addEventListener('touchstart',e=>{swipeStartY=e.touches[0].clientY;swipeStartX=e.touches[0].clientX;sweeping=false;},{passive:true});
+  handle.addEventListener('touchmove',e=>{
+    const dy=e.touches[0].clientY-swipeStartY;const dx=e.touches[0].clientX-swipeStartX;
+    if(!sweeping&&Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)*1.5)sweeping=true;
+  },{passive:true});
+  handle.addEventListener('touchend',e=>{
+    if(!sweeping)return;
+    const dy=e.changedTouches[0].clientY-swipeStartY;
+    if(dy<-40&&!ctrlExpanded)setCtrlExpanded(true);
+    else if(dy>40&&ctrlExpanded)setCtrlExpanded(false);
+    sweeping=false;
+  },{passive:true});
+
+  // スワイプ検出（map-wrap上）
+  mapWrap.addEventListener('touchstart',e=>{
+    swipeStartY=e.touches[0].clientY;
+    swipeStartX=e.touches[0].clientX;
+    sweeping=false;
+  },{passive:true});
+
+  mapWrap.addEventListener('touchmove',e=>{
+    const dy=e.touches[0].clientY-swipeStartY;
+    const dx=e.touches[0].clientX-swipeStartX;
+    if(!sweeping&&Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)*1.5){
+      sweeping=true;
+    }
+  },{passive:true});
+
+  mapWrap.addEventListener('touchend',e=>{
+    if(!sweeping)return;
+    const dy=e.changedTouches[0].clientY-swipeStartY;
+    if(dy<-THRESHOLD&&!ctrlExpanded) setCtrlExpanded(true);
+    else if(dy>THRESHOLD&&ctrlExpanded) setCtrlExpanded(false);
+    sweeping=false;
+  },{passive:true});
+
+  // コントロールパネル下スワイプでも戻れる
+  ctrlPanel.addEventListener('touchstart',e=>{
+    swipeStartY=e.touches[0].clientY;
+    swipeStartX=e.touches[0].clientX;
+    sweeping=false;
+  },{passive:true});
+  ctrlPanel.addEventListener('touchmove',e=>{
+    if(ctrlPanel.scrollTop>0)return; // スクロール中は無視
+    const dy=e.touches[0].clientY-swipeStartY;
+    const dx=e.touches[0].clientX-swipeStartX;
+    if(!sweeping&&Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)*1.5) sweeping=true;
+  },{passive:true});
+  ctrlPanel.addEventListener('touchend',e=>{
+    if(!sweeping)return;
+    const dy=e.changedTouches[0].clientY-swipeStartY;
+    if(dy>THRESHOLD&&ctrlExpanded) setCtrlExpanded(false);
+    sweeping=false;
+  },{passive:true});
+
+  // 初期状態：サークル全画面
+  setCtrlExpanded(false);
+})();
 
 // ── TAB 切り替え ──
 document.querySelectorAll('.tab').forEach(function(tab){
