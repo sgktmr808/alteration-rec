@@ -380,6 +380,11 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <div class="fb-wrap">
         <div class="fb-hdr">
           <span class="fb-hdr-l">FRETBOARD</span>
+          <div class="fb-pos-nav" id="fb-pos-nav" style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center;">
+            <div class="fb-capo" id="fb-pos-dec" style="min-width:22px;text-align:center;">◀</div>
+            <span id="fb-pos-lbl" style="font-family:var(--fm);font-size:8px;color:var(--acc);min-width:40px;text-align:center;">Pos 1/1</span>
+            <div class="fb-capo" id="fb-pos-inc" style="min-width:22px;text-align:center;">▶</div>
+          </div>
           <div class="fb-capo-wrap">
             <span class="fb-capo-lbl">CAPO</span>
             <div class="fb-capo" id="fb-capo-dec">−</div>
@@ -2390,6 +2395,9 @@ function renderPosZone(){
         c.classList.add('sel');
         const idx=parseInt(c.dataset.i);
         S.voicing=pos[idx].f; // ← 選択ボイシングを保存
+        fbPosIdx=idx;         // ← FRETBOARDとPIANO ROLLに同期
+        drawFretboard();
+        drawPianoRoll();
         playVoicing(pos[idx].f);
       });
     });
@@ -2865,6 +2873,7 @@ function moveToChord(root,type){
     let bestIdx=0,bestV=0;
     pos.forEach((p,i)=>{const v=getVote(root,type,p.f);if(v>bestV){bestV=v;bestIdx=i;}});
     S.voicing=pos[bestIdx].f;
+    fbPosIdx=bestIdx; // ← ポジションナビもリセット
   }
   renderPosZone();
 }
@@ -3355,7 +3364,7 @@ function renderRoots(){
   el.querySelectorAll('.rp').forEach(p=>p.addEventListener('click',()=>{
     S.root=p.dataset.r;
     document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
-    relCache=null;invalidate();S.voicing=null;
+    relCache=null;invalidate();S.voicing=null;fbPosIdx=0;
     renderRoots();renderPosZone();
     refreshChordVisuals();
   }));
@@ -3375,7 +3384,7 @@ function renderTypes(){
   el.querySelectorAll('.tp').forEach(p=>p.addEventListener('click',()=>{
     S.type=p.dataset.t;
     document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
-    relCache=null;invalidate();S.voicing=null;
+    relCache=null;invalidate();S.voicing=null;fbPosIdx=0;
     renderTypes();renderPosZone();
     refreshChordVisuals();
   }));
@@ -3391,6 +3400,8 @@ const STRING_NAMES=['E','A','D','G','B','e'];
 const FB_FRETS=15;   // 表示フレット数
 let   fbCapo=0;
 let   prOctave=3;    // ピアノロール表示オクターブ (C3=3)
+let   fbPosIdx=0;    // 選択中ポジションIndex (0=全表示OFF→ポジション0)
+
 
 // ── ヘルパー ──
 function chordIvSet(type){
@@ -3406,7 +3417,6 @@ function drawFretboard(){
   const canvas=document.getElementById('fb-canvas');
   if(!canvas)return;
   const dpr=window.devicePixelRatio||1;
-  // parentElementが非表示でclientWidthが0の場合はwindow幅を使う
   const W=canvas.parentElement.clientWidth||canvas.parentElement.offsetWidth||window.innerWidth-32||320;
   const H=148;
   canvas.width=Math.round(W*dpr);
@@ -3420,19 +3430,26 @@ function drawFretboard(){
   const ri=ni(S.root);
   const ivSet=chordIvSet(S.type);
 
+  // ── ポジションモード: 選択ポジションのフレット配列を取得 ──
+  const vArr=getVoicings(S.root,S.type);
+  const posMode=vArr.length>0;
+  const curPos=posMode?vArr[Math.min(fbPosIdx,vArr.length-1)]:null;
+  // ポジションナビ更新
+  updateFbPosNav(vArr.length);
+
   // ── レイアウト定数 ──
-  const FB_SL=26;            // 左余白（弦名列）※グローバルSL(スライダー配列)と区別
-  const ST=20;              // 上余白（フレット番号行）
-  const SB=6;               // 下余白
-  const fW=(W-FB_SL)/(FB_FRETS+1); // フレット幅 (+1 でナット前の開放弦エリア)
-  const sH=(H-ST-SB)/5;    // 弦間隔（6弦=5スペース）
-  const nutX=FB_SL+fW;        // ナット位置X
+  const FB_SL=26;
+  const ST=20;
+  const SB=6;
+  const fW=(W-FB_SL)/(FB_FRETS+1);
+  const sH=(H-ST-SB)/5;
+  const nutX=FB_SL+fW;
 
   // 背景
   ctx.fillStyle='#0a0a0d';
   ctx.fillRect(0,0,W,H);
 
-  // 指板木目風の薄いグラデ
+  // 指板木目風グラデ
   const grad=ctx.createLinearGradient(FB_SL,0,W,0);
   grad.addColorStop(0,'rgba(120,80,40,0.06)');
   grad.addColorStop(0.5,'rgba(160,110,60,0.04)');
@@ -3440,7 +3457,7 @@ function drawFretboard(){
   ctx.fillStyle=grad;
   ctx.fillRect(nutX,ST,W-nutX,H-ST-SB);
 
-  // フレットマーカー背景（奇数フレット＋12）
+  // フレットマーカー背景
   [3,5,7,9,12,15].forEach(f=>{
     if(f>FB_FRETS)return;
     const x=nutX+(f-1)*fW;
@@ -3452,7 +3469,6 @@ function drawFretboard(){
   for(let f=0;f<=FB_FRETS;f++){
     const x=nutX+f*fW;
     if(f===0){
-      // ナット
       ctx.fillStyle='rgba(220,200,160,0.85)';
       ctx.fillRect(x-2,ST,3.5,H-ST-SB);
     } else {
@@ -3474,7 +3490,7 @@ function drawFretboard(){
     ctx.fillText(String(absF),x,3);
   }
 
-  // フレットポジションドット（指板上のインレイ）
+  // インレイドット
   [3,5,7,9].forEach(f=>{
     if(f>FB_FRETS)return;
     const x=nutX+(f-0.5)*fW;
@@ -3490,77 +3506,147 @@ function drawFretboard(){
     });
   }
 
-  // 弦線 & 弦名 & コードトーン
   const hits=[];
-  for(let s=0;s<6;s++){
-    const y=ST+s*sH;
-    // 弦の太さ（6弦が最も太い）
-    const thickness=0.5+(5-s)*0.28;
-    const brightness=0.22+(5-s)*0.05;
 
-    // 弦線
-    ctx.beginPath();ctx.moveTo(nutX,y);ctx.lineTo(nutX+FB_FRETS*fW,y);
-    ctx.strokeStyle=`rgba(210,185,140,${brightness})`;
-    ctx.lineWidth=thickness;ctx.stroke();
+  if(posMode && curPos){
+    // ══ ポジション表示モード: 押弦ドット + 開放◯ + ミュート× ══
+    const frets=curPos.f; // [s0..s5] -1=ミュート,0=開放,n=フレット
+    for(let s=0;s<6;s++){
+      const y=ST+s*sH;
+      const thickness=0.5+(5-s)*0.28;
+      const brightness=0.22+(5-s)*0.05;
 
-    // 弦名ラベル
-    const openMidi=MIDI_OPEN[s]+fbCapo;
-    const openIv=((openMidi%12)-ri+12)%12;
-    const nameIsChord=ivSet.has(openIv);
-    ctx.font='bold 8px "DM Mono",monospace';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle=nameIsChord?ivColor(openIv):'rgba(80,80,105,0.9)';
-    ctx.fillText(STRING_NAMES[s],FB_SL/2,y);
+      // 弦線
+      ctx.beginPath();ctx.moveTo(nutX,y);ctx.lineTo(nutX+FB_FRETS*fW,y);
+      ctx.strokeStyle=`rgba(210,185,140,${brightness})`;
+      ctx.lineWidth=thickness;ctx.stroke();
 
-    // 開放弦コードトーン
-    if(nameIsChord){
-      const x=FB_SL+fW*0.5;
-      ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);
-      const col=ivColor(openIv);
-      ctx.fillStyle=col;ctx.fill();
-      if(openIv===0){
-        ctx.beginPath();ctx.arc(x,y,9.5,0,Math.PI*2);
-        ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
-      }
-      ctx.font='bold 6px "DM Mono",monospace';
+      // 弦名ラベル
+      ctx.font='bold 8px "DM Mono",monospace';
       ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillStyle='#000';
-      ctx.fillText(ivLabel(openIv),x,y);
-      hits.push({x,y,r:10,midi:openMidi});
+      ctx.fillStyle='rgba(80,80,105,0.9)';
+      ctx.fillText(STRING_NAMES[s],FB_SL/2,y);
+
+      const f=frets[s];
+      if(f<0){
+        // ミュート: ×
+        ctx.font='bold 10px "DM Mono",monospace';
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle='rgba(180,60,60,0.85)';
+        ctx.fillText('×',FB_SL+fW*0.5,y);
+      } else if(f===0){
+        // 開放弦: ◯（ICOLカラー）
+        const openMidi=MIDI_OPEN[s]+fbCapo;
+        const iv=((openMidi%12)-ri+12)%12;
+        const col=ivColor(iv);
+        const x=FB_SL+fW*0.5;
+        ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);
+        ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.stroke();
+        if(iv===0){
+          ctx.beginPath();ctx.arc(x,y,9.5,0,Math.PI*2);
+          ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.stroke();
+        }
+        ctx.font='bold 6px "DM Mono",monospace';
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle=col;
+        ctx.fillText(ivLabel(iv),x,y);
+        const midi=openMidi;
+        hits.push({x,y,r:10,midi});
+      } else {
+        // 押弦: 塗りドット（ICOLカラー）
+        const midi=MIDI_OPEN[s]+fbCapo+f;
+        const iv=((midi%12)-ri+12)%12;
+        const col=ivColor(iv);
+        const x=nutX+(f-0.5)*fW;
+        const dotR=fW>20?9:7.5;
+
+        // グロー
+        const grd=ctx.createRadialGradient(x,y,0,x,y,dotR+5);
+        grd.addColorStop(0,col+'66');
+        grd.addColorStop(1,col+'00');
+        ctx.beginPath();ctx.arc(x,y,dotR+5,0,Math.PI*2);
+        ctx.fillStyle=grd;ctx.fill();
+
+        // ドット本体
+        ctx.beginPath();ctx.arc(x,y,dotR,0,Math.PI*2);
+        ctx.fillStyle=col;ctx.fill();
+
+        // ルートは二重リング
+        if(iv===0){
+          ctx.beginPath();ctx.arc(x,y,dotR+2.5,0,Math.PI*2);
+          ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+        }
+
+        ctx.font=`bold ${dotR>8?7:6}px "DM Mono",monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle='#000';
+        ctx.fillText(ivLabel(iv),x,y);
+        hits.push({x,y,r:dotR+3,midi});
+      }
     }
+  } else {
+    // ══ 全コードトーン表示モード（従来） ══
+    for(let s=0;s<6;s++){
+      const y=ST+s*sH;
+      const thickness=0.5+(5-s)*0.28;
+      const brightness=0.22+(5-s)*0.05;
 
-    // 各フレットのコードトーン
-    for(let f=1;f<=FB_FRETS;f++){
-      const midi=openMidi+f;
-      const iv=((midi%12)-ri+12)%12;
-      if(!ivSet.has(iv))continue;
-      const x=nutX+(f-0.5)*fW;
-      const col=ivColor(iv);
-      const dotR=fW>20?8:6.5;
+      ctx.beginPath();ctx.moveTo(nutX,y);ctx.lineTo(nutX+FB_FRETS*fW,y);
+      ctx.strokeStyle=`rgba(210,185,140,${brightness})`;
+      ctx.lineWidth=thickness;ctx.stroke();
 
-      // グロー
-      const grd=ctx.createRadialGradient(x,y,0,x,y,dotR+5);
-      grd.addColorStop(0,col+'55');
-      grd.addColorStop(1,col+'00');
-      ctx.beginPath();ctx.arc(x,y,dotR+5,0,Math.PI*2);
-      ctx.fillStyle=grd;ctx.fill();
+      const openMidi=MIDI_OPEN[s]+fbCapo;
+      const openIv=((openMidi%12)-ri+12)%12;
+      const nameIsChord=ivSet.has(openIv);
+      ctx.font='bold 8px "DM Mono",monospace';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=nameIsChord?ivColor(openIv):'rgba(80,80,105,0.9)';
+      ctx.fillText(STRING_NAMES[s],FB_SL/2,y);
 
-      // ドット本体
-      ctx.beginPath();ctx.arc(x,y,dotR,0,Math.PI*2);
-      ctx.fillStyle=col;ctx.fill();
-
-      // ルートは二重リング
-      if(iv===0){
-        ctx.beginPath();ctx.arc(x,y,dotR+2.5,0,Math.PI*2);
-        ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+      if(nameIsChord){
+        const x=FB_SL+fW*0.5;
+        ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);
+        const col=ivColor(openIv);
+        ctx.fillStyle=col;ctx.fill();
+        if(openIv===0){
+          ctx.beginPath();ctx.arc(x,y,9.5,0,Math.PI*2);
+          ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+        }
+        ctx.font='bold 6px "DM Mono",monospace';
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle='#000';
+        ctx.fillText(ivLabel(openIv),x,y);
+        hits.push({x,y,r:10,midi:openMidi});
       }
 
-      // 音程ラベル
-      ctx.font=`bold ${dotR>7?6.5:6}px "DM Mono",monospace`;
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillStyle='#000';
-      ctx.fillText(ivLabel(iv),x,y);
-      hits.push({x,y,r:dotR+3,midi});
+      for(let f=1;f<=FB_FRETS;f++){
+        const midi=openMidi+f;
+        const iv=((midi%12)-ri+12)%12;
+        if(!ivSet.has(iv))continue;
+        const x=nutX+(f-0.5)*fW;
+        const col=ivColor(iv);
+        const dotR=fW>20?8:6.5;
+
+        const grd=ctx.createRadialGradient(x,y,0,x,y,dotR+5);
+        grd.addColorStop(0,col+'55');
+        grd.addColorStop(1,col+'00');
+        ctx.beginPath();ctx.arc(x,y,dotR+5,0,Math.PI*2);
+        ctx.fillStyle=grd;ctx.fill();
+
+        ctx.beginPath();ctx.arc(x,y,dotR,0,Math.PI*2);
+        ctx.fillStyle=col;ctx.fill();
+
+        if(iv===0){
+          ctx.beginPath();ctx.arc(x,y,dotR+2.5,0,Math.PI*2);
+          ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+        }
+
+        ctx.font=`bold ${dotR>7?6.5:6}px "DM Mono",monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle='#000';
+        ctx.fillText(ivLabel(iv),x,y);
+        hits.push({x,y,r:dotR+3,midi});
+      }
     }
   }
   canvas._fbHits=hits;
@@ -3606,6 +3692,45 @@ document.getElementById('fb-capo-dec').addEventListener('click',()=>{
   if(fbCapo>0){fbCapo--;document.getElementById('fb-capo-val').textContent=fbCapo;drawFretboard();}
 });
 
+// ── ポジション切り替えナビ ──
+function updateFbPosNav(total){
+  const lbl=document.getElementById('fb-pos-lbl');
+  if(!lbl)return;
+  const idx=Math.min(fbPosIdx,Math.max(0,total-1));
+  lbl.textContent=total>0?`Pos ${idx+1}/${total}`:'—';
+}
+function setFbPosIdx(idx,sync){
+  const vArr=getVoicings(S.root,S.type);
+  if(!vArr.length)return;
+  fbPosIdx=Math.max(0,Math.min(idx,vArr.length-1));
+  // S.voicingを同期
+  S.voicing=vArr[fbPosIdx].f;
+  if(sync!==false){
+    // VOICINGSカードのsel同期
+    const scroll=document.getElementById('pos-scroll');
+    if(scroll){
+      scroll.querySelectorAll('.pos-card').forEach(c=>{
+        c.classList.toggle('sel',parseInt(c.dataset.i)===fbPosIdx);
+      });
+      // 選択カードをスクロールして見えるようにする
+      const selCard=scroll.querySelector('.pos-card.sel');
+      if(selCard)selCard.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+    }
+  }
+  drawFretboard();
+  drawPianoRoll();
+}
+document.getElementById('fb-pos-dec').addEventListener('click',()=>{
+  const vArr=getVoicings(S.root,S.type);
+  if(!vArr.length)return;
+  setFbPosIdx((fbPosIdx-1+vArr.length)%vArr.length);
+});
+document.getElementById('fb-pos-inc').addEventListener('click',()=>{
+  const vArr=getVoicings(S.root,S.type);
+  if(!vArr.length)return;
+  setFbPosIdx((fbPosIdx+1)%vArr.length);
+});
+
 // ═══════════════════════
 // PIANO ROLL
 // ═══════════════════════
@@ -3640,13 +3765,26 @@ function drawPianoRoll(){
   const ivSet=chordIvSet(S.type);
   const startMidi=12*(prOctave+1); // C(prOctave) のMIDIノート
 
+  // ポジションモード: 選択ポジションのMIDIノートセットを構築
+  const vArr2=getVoicings(S.root,S.type);
+  const curPos2=vArr2.length>0?vArr2[Math.min(fbPosIdx,vArr2.length-1)]:null;
+  const posMidiSet=new Set();
+  if(curPos2){
+    curPos2.f.forEach((f,s)=>{
+      if(f<0)return;
+      const midi=MIDI_OPEN[s]+(f===0?0:f);
+      // 同音異オクターブも含める（±1oct）
+      [midi-12,midi,midi+12,midi-24,midi+24].forEach(m=>posMidiSet.add(m));
+    });
+  }
+
   // ── 白鍵 ──
   const wkHits=[];
   for(let oct=0;oct<OCTAVES;oct++){
     WK_SEMI.forEach((semi,wIdx)=>{
       const midi=startMidi+oct*12+semi;
       const iv=((midi%12)-ri+12)%12;
-      const isChord=ivSet.has(iv);
+      const isChord=curPos2?posMidiSet.has(midi):ivSet.has(iv);
       const isRoot=iv===0;
       const kx=(oct*7+wIdx)*wW;
 
@@ -3702,7 +3840,7 @@ function drawPianoRoll(){
     bkDef.forEach(({wIdx,semi})=>{
       const midi=startMidi+oct*12+semi;
       const iv=((midi%12)-ri+12)%12;
-      const isChord=ivSet.has(iv);
+      const isChord=curPos2?posMidiSet.has(midi):ivSet.has(iv);
       // 黒鍵X: 白鍵の右端から bW/2 左にずらす
       const bx=(oct*7+wIdx)*wW + wW - bW/2;
 
@@ -4075,18 +4213,6 @@ drawFrame();
 document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
 renderPath();
 renderPosZone();
-
-// ── TAB 切り替え ──
-document.querySelectorAll('.tab').forEach(function(tab){
-  tab.addEventListener('click',function(){
-    var target=this.dataset.tab;
-    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
-    document.querySelectorAll('.pane').forEach(function(p){p.classList.remove('show');});
-    this.classList.add('on');
-    document.getElementById('pane-'+target).classList.add('show');
-    if(target==='select') setTimeout(initChordVisuals,80);
-  });
-});
 </script>
 </body>
 </html>
