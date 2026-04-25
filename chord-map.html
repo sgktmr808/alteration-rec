@@ -2359,8 +2359,25 @@ function getVoicings(root,type){
   const seen=new Set();const all=[];
   db.forEach(v=>{const kk=v.join(',');if(!seen.has(kk)){seen.add(kk);all.push({v,d:true});}});
   raw.forEach(v=>{const kk=v.join(',');if(!seen.has(kk)){seen.add(kk);all.push({v,d:false});}});
+  // スコア順全件 → フレット帯域ごとに代表を選び、合計最大16件
   all.sort((a,b)=>(scoreV(b.v,ri,ivSet)+(b.d?5:0))-(scoreV(a.v,ri,ivSet)+(a.d?5:0)));
-  const res=all.slice(0,16).map(({v})=>({f:v,l:posLbl(v)}));VCACHE[k]=res;return res;
+  // 帯域別バケット: 0-4fr, 5-8fr, 9-12fr, 13-15fr
+  const buckets=[[],[],[],[]];
+  all.forEach(({v})=>{
+    const pr=v.filter(f=>f>0);
+    const minF=pr.length>0?Math.min(...pr):0;
+    const bi=minF<=4?0:minF<=8?1:minF<=12?2:3;
+    buckets[bi].push(v);
+  });
+  // 各バケットから上位4件ずつ確保（合計16件）
+  const res=[];
+  buckets.forEach(b=>b.slice(0,4).forEach(v=>res.push({f:v,l:posLbl(v)})));
+  // 足りない場合は残りのスコア順で補完
+  if(res.length<16){
+    const inRes=new Set(res.map(r=>r.f.join(',')));
+    all.forEach(({v})=>{if(res.length>=16)return;const k=v.join(',');if(!inRes.has(k)){inRes.add(k);res.push({f:v,l:posLbl(v)});}});
+  }
+  VCACHE[k]=res;return res;
 }
 function makeDiag(frets,ri){
   const STR=6,FR=4,SH=13,FW=19,NW=5,PL=13,IH=11,FH=10,PT=2;
@@ -3458,8 +3475,7 @@ function drawFretboard(){
     const pressed=curPos.f.filter(f=>f>0);
     if(pressed.length>0){
       const minF=Math.min(...pressed);
-      // 最小フレットが表示窓の左寄り（2フレット目付近）に来るようオフセット
-      fbViewOffset=Math.max(0,minF-2);
+      fbViewOffset=Math.max(0,minF-1);
     }
   }
 
@@ -3768,7 +3784,17 @@ function updateFbPosNav(total){
   const lbl=document.getElementById('fb-pos-lbl');
   if(!lbl)return;
   const idx=Math.min(fbPosIdx,Math.max(0,total-1));
-  lbl.textContent=total>0?`Pos ${idx+1}/${total}`:'—';
+  if(total>0){
+    const vArr=getVoicings(S.root,S.type);
+    const pos=vArr[idx];
+    const pressed=pos?pos.f.filter(f=>f>0):[];
+    const minF=pressed.length>0?Math.min(...pressed):0;
+    const maxF=pressed.length>0?Math.max(...pressed):0;
+    const fInfo=minF>0?` ${minF}-${maxF}fr`:'';
+    lbl.textContent=`Pos ${idx+1}/${total}${fInfo}`;
+  } else {
+    lbl.textContent='—';
+  }
 }
 function setFbPosIdx(idx,sync){
   const vArr=getVoicings(S.root,S.type);
