@@ -2361,15 +2361,26 @@ function getVoicings(root,type){
   raw.forEach(v=>{const kk=v.join(',');if(!seen.has(kk)){seen.add(kk);all.push({v,d:false});}});
   // スコア順全件 → フレット帯域ごとに代表を選び、合計最大16件
   all.sort((a,b)=>(scoreV(b.v,ri,ivSet)+(b.d?5:0))-(scoreV(a.v,ri,ivSet)+(a.d?5:0)));
-  // 帯域別バケット: 0-4fr, 5-8fr, 9-12fr, 13-15fr
+  // 帯域別バケット: 0=オープン混じり(0-4fr), 1=5-8fr純押弦, 2=9-12fr純押弦, 3=13-15fr純押弦
+  // 「純押弦」= 開放弦(0)を含まない、かつ全押弦が4フレット窓内
   const buckets=[[],[],[],[]];
   all.forEach(({v})=>{
     const pr=v.filter(f=>f>0);
+    const hasOpen=v.some(f=>f===0);
     const minF=pr.length>0?Math.min(...pr):0;
-    const bi=minF<=4?0:minF<=8?1:minF<=12?2:3;
-    buckets[bi].push(v);
+    const maxF=pr.length>0?Math.max(...pr):0;
+    const span=maxF-minF;
+    // 開放弦あり or 低ポジション → バケット0
+    if(hasOpen||minF<=4){buckets[0].push(v);return;}
+    // 純押弦かつ4フレット窓内のみ帯域バケットへ
+    if(span<=4){
+      const bi=minF<=8?1:minF<=12?2:3;
+      buckets[bi].push(v);
+    } else {
+      buckets[0].push(v); // 窓をはみ出るものはバケット0へ
+    }
   });
-  // 各バケットから上位4件ずつ確保（合計16件）
+  // 各バケットから上位4件ずつ確保（合計最大16件）
   const res=[];
   buckets.forEach(b=>b.slice(0,4).forEach(v=>res.push({f:v,l:posLbl(v)})));
   // 足りない場合は残りのスコア順で補完
@@ -3394,7 +3405,7 @@ function renderRoots(){
     S.root=p.dataset.r;
     document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
     relCache=null;invalidate();S.voicing=null;fbPosIdx=0;
-    renderRoots();renderPosZone();
+    Object.keys(VCACHE).forEach(k=>delete VCACHE[k]);
     refreshChordVisuals();
   }));
 }
@@ -3414,6 +3425,7 @@ function renderTypes(){
     S.type=p.dataset.t;
     document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
     relCache=null;invalidate();S.voicing=null;fbPosIdx=0;
+    Object.keys(VCACHE).forEach(k=>delete VCACHE[k]);
     renderTypes();renderPosZone();
     refreshChordVisuals();
   }));
