@@ -3467,9 +3467,13 @@ function drawFretboard(){
   const FB_SL=26;
   const ST=20;
   const SB=6;
-  const fW=(W-FB_SL)/(FB_FRETS+1);
+  // FRETモード: 開放弦エリアを省いて全幅を指板に使う
+  // CAPOモード: 開放弦エリア(fW分)を確保
+  const fW_fret=(W-FB_SL)/FB_FRETS;          // FRETモード: フレット幅
+  const fW_capo=(W-FB_SL)/(FB_FRETS+1);      // CAPOモード: フレット幅（開放弦エリア込み）
+  const fW=fbMode==='fret'?fW_fret:fW_capo;
+  const nutX=fbMode==='fret'?FB_SL:FB_SL+fW; // FRETモード: 左端から指板開始
   const sH=(H-ST-SB)/5;
-  const nutX=FB_SL+fW;
 
   // 背景
   ctx.fillStyle='#0a0a0d';
@@ -3483,24 +3487,33 @@ function drawFretboard(){
   ctx.fillStyle=grad;
   ctx.fillRect(nutX,ST,W-nutX,H-ST-SB);
 
-  // フレットマーカー背景
-  [3,5,7,9,12,15].forEach(f=>{
-    if(f>FB_FRETS)return;
+  // フレットマーカー背景（表示フレット番号でハイライト）
+  for(let f=1;f<=FB_FRETS;f++){
+    const absF=fbMode==='fret'?f+fbViewOffset:f+fbCapo;
+    const isMark=[3,5,7,9,12,15,17,19,21].includes(absF);
+    const is12=(absF%12===0&&absF>0);
+    if(!isMark&&!is12)continue;
     const x=nutX+(f-1)*fW;
-    ctx.fillStyle=f===12?'rgba(232,197,71,0.06)':'rgba(255,255,255,0.04)';
+    ctx.fillStyle=is12?'rgba(232,197,71,0.06)':'rgba(255,255,255,0.04)';
     ctx.fillRect(x,ST,fW,H-ST-SB);
-  });
+  }
 
-  // フレット線
+  // フレット線 + ナット
   for(let f=0;f<=FB_FRETS;f++){
     const x=nutX+f*fW;
     if(f===0){
-      ctx.fillStyle='rgba(220,200,160,0.85)';
-      ctx.fillRect(x-2,ST,3.5,H-ST-SB);
+      if(fbMode==='capo'){
+        // CAPOモード: ナットを描画
+        ctx.fillStyle='rgba(220,200,160,0.85)';
+        ctx.fillRect(x-2,ST,3.5,H-ST-SB);
+      }
+      // FRETモード: ナット非表示（開放弦エリアは使わない）
     } else {
+      // オフセット後の実フレット番号
+      const absF=fbMode==='fret'?f+fbViewOffset:f+fbCapo;
       ctx.beginPath();ctx.moveTo(x,ST);ctx.lineTo(x,H-SB);
-      ctx.strokeStyle=f%12===0?'rgba(180,160,120,0.5)':'rgba(70,70,95,0.6)';
-      ctx.lineWidth=f%12===0?1.5:0.8;
+      ctx.strokeStyle=absF%12===0?'rgba(180,160,120,0.5)':'rgba(70,70,95,0.6)';
+      ctx.lineWidth=absF%12===0?1.5:0.8;
       ctx.stroke();
     }
   }
@@ -3518,20 +3531,21 @@ function drawFretboard(){
     ctx.fillText(String(absF),x,3);
   }
 
-  // インレイドット
-  [3,5,7,9].forEach(f=>{
-    if(f>FB_FRETS)return;
-    const x=nutX+(f-0.5)*fW;
+  // インレイドット（表示フレット番号基準）
+  for(let f=1;f<=FB_FRETS;f++){
+    const absF=fbMode==='fret'?f+fbViewOffset:f+fbCapo;
     const y=ST+(H-ST-SB)/2;
-    ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fill();
-  });
-  if(12<=FB_FRETS){
-    const x=nutX+11.5*fW;
-    [0.3,0.7].forEach(r=>{
-      ctx.beginPath();ctx.arc(x,ST+(H-ST-SB)*r,3,0,Math.PI*2);
+    const x=nutX+(f-0.5)*fW;
+    if(absF%12===0&&absF>0){
+      // 12フレット系: 二連ドット
+      [0.3,0.7].forEach(r=>{
+        ctx.beginPath();ctx.arc(x,ST+(H-ST-SB)*r,3,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fill();
+      });
+    } else if([3,5,7,9,15,17,19,21].includes(absF)){
+      ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);
       ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fill();
-    });
+    }
   }
 
   const hits=[];
@@ -3544,8 +3558,9 @@ function drawFretboard(){
       const thickness=0.5+(5-s)*0.28;
       const brightness=0.22+(5-s)*0.05;
 
-      // 弦線
-      ctx.beginPath();ctx.moveTo(nutX,y);ctx.lineTo(nutX+FB_FRETS*fW,y);
+      // 弦線（FRETモードは左端から、CAPOモードはnutXから）
+      const lineStartX=fbMode==='fret'?FB_SL:nutX;
+      ctx.beginPath();ctx.moveTo(lineStartX,y);ctx.lineTo(lineStartX+FB_FRETS*fW,y);
       ctx.strokeStyle=`rgba(210,185,140,${brightness})`;
       ctx.lineWidth=thickness;ctx.stroke();
 
@@ -3558,40 +3573,48 @@ function drawFretboard(){
       const f=frets[s];
       if(f<0){
         // ミュート: ×
-        ctx.font='bold 10px "DM Mono",monospace';
+        ctx.font='bold 9px "DM Mono",monospace';
         ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillStyle='rgba(180,60,60,0.85)';
-        ctx.fillText('×',FB_SL+fW*0.5,y);
+        ctx.fillStyle='rgba(200,60,60,0.9)';
+        ctx.fillText('×',FB_SL/2,y);
       } else if(f===0){
-        // 開放弦: ◯（ICOLカラー）
-        // capoモード: 開放弦の音程 = MIDI_OPEN[s] + fbCapo
-        // fretモード: 開放弦はオフセット関係なく実際の開放弦音程
-        const openMidi=MIDI_OPEN[s]+(fbMode==='capo'?fbCapo:0);
-        const iv=((openMidi%12)-ri+12)%12;
-        const col=ivColor(iv);
-        const x=FB_SL+fW*0.5;
-        ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);
-        ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.stroke();
-        if(iv===0){
-          ctx.beginPath();ctx.arc(x,y,9.5,0,Math.PI*2);
-          ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.stroke();
+        if(fbMode==='capo'){
+          // CAPOモード: 開放弦 ◯ を開放弦エリアに表示
+          const openMidi=MIDI_OPEN[s]+fbCapo;
+          const iv=((openMidi%12)-ri+12)%12;
+          const col=ivColor(iv);
+          const x=FB_SL+fW*0.5;
+          ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);
+          ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.stroke();
+          if(iv===0){ctx.beginPath();ctx.arc(x,y,9.5,0,Math.PI*2);ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.stroke();}
+          ctx.font='bold 6px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillStyle=col;ctx.fillText(ivLabel(iv),x,y);
+          hits.push({x,y,r:10,midi:openMidi});
+        } else {
+          // FRETモード: 開放弦は弦名をICOLカラーに変えて◯で囲む
+          const openMidi=MIDI_OPEN[s];
+          const iv=((openMidi%12)-ri+12)%12;
+          const col=ivColor(iv);
+          ctx.beginPath();ctx.arc(FB_SL/2,y,9,0,Math.PI*2);
+          ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+          ctx.font='bold 8px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillStyle=col;ctx.fillText(STRING_NAMES[s],FB_SL/2,y);
+          hits.push({x:FB_SL/2,y,r:9,midi:openMidi});
         }
-        ctx.font='bold 6px "DM Mono",monospace';
-        ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillStyle=col;
-        ctx.fillText(ivLabel(iv),x,y);
-        hits.push({x,y,r:10,midi:openMidi});
       } else {
-        // 押弦: 塗りドット（ICOLカラー）
-        // fretモード: 画面上の表示位置 = f - fbViewOffset（フレット番号基準）
-        // capoモード: 画面上の表示位置 = f（フレット番号そのまま）
+        // 押弦: 塗りドット
+        // FRETモード: 表示列 = f - fbViewOffset (1-indexed, left=1)
+        // CAPOモード: 表示列 = f
         const dispF=fbMode==='fret'?f-fbViewOffset:f;
-        // 表示範囲外はスキップ
         if(dispF<1||dispF>FB_FRETS){continue;}
         const midi=MIDI_OPEN[s]+(fbMode==='capo'?fbCapo:0)+f;
         const iv=((midi%12)-ri+12)%12;
         const col=ivColor(iv);
-        const x=nutX+(dispF-0.5)*fW;
+        // FRETモード: 指板左端(FB_SL)を基準に配置
+        // CAPOモード: ナット(nutX)を基準に配置
+        const x=fbMode==='fret'
+          ?FB_SL+(dispF-0.5)*fW
+          :nutX+(dispF-0.5)*fW;
         const dotR=fW>20?9:7.5;
 
         // グロー
@@ -3625,7 +3648,8 @@ function drawFretboard(){
       const thickness=0.5+(5-s)*0.28;
       const brightness=0.22+(5-s)*0.05;
 
-      ctx.beginPath();ctx.moveTo(nutX,y);ctx.lineTo(nutX+FB_FRETS*fW,y);
+      const lineStartX2=fbMode==='fret'?FB_SL:nutX;
+      ctx.beginPath();ctx.moveTo(lineStartX2,y);ctx.lineTo(lineStartX2+FB_FRETS*fW,y);
       ctx.strokeStyle=`rgba(210,185,140,${brightness})`;
       ctx.lineWidth=thickness;ctx.stroke();
 
@@ -3637,7 +3661,7 @@ function drawFretboard(){
       ctx.fillStyle=nameIsChord?ivColor(openIv):'rgba(80,80,105,0.9)';
       ctx.fillText(STRING_NAMES[s],FB_SL/2,y);
 
-      if(nameIsChord){
+      if(nameIsChord && fbMode==='capo'){
         const x=FB_SL+fW*0.5;
         ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);
         const col=ivColor(openIv);
@@ -3659,7 +3683,7 @@ function drawFretboard(){
         const midi=openMidi+absF;
         const iv=((midi%12)-ri+12)%12;
         if(!ivSet.has(iv))continue;
-        const x=nutX+(f-0.5)*fW;
+        const x=fbMode==='fret'?FB_SL+(f-0.5)*fW:nutX+(f-0.5)*fW;
         const col=ivColor(iv);
         const dotR=fW>20?8:6.5;
 
