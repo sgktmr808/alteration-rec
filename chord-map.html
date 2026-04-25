@@ -176,6 +176,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .fb-capo{font-family:var(--fm);font-size:8px;padding:1px 6px;
   border:1px solid var(--bdr2);border-radius:3px;color:var(--acc);
   background:var(--surf2);cursor:pointer;min-width:28px;text-align:center;}
+.fb-capo.on{border-color:var(--acc);background:var(--acc-a);}
 #fb-canvas{display:block;width:100%;cursor:pointer;touch-action:manipulation;}
 
 /* ── PIANO ROLL ── */
@@ -385,7 +386,11 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <span id="fb-pos-lbl" style="font-family:var(--fm);font-size:8px;color:var(--acc);min-width:40px;text-align:center;">Pos 1/1</span>
             <div class="fb-capo" id="fb-pos-inc" style="min-width:22px;text-align:center;">▶</div>
           </div>
-          <div class="fb-capo-wrap">
+          <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+            <div class="fb-capo on" id="fb-mode-fret" style="font-size:7px;letter-spacing:.05em;">FRET</div>
+            <div class="fb-capo" id="fb-mode-capo" style="font-size:7px;letter-spacing:.05em;">CAPO</div>
+          </div>
+          <div class="fb-capo-wrap" id="fb-capo-wrap" style="display:none;">
             <span class="fb-capo-lbl">CAPO</span>
             <div class="fb-capo" id="fb-capo-dec">−</div>
             <span class="fb-capo" id="fb-capo-val" style="pointer-events:none">0</span>
@@ -3407,7 +3412,8 @@ const STRING_NAMES=['E','A','D','G','B','e'];
 const FB_FRETS=15;   // 表示フレット数
 let   fbCapo=0;
 let   prOctave=3;    // ピアノロール表示オクターブ (C3=3)
-let   fbPosIdx=0;    // 選択中ポジションIndex (0=全表示OFF→ポジション0)
+let   fbPosIdx=0;    // 選択中ポジションIndex
+let   fbMode='fret'; // 'fret'=フレット移動モード(デフォルト) / 'capo'=オープン+カポモード
 
 
 // ── ヘルパー ──
@@ -3443,6 +3449,19 @@ function drawFretboard(){
   const curPos=posMode?vArr[Math.min(fbPosIdx,vArr.length-1)]:null;
   // ポジションナビ更新
   updateFbPosNav(vArr.length);
+
+  // ── フレット表示オフセット計算 ──
+  // fretモード: 選択ポジションの最小押弦フレットを基準に窓をスライド
+  // capoモード: 常にフレット1から表示（fbCapoで音程オフセット）
+  let fbViewOffset=0; // 表示するフレットの開始オフセット（fretモード用）
+  if(fbMode==='fret' && curPos){
+    const pressed=curPos.f.filter(f=>f>0);
+    if(pressed.length>0){
+      const minF=Math.min(...pressed);
+      // 最小フレットが表示窓の左寄り（2フレット目付近）に来るようオフセット
+      fbViewOffset=Math.max(0,minF-2);
+    }
+  }
 
   // ── レイアウト定数 ──
   const FB_SL=26;
@@ -3490,7 +3509,9 @@ function drawFretboard(){
   ctx.font='7px "DM Mono",monospace';
   ctx.textAlign='center';ctx.textBaseline='top';
   for(let f=1;f<=FB_FRETS;f++){
-    const absF=f+fbCapo;
+    // fretモード: f+fbViewOffset が実際のフレット番号
+    // capoモード: f+fbCapo が実際のフレット番号
+    const absF=fbMode==='fret'?f+fbViewOffset:f+fbCapo;
     const x=nutX+(f-0.5)*fW;
     const dot=[3,5,7,9,12,15,17].includes(absF);
     ctx.fillStyle=dot?'rgba(232,197,71,0.6)':'rgba(55,55,75,1)';
@@ -3543,7 +3564,9 @@ function drawFretboard(){
         ctx.fillText('×',FB_SL+fW*0.5,y);
       } else if(f===0){
         // 開放弦: ◯（ICOLカラー）
-        const openMidi=MIDI_OPEN[s]+fbCapo;
+        // capoモード: 開放弦の音程 = MIDI_OPEN[s] + fbCapo
+        // fretモード: 開放弦はオフセット関係なく実際の開放弦音程
+        const openMidi=MIDI_OPEN[s]+(fbMode==='capo'?fbCapo:0);
         const iv=((openMidi%12)-ri+12)%12;
         const col=ivColor(iv);
         const x=FB_SL+fW*0.5;
@@ -3557,14 +3580,18 @@ function drawFretboard(){
         ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillStyle=col;
         ctx.fillText(ivLabel(iv),x,y);
-        const midi=openMidi;
-        hits.push({x,y,r:10,midi});
+        hits.push({x,y,r:10,midi:openMidi});
       } else {
         // 押弦: 塗りドット（ICOLカラー）
-        const midi=MIDI_OPEN[s]+fbCapo+f;
+        // fretモード: 画面上の表示位置 = f - fbViewOffset（フレット番号基準）
+        // capoモード: 画面上の表示位置 = f（フレット番号そのまま）
+        const dispF=fbMode==='fret'?f-fbViewOffset:f;
+        // 表示範囲外はスキップ
+        if(dispF<1||dispF>FB_FRETS){continue;}
+        const midi=MIDI_OPEN[s]+(fbMode==='capo'?fbCapo:0)+f;
         const iv=((midi%12)-ri+12)%12;
         const col=ivColor(iv);
-        const x=nutX+(f-0.5)*fW;
+        const x=nutX+(dispF-0.5)*fW;
         const dotR=fW>20?9:7.5;
 
         // グロー
@@ -3602,7 +3629,7 @@ function drawFretboard(){
       ctx.strokeStyle=`rgba(210,185,140,${brightness})`;
       ctx.lineWidth=thickness;ctx.stroke();
 
-      const openMidi=MIDI_OPEN[s]+fbCapo;
+      const openMidi=MIDI_OPEN[s]+(fbMode==='capo'?fbCapo:0);
       const openIv=((openMidi%12)-ri+12)%12;
       const nameIsChord=ivSet.has(openIv);
       ctx.font='bold 8px "DM Mono",monospace';
@@ -3627,7 +3654,9 @@ function drawFretboard(){
       }
 
       for(let f=1;f<=FB_FRETS;f++){
-        const midi=openMidi+f;
+        // fretモードでは表示フレットf = 実際のフレット f+fbViewOffset
+        const absF=fbMode==='fret'?f+fbViewOffset:f;
+        const midi=openMidi+absF;
         const iv=((midi%12)-ri+12)%12;
         if(!ivSet.has(iv))continue;
         const x=nutX+(f-0.5)*fW;
@@ -3698,6 +3727,17 @@ document.getElementById('fb-capo-inc').addEventListener('click',()=>{
 document.getElementById('fb-capo-dec').addEventListener('click',()=>{
   if(fbCapo>0){fbCapo--;document.getElementById('fb-capo-val').textContent=fbCapo;drawFretboard();}
 });
+
+// ── FRET / CAPO モード切り替え ──
+function setFbMode(mode){
+  fbMode=mode;
+  document.getElementById('fb-mode-fret').classList.toggle('on',mode==='fret');
+  document.getElementById('fb-mode-capo').classList.toggle('on',mode==='capo');
+  document.getElementById('fb-capo-wrap').style.display=mode==='capo'?'flex':'none';
+  drawFretboard();
+}
+document.getElementById('fb-mode-fret').addEventListener('click',()=>setFbMode('fret'));
+document.getElementById('fb-mode-capo').addEventListener('click',()=>setFbMode('capo'));
 
 // ── ポジション切り替えナビ ──
 function updateFbPosNav(total){
