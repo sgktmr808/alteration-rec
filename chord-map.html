@@ -32,7 +32,7 @@
   --diag-node-r:5px;   /* ノード半径 */
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;}
+html,body{height:100%;overflow:hidden;touch-action:manipulation;}
 body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
 .hdr{flex-shrink:0;background:var(--surf);border-bottom:1px solid var(--bdr);
   padding:calc(var(--safe-t)+10px) 14px 10px;display:flex;align-items:center;gap:10px;}
@@ -1954,10 +1954,10 @@ function drawFrame(){
     const a1=sec.start-Math.PI/2,a2=sec.start+sec.size-Math.PI/2;
     ctx.beginPath();ctx.moveTo(cx,cy);
     ctx.arc(cx,cy,MR,a1,a2);ctx.closePath();
-    ctx.fillStyle=sec.col+'08';ctx.fill();
+    ctx.fillStyle=hexToRgba(sec.col,0.03);ctx.fill();
     const midA=(a1+a2)/2;
     ctx.font='7px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle=sec.col+'60';
+    ctx.fillStyle=hexToRgba(sec.col,0.38);
     ctx.fillText(sec.label,cx+MR*0.82*Math.cos(midA),cy+MR*0.82*Math.sin(midA));
   });
 
@@ -2299,6 +2299,13 @@ function initCanvas(){
 // VOICINGS
 // ═══════════════════════
 const ICOL={0:'#e8c547',3:'#4a90d4',4:'#4a90d4',7:'#4aaa72',10:'#9a6ad4',11:'#9a6ad4',2:'#d4823a',1:'#d4823a',5:'#5a90b0',9:'#5a90b0',6:'#777',8:'#777'};
+// #rrggbb[aa] → rgba() 変換（Safari 15以前の#rrggbbAA非対応対策）
+function hexToRgba(hex,alpha){
+  var h=hex.replace('#','');
+  if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  return'rgba('+r+','+g+','+b+','+(alpha||1)+')';
+}
 const INAME={0:'R',1:'b9',2:'9',3:'b3',4:'3',5:'4',6:'b5',7:'5',8:'#5',9:'6',10:'b7',11:'M7'};
 const DB_RM={'C':'C','C#':'Csharp','D':'D','D#':'Eb','E':'E','F':'F','F#':'Fsharp','G':'G','G#':'Ab','A':'A','A#':'Bb','B':'B'};
 const T2DB={major:'major',minor:'minor',dom7:'7',m7:'m7',maj7:'maj7',m9:'m9','9':'9',maj9:'maj9',dim:'dim',dim7:'dim7',aug:'aug',sus4:'sus4',sus2:'sus2',m7b5:'m7b5',add9:'add9','6':'6',mmaj7:'mmaj7',m6:'m6'};
@@ -3562,8 +3569,8 @@ function drawFretboard(){
 
         // グロー
         const grd=ctx.createRadialGradient(x,y,0,x,y,dotR+5);
-        grd.addColorStop(0,col+'66');
-        grd.addColorStop(1,col+'00');
+        grd.addColorStop(0,hexToRgba(col,0.4));
+        grd.addColorStop(1,hexToRgba(col,0));
         ctx.beginPath();ctx.arc(x,y,dotR+5,0,Math.PI*2);
         ctx.fillStyle=grd;ctx.fill();
 
@@ -3628,8 +3635,8 @@ function drawFretboard(){
         const dotR=fW>20?8:6.5;
 
         const grd=ctx.createRadialGradient(x,y,0,x,y,dotR+5);
-        grd.addColorStop(0,col+'55');
-        grd.addColorStop(1,col+'00');
+        grd.addColorStop(0,hexToRgba(col,0.33));
+        grd.addColorStop(1,hexToRgba(col,0));
         ctx.beginPath();ctx.arc(x,y,dotR+5,0,Math.PI*2);
         ctx.fillStyle=grd;ctx.fill();
 
@@ -3847,7 +3854,7 @@ function drawPianoRoll(){
       if(isChord){
         const col=ivColor(iv);
         // グロー
-        ctx.fillStyle=col+'44';
+        ctx.fillStyle=hexToRgba(col,0.27);
         ctx.fillRect(bx-2,0,bW+4,bH+3);
         ctx.fillStyle=col;
       } else {
