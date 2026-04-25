@@ -58,38 +58,46 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 #map-wrap{flex:1;position:relative;overflow:hidden;}
 #map-canvas{width:100%;height:100%;display:block;touch-action:none;}
 
-/* ── スワイプ切り替え ──
-   pane-map を position:relative にして、
-   #map-layer（サークル）と #ctrl-layer（コントロール）を
-   上下に並べた2倍高のスタックにする。
-   translateY(0) → サークル表示、translateY(-50%) → コントロール表示
-*/
-#map-stack{
-  position:absolute;inset:0;
+/* ── スワイプ切り替え ── */
+#pane-map{overflow:hidden;}
+#map-slide{
+  width:100%;height:200%;
   display:flex;flex-direction:column;
-  transition:transform .3s cubic-bezier(.4,0,.2,1);
   will-change:transform;
 }
-#map-layer{
-  flex:0 0 100%;height:100%;
-  position:relative;overflow:hidden;
+#map-screen{
+  flex:0 0 50%;position:relative;
+  display:flex;flex-direction:column;overflow:hidden;
 }
-#ctrl-layer{
-  flex:0 0 100%;height:100%;
-  overflow-y:auto;
+#ctrl-screen{
+  flex:0 0 50%;overflow-y:auto;
   display:flex;flex-direction:column;
   background:var(--bg);
 }
-/* スワイプインジケーター */
+/* スワイプヒント */
 .swipe-pip{
-  position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
-  width:32px;height:3px;border-radius:2px;
-  background:rgba(255,255,255,0.22);pointer-events:none;z-index:20;
-  transition:background .2s;
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  pointer-events:none;z-index:20;
 }
-#map-stack.ctrl-open .swipe-pip{background:rgba(232,197,71,0.55);}
-/* コントロール展開時はサークル不要なのでpointer-eventsを切る */
-#map-stack.ctrl-open #map-layer{pointer-events:none;}
+.swipe-pip-bar{
+  width:36px;height:3px;border-radius:2px;
+  background:rgba(255,255,255,0.28);
+}
+.swipe-pip-label{
+  font-family:var(--fm);font-size:7px;letter-spacing:.12em;
+  color:rgba(255,255,255,0.28);
+}
+/* コントロール上部の戻るハンドル */
+.ctrl-back-handle{
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  padding:6px 0;background:var(--surf2);
+  border-bottom:1px solid var(--bdr);cursor:pointer;
+}
+.ctrl-back-bar{
+  width:36px;height:3px;border-radius:2px;
+  background:rgba(232,197,71,0.5);
+}
 
 /* VOICINGS */
 .pos-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
@@ -276,9 +284,10 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 </div>
 <div class="main">
   <div id="pane-map" class="pane show">
-    <div id="map-stack">
+    <div id="map-slide">
+
       <!-- 層1: サークルマップ -->
-      <div id="map-layer">
+      <div id="map-screen">
         <div id="map-wrap">
           <canvas id="map-canvas"></canvas>
           <div class="mode-bar">
@@ -295,119 +304,128 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             </div>
           </div>
         </div>
-        <!-- スワイプインジケーター（上スワイプ促進） -->
-        <div class="swipe-pip"></div>
-      </div>
-      <!-- 層2: コントロール群 -->
-      <div id="ctrl-layer">
-    <div class="pos-zone">
-      <div class="pos-hdr" id="pos-hdr">
-        <span class="pos-hdr-l">VOICINGS</span>
-        <span class="pos-tog" id="pos-tog">▲</span>
-      </div>
-      <div class="pos-wrap open" id="pos-wrap">
-        <div class="pos-scroll" id="pos-scroll">
-          <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);padding:16px">…</span>
+        <!-- 上スワイプ促進インジケーター -->
+        <div class="swipe-pip" id="swipe-pip">
+          <div class="swipe-pip-bar"></div>
+          <div class="swipe-pip-label">↑ SWIPE</div>
         </div>
       </div>
-    </div>
-    <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
-    <div class="midi-bar" id="midi-bar">
-      <div class="midi-rec-btn" id="midi-rec-btn" onclick="toggleMidiRec()">● REC</div>
-      <div class="midi-status" id="midi-status">MIDI off — tap REC to capture chords</div>
-      <div class="midi-action-btn" id="midi-export-btn" style="display:none" onclick="exportMidi()">↓ MIDI</div>
-      <div class="midi-action-btn" id="midi-clear-btn" style="display:none" onclick="clearMidi()">✕</div>
-    </div>
-    <div class="learn-bar" id="learn-bar">
-      <span class="learn-lbl">LEARNED</span>
-      <div id="learn-chips"></div>
-    </div>
-    <div class="auto-bar" id="auto-bar">
-      <div class="auto-btn" id="auto-btn" onclick="autoPlay?stopAuto():startAuto()">▶ AUTO</div>
-      <select class="auto-sel" id="auto-mode-sel">
-        <option value="free">FREE</option>
-        <option value="pattern">PATTERN</option>
-      </select>
-      <select class="auto-sel" id="phrase-mode-sel">
-        <option value="off">— PHRASE</option>
-        <option value="melody">MELODY</option>
-        <option value="adlib">ADLIB</option>
-      </select>
-      <select class="auto-sel" id="phrase-timbre-sel">
-        <option value="crystal">CRYSTAL</option>
-        <option value="celeste">CELESTE</option>
-        <option value="bell">BELL</option>
-        <option value="piano">PIANO</option>
-        <option value="marimba">MARIMBA</option>
-        <option value="koto">KOTO</option>
-        <option value="plucksynth">PLUCK</option>
-        <option value="acid">ACID</option>
-        <option value="detroit">DETROIT</option>
-        <option value="synth">SYNTH</option>
-      </select>
-      <select class="auto-sel" id="timbre-sel">
-        <optgroup label="─ MELODIC ─">
-          <option value="synth">SYNTH</option>
-          <option value="piano">PIANO</option>
-          <option value="organ">ORGAN</option>
-          <option value="guitar">GUITAR</option>
-          <option value="marimba">MARIMBA</option>
-          <option value="celeste">CELESTE</option>
-          <option value="bell">BELL</option>
-          <option value="koto">KOTO</option>
-          <option value="oud">OUD</option>
-        </optgroup>
-        <optgroup label="─ AMBIENT ─">
-          <option value="ambient">AMBIENT</option>
-          <option value="pad">PAD</option>
-          <option value="strings">STRINGS</option>
-          <option value="crystal">CRYSTAL</option>
-          <option value="drone">DRONE</option>
-          <option value="cosmos">COSMOS</option>
-        </optgroup>
-        <optgroup label="─ WORLD/ETHNIC ─">
-          <option value="tibetan">TIBETAN</option>
-          <option value="throat">THROAT</option>
-          <option value="rainforest">RAINFOREST</option>
-          <option value="waterphone">WATERPHONE</option>
-        </optgroup>
-        <optgroup label="─ ELECTRONIC ─">
-          <option value="braindance">BRAINDANCE</option>
-          <option value="acid">ACID 303</option>
-          <option value="reese">REESE BASS</option>
-          <option value="technopad">TECHNO PAD</option>
-          <option value="housechord">HOUSE CHORD</option>
-          <option value="supersaw">SUPERSAW</option>
-          <option value="plucksynth">PLUCK</option>
-          <option value="bass808">808 BASS</option>
-          <option value="ravestab">RAVE STAB</option>
-          <option value="detroit">DETROIT</option>
-          <option value="junglestab">JUNGLE STAB</option>
-          <option value="trancelead">TRANCE LEAD</option>
-          <option value="deephouse">DEEP HOUSE</option>
-        </optgroup>
-      </select>
-      <span class="auto-lbl">BPM</span>
-      <input type="range" class="auto-bpm" id="auto-bpm" min="40" max="180" step="4" value="72">
-      <span class="auto-bpm-val" id="auto-bpm-val">72</span>
-    </div>
-    <div class="prog-bar" id="prog-bar" style="display:none">
-      <select class="auto-sel" id="prog-genre-sel"></select>
-      <select class="auto-sel wide" id="prog-name-sel"></select>
-    </div>
-    <div class="sector-hdr" id="sector-hdr">
-      <span class="sector-hdr-l">SECTORS ▾</span>
-    </div>
-    <div class="sector-panel closed" id="sector-panel">
-      <div class="preset-row" id="preset-row"></div>
-      <div class="weight-row" id="weight-row"></div>
-    </div>
-    <div class="db-banner" id="db-banner">
-      <span id="db-banner-msg">⚡ guitar-db-filtered.js があればより多くのボイシングが使えます</span>
-      <button class="db-load-btn" onclick="loadGuitarDB()">LOAD</button>
-    </div>
-      </div><!-- /#ctrl-layer -->
-    </div><!-- /#map-stack -->
+
+      <!-- 層2: コントロール群 -->
+      <div id="ctrl-screen">
+        <!-- 戻るハンドル -->
+        <div class="ctrl-back-handle" id="ctrl-back-handle">
+          <div class="ctrl-back-bar"></div>
+        </div>
+        <div class="pos-zone">
+          <div class="pos-hdr" id="pos-hdr">
+            <span class="pos-hdr-l">VOICINGS</span>
+            <span class="pos-tog" id="pos-tog">▲</span>
+          </div>
+          <div class="pos-wrap open" id="pos-wrap">
+            <div class="pos-scroll" id="pos-scroll">
+              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);padding:16px">…</span>
+            </div>
+          </div>
+        </div>
+        <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
+        <div class="midi-bar" id="midi-bar">
+          <div class="midi-rec-btn" id="midi-rec-btn" onclick="toggleMidiRec()">● REC</div>
+          <div class="midi-status" id="midi-status">MIDI off — tap REC to capture chords</div>
+          <div class="midi-action-btn" id="midi-export-btn" style="display:none" onclick="exportMidi()">↓ MIDI</div>
+          <div class="midi-action-btn" id="midi-clear-btn" style="display:none" onclick="clearMidi()">✕</div>
+        </div>
+        <div class="learn-bar" id="learn-bar">
+          <span class="learn-lbl">LEARNED</span>
+          <div id="learn-chips"></div>
+        </div>
+        <div class="auto-bar" id="auto-bar">
+          <div class="auto-btn" id="auto-btn" onclick="autoPlay?stopAuto():startAuto()">▶ AUTO</div>
+          <select class="auto-sel" id="auto-mode-sel">
+            <option value="free">FREE</option>
+            <option value="pattern">PATTERN</option>
+          </select>
+          <select class="auto-sel" id="phrase-mode-sel">
+            <option value="off">— PHRASE</option>
+            <option value="melody">MELODY</option>
+            <option value="adlib">ADLIB</option>
+          </select>
+          <select class="auto-sel" id="phrase-timbre-sel">
+            <option value="crystal">CRYSTAL</option>
+            <option value="celeste">CELESTE</option>
+            <option value="bell">BELL</option>
+            <option value="piano">PIANO</option>
+            <option value="marimba">MARIMBA</option>
+            <option value="koto">KOTO</option>
+            <option value="plucksynth">PLUCK</option>
+            <option value="acid">ACID</option>
+            <option value="detroit">DETROIT</option>
+            <option value="synth">SYNTH</option>
+          </select>
+          <select class="auto-sel" id="timbre-sel">
+            <optgroup label="─ MELODIC ─">
+              <option value="synth">SYNTH</option>
+              <option value="piano">PIANO</option>
+              <option value="organ">ORGAN</option>
+              <option value="guitar">GUITAR</option>
+              <option value="marimba">MARIMBA</option>
+              <option value="celeste">CELESTE</option>
+              <option value="bell">BELL</option>
+              <option value="koto">KOTO</option>
+              <option value="oud">OUD</option>
+            </optgroup>
+            <optgroup label="─ AMBIENT ─">
+              <option value="ambient">AMBIENT</option>
+              <option value="pad">PAD</option>
+              <option value="strings">STRINGS</option>
+              <option value="crystal">CRYSTAL</option>
+              <option value="drone">DRONE</option>
+              <option value="cosmos">COSMOS</option>
+            </optgroup>
+            <optgroup label="─ WORLD/ETHNIC ─">
+              <option value="tibetan">TIBETAN</option>
+              <option value="throat">THROAT</option>
+              <option value="rainforest">RAINFOREST</option>
+              <option value="waterphone">WATERPHONE</option>
+            </optgroup>
+            <optgroup label="─ ELECTRONIC ─">
+              <option value="braindance">BRAINDANCE</option>
+              <option value="acid">ACID 303</option>
+              <option value="reese">REESE BASS</option>
+              <option value="technopad">TECHNO PAD</option>
+              <option value="housechord">HOUSE CHORD</option>
+              <option value="supersaw">SUPERSAW</option>
+              <option value="plucksynth">PLUCK</option>
+              <option value="bass808">808 BASS</option>
+              <option value="ravestab">RAVE STAB</option>
+              <option value="detroit">DETROIT</option>
+              <option value="junglestab">JUNGLE STAB</option>
+              <option value="trancelead">TRANCE LEAD</option>
+              <option value="deephouse">DEEP HOUSE</option>
+            </optgroup>
+          </select>
+          <span class="auto-lbl">BPM</span>
+          <input type="range" class="auto-bpm" id="auto-bpm" min="40" max="180" step="4" value="72">
+          <span class="auto-bpm-val" id="auto-bpm-val">72</span>
+        </div>
+        <div class="prog-bar" id="prog-bar" style="display:none">
+          <select class="auto-sel" id="prog-genre-sel"></select>
+          <select class="auto-sel wide" id="prog-name-sel"></select>
+        </div>
+        <div class="sector-hdr" id="sector-hdr">
+          <span class="sector-hdr-l">SECTORS ▾</span>
+        </div>
+        <div class="sector-panel closed" id="sector-panel">
+          <div class="preset-row" id="preset-row"></div>
+          <div class="weight-row" id="weight-row"></div>
+        </div>
+        <div class="db-banner" id="db-banner">
+          <span id="db-banner-msg">⚡ guitar-db-filtered.js があればより多くのボイシングが使えます</span>
+          <button class="db-load-btn" onclick="loadGuitarDB()">LOAD</button>
+        </div>
+      </div><!-- /#ctrl-screen -->
+
+    </div><!-- /#map-slide -->
   </div>
   <div id="pane-select" class="pane">
     <div class="sel-view">
@@ -4416,67 +4434,74 @@ renderPath();
 renderPosZone();
 updatePrLockUI();
 
-// ── MAP スワイプ切り替え（translateY方式）──
+// ── MAP スワイプ切り替え ──
 (function(){
-  const stack  = document.getElementById('map-stack');
-  const mapLyr = document.getElementById('map-layer');
-  const ctrlLyr= document.getElementById('ctrl-layer');
-  if(!stack||!mapLyr||!ctrlLyr) return;
+  const slide    = document.getElementById('map-slide');
+  const mapScr   = document.getElementById('map-screen');
+  const ctrlScr  = document.getElementById('ctrl-screen');
+  const backHdl  = document.getElementById('ctrl-back-handle');
+  const pip      = document.getElementById('swipe-pip');
+  if(!slide||!mapScr||!ctrlScr) return;
 
-  let isCtrl   = false;   // false=サークル, true=コントロール
-  let tsY=0, tsX=0, tracking=false, dragging=false;
-  const MIN_SWIPE=55;     // 判定距離px
-  const DIR_RATIO=1.8;    // 縦:横の比率（縦がこれ以上大きければスワイプ扱い）
+  let isCtrl=false, pxOffset=0;
+  let screenH=window.innerHeight;
+  let tsY=0,tsX=0,dragging=false,dragStart=0,dirLocked=false,isVert=false;
 
-  function show(ctrl){
-    isCtrl = ctrl;
-    stack.style.transform = ctrl ? 'translateY(-50%)' : 'translateY(0)';
-    stack.classList.toggle('ctrl-open', ctrl);
-    // サークル表示に戻ったときcanvas再描画
-    if(!ctrl) setTimeout(()=>{ if(typeof initCanvas==='function')initCanvas(); drawFrame(); }, 320);
+  window.addEventListener('resize',()=>{
+    screenH=window.innerHeight; snap(isCtrl,false);
+  });
+
+  function applyT(px,animated){
+    slide.style.transition=animated?'transform .32s cubic-bezier(.4,0,.2,1)':'none';
+    slide.style.transform='translateY('+px+'px)';
+    pxOffset=px;
+    if(pip) pip.style.opacity=String(Math.max(0,1-Math.abs(px)/screenH*2));
   }
-
-  // タッチ開始
+  function snap(toCtrl,animated){
+    if(animated===undefined)animated=true;
+    isCtrl=toCtrl;
+    applyT(toCtrl?-screenH:0,animated);
+    // サークルに戻ったときcanvas再描画
+    if(!toCtrl) setTimeout(()=>{if(typeof initCanvas==='function'){initCanvas();drawFrame();}},340);
+  }
   function onStart(e){
-    const t = e.touches[0];
-    tsY=t.clientY; tsX=t.clientX;
-    tracking=true; dragging=false;
+    tsY=e.touches[0].clientY; tsX=e.touches[0].clientX;
+    dragStart=pxOffset; dragging=false; dirLocked=false; isVert=false;
+    slide.style.transition='none';
   }
-  // タッチ移動（方向確定）
   function onMove(e){
-    if(!tracking) return;
-    const dy=e.touches[0].clientY-tsY;
-    const dx=e.touches[0].clientX-tsX;
-    if(Math.abs(dy)>8 && Math.abs(dy)>Math.abs(dx)*DIR_RATIO){
-      dragging=true; tracking=false;
-    } else if(Math.abs(dx)>8){
-      tracking=false; // 横スワイプ→無視
+    const dy=e.touches[0].clientY-tsY, dx=e.touches[0].clientX-tsX;
+    if(!dirLocked&&(Math.abs(dy)>8||Math.abs(dx)>8)){
+      dirLocked=true; isVert=Math.abs(dy)>Math.abs(dx)*1.2;
     }
+    if(!dirLocked||!isVert) return;
+    dragging=true;
+    let next=dragStart+dy;
+    const mn=-screenH, mx=0;
+    if(next>mx) next=mx+(next-mx)*0.25;
+    else if(next<mn) next=mn+(next-mn)*0.25;
+    applyT(next,false);
   }
-  // タッチ終了（判定）
   function onEnd(e){
-    if(!dragging){ tracking=false; return; }
+    if(!dragging){dirLocked=false;return;}
     const dy=e.changedTouches[0].clientY-tsY;
-    if(!isCtrl && dy < -MIN_SWIPE) show(true);   // 上スワイプ→コントロール
-    if( isCtrl && dy >  MIN_SWIPE) show(false);  // 下スワイプ→サークル
-    dragging=false; tracking=false;
+    const half=screenH*0.35;
+    if(!isCtrl) snap(dy<-half);
+    else snap(!(dy>half));
+    dragging=false; dirLocked=false;
   }
 
-  // サークル層でのスワイプ検出
-  mapLyr.addEventListener('touchstart', onStart, {passive:true});
-  mapLyr.addEventListener('touchmove',  onMove,  {passive:true});
-  mapLyr.addEventListener('touchend',   onEnd,   {passive:true});
+  mapScr.addEventListener('touchstart',onStart,{passive:true});
+  mapScr.addEventListener('touchmove', onMove, {passive:true});
+  mapScr.addEventListener('touchend',  onEnd,  {passive:true});
 
-  // コントロール層：最上部（scrollTop===0）のときだけ下スワイプを受け付ける
-  ctrlLyr.addEventListener('touchstart', onStart, {passive:true});
-  ctrlLyr.addEventListener('touchmove', e=>{
-    if(ctrlLyr.scrollTop > 2){ tracking=false; return; }
-    onMove(e);
-  }, {passive:true});
-  ctrlLyr.addEventListener('touchend', onEnd, {passive:true});
+  ctrlScr.addEventListener('touchstart',e=>{if(ctrlScr.scrollTop>2)return;onStart(e);},{passive:true});
+  ctrlScr.addEventListener('touchmove',e=>{if(!dirLocked&&ctrlScr.scrollTop>2)return;if(dirLocked&&!isVert)return;onMove(e);},{passive:true});
+  ctrlScr.addEventListener('touchend',onEnd,{passive:true});
 
-  // 初期状態
-  show(false);
+  if(backHdl) backHdl.addEventListener('click',()=>snap(false));
+
+  snap(false,false);
 })();
 
 // ── TAB 切り替え ──
