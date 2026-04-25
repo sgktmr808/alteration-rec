@@ -53,32 +53,43 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .main{flex:1;overflow:hidden;position:relative;}
 .pane{display:none;width:100%;height:100%;flex-direction:column;}
 .pane.show{display:flex;}
-#pane-map{overflow:hidden;height:100%;}
 
-/* ── スワイプ切り替え ── */
-#pane-map{overflow:hidden;}
+/* ── pane-map: overflow:hidden のコンテナ ── */
+#pane-map{
+  overflow:hidden;
+  position:relative;
+}
+
+/* ── スワイプ切り替え ──
+   #map-slide が height:200%、上半分=サークル、下半分=コントロール
+   translateY(0) → サークル表示
+   translateY(-50%) → コントロール表示
+*/
 #map-slide{
-  width:100%;height:200%;
-  display:flex;flex-direction:column;
+  position:absolute;
+  top:0;left:0;right:0;
+  height:200%;
+  display:flex;
+  flex-direction:column;
   will-change:transform;
 }
 #map-screen{
   flex:0 0 50%;
-  height:50%;         /* 親200%の50% = 画面1枚分 */
   position:relative;
-  display:flex;flex-direction:column;
   overflow:hidden;
+  display:flex;
+  flex-direction:column;
 }
 #map-wrap{
-  flex:1;position:relative;overflow:hidden;
-  width:100%;height:100%;
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
 }
 #map-canvas{width:100%;height:100%;display:block;touch-action:none;}
 #ctrl-screen{
   flex:0 0 50%;
-  height:50%;
   overflow-y:auto;
-  display:flex;flex-direction:column;
+  display:flex;
+  flex-direction:column;
   background:var(--bg);
 }
 /* スワイプヒント */
@@ -4448,29 +4459,33 @@ updatePrLockUI();
   const ctrlScr  = document.getElementById('ctrl-screen');
   const backHdl  = document.getElementById('ctrl-back-handle');
   const pip      = document.getElementById('swipe-pip');
-  if(!slide||!mapScr||!ctrlScr) return;
+  const paneMap  = document.getElementById('pane-map');
+  if(!slide||!mapScr||!ctrlScr||!paneMap) return;
 
   let isCtrl=false, pxOffset=0;
-  let screenH=window.innerHeight;
-  let tsY=0,tsX=0,dragging=false,dragStart=0,dirLocked=false,isVert=false;
 
-  window.addEventListener('resize',()=>{
-    screenH=window.innerHeight; snap(isCtrl,false);
-  });
+  // pane-mapの実際の高さを使う（windowではなく）
+  function getH(){ return paneMap.clientHeight||window.innerHeight; }
+
+  window.addEventListener('resize',()=>snap(isCtrl,false));
 
   function applyT(px,animated){
     slide.style.transition=animated?'transform .32s cubic-bezier(.4,0,.2,1)':'none';
     slide.style.transform='translateY('+px+'px)';
     pxOffset=px;
-    if(pip) pip.style.opacity=String(Math.max(0,1-Math.abs(px)/screenH*2));
+    const h=getH();
+    if(pip) pip.style.opacity=String(Math.max(0,1-Math.abs(px)/h*2));
   }
   function snap(toCtrl,animated){
     if(animated===undefined)animated=true;
     isCtrl=toCtrl;
-    applyT(toCtrl?-screenH:0,animated);
-    // サークルに戻ったときcanvas再描画
-    if(!toCtrl) setTimeout(()=>{if(typeof initCanvas==='function'){initCanvas();drawFrame();}},340);
+    const h=getH();
+    applyT(toCtrl?-h:0,animated);
+    if(!toCtrl) setTimeout(()=>{if(typeof getL==='function'){getL();drawFrame();}},340);
   }
+
+  let tsY=0,tsX=0,dragging=false,dragStart=0,dirLocked=false,isVert=false;
+
   function onStart(e){
     tsY=e.touches[0].clientY; tsX=e.touches[0].clientX;
     dragStart=pxOffset; dragging=false; dirLocked=false; isVert=false;
@@ -4483,18 +4498,18 @@ updatePrLockUI();
     }
     if(!dirLocked||!isVert) return;
     dragging=true;
+    const h=getH();
     let next=dragStart+dy;
-    const mn=-screenH, mx=0;
-    if(next>mx) next=mx+(next-mx)*0.25;
-    else if(next<mn) next=mn+(next-mn)*0.25;
+    if(next>0)      next=next*0.25;
+    else if(next<-h) next=-h+(next+h)*0.25;
     applyT(next,false);
   }
   function onEnd(e){
     if(!dragging){dirLocked=false;return;}
     const dy=e.changedTouches[0].clientY-tsY;
-    const half=screenH*0.35;
-    if(!isCtrl) snap(dy<-half);
-    else snap(!(dy>half));
+    const h=getH();
+    if(!isCtrl) snap(dy<-(h*0.35));
+    else snap(!(dy>(h*0.35)));
     dragging=false; dirLocked=false;
   }
 
@@ -4503,12 +4518,17 @@ updatePrLockUI();
   mapScr.addEventListener('touchend',  onEnd,  {passive:true});
 
   ctrlScr.addEventListener('touchstart',e=>{if(ctrlScr.scrollTop>2)return;onStart(e);},{passive:true});
-  ctrlScr.addEventListener('touchmove',e=>{if(!dirLocked&&ctrlScr.scrollTop>2)return;if(dirLocked&&!isVert)return;onMove(e);},{passive:true});
+  ctrlScr.addEventListener('touchmove',e=>{
+    if(!dirLocked&&ctrlScr.scrollTop>2)return;
+    if(dirLocked&&!isVert)return;
+    onMove(e);
+  },{passive:true});
   ctrlScr.addEventListener('touchend',onEnd,{passive:true});
 
   if(backHdl) backHdl.addEventListener('click',()=>snap(false));
 
-  snap(false,false);
+  // DOMが完全にレンダリングされてから初期化
+  requestAnimationFrame(()=>requestAnimationFrame(()=>snap(false,false)));
 })();
 
 // ── TAB 切り替え ──
