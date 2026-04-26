@@ -2785,7 +2785,10 @@ function initCanvas(){
     // Center node — tap to play chord, long tap or AUTO mode toggles auto
     if(dist<32){
       if(autoPlay){stopAuto();}
-      else{playChord(S.root,S.type);}
+      else{
+        playChord(S.root,S.type);
+        triggerPhrase(S.root,S.type);
+      }
       return;
     }
     const hit=hitNode(x,y);
