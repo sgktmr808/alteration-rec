@@ -586,9 +586,9 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 
         <!-- SECTORS -->
         <div class="sector-hdr" id="sector-hdr">
-          <span class="sector-hdr-l">SECTORS ▾</span>
+          <span class="sector-hdr-l">SECTORS ▴</span>
         </div>
-        <div class="sector-panel closed" id="sector-panel">
+        <div class="sector-panel open" id="sector-panel">
           <div class="preset-row" id="preset-row"></div>
           <div class="weight-row" id="weight-row"></div>
         </div>
@@ -3663,7 +3663,7 @@ function renderLegend(){
     `<div class="li"><div class="ldot" style="background:${p.colors[i]}"></div><span class="ltxt">${p.labels[i]}</span></div>`
   ).join('');
 }
-let sectorOpen=false;
+let sectorOpen=true;
 document.getElementById('sector-hdr').addEventListener('click',()=>{
   sectorOpen=!sectorOpen;
   document.getElementById('sector-panel').className='sector-panel '+(sectorOpen?'open':'closed');
@@ -4777,33 +4777,35 @@ updatePrLockUI();
   const paneMap  = document.getElementById('pane-map');
   if(!slide||!mapScr||!ctrlScr||!paneMap) return;
 
-  let isCtrl=false, pxOffset=0;
-
-  // pane-mapの実際の高さを使う（windowではなく）
-  function getH(){ return paneMap.clientHeight||window.innerHeight; }
+  let isCtrl=false;
+  // pxOffsetは「pane-mapの高さに対する割合(-1〜0)」で管理
+  // translateY: 0% = サークル表示, -50% = コントロール表示
+  let pctOffset=0; // 0〜-100 (map-slideはheight:200%なので-50%がコントロール)
 
   window.addEventListener('resize',()=>snap(isCtrl,false));
 
-  function applyT(px,animated){
-    slide.style.transition=animated?'transform .32s cubic-bezier(.4,0,.2,1)':'none';
-    slide.style.transform='translateY('+px+'px)';
-    pxOffset=px;
-    const h=getH();
-    if(pip) pip.style.opacity=String(Math.max(0,1-Math.abs(px)/h*2));
+  function applyPct(pct, animated){
+    slide.style.transition = animated ? 'transform .32s cubic-bezier(.4,0,.2,1)' : 'none';
+    slide.style.transform  = 'translateY('+pct+'%)';
+    pctOffset = pct;
+    // pip opacity: 0%で1, -50%で0
+    if(pip) pip.style.opacity = String(Math.max(0, 1 + pct/50));
   }
-  function snap(toCtrl,animated){
-    if(animated===undefined)animated=true;
-    isCtrl=toCtrl;
-    const h=getH();
-    applyT(toCtrl?-h:0,animated);
-    if(!toCtrl) setTimeout(()=>{if(typeof getL==='function'){getL();drawFrame();}},340);
+  function snap(toCtrl, animated){
+    if(animated===undefined) animated=true;
+    isCtrl = toCtrl;
+    applyPct(toCtrl ? -50 : 0, animated);
+    if(!toCtrl) setTimeout(()=>{ if(typeof getL==='function'){getL();drawFrame();} }, 340);
   }
 
-  let tsY=0,tsX=0,dragging=false,dragStart=0,dirLocked=false,isVert=false;
+  // タッチ: pxで操作してpctに変換
+  let tsY=0, tsX=0, dragging=false, dragStartPct=0, dirLocked=false, isVert=false;
+
+  function getH(){ return paneMap.clientHeight || window.innerHeight; }
 
   function onStart(e){
     tsY=e.touches[0].clientY; tsX=e.touches[0].clientX;
-    dragStart=pxOffset; dragging=false; dirLocked=false; isVert=false;
+    dragStartPct=pctOffset; dragging=false; dirLocked=false; isVert=false;
     slide.style.transition='none';
   }
   function onMove(e){
@@ -4814,33 +4816,37 @@ updatePrLockUI();
     if(!dirLocked||!isVert) return;
     dragging=true;
     const h=getH();
-    let next=dragStart+dy;
-    if(next>0)      next=next*0.25;
-    else if(next<-h) next=-h+(next+h)*0.25;
-    applyT(next,false);
+    // px → % 変換 (map-slideはheight:200%なので px/h*50 が%)
+    const deltaPct = dy/h*50;
+    let next = dragStartPct + deltaPct;
+    // オーバーシュート抵抗
+    if(next > 0)    next = next * 0.25;
+    if(next < -50)  next = -50 + (next+50)*0.25;
+    applyPct(next, false);
   }
   function onEnd(e){
     if(!dragging){dirLocked=false;return;}
     const dy=e.changedTouches[0].clientY-tsY;
     const h=getH();
-    if(!isCtrl) snap(dy<-(h*0.35));
-    else snap(!(dy>(h*0.35)));
+    const threshold=h*0.35;
+    if(!isCtrl) snap(dy < -threshold);
+    else        snap(!(dy > threshold));
     dragging=false; dirLocked=false;
   }
 
-  mapScr.addEventListener('touchstart',onStart,{passive:true});
-  mapScr.addEventListener('touchmove', onMove, {passive:true});
-  mapScr.addEventListener('touchend',  onEnd,  {passive:true});
+  mapScr.addEventListener('touchstart', onStart, {passive:true});
+  mapScr.addEventListener('touchmove',  onMove,  {passive:true});
+  mapScr.addEventListener('touchend',   onEnd,   {passive:true});
 
-  ctrlScr.addEventListener('touchstart',e=>{if(ctrlScr.scrollTop>2)return;onStart(e);},{passive:true});
-  ctrlScr.addEventListener('touchmove',e=>{
-    if(!dirLocked&&ctrlScr.scrollTop>2)return;
-    if(dirLocked&&!isVert)return;
+  ctrlScr.addEventListener('touchstart', e=>{ if(ctrlScr.scrollTop>2)return; onStart(e); }, {passive:true});
+  ctrlScr.addEventListener('touchmove',  e=>{
+    if(!dirLocked&&ctrlScr.scrollTop>2) return;
+    if(dirLocked&&!isVert) return;
     onMove(e);
-  },{passive:true});
-  ctrlScr.addEventListener('touchend',onEnd,{passive:true});
+  }, {passive:true});
+  ctrlScr.addEventListener('touchend', onEnd, {passive:true});
 
-  if(backHdl) backHdl.addEventListener('click',()=>snap(false));
+  if(backHdl) backHdl.addEventListener('click', ()=>snap(false));
 
   // DOMが完全にレンダリングされてから初期化
   requestAnimationFrame(()=>requestAnimationFrame(()=>snap(false,false)));
