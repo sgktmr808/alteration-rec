@@ -3694,6 +3694,14 @@ function buildProgressivePhrase(root, type, preset, chordTones, scaleTones, dura
   });
 }
 
+// ── playNote ヘルパー（TIMBRE切替込み・phraseVolume反映）──
+function playPhraseNote(ctx, midi, t, vol){
+  const hz=midi2hz(Math.max(36,Math.min(96,midi)));
+  const saved=TIMBRE; TIMBRE=phraseTIMBRE;
+  pluck(ctx,hz,t,vol*phraseVolume);
+  TIMBRE=saved;
+}
+
 // ── MELODY モード (v4) ──
 function playMelodyPhrase(root, type, durationMs){
   if(phraseMode!=='melody')return;
