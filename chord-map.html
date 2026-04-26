@@ -302,7 +302,31 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   margin:12px 0 0;display:inline-block;background:var(--surf2);transition:border-color .15s,color .15s;}
 .csv-btn:hover,.csv-btn:active{border-color:var(--acc);color:var(--acc);}
 
-/* ── FRETBOARD ── */
+/* ── STRING RANGE トグル ── */
+.str-range-wrap{display:flex;flex-direction:row;gap:0;}
+.str-toggle-col{display:flex;flex-direction:column;justify-content:space-between;
+  padding:20px 0 6px;width:18px;flex-shrink:0;}
+.str-toggle{
+  width:16px;height:16px;border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--fm);font-size:6px;cursor:pointer;
+  border:1px solid rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.05);
+  color:rgba(255,255,255,0.3);
+  transition:background .12s,border-color .12s,color .12s;
+  user-select:none;-webkit-user-select:none;
+  line-height:1;
+}
+.str-toggle.on{
+  background:rgba(210,185,140,0.18);
+  border-color:rgba(210,185,140,0.5);
+  color:rgba(210,185,140,0.9);
+}
+.str-toggle.off{
+  background:rgba(255,255,255,0.02);
+  border-color:rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.18);
+}
 .fb-wrap{margin:14px 0 10px;background:var(--surf);border:1px solid var(--bdr2);
   border-radius:6px;overflow:hidden;}
 .fb-hdr{display:flex;align-items:center;justify-content:space-between;
@@ -646,7 +670,13 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <div class="fb-capo" id="fb-capo-inc">＋</div>
           </div>
         </div>
-        <canvas id="fb-canvas" height="148"></canvas>
+        <!-- ストリングレンジトグル + Canvas を横並び -->
+        <div class="str-range-wrap">
+          <div class="str-toggle-col" id="str-toggle-col">
+            <!-- JS で生成 -->
+          </div>
+          <canvas id="fb-canvas" height="148" style="flex:1;min-width:0;"></canvas>
+        </div>
       </div>
 
       <!-- ── PIANO ROLL ── -->
@@ -1954,7 +1984,14 @@ function playVoicing(frets){
   try{const ctx=getCtx();
     const p=TIMBRE_PROPS[TIMBRE]||TIMBRE_PROPS.synth;
     const play=()=>{const t0=ctx.currentTime+0.04;let cnt=0;
-      frets.forEach((f,si)=>{if(f<0)return;pluck(ctx,STR_HZ[si]*Math.pow(2,f/12),t0+cnt*p.strum,p.vol*0.9);cnt++;});};
+      frets.forEach((f,si)=>{
+        if(f<0)return;
+        if(!stringActive[si])return; // ストリングレンジOFF弦はスキップ
+        pluck(ctx,STR_HZ[si]*Math.pow(2,f/12),t0+cnt*p.strum,p.vol*0.9);cnt++;
+      });};
+    if(ctx.state==='suspended')ctx.resume().then(play);else play();
+  }catch(e){}
+}
     if(ctx.state==='suspended')ctx.resume().then(play);else play();
   }catch(e){}
 }
@@ -3671,6 +3708,37 @@ document.getElementById('sector-hdr').addEventListener('click',()=>{
     'SECTORS '+(sectorOpen?'▴':'▾');
 });
 renderPresetBtns();renderWeightSliders();
+
+// ── ストリングレンジ トグルUI 生成 ──
+(function(){
+  const col=document.getElementById('str-toggle-col');
+  if(!col)return;
+  // 上からe,B,G,D,A,E の順で表示
+  const displayOrder=[5,4,3,2,1,0];
+  col.innerHTML=displayOrder.map(s=>
+    `<div class="str-toggle on" data-s="${s}" title="${STRING_NAMES[s]}弦">${STRING_NAMES[s]}</div>`
+  ).join('');
+  col.querySelectorAll('.str-toggle').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const s=parseInt(btn.dataset.s);
+      stringActive[s]=!stringActive[s];
+      btn.classList.toggle('on', stringActive[s]);
+      btn.classList.toggle('off',!stringActive[s]);
+      drawFretboard();
+    });
+  });
+})();
+
+// ── ストリングレンジに基づくボイシングフィルター ──
+function getVoicingsFiltered(root,type){
+  const all=getVoicings(root,type);
+  if(stringActive.every(a=>a))return all;
+  const filtered=all.filter(v=>
+    v.f.every((f,s)=>stringActive[s]||f<=0)
+  );
+  return filtered.length>0?filtered:all;
+}
+
 function setMode(mode){
   MAP_MODE=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>{
@@ -3728,6 +3796,8 @@ const MIDI_OPEN=[40,45,50,55,59,64];
 const STRING_NAMES=['E','A','D','G','B','e'];
 const FB_FRETS=15;   // 表示フレット数
 let   fbCapo=0;
+// ── ストリングレンジ: true=アクティブ(発音), false=ミュート(薄表示) ──
+let stringActive=[true,true,true,true,true,true]; // [E,A,D,G,B,e]
 let   prOctave=3;    // ピアノロール表示オクターブ (C3=3)
 let   fbPosIdx=0;    // 選択中ポジションIndex
 let   fbMode='fret'; // 'fret'=フレット移動モード(デフォルト) / 'capo'=オープン+カポモード
@@ -3762,7 +3832,7 @@ function drawFretboard(){
   const ivSet=chordIvSet(S.type);
 
   // ── ポジションモード: 選択ポジションのフレット配列を取得 ──
-  const vArr=getVoicings(S.root,S.type);
+  const vArr=getVoicingsFiltered(S.root,S.type);
   const posMode=vArr.length>0;
   const curPos=posMode?vArr[Math.min(fbPosIdx,vArr.length-1)]:null;
   // ポジションナビ更新
@@ -3871,6 +3941,9 @@ function drawFretboard(){
     // ══ ポジション表示モード: 押弦ドット + 開放◯ + ミュート× ══
     const frets=curPos.f; // [s0..s5] -1=ミュート,0=開放,n=フレット
     for(let s=0;s<6;s++){
+      const active=stringActive[s];
+      const alpha=active?1.0:0.18; // OFF弦は強く透明化
+      ctx.globalAlpha=alpha;
       const y=ST+(5-s)*sH;           // 逆転: s=0(E)が下、s=5(e)が上
       const thickness=0.5+s*0.28;   // 逆転: s=0(E)が最も太い
       const brightness=0.22+s*0.05;
@@ -3957,10 +4030,14 @@ function drawFretboard(){
         ctx.fillText(ivLabel(iv),x,y);
         hits.push({x,y,r:dotR+3,midi});
       }
+      ctx.globalAlpha=1; // 弦ごとにリセット
     }
   } else {
     // ══ 全コードトーン表示モード（従来） ══
     for(let s=0;s<6;s++){
+      const active=stringActive[s];
+      const alpha=active?1.0:0.18;
+      ctx.globalAlpha=alpha;
       const y=ST+(5-s)*sH;           // 逆転: s=0(E)が下、s=5(e)が上
       const thickness=0.5+s*0.28;   // 逆転: s=0(E)が最も太い
       const brightness=0.22+s*0.05;
@@ -4024,8 +4101,10 @@ function drawFretboard(){
         ctx.fillText(ivLabel(iv),x,y);
         hits.push({x,y,r:dotR+3,midi});
       }
+      ctx.globalAlpha=1; // 弦ごとにリセット
     }
   }
+  ctx.globalAlpha=1; // 念のため最終リセット
   canvas._fbHits=hits;
 }
 
