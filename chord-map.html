@@ -563,16 +563,37 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <option value="adlib">ADLIB</option>
             </select>
             <select class="phrase-sel" id="phrase-timbre-sel">
-              <option value="crystal">CRYSTAL</option>
-              <option value="celeste">CELESTE</option>
-              <option value="bell">BELL</option>
-              <option value="piano">PIANO</option>
-              <option value="marimba">MARIMBA</option>
-              <option value="koto">KOTO</option>
-              <option value="plucksynth">PLUCK</option>
-              <option value="acid">ACID</option>
-              <option value="detroit">DETROIT</option>
-              <option value="synth">SYNTH</option>
+              <optgroup label="─ CLASSIC ─">
+                <option value="crystal">CRYSTAL</option>
+                <option value="celeste">CELESTE</option>
+                <option value="bell">BELL</option>
+                <option value="piano">PIANO</option>
+                <option value="marimba">MARIMBA</option>
+                <option value="koto">KOTO</option>
+              </optgroup>
+              <optgroup label="─ VINTAGE ─">
+                <option value="rhodes">RHODES</option>
+                <option value="wurlitzer">WURLITZER</option>
+                <option value="moog">MOOG</option>
+                <option value="clavinet">CLAVINET</option>
+                <option value="organ">ORGAN</option>
+              </optgroup>
+              <optgroup label="─ STRINGS ─">
+                <option value="violin">VIOLIN</option>
+                <option value="cello">CELLO</option>
+                <option value="ensemble">ENSEMBLE</option>
+                <option value="strings">STRINGS</option>
+              </optgroup>
+              <optgroup label="─ ELECTRONIC ─">
+                <option value="sawlead">SAW LEAD</option>
+                <option value="glidelead">GLIDE LEAD</option>
+                <option value="trancelead">TRANCE LEAD</option>
+                <option value="pulsebass">PULSE BASS</option>
+                <option value="plucksynth">PLUCK</option>
+                <option value="acid">ACID</option>
+                <option value="synth">SYNTH</option>
+                <option value="detroit">DETROIT</option>
+              </optgroup>
             </select>
             <select class="phrase-sel" id="timbre-sel">
               <optgroup label="─ MELODIC ─">
@@ -622,6 +643,14 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <div class="phrase-cx-btn on" data-cx="easy">EASY</div>
             <div class="phrase-cx-btn" data-cx="difficult">DIFFICULT</div>
             <div class="phrase-cx-btn" data-cx="progressive">PROGRESSIVE</div>
+          </div>
+          <!-- 音量スライダー -->
+          <div style="display:flex;align-items:center;gap:8px;margin-top:7px;">
+            <span style="font-family:var(--fm);font-size:7.5px;color:var(--dim);letter-spacing:.08em;flex-shrink:0;">VOL</span>
+            <input type="range" id="phrase-vol-sl" min="0" max="100" value="75"
+              style="-webkit-appearance:none;appearance:none;flex:1;height:3px;border-radius:2px;
+                background:var(--bdr2);accent-color:var(--acc);cursor:pointer;">
+            <span id="phrase-vol-val" style="font-family:var(--fm);font-size:8px;color:var(--acc);width:24px;text-align:right;">75</span>
           </div>
         </div>
 
@@ -1476,6 +1505,19 @@ const TIMBRE_PROPS={
   junglestab: {strum:0.01, vol:0.13,dur:0.4},
   trancelead: {strum:0.03, vol:0.11,dur:2.0},
   deephouse:  {strum:0.06, vol:0.10,dur:3.0},
+  // ── Vintage ──
+  rhodes:     {strum:0.02, vol:0.13,dur:2.4},
+  moog:       {strum:0.01, vol:0.12,dur:1.8},
+  wurlitzer:  {strum:0.02, vol:0.12,dur:2.0},
+  clavinet:   {strum:0.01, vol:0.13,dur:0.9},
+  // ── Strings ──
+  violin:     {strum:0.04, vol:0.10,dur:3.0},
+  cello:      {strum:0.05, vol:0.10,dur:3.5},
+  ensemble:   {strum:0.09, vol:0.09,dur:4.5},
+  // ── Electronic Lead ──
+  sawlead:    {strum:0.01, vol:0.11,dur:1.6},
+  pulsebass:  {strum:0.01, vol:0.12,dur:1.4},
+  glidelead:  {strum:0.02, vol:0.11,dur:2.0},
 };
 
 function pluck(ctx,hz,t0,vol){
@@ -1511,6 +1553,19 @@ function pluck(ctx,hz,t0,vol){
     case'junglestab': playJungleStab(ctx,hz,t0,vol);break;
     case'trancelead': playTrancelead(ctx,hz,t0,vol);break;
     case'deephouse':  playDeephouse(ctx,hz,t0,vol);break;
+    // ── Vintage ──
+    case'rhodes':     playRhodes(ctx,hz,t0,vol);break;
+    case'moog':       playMoog(ctx,hz,t0,vol);break;
+    case'wurlitzer':  playWurlitzer(ctx,hz,t0,vol);break;
+    case'clavinet':   playClavinet(ctx,hz,t0,vol);break;
+    // ── Strings ──
+    case'violin':     playViolin(ctx,hz,t0,vol);break;
+    case'cello':      playCello(ctx,hz,t0,vol);break;
+    case'ensemble':   playEnsemble(ctx,hz,t0,vol);break;
+    // ── Electronic Lead ──
+    case'sawlead':    playSawlead(ctx,hz,t0,vol);break;
+    case'pulsebass':  playPulsebass(ctx,hz,t0,vol);break;
+    case'glidelead':  playGlidelead(ctx,hz,t0,vol);break;
     default:          playSynth(ctx,hz,t0,vol);
   }
 }
@@ -1956,7 +2011,6 @@ function playTrancelead(ctx,hz,t0,vol){
 // ── DEEP HOUSE (mellow Juno-style chord) ──
 function playDeephouse(ctx,hz,t0,vol){
   const out=getOut(ctx,0.42);
-  // Warm chorus-y sound
   const voices=[{d:0,t:'triangle'},{d:7,t:'sawtooth'},{d:-5,t:'triangle'}];
   voices.forEach(({d,t})=>{
     const o=ctx.createOscillator(),g=ctx.createGain(),lp=ctx.createBiquadFilter();
@@ -1970,6 +2024,186 @@ function playDeephouse(ctx,hz,t0,vol){
     o.connect(lp);lp.connect(ch);ch.connect(g);g.connect(out);
     o.start(t0);o.stop(t0+3.1);
   });
+}
+
+// ── RHODES (Fender Rhodes風 — FM系倍音+振幅変調) ──
+function playRhodes(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.5);
+  const car=ctx.createOscillator(), mod=ctx.createOscillator();
+  const modGain=ctx.createGain(), g=ctx.createGain();
+  mod.frequency.value=hz*2.0;
+  modGain.gain.setValueAtTime(hz*1.8,t0);
+  modGain.gain.exponentialRampToValueAtTime(hz*0.3,t0+0.8);
+  car.type='sine'; car.frequency.value=hz;
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol*0.9,t0+0.008);
+  g.gain.exponentialRampToValueAtTime(vol*0.4,t0+0.3);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+2.4);
+  // トレモロ
+  const trem=ctx.createOscillator(), tremGain=ctx.createGain();
+  trem.frequency.value=4.8; tremGain.gain.value=0.05;
+  trem.connect(tremGain); tremGain.connect(g.gain);
+  mod.connect(modGain); modGain.connect(car.frequency);
+  car.connect(g); g.connect(out);
+  mod.start(t0); car.start(t0); trem.start(t0);
+  mod.stop(t0+2.5); car.stop(t0+2.5); trem.stop(t0+2.5);
+}
+
+// ── MOOG (Moog風 — sawtooth + resonant LP ladder filter) ──
+function playMoog(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.48);
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  const lp=ctx.createBiquadFilter(), lp2=ctx.createBiquadFilter();
+  o.type='sawtooth'; o.frequency.value=hz;
+  // ピッチスライド（ポルタメント感）
+  o.frequency.setValueAtTime(hz*1.04,t0);
+  o.frequency.exponentialRampToValueAtTime(hz,t0+0.06);
+  lp.type='lowpass'; lp.frequency.setValueAtTime(hz*12,t0);
+  lp.frequency.exponentialRampToValueAtTime(hz*1.8,t0+0.15); lp.Q.value=8;
+  lp2.type='lowpass'; lp2.frequency.value=hz*4; lp2.Q.value=2;
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol*0.85,t0+0.012);
+  g.gain.setValueAtTime(vol*0.85,t0+0.3);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+1.8);
+  o.connect(lp); lp.connect(lp2); lp2.connect(g); g.connect(out);
+  o.start(t0); o.stop(t0+1.9);
+}
+
+// ── WURLITZER (Wurlitzer風 — 矩形波+倍音) ──
+function playWurlitzer(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.45);
+  [[1,0.6,'square'],[2,0.2,'sine'],[3,0.08,'sine']].forEach(([r,w,type])=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type=type; o.frequency.value=hz*r;
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(vol*w,t0+0.01);
+    g.gain.exponentialRampToValueAtTime(vol*w*0.5,t0+0.2);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+2.0);
+    o.connect(g); g.connect(out); o.start(t0); o.stop(t0+2.1);
+  });
+}
+
+// ── CLAVINET (クラビネット風 — sharp attack) ──
+function playClavinet(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.45);
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  const hp=ctx.createBiquadFilter(), lp=ctx.createBiquadFilter();
+  o.type='sawtooth'; o.frequency.value=hz;
+  hp.type='highpass'; hp.frequency.value=hz*1.5; hp.Q.value=1;
+  lp.type='lowpass';  lp.frequency.value=hz*8;   lp.Q.value=2;
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol,t0+0.004);
+  g.gain.exponentialRampToValueAtTime(vol*0.1,t0+0.12);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+0.9);
+  o.connect(hp); hp.connect(lp); lp.connect(g); g.connect(out);
+  o.start(t0); o.stop(t0+1.0);
+}
+
+// ── VIOLIN (バイオリン風 — bowed string) ──
+function playViolin(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.5);
+  const dur=3.0;
+  [[1,0.5],[2,0.25],[3,0.12],[4,0.06],[5,0.04]].forEach(([r,w])=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sawtooth'; o.frequency.value=hz*r;
+    // ビブラート
+    const vib=ctx.createOscillator(), vibG=ctx.createGain();
+    vib.frequency.value=5.8; vibG.gain.value=hz*r*0.006;
+    vib.connect(vibG); vibG.connect(o.frequency);
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(vol*w,t0+0.18); // ボウイング開始
+    g.gain.setValueAtTime(vol*w,t0+dur-0.15);
+    g.gain.linearRampToValueAtTime(0.0001,t0+dur);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=hz*r*3;
+    o.connect(lp); lp.connect(g); g.connect(out);
+    o.start(t0); vib.start(t0); o.stop(t0+dur+0.1); vib.stop(t0+dur+0.1);
+  });
+}
+
+// ── CELLO (チェロ風 — deeper bowed string) ──
+function playCello(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.5);
+  const dur=3.5;
+  [[1,0.55],[2,0.22],[3,0.10],[4,0.05]].forEach(([r,w])=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sawtooth'; o.frequency.value=hz*r;
+    const vib=ctx.createOscillator(), vibG=ctx.createGain();
+    vib.frequency.value=4.5; vibG.gain.value=hz*r*0.005;
+    vib.connect(vibG); vibG.connect(o.frequency);
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(vol*w,t0+0.22);
+    g.gain.setValueAtTime(vol*w,t0+dur-0.2);
+    g.gain.linearRampToValueAtTime(0.0001,t0+dur);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=hz*r*2.5;
+    o.connect(lp); lp.connect(g); g.connect(out);
+    o.start(t0); vib.start(t0); o.stop(t0+dur+0.1); vib.stop(t0+dur+0.1);
+  });
+}
+
+// ── ENSEMBLE (ストリングスアンサンブル — detuned layered strings) ──
+function playEnsemble(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.55);
+  const detunes=[0,3,-3,5,-5];
+  detunes.forEach(d=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sawtooth'; o.frequency.value=hz*Math.pow(2,d/1200);
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(vol*0.16,t0+0.3);
+    g.gain.setValueAtTime(vol*0.16,t0+4.0);
+    g.gain.linearRampToValueAtTime(0.0001,t0+4.5);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=hz*4; lp.Q.value=0.5;
+    o.connect(lp); lp.connect(g); g.connect(out);
+    o.start(t0); o.stop(t0+4.6);
+  });
+}
+
+// ── SAWLEAD (Electronc Saw Lead) ──
+function playSawlead(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.48);
+  const o1=ctx.createOscillator(), o2=ctx.createOscillator();
+  const g=ctx.createGain(), lp=ctx.createBiquadFilter();
+  o1.type='sawtooth'; o1.frequency.value=hz;
+  o2.type='sawtooth'; o2.frequency.value=hz*1.005;
+  lp.type='lowpass'; lp.frequency.setValueAtTime(hz*8,t0);
+  lp.frequency.exponentialRampToValueAtTime(hz*2,t0+0.1); lp.Q.value=3;
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol*0.5,t0+0.015);
+  g.gain.setValueAtTime(vol*0.5,t0+1.4);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+1.6);
+  o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(out);
+  o1.start(t0); o2.start(t0); o1.stop(t0+1.7); o2.stop(t0+1.7);
+}
+
+// ── PULSEBASS (Pulse Wave Bass) ──
+function playPulsebass(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.45);
+  const o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+  o.type='square'; o.frequency.value=hz;
+  lp.type='lowpass'; lp.frequency.setValueAtTime(hz*6,t0);
+  lp.frequency.exponentialRampToValueAtTime(hz*1.5,t0+0.08); lp.Q.value=5;
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol*0.8,t0+0.01);
+  g.gain.exponentialRampToValueAtTime(vol*0.3,t0+0.2);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+1.4);
+  o.connect(lp); lp.connect(g); g.connect(out);
+  o.start(t0); o.stop(t0+1.5);
+}
+
+// ── GLIDELEAD (Glide/Portamento Lead) ──
+function playGlidelead(ctx,hz,t0,vol){
+  const out=getOut(ctx,0.48);
+  const o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+  o.type='sawtooth';
+  // ポルタメント: 半音上からスライドイン
+  o.frequency.setValueAtTime(hz*1.06,t0);
+  o.frequency.exponentialRampToValueAtTime(hz,t0+0.08);
+  lp.type='lowpass'; lp.frequency.value=hz*5; lp.Q.value=4;
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol*0.75,t0+0.02);
+  g.gain.setValueAtTime(vol*0.75,t0+1.6);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+2.0);
+  o.connect(lp); lp.connect(g); g.connect(out);
+  o.start(t0); o.stop(t0+2.1);
 }
 
 function playChord(root,type){
@@ -2106,6 +2340,7 @@ let autoHistory=[];   // 再生済みコード履歴（学習・home gravity用�
 let phraseMode='off';       // 'off' | 'melody' | 'adlib'
 let phraseTIMBRE='crystal'; // フレーズ専用音色
 let phraseComplexity='easy'; // 'easy' | 'difficult' | 'progressive'
+let phraseVolume=0.75;       // フレーズ音量 0.0〜1.0
 let phraseChordHistory=[]; // [{root,type},...] Progressive用
 let phraseMotif=null;      // Progressiveモチーフ
 let phraseTimer=null;
@@ -3002,8 +3237,89 @@ function nearestNote(from,candidates){
 // ── スタイル別リズムパターンライブラリ ──
 // 各パターン: [{dur: 拍数倍率, rest: 休符か}]
 // dur: 0.5=8分, 1=4分, 1.5=付点8分, 0.25=16分, 0.75=付点16分
+
+// ═══════════════════════════════════════════════════════════════════
+// PHRASE ENGINE v3 — キャッチーポイント × Easy/Difficult/Progressive
+// ═══════════════════════════════════════════════════════════════════
+
+// ── ジャンル別キャッチーポイント定義 ──
+// motif: モチーフの音程パターン（半音単位、相対）
+// landOn: 着地する音程クラス ('chord'=コードトーン, 'root'=ルート, '5th'=5度)
+// contour: フレーズの輪郭 ('arch'=山型, 'ascend'=上昇, 'descend'=下降, 'wave'=波)
+// tension: テンション使用度 0.0〜1.0
+const CATCHY_HOOKS={
+  pop:{
+    motifs:[[0,2,4,2],[0,4,2,0,2],[0,2,0,-2,0],[4,5,4,2,0]], // 順次進行中心
+    contour:'arch', tension:0.1, landOn:'chord',
+    rhythmFeel:'straight', accentBeats:[0,2],
+  },
+  blues:{
+    motifs:[[0,-2,0,3],[3,0,-2,-3,0],[0,3,3,0,-2],[0,-1,0,3,2,0]], // ブルーノート絡み
+    contour:'wave', tension:0.35, landOn:'chord',
+    rhythmFeel:'swing', accentBeats:[0,3],
+  },
+  jazz:{
+    motifs:[[0,2,3,5,4,2],[0,-1,2,1,-2,0],[5,4,2,0,-2,0],[0,3,2,1,0,-1]], // ii-V感
+    contour:'descend', tension:0.45, landOn:'chord',
+    rhythmFeel:'swing', accentBeats:[1,3],
+  },
+  modal:{
+    motifs:[[0,0,2,0],[0,5,4,0],[0,2,2,0,2],[7,5,4,2,0,2]], // 特徴音反復
+    contour:'wave', tension:0.2, landOn:'root',
+    rhythmFeel:'straight', accentBeats:[0,2],
+  },
+  spanish:{
+    motifs:[[0,-1,-3,-4],[0,-2,-3,-4,-5],[0,-1,0,-1,-3,-4],[2,1,0,-1,-2]], // フリジアン下行
+    contour:'descend', tension:0.3, landOn:'root',
+    rhythmFeel:'straight', accentBeats:[0,2,3],
+  },
+  arabic:{
+    motifs:[[0,3,1,0],[0,-1,3,1],[0,3,4,3,1,0],[3,1,-1,0,3]], // 増2度跳躍
+    contour:'wave', tension:0.4, landOn:'chord',
+    rhythmFeel:'straight', accentBeats:[0,3],
+  },
+  japanese:{
+    motifs:[[0,-2,-3,0],[0,-3,0,-2],[0,5,3,0,-2],[-2,0,-3,-2,0]], // 都節短2度・短3度
+    contour:'wave', tension:0.25, landOn:'root',
+    rhythmFeel:'straight', accentBeats:[0,2],
+  },
+  emotion:{
+    motifs:[[0,2,4,7,5,4],[0,2,5,7,9,7],[0,4,5,9,7,5,4],[2,4,7,9,7,5]], // 上昇クレッシェンド
+    contour:'ascend', tension:0.15, landOn:'chord',
+    rhythmFeel:'straight', accentBeats:[0,3],
+  },
+  world:{
+    motifs:[[0,2,3,5,3],[0,3,2,0,-2],[0,5,3,2,0],[2,3,5,3,2,0]],
+    contour:'wave', tension:0.2, landOn:'chord',
+    rhythmFeel:'straight', accentBeats:[0,2],
+  },
+  default:{
+    motifs:[[0,2,4,2,0],[0,4,2,0],[0,2,0,-2],[2,4,5,4,2,0]],
+    contour:'arch', tension:0.2, landOn:'chord',
+    rhythmFeel:'straight', accentBeats:[0,2],
+  },
+};
+
+// SECTORSプリセット → キャッチーフック
+const PRESET_HOOK_MAP={
+  theory:'default', jazz:'jazz', pop:'pop', blues:'blues',
+  modal:'modal', emotion:'emotion', spanish:'spanish', arabic:'arabic',
+  japanese:'japanese', african:'world', indian:'world', hungarian:'world',
+  byzantine:'arabic', jewish:'jazz', balinese:'world', celtic:'world',
+  persian:'arabic', brazilian:'jazz',
+};
+
+// SECTORSプリセット → リズムスタイル
+const PRESET_RHYTHM_STYLE={
+  theory:'default', jazz:'jazz', pop:'pop', blues:'blues',
+  modal:'modal', emotion:'pop', spanish:'world', arabic:'world',
+  japanese:'world', african:'world', indian:'world', hungarian:'world',
+  byzantine:'world', jewish:'jazz', balinese:'world', celtic:'world',
+  persian:'world', brazilian:'jazz',
+};
+
+// リズムパターンライブラリ（難易度×スタイル）
 const PHRASE_RHYTHMS={
-  // === EASY ===
   easy:{
     pop:     [[.5,.5,.5,.5,1],[1,.5,.5,1],[.5,.5,1,.5,.5]],
     blues:   [[1,.5,.5,1],[.5,.5,.5,.5,.5,.5],[1,1,1]],
@@ -3012,7 +3328,6 @@ const PHRASE_RHYTHMS={
     world:   [[.5,.5,1,.5,.5],[1,.5,.5,.5,.5],[.5,.5,.5,.5,1]],
     default: [[1,.5,.5,1],[.5,.5,.5,.5,1],[1,1,1]],
   },
-  // === DIFFICULT ===
   difficult:{
     pop:     [[.75,.25,.5,.5,1],[.5,.25,.25,.5,.75,.25,.5],[1,.25,.25,.5,.5,.5]],
     blues:   [[1.5,.5,.5,.5],[.5,.5,.5,.25,.25,.5,.5],[.75,.25,1,.5,.5]],
@@ -3021,7 +3336,6 @@ const PHRASE_RHYTHMS={
     world:   [[.5,.5,.25,.25,.25,.25,.5],[.75,.25,.5,.5,.5],[.5,.25,.25,.5,.5,.5]],
     default: [[.75,.25,.5,.5,.5,.5],[1,.25,.25,.5,.5],[.5,.5,.25,.25,1]],
   },
-  // === PROGRESSIVE ===
   progressive:{
     pop:     [[.5,.5,.25,.25,.5,.5,.5],[.75,.25,.5,.25,.25,.75,.25],[.5,.5,.5,.25,.25,.5,.25,.25]],
     blues:   [[1,.25,.25,.25,.25,.5,.5],[.5,.25,.25,.5,.25,.25,1],[.75,.25,.25,.25,.25,.25,.5,.5]],
@@ -3032,51 +3346,32 @@ const PHRASE_RHYTHMS={
   },
 };
 
-// SECTORSプリセット → リズムスタイルのマッピング
-const PRESET_RHYTHM_STYLE={
-  theory:'default', jazz:'jazz', pop:'pop', blues:'blues',
-  modal:'modal', emotion:'pop', spanish:'world', arabic:'world',
-  japanese:'world', african:'world', indian:'world', hungarian:'world',
-  byzantine:'world', jewish:'jazz', balinese:'world', celtic:'world',
-  persian:'world', brazilian:'jazz',
-};
-
 // スタイル別スケール選択
 function getStyleScale(root,type,preset){
   const ri=ni(root);
   const chordIvs=CT[type]?.iv??[0,4,7];
   const isMin=type.startsWith('m')&&!['maj7','maj9','mmaj7'].includes(type);
-
-  // プリセット別スケールオフセット
   const scaleMap={
-    spanish:  [0,1,3,4,5,7,8,10],  // フリジアン・ドミナント
-    arabic:   [0,1,4,5,7,8,11],    // ヒジャーズ
-    japanese: [0,2,3,7,8],         // 都節
-    african:  [0,2,5,7,10],        // ペンタ
-    blues:    [0,3,5,6,7,10],      // ブルース
-    indian:   [0,1,4,5,7,9,11],    // カルヤーニ（簡易）
-    hungarian:[0,2,3,6,7,8,11],    // ハンガリー短音階
-    byzantine:[0,1,4,5,7,8,11],    // ビザンチン
-    celtic:   [0,2,5,7,9],         // ペンタ(メジャー)
-    modal:    isMin?[0,2,3,5,7,9,10]:[0,2,4,5,7,9,11], // ドリアン/リディアン
+    spanish:  [0,1,3,4,5,7,8,10],
+    arabic:   [0,1,4,5,7,8,11],
+    japanese: [0,2,3,7,8],
+    african:  [0,2,5,7,10],
+    blues:    [0,3,5,6,7,10],
+    indian:   [0,1,4,5,7,9,11],
+    hungarian:[0,2,3,6,7,8,11],
+    byzantine:[0,1,4,5,7,8,11],
+    celtic:   [0,2,5,7,9],
+    modal:    isMin?[0,2,3,5,7,9,10]:[0,2,4,5,7,9,11],
     default:  isMin?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11],
   };
   const key=scaleMap[preset]?preset:'default';
   const scaleIvs=scaleMap[key];
   const allIvs=[...new Set([...chordIvs,...scaleIvs])].sort((a,b)=>a-b);
-
-  // scaleTones: oct 3〜6 の4オクターブ展開（音域 C4〜B6）
-  const scaleTones=[];
+  const scaleTones=[], chordTones=[];
   [3,4,5,6].forEach(oct=>{
     allIvs.forEach(iv=>{ scaleTones.push(12*(oct+1)+((ri+iv)%12)); });
-  });
-
-  // chordTones: scaleTones と同じ音域で展開（prevNoteとの距離計算が正確になる）
-  const chordTones=[];
-  [3,4,5,6].forEach(oct=>{
     chordIvs.forEach(iv=>{ chordTones.push(12*(oct+1)+((ri+iv)%12)); });
   });
-
   return{scaleTones,chordTones};
 }
 
@@ -3084,12 +3379,13 @@ function getStyleScale(root,type,preset){
 function weightedPick(items, wFn){
   const ws=items.map(wFn);
   const total=ws.reduce((a,b)=>a+b,0);
+  if(total<=0)return items[Math.floor(Math.random()*items.length)];
   let r=Math.random()*total;
   for(let i=0;i<items.length;i++){r-=ws[i];if(r<=0)return items[i];}
   return items[items.length-1];
 }
 
-// リズムパターン1つを選択
+// リズムパターン選択
 function pickRhythm(complexity, preset){
   const styleKey=PRESET_RHYTHM_STYLE[preset]||'default';
   const patterns=PHRASE_RHYTHMS[complexity]?.[styleKey]
@@ -3098,109 +3394,188 @@ function pickRhythm(complexity, preset){
   return patterns[Math.floor(Math.random()*patterns.length)];
 }
 
-// ── ノート選択 ── 難易度別の引力設計
-function pickNote(prevNote, chordTones, scaleTones, complexity, preset, posInPhrase, phraseLen){
-  const frac=posInPhrase/phraseLen;
+// prevNoteに最近傍のコードトーンを返す
+function nearestChordTone(prevNote, chordTones){
+  return chordTones.reduce((b,n)=>Math.abs(n-prevNote)<Math.abs(b-prevNote)?n:b, chordTones[0]);
+}
 
-  // prevNoteに最も近いコードトーンを返す（着地用）
-  function nearestChord(){
-    return chordTones.reduce((b,n)=>Math.abs(n-prevNote)<Math.abs(b-prevNote)?n:b, chordTones[0]);
+// ── EASY: キャッチーモチーフ生成 ──
+// ジャンルのキャッチーポイントを使ってモチーフをコードに当てはめる
+function buildEasyPhrase(root, type, preset, chordTones, scaleTones, durations, beatMs){
+  const ri=ni(root);
+  const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
+  // モチーフを選択
+  const motif=hook.motifs[Math.floor(Math.random()*hook.motifs.length)];
+  // 開始音: コードトーン（ルート近傍）
+  const startNote=nearestChordTone(phraseLastNote, chordTones);
+  const notes=[];
+  let prev=startNote;
+
+  for(let i=0;i<durations.length;i++){
+    const frac=i/durations.length;
+    // モチーフのインデックス（フレーズ長に合わせてループ）
+    const mi=i%motif.length;
+    let candidate=startNote+motif[mi];
+    // スケール上の最近傍に吸着
+    const snapNote=scaleTones.reduce((b,n)=>Math.abs(n-candidate)<Math.abs(b-candidate)?n:b,scaleTones[0]);
+    // フレーズ末・強拍はコードトーンへ強制
+    const isAccentBeat=hook.accentBeats.includes(i%4);
+    const isEnding=frac>=0.82;
+    if(isEnding||isAccentBeat){
+      notes.push(nearestChordTone(snapNote, chordTones));
+    } else {
+      notes.push(snapNote);
+    }
+    prev=notes[notes.length-1];
   }
+  return notes;
+}
 
-  // ── EASY ──
-  if(complexity==='easy'){
-    // フレーズの最初・最後は必ずコードトーンに着地
-    if(posInPhrase===0 || frac>=0.85) return nearestChord();
+// ── DIFFICULT: アーク構造 + アプローチノート + クロマチック ──
+function buildDifficultPhrase(root, type, preset, chordTones, scaleTones, durations){
+  const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
+  const notes=[];
+  let prev=nearestChordTone(phraseLastNote, chordTones);
+  const peakPos=Math.floor(durations.length*0.55); // アーク頂点位置
 
-    // 近傍スケール音のみ（±5半音）
-    const nearby=scaleTones.filter(n=>Math.abs(n-prevNote)<=5);
-    const pool=nearby.length>=2?nearby:scaleTones;
-    // コードトーンに強い引力（非コード音は重み0.15）
-    return weightedPick(pool,n=>{
-      const isChord=chordTones.some(c=>c%12===n%12);
-      const dist=Math.abs(n-prevNote);
-      return(isChord?8:0.15)/(dist*0.5+1);
-    });
+  for(let i=0;i<durations.length;i++){
+    const frac=i/durations.length;
+    const isEnding=frac>=0.82;
+    const isStart=i===0;
 
-  // ── DIFFICULT ──
-  } else if(complexity==='difficult'){
-    // フレーズ末：コードトーンへ解決
-    if(frac>=0.82) return nearestChord();
-
-    // フレーズ頭：コードトーンからスタート
-    if(posInPhrase===0) return nearestChord();
-
-    // アプローチノート（コードトーンの半音上下）
-    if(frac>0.55&&Math.random()<0.38){
-      const target=nearestChord();
+    // 開始・終了はコードトーン
+    if(isStart||isEnding){
+      const ct=nearestChordTone(prev, chordTones);
+      notes.push(ct); prev=ct; continue;
+    }
+    // アーク頂点前後でアプローチノート
+    if(Math.abs(i-peakPos)<=1&&Math.random()<0.45){
+      const target=nearestChordTone(prev, chordTones);
       const approach=target+(Math.random()<0.5?1:-1);
-      // アプローチはスケール外でもOK（クロマチック）
-      return Math.max(45,Math.min(84,approach));
+      notes.push(Math.max(52,Math.min(83,approach)));
+      prev=notes[notes.length-1]; continue;
     }
-    // クロマチック経過音（方向性を持って動く）
-    if(Math.random()<0.2){
-      const dir=chordTones.reduce((b,c)=>Math.abs(c-prevNote)<Math.abs(b-prevNote)?c:b,chordTones[0])>prevNote?1:-1;
-      return Math.max(45,Math.min(84,prevNote+dir));
+    // テンション使用（フック設定に従う）
+    if(Math.random()<hook.tension&&frac>0.3&&frac<0.75){
+      const dir=chordTones.reduce((b,c)=>Math.abs(c-prev)<Math.abs(b-prev)?c:b,chordTones[0])>prev?1:-1;
+      const chromatic=prev+dir;
+      notes.push(Math.max(52,Math.min(83,chromatic)));
+      prev=notes[notes.length-1]; continue;
     }
-    // 通常：近傍スケール音（コードトーン中程度の引力）
-    const nearby=scaleTones.filter(n=>Math.abs(n-prevNote)<=7);
+    // 通常スケール音（コードトーン引力あり）
+    const nearby=scaleTones.filter(n=>Math.abs(n-prev)<=6);
     const pool=nearby.length>=2?nearby:scaleTones;
-    return weightedPick(pool,n=>{
+    const n=weightedPick(pool,n=>{
       const isChord=chordTones.some(c=>c%12===n%12);
-      const dist=Math.abs(n-prevNote);
-      return(isChord?4:1)/(dist*0.4+1);
+      const dist=Math.abs(n-prev);
+      return(isChord?5:1.2)/(dist*0.4+1);
     });
+    notes.push(Math.max(52,Math.min(83,n)));
+    prev=notes[notes.length-1];
+  }
+  return notes;
+}
 
-  // ── PROGRESSIVE ──
-  } else {
-    // フレーズ頭：コードトーンからスタート
-    if(posInPhrase===0) return nearestChord();
+// ── PROGRESSIVE: 先取り音・コード境界越え・予期しない跳躍 ──
+// nextChordInfo: {root,type} 次のコード情報（あれば）
+function buildProgressivePhrase(root, type, preset, chordTones, scaleTones, durations, nextChordInfo){
+  const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
+  const notes=[];
+  let prev=nearestChordTone(phraseLastNote, chordTones);
 
-    // フレーズ末：コードトーンへ解決
-    if(frac>=0.78) return nearestChord();
+  // 次コードのコードトーンを取得（先取り音のターゲット）
+  let nextChordTones=chordTones; // フォールバック
+  if(nextChordInfo){
+    const nri=ni(nextChordInfo.root);
+    const nIvs=CT[nextChordInfo.type]?.iv??[0,4,7];
+    nextChordTones=[4,5,6].flatMap(oct=>nIvs.map(iv=>12*(oct+1)+((nri+iv)%12)));
+  }
 
-    // モチーフの音程を現在コードに適用（前半）
-    if(frac<0.35&&phraseMotif){
-      const motifStep=phraseMotif[Math.floor(frac*phraseMotif.length)];
-      const candidate=prevNote+motifStep.interval;
-      const clamped=Math.max(48,Math.min(84,candidate));
-      // スケール上の最近傍に補正（不協和を避ける）
-      return scaleTones.reduce((b,n)=>Math.abs(n-clamped)<Math.abs(b-clamped)?n:b,scaleTones[0]);
+  // モチーフ生成（Progressive専用：大きな音程も許容）
+  if(!phraseMotif||Math.random()<0.35){
+    const motifLen=3+Math.floor(Math.random()*3);
+    phraseMotif=Array.from({length:motifLen},(_,i)=>{
+      const pattern=hook.motifs[Math.floor(Math.random()*hook.motifs.length)];
+      return{interval:pattern[i%pattern.length]*(1+(Math.random()<0.3?2:1)),durMult:1};
+    });
+  }
+
+  for(let i=0;i<durations.length;i++){
+    const frac=i/durations.length;
+    const isStart=i===0;
+    const isEnding=frac>=0.80;
+    const isPreEnding=frac>=0.65&&frac<0.80;
+
+    if(isStart){
+      // 冒頭：コードトーンからスタート（時に予期しない跳躍）
+      const startFromChord=nearestChordTone(prev,chordTones);
+      if(Math.random()<0.3){
+        // 予期しない跳躍（±7〜10半音）でコードトーンへ
+        const jumpDir=Math.random()<0.5?1:-1;
+        const jumpAmt=7+Math.floor(Math.random()*4);
+        const candidate=prev+jumpDir*jumpAmt;
+        const landed=nearestChordTone(candidate, chordTones);
+        notes.push(Math.max(48,Math.min(84,landed)));
+      } else {
+        notes.push(startFromChord);
+      }
+      prev=notes[0]; continue;
     }
 
-    // 中間：ある程度の跳躍を許容しつつコードトーンに引力
-    const pool=scaleTones.filter(n=>Math.abs(n-prevNote)<=9);
-    return weightedPick(pool.length>=2?pool:scaleTones,n=>{
+    if(isPreEnding&&nextChordInfo){
+      // コード境界直前：次コードへの先取り音（anticipation）
+      if(Math.random()<0.55){
+        const anticipation=nearestChordTone(prev, nextChordTones);
+        notes.push(Math.max(48,Math.min(84,anticipation)));
+        prev=notes[notes.length-1]; continue;
+      }
+    }
+
+    if(isEnding){
+      // フレーズ末は現在コードトーンへ解決（先取りからの着地感）
+      const resolve=nearestChordTone(prev, chordTones);
+      notes.push(resolve); prev=resolve; continue;
+    }
+
+    // モチーフ適用（前半〜中盤）
+    if(frac<0.4&&phraseMotif){
+      const mi=i%phraseMotif.length;
+      const candidate=prev+phraseMotif[mi].interval;
+      // スケール最近傍に補正（完全に外れないように）
+      const snapNote=scaleTones.reduce((b,n)=>Math.abs(n-candidate)<Math.abs(b-candidate)?n:b,scaleTones[0]);
+      notes.push(Math.max(48,Math.min(84,snapNote)));
+      prev=notes[notes.length-1]; continue;
+    }
+
+    // 中盤：テンション + 大きな跳躍を許容しつつコードトーンに引力
+    if(Math.random()<hook.tension+0.1){
+      // テンション（クロマチックまたはアプローチ）
+      const target=nearestChordTone(prev, chordTones);
+      const approach=target+(Math.random()<0.5?1:-1);
+      notes.push(Math.max(48,Math.min(84,approach)));
+      prev=notes[notes.length-1]; continue;
+    }
+    const pool=scaleTones.filter(n=>Math.abs(n-prev)<=10); // Progressive: 最大10半音
+    const n=weightedPick(pool.length>=2?pool:scaleTones,n=>{
       const isChord=chordTones.some(c=>c%12===n%12);
-      const dist=Math.abs(n-prevNote);
-      return(isChord?5:0.8)/(dist*0.25+1);
+      const dist=Math.abs(n-prev);
+      return(isChord?4:0.9)/(dist*0.2+1);
     });
+    notes.push(Math.max(48,Math.min(84,n)));
+    prev=notes[notes.length-1];
   }
+  return notes;
 }
 
-// モチーフ生成（Progressive用）
-function generateMotif(scaleTones, chordTones){
-  const len=3+Math.floor(Math.random()*3); // 3〜5音
-  const motif=[];
-  let prev=phraseLastNote;
-  for(let i=0;i<len;i++){
-    const frac=i/len;
-    const n=pickNote(prev,chordTones,scaleTones,'difficult','default',frac,1);
-    motif.push({interval:n-prev, durMult:Math.random()<0.3?2:1});
-    prev=n;
-  }
-  return motif;
-}
-
-// ── playNote ヘルパー（TIMBRE切替込み）──
+// ── playNote ヘルパー（TIMBRE切替込み・phraseVolume反映）──
 function playPhraseNote(ctx, midi, t, vol){
   const hz=midi2hz(Math.max(36,Math.min(96,midi)));
   const saved=TIMBRE; TIMBRE=phraseTIMBRE;
-  pluck(ctx,hz,t,vol);
+  pluck(ctx,hz,t,vol*phraseVolume);
   TIMBRE=saved;
 }
 
-// ── MELODY モード（新エンジン）──
+// ── MELODY モード（v3）──
 function playMelodyPhrase(root, type, durationMs){
   if(phraseMode!=='melody')return;
   const ctx=getCtx();
@@ -3208,57 +3583,59 @@ function playMelodyPhrase(root, type, durationMs){
 
   const preset=CURRENT_PRESET||'theory';
   const cx=phraseComplexity;
-  const {scaleTones,chordTones}=getStyleScale(root,type,preset);
+  const{scaleTones,chordTones}=getStyleScale(root,type,preset);
   const beatMs=60000/autoBpm;
   const p=TIMBRE_PROPS[phraseTIMBRE]||TIMBRE_PROPS.crystal;
 
-  // Progressiveモードでモチーフを生成（コード変化ごとに更新or継続）
-  if(cx==='progressive'){
-    if(!phraseMotif||Math.random()<0.4){
-      phraseMotif=generateMotif(scaleTones,chordTones);
-    }
-  }
-
-  // リズムパターンを選択してduration倍率配列に変換
-  const rhythmDurs=pickRhythm(cx, preset);
+  // リズムパターン決定
+  const rhythmDurs=pickRhythm(cx,preset);
   const totalBeats=durationMs/beatMs;
-  // パターンをtotalBeatsに正規化
   const patternTotal=rhythmDurs.reduce((a,b)=>a+b,0);
   const scale=totalBeats/patternTotal;
   const durations=rhythmDurs.map(d=>d*scale);
 
-  let t=ctx.currentTime+0.05;
-  let prevNote=phraseLastNote;
-  const deadline=ctx.currentTime+durationMs/1000-0.08;
+  // 次コード予測（Progressive先取り用）
+  const nextInfo=phraseChordHistory.length>=2
+    ?phraseChordHistory[phraseChordHistory.length-2]
+    :null;
 
-  for(let i=0;i<durations.length;i++){
+  // ノート列を難易度別ビルダーで生成
+  let noteSeq;
+  if(cx==='easy'){
+    noteSeq=buildEasyPhrase(root,type,preset,chordTones,scaleTones,durations,beatMs);
+  } else if(cx==='difficult'){
+    noteSeq=buildDifficultPhrase(root,type,preset,chordTones,scaleTones,durations);
+  } else {
+    noteSeq=buildProgressivePhrase(root,type,preset,chordTones,scaleTones,durations,nextInfo);
+  }
+
+  // スケジューリング
+  let t=ctx.currentTime+0.05;
+  const deadline=ctx.currentTime+durationMs/1000-0.08;
+  const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
+
+  for(let i=0;i<noteSeq.length;i++){
     if(t>=deadline)break;
     const noteDurSec=(durations[i]*beatMs)/1000;
-
-    // 休符確率：難易度別
-    const restProb={easy:0.1, difficult:0.15, progressive:0.12}[cx]||0.1;
+    // 休符（Easyは少なく、Progressiveはやや多め）
+    const restProb={easy:0.08,difficult:0.12,progressive:0.14}[cx]||0.1;
     if(Math.random()<restProb){t+=noteDurSec;continue;}
 
-    const note=pickNote(prevNote,chordTones,scaleTones,cx,preset,i,durations.length);
-    // 音域: E3(52)〜B5(83) でクランプ
-    const clamped=Math.max(52,Math.min(83,note));
-
-    // ベロシティ：アクセント付与
-    const isAccent=i%2===0;
-    const vel=p.vol*0.72*(isAccent?1:0.75)*(0.85+Math.random()*0.15);
-
-    playPhraseNote(ctx,clamped,t,vel);
-    prevNote=clamped;
+    const midi=noteSeq[i];
+    // アクセント付与
+    const isAccent=hook.accentBeats.includes(i%4);
+    const vel=p.vol*(isAccent?1.0:0.72)*(0.88+Math.random()*0.12);
+    playPhraseNote(ctx,midi,t,vel);
     t+=noteDurSec;
   }
-  phraseLastNote=prevNote;
+  phraseLastNote=noteSeq[noteSeq.length-1]||phraseLastNote;
 
-  // コード履歴更新（Progressive先読み用）
+  // コード履歴更新
   phraseChordHistory.push({root,type});
-  if(phraseChordHistory.length>4)phraseChordHistory.shift();
+  if(phraseChordHistory.length>6)phraseChordHistory.shift();
 }
 
-// ── ADLIB モード（既存を維持・微調整）──
+// ── ADLIB モード ──
 function playAdlibPhrase(root,type,durationMs){
   if(phraseMode!=='adlib')return;
   const ctx=getCtx();
@@ -3268,11 +3645,8 @@ function playAdlibPhrase(root,type,durationMs){
   const{chordTones,scaleTones}=getStyleScale(root,type,preset);
   const beatMs=60000/autoBpm;
   let t=ctx.currentTime+0.05;
-  // phraseLastNoteを現在コードの最近傍コードトーンに補正してスタート
-  const startNote=chordTones.reduce((b,n)=>Math.abs(n-phraseLastNote)<Math.abs(b-phraseLastNote)?n:b,chordTones[0]);
-  let prevNote=Math.max(48,Math.min(81,startNote));
+  let prevNote=nearestChordTone(phraseLastNote,chordTones);
   const p=TIMBRE_PROPS[phraseTIMBRE]||TIMBRE_PROPS.crystal;
-  const targetNote=weightedPick(chordTones,()=>1);
   const totalBeats=durationMs/beatMs;
   const cells=Math.max(2,Math.round(totalBeats/2));
 
@@ -3284,9 +3658,21 @@ function playAdlibPhrase(root,type,durationMs){
       const frac=j/notesInCell;
       const noteDur=cellDur/notesInCell;
       if(Math.random()<0.12){t+=noteDur;continue;}
-      let note=pickNote(prevNote,chordTones,scaleTones,
-        cx==='easy'?'easy':'difficult', preset, frac, 1);
-      note=Math.max(45,Math.min(81,note));
+
+      let note;
+      if(frac>=0.75) note=nearestChordTone(prevNote,chordTones);
+      else if(frac>0.5&&Math.random()<0.4){
+        const target=nearestChordTone(prevNote,chordTones);
+        note=Math.max(45,Math.min(81,target+(Math.random()<0.5?1:-1)));
+      } else {
+        const nearby=scaleTones.filter(n=>Math.abs(n-prevNote)<=6);
+        const pool=nearby.length?nearby:scaleTones;
+        note=weightedPick(pool,n=>{
+          const isChord=chordTones.some(c=>c%12===n%12);
+          return(isChord?4:1)/(Math.abs(n-prevNote)*0.3+1);
+        });
+        note=Math.max(45,Math.min(81,note));
+      }
       const vol=p.vol*(noteDur<beatMs/1000*0.4?0.5:0.75)*(0.8+Math.random()*0.2);
       playPhraseNote(ctx,note,t,vol);
       prevNote=note;
@@ -3297,10 +3683,10 @@ function playAdlibPhrase(root,type,durationMs){
   phraseLastNote=prevNote;
 }
 
-// コード変化時にフレーズを起動（moveToChordから呼ばれる）
+// コード変化時にフレーズを起動
 function triggerPhrase(root,type){
   if(phraseMode==='off')return;
-  const durationMs=Math.round(60000/autoBpm*2)-50; // 2拍分
+  const durationMs=Math.round(60000/autoBpm*2)-50;
   if(phraseMode==='melody')playMelodyPhrase(root,type,durationMs);
   else if(phraseMode==='adlib')playAdlibPhrase(root,type,durationMs);
 }
@@ -4775,12 +5161,21 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
   document.querySelectorAll('.phrase-cx-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       phraseComplexity=btn.dataset.cx;
-      phraseMotif=null; // モチーフリセット
+      phraseMotif=null;
       document.querySelectorAll('.phrase-cx-btn').forEach(b=>{
         b.classList.toggle('on',b.dataset.cx===phraseComplexity);
       });
     });
   });
+  // 音量スライダー
+  const volSl=document.getElementById('phrase-vol-sl');
+  const volVal=document.getElementById('phrase-vol-val');
+  if(volSl){
+    volSl.addEventListener('input',()=>{
+      phraseVolume=parseInt(volSl.value)/100;
+      if(volVal)volVal.textContent=volSl.value;
+    });
+  }
 })();
 document.getElementById('prog-genre-sel')?.addEventListener('change',e=>{
   autoProgGenre=e.target.value;autoProgIdx=0;autoStepIdx=0;renderProgNames();
