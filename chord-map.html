@@ -2341,6 +2341,10 @@ let phraseMode='off';       // 'off' | 'melody' | 'adlib'
 let phraseTIMBRE='crystal'; // フレーズ専用音色
 let phraseComplexity='easy'; // 'easy' | 'difficult' | 'progressive'
 let phraseVolume=0.75;       // フレーズ音量 0.0〜1.0
+// ── フレーズ継続演奏用状態 ──
+let phraseCurrentChord={root:'A',type:'m'}; // 現在追従中のコード
+let phraseEndTime=0;          // フレーズ終了のAudioContext時刻
+let phraseIsPlaying=false;    // フレーズ再生中フラグ
 let phraseChordHistory=[]; // [{root,type},...] Progressive用
 let phraseMotif=null;      // Progressiveモチーフ
 let phraseTimer=null;
@@ -3581,58 +3585,147 @@ function playMelodyPhrase(root, type, durationMs){
   const ctx=getCtx();
   if(ctx.state==='suspended')ctx.resume();
 
+  phraseCurrentChord={root,type};
+  phraseIsPlaying=true;
+
   const preset=CURRENT_PRESET||'theory';
   const cx=phraseComplexity;
-  const{scaleTones,chordTones}=getStyleScale(root,type,preset);
   const beatMs=60000/autoBpm;
   const p=TIMBRE_PROPS[phraseTIMBRE]||TIMBRE_PROPS.crystal;
 
-  // リズムパターン決定
+  // リズムパターン決定（フレーズ開始時に1回だけ）
   const rhythmDurs=pickRhythm(cx,preset);
   const totalBeats=durationMs/beatMs;
   const patternTotal=rhythmDurs.reduce((a,b)=>a+b,0);
   const scale=totalBeats/patternTotal;
   const durations=rhythmDurs.map(d=>d*scale);
 
-  // 次コード予測（Progressive先取り用）
-  const nextInfo=phraseChordHistory.length>=2
-    ?phraseChordHistory[phraseChordHistory.length-2]
-    :null;
-
-  // ノート列を難易度別ビルダーで生成
-  let noteSeq;
-  if(cx==='easy'){
-    noteSeq=buildEasyPhrase(root,type,preset,chordTones,scaleTones,durations,beatMs);
-  } else if(cx==='difficult'){
-    noteSeq=buildDifficultPhrase(root,type,preset,chordTones,scaleTones,durations);
-  } else {
-    noteSeq=buildProgressivePhrase(root,type,preset,chordTones,scaleTones,durations,nextInfo);
-  }
-
-  // スケジューリング
-  let t=ctx.currentTime+0.05;
-  const deadline=ctx.currentTime+durationMs/1000-0.08;
-  const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
-
-  for(let i=0;i<noteSeq.length;i++){
-    if(t>=deadline)break;
-    const noteDurSec=(durations[i]*beatMs)/1000;
-    // 休符（Easyは少なく、Progressiveはやや多め）
-    const restProb={easy:0.08,difficult:0.12,progressive:0.14}[cx]||0.1;
-    if(Math.random()<restProb){t+=noteDurSec;continue;}
-
-    const midi=noteSeq[i];
-    // アクセント付与
-    const isAccent=hook.accentBeats.includes(i%4);
-    const vel=p.vol*(isAccent?1.0:0.72)*(0.88+Math.random()*0.12);
-    playPhraseNote(ctx,midi,t,vel);
-    t+=noteDurSec;
-  }
-  phraseLastNote=noteSeq[noteSeq.length-1]||phraseLastNote;
-
   // コード履歴更新
   phraseChordHistory.push({root,type});
   if(phraseChordHistory.length>6)phraseChordHistory.shift();
+
+  // スケジューリング: ノートごとにphraseCurrentChordを参照してコード追従
+  let t=ctx.currentTime+0.05;
+  const phraseStartTime=t;
+  phraseEndTime=phraseStartTime+durationMs/1000;
+
+  function scheduleNote(i){
+    if(i>=durations.length){
+      // フレーズ末 — phraseIsPlayingをfalseに（次のtriggerで新フレーズ開始可能に）
+      const delay=(phraseEndTime-ctx.currentTime)*1000;
+      phraseTimer=setTimeout(()=>{
+        phraseIsPlaying=false;
+        phraseTimer=null;
+      }, Math.max(0,delay));
+      return;
+    }
+
+    // ノートスケジュール時点のコードを取得（コード変化に追従）
+    const {root:cr,type:ct}=phraseCurrentChord;
+    const{scaleTones,chordTones}=getStyleScale(cr,ct,CURRENT_PRESET||'theory');
+
+    // 次コード予測
+    const nextInfo=phraseChordHistory.length>=2
+      ?phraseChordHistory[phraseChordHistory.length-2]:null;
+
+    // ノート列生成（1音ずつ生成するため単音モード）
+    // 難易度別ビルダーを1音分だけ呼ぶのではなく、
+    // posInPhraseとphraseLenを渡して適切な音を選ぶ
+    let midi;
+    const frac=i/durations.length;
+    if(cx==='easy'){
+      const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[CURRENT_PRESET||'theory']||'default'];
+      const motif=hook.motifs[phraseChordHistory.length%hook.motifs.length];
+      const mi=i%motif.length;
+      // コードトーンにスナップしたスタートノート
+      const startNote=nearestChordTone(phraseLastNote,chordTones);
+      let candidate=startNote+motif[mi];
+      const snap=scaleTones.reduce((b,n)=>Math.abs(n-candidate)<Math.abs(b-candidate)?n:b,scaleTones[0]);
+      const isAccent=hook.accentBeats.includes(i%4);
+      midi=(frac>=0.82||isAccent)?nearestChordTone(snap,chordTones):snap;
+
+    } else if(cx==='difficult'){
+      const peakPos=Math.floor(durations.length*0.55);
+      if(i===0||frac>=0.82){
+        midi=nearestChordTone(phraseLastNote,chordTones);
+      } else if(Math.abs(i-peakPos)<=1&&Math.random()<0.45){
+        const target=nearestChordTone(phraseLastNote,chordTones);
+        midi=Math.max(52,Math.min(83,target+(Math.random()<0.5?1:-1)));
+      } else {
+        const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[CURRENT_PRESET||'theory']||'default'];
+        const nearby=scaleTones.filter(n=>Math.abs(n-phraseLastNote)<=6);
+        const pool=nearby.length>=2?nearby:scaleTones;
+        midi=weightedPick(pool,n=>{
+          const isChord=chordTones.some(c=>c%12===n%12);
+          return(isChord?5:1.2)/(Math.abs(n-phraseLastNote)*0.4+1);
+        });
+        midi=Math.max(52,Math.min(83,midi));
+      }
+
+    } else { // progressive
+      if(i===0){
+        midi=nearestChordTone(phraseLastNote,chordTones);
+        if(Math.random()<0.3){
+          const jump=(Math.random()<0.5?1:-1)*(7+Math.floor(Math.random()*4));
+          midi=nearestChordTone(phraseLastNote+jump,chordTones);
+        }
+      } else if(frac>=0.65&&frac<0.80&&nextInfo){
+        const nri=ni(nextInfo.root);
+        const nIvs=CT[nextInfo.type]?.iv??[0,4,7];
+        const nextCTs=[4,5,6].flatMap(oct=>nIvs.map(iv=>12*(oct+1)+((nri+iv)%12)));
+        if(Math.random()<0.55) midi=nearestChordTone(phraseLastNote,nextCTs);
+        else midi=nearestChordTone(phraseLastNote,chordTones);
+      } else if(frac>=0.80){
+        midi=nearestChordTone(phraseLastNote,chordTones);
+      } else if(phraseMotif&&frac<0.4){
+        const mi=i%phraseMotif.length;
+        const candidate=phraseLastNote+phraseMotif[mi].interval;
+        midi=scaleTones.reduce((b,n)=>Math.abs(n-candidate)<Math.abs(b-candidate)?n:b,scaleTones[0]);
+        midi=Math.max(48,Math.min(84,midi));
+      } else {
+        const pool=scaleTones.filter(n=>Math.abs(n-phraseLastNote)<=10);
+        midi=weightedPick(pool.length>=2?pool:scaleTones,n=>{
+          const isChord=chordTones.some(c=>c%12===n%12);
+          return(isChord?4:0.9)/(Math.abs(n-phraseLastNote)*0.2+1);
+        });
+        midi=Math.max(48,Math.min(84,midi));
+      }
+    }
+
+    // 休符判定
+    const restProb={easy:0.08,difficult:0.12,progressive:0.14}[cx]||0.1;
+    const noteDurSec=(durations[i]*beatMs)/1000;
+    const deadline=phraseStartTime+durationMs/1000-0.08;
+
+    if(t<deadline&&Math.random()>=restProb){
+      const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[CURRENT_PRESET||'theory']||'default'];
+      const isAccent=hook.accentBeats.includes(i%4);
+      const vel=p.vol*(isAccent?1.0:0.72)*(0.88+Math.random()*0.12);
+      playPhraseNote(ctx,midi,t,vel);
+      phraseLastNote=midi;
+    }
+
+    t+=noteDurSec;
+
+    // 次のノートを非同期スケジュール（setTimeoutでAudioContextタイムに追従）
+    const nextDelay=(t-ctx.currentTime)*1000-60; // 60ms前にスケジュール
+    phraseTimer=setTimeout(()=>scheduleNote(i+1), Math.max(0,nextDelay));
+  }
+
+  // モチーフ初期化（Progressive）
+  if(cx==='progressive'&&(!phraseMotif||Math.random()<0.35)){
+    const{scaleTones:st,chordTones:ct2}=getStyleScale(root,type,preset);
+    const motifLen=3+Math.floor(Math.random()*3);
+    const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
+    phraseMotif=Array.from({length:motifLen},(_,idx)=>{
+      const pattern=hook.motifs[Math.floor(Math.random()*hook.motifs.length)];
+      return{interval:pattern[idx%pattern.length]*(1+(Math.random()<0.3?2:1)),durMult:1};
+    });
+  }
+
+  // 既存タイマーをクリアして開始
+  if(phraseTimer){clearTimeout(phraseTimer);phraseTimer=null;}
+  scheduleNote(0);
 }
 
 // ── ADLIB モード ──
@@ -3640,6 +3733,7 @@ function playAdlibPhrase(root,type,durationMs){
   if(phraseMode!=='adlib')return;
   const ctx=getCtx();
   if(ctx.state==='suspended')ctx.resume();
+  phraseIsPlaying=true;
   const preset=CURRENT_PRESET||'theory';
   const cx=phraseComplexity;
   const{chordTones,scaleTones}=getStyleScale(root,type,preset);
@@ -3681,14 +3775,34 @@ function playAdlibPhrase(root,type,durationMs){
     if(Math.random()<0.35)t+=beatMs/1000*0.25;
   }
   phraseLastNote=prevNote;
+  phraseIsPlaying=false;
 }
 
-// コード変化時にフレーズを起動
+// コード変化時にフレーズを起動 or コード情報を更新
 function triggerPhrase(root,type){
   if(phraseMode==='off')return;
-  const durationMs=Math.round(60000/autoBpm*2)-50;
-  if(phraseMode==='melody')playMelodyPhrase(root,type,durationMs);
-  else if(phraseMode==='adlib')playAdlibPhrase(root,type,durationMs);
+
+  // コード履歴を更新（先取り音計算用）
+  phraseChordHistory.push({root,type});
+  if(phraseChordHistory.length>6)phraseChordHistory.shift();
+
+  if(phraseMode==='melody'){
+    if(phraseIsPlaying){
+      // A案: フレーズ再生中 → コード情報だけ更新して演奏継続
+      phraseCurrentChord={root,type};
+    } else {
+      // C案: フレーズ終了済み → 新フレーズ開始
+      const durationMs=Math.round(60000/autoBpm*2)-50;
+      playMelodyPhrase(root,type,durationMs);
+    }
+  } else if(phraseMode==='adlib'){
+    if(!phraseIsPlaying){
+      const durationMs=Math.round(60000/autoBpm*2)-50;
+      playAdlibPhrase(root,type,durationMs);
+    } else {
+      phraseCurrentChord={root,type};
+    }
+  }
 }
 
 
@@ -5154,7 +5268,13 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
   const sel=document.getElementById('timbre-sel');
   if(sel){ sel.value=TIMBRE; sel.addEventListener('change',e=>{TIMBRE=e.target.value;}); }
   const pms=document.getElementById('phrase-mode-sel');
-  if(pms){ pms.value=phraseMode; pms.addEventListener('change',e=>{phraseMode=e.target.value;}); }
+  if(pms){ pms.value=phraseMode; pms.addEventListener('change',e=>{
+    phraseMode=e.target.value;
+    if(phraseMode==='off'){
+      if(phraseTimer){clearTimeout(phraseTimer);phraseTimer=null;}
+      phraseIsPlaying=false;
+    }
+  }); }
   const pts=document.getElementById('phrase-timbre-sel');
   if(pts){ pts.value=phraseTIMBRE; pts.addEventListener('change',e=>{phraseTIMBRE=e.target.value;}); }
   // complexityボタン
