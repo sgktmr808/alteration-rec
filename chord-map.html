@@ -177,57 +177,126 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:rgba(13,13,16,0.9);cursor:pointer;letter-spacing:.05em;white-space:nowrap;transition:border-color .15s,color .15s;}
 .mode-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
 
-/* AUTO BAR */
-.auto-bar{flex-shrink:0;display:flex;flex-direction:column;gap:0;
-  background:var(--surf2);border-top:1px solid var(--bdr);}
-.auto-row1{display:flex;align-items:center;gap:8px;padding:6px 12px 4px;}
-.auto-row2{display:flex;align-items:center;gap:6px;padding:4px 12px 6px;border-top:1px solid rgba(255,255,255,0.05);}
-.auto-btn{font-family:var(--fm);font-size:9px;padding:3px 10px;
-  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
-  background:var(--surf);cursor:pointer;letter-spacing:.1em;flex-shrink:0;transition:border-color .15s,color .15s;}
-.auto-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
-.auto-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);flex-shrink:0;}
-.auto-bpm{flex:1;-webkit-appearance:none;appearance:none;height:4px;
-  border-radius:2px;background:var(--bdr2);accent-color:var(--acc);cursor:pointer;}
-.auto-bpm::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
-  border-radius:50%;background:var(--acc);cursor:pointer;}
-.auto-bpm-val{font-family:var(--fm);font-size:9px;color:var(--acc);
-  width:26px;text-align:center;flex-shrink:0;}
-.auto-bpm-step{font-family:var(--fm);font-size:11px;color:var(--dim);
-  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
-  border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf);
-  cursor:pointer;flex-shrink:0;user-select:none;-webkit-user-select:none;
-  transition:border-color .12s,color .12s;}
-.auto-bpm-step:active{border-color:var(--acc);color:var(--acc);}
+/* ── アイコンボタン行 ── */
+.icon-row{
+  flex-shrink:0;display:flex;gap:8px;padding:10px 12px 8px;
+  background:var(--surf2);border-top:1px solid var(--bdr);
+}
+.icon-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;cursor:pointer;border-radius:8px;padding:8px 4px;
+  border:1px solid var(--bdr2);background:var(--surf);
+  transition:border-color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+.icon-btn:active{opacity:.72;}
+.icon-sym{font-size:18px;line-height:1;}
+.icon-lbl{font-family:var(--fm);font-size:7px;letter-spacing:.1em;line-height:1;}
+.icon-sub{font-family:var(--fm);font-size:6.5px;line-height:1;margin-top:1px;opacity:.7;}
+/* AUTO — 青 */
+.icon-btn.ic-auto{border-color:rgba(74,144,212,0.25);}
+.icon-btn.ic-auto .icon-sym,.icon-btn.ic-auto .icon-lbl{color:#4a90d4;}
+.icon-btn.ic-auto .icon-sub{color:#4a90d4;}
+.icon-btn.ic-auto.on{background:rgba(74,144,212,0.1);border-color:#4a90d4;}
+/* REC — 赤 */
+.icon-btn.ic-rec{border-color:rgba(212,74,106,0.25);}
+.icon-btn.ic-rec .icon-sym,.icon-btn.ic-rec .icon-lbl{color:#d44a6a;}
+.icon-btn.ic-rec .icon-sub{color:#d44a6a;}
+.icon-btn.ic-rec.on{background:rgba(212,74,106,0.1);border-color:#d44a6a;}
+/* PHRASE — 黄 */
+.icon-btn.ic-phrase{border-color:rgba(232,197,71,0.25);}
+.icon-btn.ic-phrase .icon-sym,.icon-btn.ic-phrase .icon-lbl{color:var(--acc);}
+.icon-btn.ic-phrase .icon-sub{color:var(--acc);}
+.icon-btn.ic-phrase.on{background:var(--acc-a);border-color:var(--acc);}
+
+/* ── BPMダイヤルエリア ── */
+.bpm-dial-area{
+  flex-shrink:0;display:flex;flex-direction:column;align-items:center;
+  padding:10px 12px 8px;gap:6px;
+  background:var(--surf2);border-top:1px solid var(--bdr);
+}
+.bpm-dial-wrap{position:relative;width:130px;height:130px;}
+.bpm-dial-svg{position:absolute;inset:0;width:100%;height:100%;}
+.bpm-dial-center{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none;}
+.bpm-dial-n{font-family:var(--fm);font-size:28px;color:var(--acc);line-height:1;font-weight:500;}
+.bpm-dial-u{font-family:var(--fm);font-size:7px;color:var(--dim);letter-spacing:.14em;margin-top:3px;}
+.bpm-dial-steps{display:flex;gap:10px;}
+.bpm-dial-step{width:34px;height:34px;border-radius:50%;background:var(--surf);
+  border:1px solid var(--bdr2);display:flex;align-items:center;justify-content:center;
+  font-size:16px;color:var(--dim);cursor:pointer;transition:border-color .12s,color .12s;
+  user-select:none;-webkit-user-select:none;}
+.bpm-dial-step:active{border-color:var(--acc);color:var(--acc);}
+.bpm-mode-row{display:flex;gap:6px;width:100%;}
 .auto-sel{font-family:var(--fm);font-size:8px;padding:2px 4px;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--acc);
   background:var(--surf);cursor:pointer;-webkit-appearance:none;appearance:none;
-  flex-shrink:0;min-width:52px;text-align:center;accent-color:var(--acc);}
-.auto-sel.wide{min-width:120px;flex:1;}
-.prog-bar{flex-shrink:0;display:flex;align-items:center;gap:6px;
-  padding:4px 12px;background:var(--surf2);border-top:1px solid var(--bdr);}
+  flex:1;text-align:center;accent-color:var(--acc);height:26px;}
+.auto-sel.wide{flex:2;}
+/* 後方互換 (auto-bpm は JS側で使用) */
+.auto-bpm{display:none;}
+.auto-bpm-val{display:none;}
+.auto-bpm-step{display:none;}
+.auto-btn{display:none;}
+.auto-lbl{display:none;}
+.auto-row1{display:none;}
+.auto-row2{display:none;}
+.auto-bar{display:none;}
 
-/* SECTOR PANEL */
+/* ── PHRASEパネル ── */
+.phrase-panel{
+  flex-shrink:0;display:none;
+  background:var(--surf2);border-top:1px solid rgba(232,197,71,0.2);
+  padding:9px 12px;
+}
+.phrase-panel.open{display:block;}
+.phrase-panel-t{font-family:var(--fm);font-size:8px;color:var(--acc);
+  letter-spacing:.12em;opacity:.8;margin-bottom:7px;}
+.phrase-sels{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:6px;}
+.phrase-sel{font-family:var(--fm);font-size:8.5px;padding:0 7px;height:30px;
+  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--acc);
+  background:var(--surf);-webkit-appearance:none;cursor:pointer;}
+
+/* ── SECTOR PANEL (新デザイン) ── */
 .sector-panel{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);
-  overflow:hidden;transition:max-height .2s;}
-.sector-panel.open{max-height:160px;}
+  overflow:hidden;transition:max-height .25s;}
+.sector-panel.open{max-height:200px;}
 .sector-panel.closed{max-height:0;}
 .sector-hdr{display:flex;align-items:center;justify-content:space-between;
   padding:5px 12px 4px;cursor:pointer;border-top:1px solid var(--bdr);}
 .sector-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);}
-.preset-row{display:flex;gap:4px;padding:4px 10px 2px;overflow-x:auto;scrollbar-width:none;}
+/* プリセット dotボタン */
+.preset-row{display:flex;gap:5px;padding:4px 10px 4px;overflow-x:auto;scrollbar-width:none;}
 .preset-row::-webkit-scrollbar{display:none;}
-.preset-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;
-  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
-  background:var(--surf);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:border-color .15s,color .15s;}
-.preset-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
-.weight-row{display:flex;gap:4px;padding:4px 10px 6px;align-items:center;}
-.weight-sl-wrap{display:flex;flex-direction:column;align-items:center;flex:1;}
-.weight-lbl{font-family:var(--fm);font-size:6px;color:var(--dim);margin-bottom:2px;text-align:center;}
-.weight-sl{width:100%;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
-  background:var(--bdr2);outline:none;cursor:pointer;}
-.weight-sl::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
-  border-radius:50%;background:var(--acc);cursor:pointer;}
+.preset-btn{font-family:var(--fm);font-size:7.5px;
+  display:flex;align-items:center;gap:4px;
+  padding:3px 9px;border:1px solid var(--bdr2);border-radius:10px;
+  color:var(--dim);background:var(--surf);cursor:pointer;white-space:nowrap;flex-shrink:0;
+  transition:border-color .15s,color .15s,background .15s;}
+.preset-btn.on{border-color:rgba(255,255,255,0.22);color:var(--text);background:rgba(255,255,255,0.05);}
+.preset-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+/* ウェイトスライダー 2列グリッド */
+.weight-row{display:grid;grid-template-columns:1fr 1fr;gap:7px 14px;padding:6px 12px 10px;}
+.weight-sl-wrap{display:flex;flex-direction:column;gap:3px;}
+.weight-sl-hdr{display:flex;justify-content:space-between;align-items:baseline;}
+.weight-lbl{font-family:var(--fm);font-size:7px;letter-spacing:.08em;}
+.weight-val{font-family:var(--fm);font-size:8px;color:var(--acc);}
+.weight-sl-track{position:relative;height:20px;display:flex;align-items:center;}
+.weight-sl-bg{width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,0.07);position:relative;overflow:hidden;}
+.weight-sl-fill{height:100%;border-radius:2px;position:absolute;left:0;top:0;opacity:.75;}
+.weight-sl{
+  position:absolute;inset:0;width:100%;
+  -webkit-appearance:none;appearance:none;
+  background:transparent;cursor:pointer;margin:0;
+}
+.weight-sl::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--thumb-col, var(--acc));background:var(--surf2);cursor:pointer;
+}
+.prog-bar{flex-shrink:0;display:flex;align-items:center;gap:6px;
+  padding:4px 12px;background:var(--surf2);border-top:1px solid var(--bdr);}
+
+/* SECTOR PANEL → 上部の新CSSに統合済み */
 .csv-btn{font-family:var(--fm);font-size:9px;padding:5px 12px;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);cursor:pointer;
   margin:12px 0 0;display:inline-block;background:var(--surf2);transition:border-color .15s,color .15s;}
@@ -345,6 +414,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <div class="ctrl-back-handle" id="ctrl-back-handle">
           <div class="ctrl-back-bar"></div>
         </div>
+
+        <!-- VOICINGS -->
         <div class="pos-zone">
           <div class="pos-hdr" id="pos-hdr">
             <span class="pos-hdr-l">VOICINGS</span>
@@ -356,37 +427,107 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             </div>
           </div>
         </div>
+
+        <!-- PATH -->
         <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
-        <div class="midi-bar" id="midi-bar">
-          <div class="midi-rec-btn" id="midi-rec-btn" onclick="toggleMidiRec()">● REC</div>
-          <div class="midi-status" id="midi-status">MIDI off</div>
-          <div class="midi-action-btn" id="midi-export-btn" style="display:none" onclick="exportMidi()">↓ MIDI</div>
-          <div class="midi-action-btn" id="midi-clear-btn" style="display:none" onclick="clearMidi()">✕</div>
-        </div>
+
+        <!-- LEARN BAR -->
         <div class="learn-bar" id="learn-bar">
           <span class="learn-lbl">LEARNED</span>
           <div id="learn-chips"></div>
         </div>
-        <div class="auto-bar" id="auto-bar">
-          <div class="auto-row1">
-            <div class="auto-btn" id="auto-btn" onclick="autoPlay?stopAuto():startAuto()">▶ AUTO</div>
+
+        <!-- アイコンボタン行: AUTO / REC / PHRASE -->
+        <div class="icon-row">
+          <div class="icon-btn ic-auto" id="ic-auto-btn">
+            <div class="icon-sym">▶</div>
+            <div class="icon-lbl">AUTO</div>
+            <div class="icon-sub" id="ic-auto-sub">FREE</div>
+          </div>
+          <div class="icon-btn ic-rec" id="ic-rec-btn">
+            <div class="icon-sym">●</div>
+            <div class="icon-lbl">REC</div>
+            <div class="icon-sub" id="ic-rec-sub">MIDI off</div>
+          </div>
+          <div class="icon-btn ic-phrase" id="ic-phrase-btn">
+            <div class="icon-sym">♪</div>
+            <div class="icon-lbl">PHRASE</div>
+            <div class="icon-sub" id="ic-phrase-sub">— off</div>
+          </div>
+        </div>
+
+        <!-- BPMダイヤル + モード -->
+        <div class="bpm-dial-area" id="bpm-dial-area">
+          <div class="bpm-dial-wrap" id="bpm-dial-wrap">
+            <svg class="bpm-dial-svg" id="bpm-dial-svg" viewBox="0 0 130 130">
+              <!-- 外リング装飾 -->
+              <circle cx="65" cy="65" r="60" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+              <!-- 目盛り -->
+              <g stroke="rgba(255,255,255,0.1)" stroke-width="1.2" stroke-linecap="round">
+                <line x1="65" y1="7" x2="65" y2="14" transform="rotate(-135 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="11" transform="rotate(-112.5 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="14" transform="rotate(-90 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="11" transform="rotate(-67.5 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="14" transform="rotate(-45 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="11" transform="rotate(-22.5 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="14" transform="rotate(0 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="11" transform="rotate(22.5 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="14" transform="rotate(45 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="11" transform="rotate(67.5 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="14" transform="rotate(90 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="11" transform="rotate(112.5 65 65)"/>
+                <line x1="65" y1="7" x2="65" y2="14" transform="rotate(135 65 65)"/>
+              </g>
+              <!-- レンジラベル -->
+              <text x="15" y="100" font-family="DM Mono,monospace" font-size="7" fill="rgba(255,255,255,0.18)" text-anchor="middle">40</text>
+              <text x="65" y="126" font-family="DM Mono,monospace" font-size="7" fill="rgba(255,255,255,0.18)" text-anchor="middle">110</text>
+              <text x="115" y="100" font-family="DM Mono,monospace" font-size="7" fill="rgba(255,255,255,0.18)" text-anchor="middle">180</text>
+              <!-- 背景トラック -->
+              <circle id="bpm-track" cx="65" cy="65" r="50" fill="none"
+                stroke="rgba(255,255,255,0.07)" stroke-width="6"
+                stroke-dasharray="263 315" stroke-dashoffset="-68"
+                stroke-linecap="round"/>
+              <!-- 進捗アーク -->
+              <circle id="bpm-arc" cx="65" cy="65" r="50" fill="none"
+                stroke="#e8c547" stroke-width="6"
+                stroke-dasharray="105 315" stroke-dashoffset="-68"
+                stroke-linecap="round" opacity=".9"/>
+              <!-- グロー -->
+              <circle id="bpm-glow" cx="65" cy="65" r="50" fill="none"
+                stroke="#e8c547" stroke-width="12"
+                stroke-dasharray="16 315" stroke-dashoffset="-157"
+                stroke-linecap="round" opacity=".15"/>
+              <!-- ノブ -->
+              <circle id="bpm-knob-outer" cx="65" cy="15" r="5" fill="#e8c547" transform="rotate(-27 65 65)"/>
+              <circle id="bpm-knob-inner" cx="65" cy="15" r="2.8" fill="#0d0d10" transform="rotate(-27 65 65)"/>
+            </svg>
+            <div class="bpm-dial-center">
+              <div class="bpm-dial-n" id="bpm-dial-n">72</div>
+              <div class="bpm-dial-u">BPM</div>
+            </div>
+          </div>
+          <div class="bpm-dial-steps">
+            <div class="bpm-dial-step" id="bpm-dial-minus">−</div>
+            <div class="bpm-dial-step" id="bpm-dial-plus">+</div>
+          </div>
+          <div class="bpm-mode-row">
             <select class="auto-sel" id="auto-mode-sel">
               <option value="free">FREE</option>
               <option value="pattern">PATTERN</option>
             </select>
-            <span class="auto-lbl">BPM</span>
-            <div class="auto-bpm-step" id="auto-bpm-minus">−</div>
-            <input type="range" class="auto-bpm" id="auto-bpm" min="40" max="180" step="4" value="72">
-            <div class="auto-bpm-step" id="auto-bpm-plus">+</div>
-            <span class="auto-bpm-val" id="auto-bpm-val">72</span>
           </div>
-          <div class="auto-row2">
-            <select class="auto-sel" id="phrase-mode-sel">
-              <option value="off">— PHRASE</option>
+        </div>
+
+        <!-- PHRASEパネル (ic-phrase-btnでトグル) -->
+        <div class="phrase-panel" id="phrase-panel">
+          <div class="phrase-panel-t">♪ PHRASE</div>
+          <div class="phrase-sels">
+            <select class="phrase-sel" id="phrase-mode-sel">
+              <option value="off">— OFF</option>
               <option value="melody">MELODY</option>
               <option value="adlib">ADLIB</option>
             </select>
-            <select class="auto-sel" id="phrase-timbre-sel">
+            <select class="phrase-sel" id="phrase-timbre-sel">
               <option value="crystal">CRYSTAL</option>
               <option value="celeste">CELESTE</option>
               <option value="bell">BELL</option>
@@ -398,7 +539,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <option value="detroit">DETROIT</option>
               <option value="synth">SYNTH</option>
             </select>
-            <select class="auto-sel" id="timbre-sel" style="flex:1;min-width:0;">
+            <select class="phrase-sel" id="timbre-sel">
               <optgroup label="─ MELODIC ─">
                 <option value="synth">SYNTH</option>
                 <option value="piano">PIANO</option>
@@ -442,10 +583,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             </select>
           </div>
         </div>
-        <div class="prog-bar" id="prog-bar" style="display:none">
-          <select class="auto-sel" id="prog-genre-sel"></select>
-          <select class="auto-sel wide" id="prog-name-sel"></select>
-        </div>
+
+        <!-- SECTORS -->
         <div class="sector-hdr" id="sector-hdr">
           <span class="sector-hdr-l">SECTORS ▾</span>
         </div>
@@ -453,9 +592,27 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div class="preset-row" id="preset-row"></div>
           <div class="weight-row" id="weight-row"></div>
         </div>
+
+        <!-- PATTERN進行選択 -->
+        <div class="prog-bar" id="prog-bar" style="display:none">
+          <select class="auto-sel" id="prog-genre-sel"></select>
+          <select class="auto-sel wide" id="prog-name-sel"></select>
+        </div>
+
         <div class="db-banner" id="db-banner">
           <span id="db-banner-msg">⚡ guitar-db-filtered.js があればより多くのボイシングが使えます</span>
           <button class="db-load-btn" onclick="loadGuitarDB()">LOAD</button>
+        </div>
+
+        <!-- 後方互換ダミー要素 (JS参照用) -->
+        <input type="range" id="auto-bpm" style="display:none" min="40" max="180" step="4" value="72">
+        <span id="auto-bpm-val" style="display:none">72</span>
+        <div id="auto-btn" style="display:none"></div>
+        <div id="midi-bar" style="display:none">
+          <div id="midi-rec-btn"></div>
+          <div id="midi-status"></div>
+          <div id="midi-export-btn" style="display:none"></div>
+          <div id="midi-clear-btn" style="display:none"></div>
         </div>
       </div><!-- /#ctrl-screen -->
 
@@ -3450,9 +3607,10 @@ function drawBridge(ctx,rels){
 // ═══════════════════════
 function renderPresetBtns(){
   const row=document.getElementById('preset-row');
-  row.innerHTML=Object.entries(SECTOR_PRESETS).map(([k,p])=>
-    `<div class="preset-btn${k===CURRENT_PRESET?' on':''}" data-preset="${k}">${p.name}</div>`
-  ).join('');
+  row.innerHTML=Object.entries(SECTOR_PRESETS).map(([k,p])=>{
+    const col=p.colors[0]||'#e8c547';
+    return '<div class="preset-btn'+(k===CURRENT_PRESET?' on':'')+'" data-preset="'+k+'"><div class="preset-dot" style="background:'+col+'"></div>'+p.name+'</div>';
+  }).join('');
   row.querySelectorAll('.preset-btn').forEach(b=>b.addEventListener('click',()=>{
     CURRENT_PRESET=b.dataset.preset;
     SECTOR_WEIGHTS=[...SECTOR_PRESETS[CURRENT_PRESET].weights];
@@ -3463,20 +3621,40 @@ function renderPresetBtns(){
 function renderWeightSliders(){
   const p=getPreset();
   const row=document.getElementById('weight-row');
+  // pct: weight 0.1-3 → 0-100%
+  function wPct(w){ return Math.round((w-0.1)/2.9*100); }
   row.innerHTML=p.types.map((t,i)=>{
     const col=p.colors[i];
-    return`<div class="weight-sl-wrap">
-      <div class="weight-lbl" style="color:${col}">${p.labels[i].slice(0,4)}</div>
-      <input type="range" class="weight-sl" min="0.1" max="3" step="0.1"
-        value="${SECTOR_WEIGHTS[i]}" data-i="${i}"
-        style="--thumb-col:${col};accent-color:${col}">
-    </div>`;
+    const pct=wPct(SECTOR_WEIGHTS[i]);
+    const lbl=p.labels[i].slice(0,4);
+    return '<div class="weight-sl-wrap">'
+      +'<div class="weight-sl-hdr">'
+      +'<span class="weight-lbl" style="color:'+col+'">'+lbl+'</span>'
+      +'<span class="weight-val" data-i="'+i+'">'+pct+'</span>'
+      +'</div>'
+      +'<div class="weight-sl-track">'
+      +'<div class="weight-sl-bg"><div class="weight-sl-fill" data-fi="'+i+'" style="width:'+pct+'%;background:'+col+'"></div></div>'
+      +'<input type="range" class="weight-sl" min="0.1" max="3" step="0.1"'
+      +' value="'+SECTOR_WEIGHTS[i]+'" data-i="'+i+'"'
+      +' style="--thumb-col:'+col+';border-color:'+col+'">'
+      +'</div>'
+      +'</div>';
   }).join('');
-  row.querySelectorAll('.weight-sl').forEach(sl=>sl.addEventListener('input',()=>{
-    const i=parseInt(sl.dataset.i);
-    SECTOR_WEIGHTS[i]=parseFloat(sl.value);
-    relCache=null;invalidate();
-  }));
+  // つまみ色をCSSで設定
+  row.querySelectorAll('.weight-sl').forEach(sl=>{
+    const col=p.colors[parseInt(sl.dataset.i)];
+    sl.style.setProperty('--thumb-col',col);
+    sl.addEventListener('input',()=>{
+      const i=parseInt(sl.dataset.i);
+      SECTOR_WEIGHTS[i]=parseFloat(sl.value);
+      const pct=wPct(SECTOR_WEIGHTS[i]);
+      const fill=row.querySelector('.weight-sl-fill[data-fi="'+i+'"]');
+      const val=row.querySelector('.weight-val[data-i="'+i+'"]');
+      if(fill) fill.style.width=pct+'%';
+      if(val) val.textContent=pct;
+      relCache=null;invalidate();
+    });
+  });
 }
 function renderLegend(){
   const p=getPreset();
@@ -4194,19 +4372,114 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
   autoStepIdx=0;
 });
 
-// BPM スライダー・±ボタン
+// ── BPMダイヤル UI ──
 (function(){
-  const sl=document.getElementById('auto-bpm');
-  const val=document.getElementById('auto-bpm-val');
-  const minus=document.getElementById('auto-bpm-minus');
-  const plus=document.getElementById('auto-bpm-plus');
+  // SVGアーク更新
+  function updateDial(bpm){
+    const pct=(bpm-40)/140;
+    const total=263;
+    const prog=total*pct;
+    const arc=document.getElementById('bpm-arc');
+    const glow=document.getElementById('bpm-glow');
+    const ko=document.getElementById('bpm-knob-outer');
+    const ki=document.getElementById('bpm-knob-inner');
+    const dialN=document.getElementById('bpm-dial-n');
+    if(arc) arc.setAttribute('stroke-dasharray',`${prog} 315`);
+    if(glow){
+      const glowOff=-(68+prog);
+      glow.setAttribute('stroke-dashoffset',glowOff);
+    }
+    const deg=-135+270*pct;
+    if(ko) ko.setAttribute('transform',`rotate(${deg} 65 65)`);
+    if(ki) ki.setAttribute('transform',`rotate(${deg} 65 65)`);
+    if(dialN) dialN.textContent=bpm;
+    // 後方互換
+    const sl=document.getElementById('auto-bpm');
+    const val=document.getElementById('auto-bpm-val');
+    if(sl) sl.value=bpm;
+    if(val) val.textContent=bpm;
+  }
   function setBpm(v){
     v=Math.max(40,Math.min(180,Math.round(v/4)*4));
-    autoBpm=v; sl.value=v; val.textContent=v;
+    autoBpm=v;
+    updateDial(v);
   }
-  sl.addEventListener('input',()=>setBpm(parseInt(sl.value)));
-  minus.addEventListener('click',()=>setBpm(autoBpm-4));
-  plus.addEventListener('click',()=>setBpm(autoBpm+4));
+  document.getElementById('bpm-dial-minus')?.addEventListener('click',()=>setBpm(autoBpm-4));
+  document.getElementById('bpm-dial-plus')?.addEventListener('click',()=>setBpm(autoBpm+4));
+  // 初期描画
+  updateDial(autoBpm);
+})();
+
+// ── アイコンボタン ──
+(function(){
+  // AUTO
+  const icAuto=document.getElementById('ic-auto-btn');
+  const icAutoSub=document.getElementById('ic-auto-sub');
+  const icAutoSym=icAuto?.querySelector('.icon-sym');
+  icAuto?.addEventListener('click',()=>{
+    if(autoPlay){ stopAuto(); } else { startAuto(); }
+  });
+  // startAuto/stopAutoがauto-btnのtextContent/classを更新するため、
+  // ic-auto-btnも同期する関数をオーバーライド
+  const _startAuto=startAuto;
+  const _stopAuto=stopAuto;
+  // startAuto/stopAutoはグローバルなので直接フック
+  const origStart=window.startAuto||startAuto;
+  const origStop=window.stopAuto||stopAuto;
+
+  function syncAutoIcon(){
+    if(!icAuto) return;
+    if(autoPlay){
+      icAuto.classList.add('on');
+      if(icAutoSym) icAutoSym.textContent='⏹';
+      if(icAutoSub) icAutoSub.textContent='playing';
+    } else {
+      icAuto.classList.remove('on');
+      if(icAutoSym) icAutoSym.textContent='▶';
+      const modeSel=document.getElementById('auto-mode-sel');
+      if(icAutoSub) icAutoSub.textContent=modeSel?.value?.toUpperCase()||'FREE';
+    }
+  }
+  // 100ms間隔で同期（startAuto/stopAutoがDOMを更新した後）
+  setInterval(syncAutoIcon,120);
+
+  // REC
+  const icRec=document.getElementById('ic-rec-btn');
+  const icRecSub=document.getElementById('ic-rec-sub');
+  const icRecSym=icRec?.querySelector('.icon-sym');
+  icRec?.addEventListener('click',()=>{
+    toggleMidiRec();
+    setTimeout(()=>{
+      if(midiRec){
+        icRec.classList.add('on');
+        if(icRecSym) icRecSym.textContent='■';
+        if(icRecSub) icRecSub.textContent='rec…';
+      } else {
+        icRec.classList.remove('on');
+        if(icRecSym) icRecSym.textContent='●';
+        const n=midiEvs.filter(e=>e.type==='on').length;
+        if(icRecSub) icRecSub.textContent=n?`${n} notes`:'MIDI off';
+      }
+    },0);
+  });
+
+  // PHRASE トグル
+  const icPhrase=document.getElementById('ic-phrase-btn');
+  const icPhraseSub=document.getElementById('ic-phrase-sub');
+  const phrasePanel=document.getElementById('phrase-panel');
+  icPhrase?.addEventListener('click',()=>{
+    const isOpen=phrasePanel?.classList.contains('open');
+    if(isOpen){
+      phrasePanel.classList.remove('open');
+      icPhrase.classList.remove('on');
+      if(icPhraseSub) icPhraseSub.textContent='— off';
+    } else {
+      phrasePanel.classList.add('open');
+      icPhrase.classList.add('on');
+      const mode=document.getElementById('phrase-mode-sel')?.value||'off';
+      if(icPhraseSub) icPhraseSub.textContent=mode==='off'?'— off':mode.toUpperCase();
+    }
+  });
 })();
 
 // timbre-sel
