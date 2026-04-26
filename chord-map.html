@@ -3706,36 +3706,6 @@ document.getElementById('sector-hdr').addEventListener('click',()=>{
 });
 renderPresetBtns();renderWeightSliders();
 
-// ── ストリングレンジ トグルUI 生成 ──
-(function(){
-  const col=document.getElementById('str-toggle-col');
-  if(!col)return;
-  // 上からe,B,G,D,A,E の順で表示
-  const displayOrder=[5,4,3,2,1,0];
-  col.innerHTML=displayOrder.map(s=>
-    `<div class="str-toggle on" data-s="${s}" title="${STRING_NAMES[s]}弦">${STRING_NAMES[s]}</div>`
-  ).join('');
-  col.querySelectorAll('.str-toggle').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const s=parseInt(btn.dataset.s);
-      stringActive[s]=!stringActive[s];
-      btn.classList.toggle('on', stringActive[s]);
-      btn.classList.toggle('off',!stringActive[s]);
-      drawFretboard();
-    });
-  });
-})();
-
-// ── ストリングレンジに基づくボイシングフィルター ──
-function getVoicingsFiltered(root,type){
-  const all=getVoicings(root,type);
-  if(stringActive.every(a=>a))return all;
-  const filtered=all.filter(v=>
-    v.f.every((f,s)=>stringActive[s]||f<=0)
-  );
-  return filtered.length>0?filtered:all;
-}
-
 function setMode(mode){
   MAP_MODE=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>{
@@ -3796,6 +3766,16 @@ let   fbCapo=0;
 // ── ストリングレンジ: true=アクティブ(発音), false=ミュート(薄表示) ──
 let stringActive=[true,true,true,true,true,true]; // [E,A,D,G,B,e]
 let   prOctave=3;    // ピアノロール表示オクターブ (C3=3)
+
+// ── ストリングレンジに基づくボイシングフィルター ──
+function getVoicingsFiltered(root,type){
+  const all=getVoicings(root,type);
+  if(stringActive.every(a=>a))return all;
+  const filtered=all.filter(v=>
+    v.f.every((f,s)=>stringActive[s]||f<=0)
+  );
+  return filtered.length>0?filtered:all;
+}
 let   fbPosIdx=0;    // 選択中ポジションIndex
 let   fbMode='fret'; // 'fret'=フレット移動モード(デフォルト) / 'capo'=オープン+カポモード
 let   prLock=true;   // PIANOROLLポジションロック（デフォルト：ロック）
@@ -4104,6 +4084,25 @@ function drawFretboard(){
   ctx.globalAlpha=1; // 念のため最終リセット
   canvas._fbHits=hits;
 }
+
+// ── ストリングレンジ トグルUI 生成（STRING_NAMES宣言後に実行）──
+(function(){
+  const col=document.getElementById('str-toggle-col');
+  if(!col)return;
+  const displayOrder=[5,4,3,2,1,0]; // 上からe,B,G,D,A,E
+  col.innerHTML=displayOrder.map(s=>
+    `<div class="str-toggle on" data-s="${s}" title="${STRING_NAMES[s]}弦">${STRING_NAMES[s]}</div>`
+  ).join('');
+  col.querySelectorAll('.str-toggle').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const s=parseInt(btn.dataset.s);
+      stringActive[s]=!stringActive[s];
+      btn.classList.toggle('on', stringActive[s]);
+      btn.classList.toggle('off',!stringActive[s]);
+      drawFretboard();
+    });
+  });
+})();
 
 // 指板タップ → 単音発音
 document.getElementById('fb-canvas').addEventListener('pointerdown',e=>{
