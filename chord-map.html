@@ -1293,6 +1293,24 @@ function buildRelations(root,type){
   add(nn(ri+5),'bossa','ethnic_brazilian','IV Bossa',11);
   add(nn(ri+2),'m7b5','ethnic_brazilian','iiø Bossa',11);
   add(nn(ri+9),'bossa','ethnic_brazilian','VI Bossa',10);
+  // ── S1進行コンテキストスコアブースト ──
+  // detectProgressionでS.historyを分析し、次に来るべきコードのscoreを押し上げる
+  // これにより「ii-V-I」の文脈でIが、「ドミナントチェーン」でV7が強調される
+  const progCtx=typeof detectProgression==='function'?detectProgression(S.history.slice(0,S.histIdx+1)):null;
+  if(progCtx&&progCtx.next){
+    const{interval:targetInterval,types:targetTypes}=progCtx.next;
+    res.forEach(n=>{
+      const nodeInterval=((ni(n.root)-ri)+12)%12;
+      // 期待インターバルかつ期待タイプに一致する候補を大幅ブースト
+      if(nodeInterval===targetInterval&&targetTypes.includes(n.type)){
+        n.score+=18; // 強い引力（buildRelationsの通常max≒20に対して強めの加算）
+      }
+      // タイプだけ一致する候補も少しブースト
+      else if(targetTypes.includes(n.type)&&nodeInterval<=2){
+        n.score+=5;
+      }
+    });
+  }
   res.sort((a,b)=>b.score-a.score);
   // Normalize score to 0..1 for opacity
   const maxS=res[0]?.score||1,minS=res[res.length-1]?.score||0;
@@ -2355,6 +2373,12 @@ let expandNodes=[];  // flat list for hit detection
 // LINK mode: selected nodes set
 let linkSelected=new Set(); // keys like "Am9"
 // CHAIN mode uses S.history
+// ── CHAIN: パーティクルストリーム状態 ──
+const CHAIN_FX={
+  streams:[],   // [{ax,ay,bx,by,col,particles:[{t,speed}]}] ラインごとのストリーム
+  nodePulse:{}, // key→ {phase, col} ノードパルス状態
+  tick:0,
+};
 let L={W:0,H:0,cx:0,cy:0,SR:0,MR:0,mr:0,DPR:1};
 // Cache last computed relations (recompute only when chord or sliders change)
 let relCache=null;
@@ -2724,7 +2748,7 @@ function drawFrame(){
   } else if(MAP_MODE==='chain'){
     drawChain(ctx,rels);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
-    ctx.fillStyle='rgba(232,197,71,0.4)';ctx.fillText('CHAIN: PATH VISUALIZED ON MAP',10,10);
+    ctx.fillStyle='rgba(232,197,71,0.3)';ctx.fillText('CHAIN',10,10);
   } else if(MAP_MODE==='bridge'){
     drawBridge(ctx,rels);
   }
@@ -3136,6 +3160,150 @@ const PROG_DB={
     {name:'Coltrane Sub',   steps:[{i:0,t:'maj7'},{i:8,t:'maj7'},{i:4,t:'maj7'}]},
   ],
 };
+
+// ═══════════════════════════════════════════════════════
+// PROGRESSION RECOGNITION ENGINE — Callipari S1準拠
+// S.historyから現在の進行コンテキストを判定し、
+// 次コード選択のスコアブーストと進行名表示に使用する
+// ═══════════════════════════════════════════════════════
+
+// 進行パターン定義（音程インターバルで表現）
+const PROG_PATTERNS={
+  // ── S1: 251進行（ii-V-I / ii-V-i） ──
+  // 最も解決感が強い進行。Vの後のIを強く引き寄せる
+  twoFiveOne:{
+    name:'ii-V-I',
+    // [2半音上がm7/m7b5] → [現在がdom7/7b9] → [5半音下がmaj/min]
+    detect(hist){
+      if(hist.length<2)return null;
+      const cur=hist[hist.length-1];
+      const prev=hist[hist.length-2];
+      const ri=ni(cur.root), pi=ni(prev.root);
+      const interval=((ri-pi)+12)%12;
+      // ii(m7/m7b5) → V(dom7系): 5度上昇
+      const isTwo=interval===5
+        &&(prev.type==='m7'||prev.type==='m7b5'||prev.type==='minor')
+        &&(cur.type==='dom7'||cur.type==='7b9'||cur.type==='7s9'||cur.type==='7#11');
+      if(isTwo) return{name:'ii-V-I',phase:'V',next:{interval:5,types:['major','maj7','minor','m7']}};
+      // V単独検出: dom7ならI方向に強く引く
+      if(cur.type==='dom7'||cur.type==='7b9'){
+        return{name:'V-I',phase:'V',next:{interval:5,types:['major','maj7','minor','m7']}};
+      }
+      return null;
+    }
+  },
+  // ── S1: ドミナントチェーン（完全5度連鎖） ──
+  // A7→D7→G7→C7... の連鎖。次も5度下のdom7を引き寄せる
+  dominantChain:{
+    name:'Dominant Chain',
+    detect(hist){
+      if(hist.length<2)return null;
+      const cur=hist[hist.length-1];
+      const prev=hist[hist.length-2];
+      if(!(cur.type==='dom7'||cur.type==='7b9'))return null;
+      const ri=ni(cur.root), pi=ni(prev.root);
+      const interval=((ri-pi)+12)%12;
+      // 前のコードも5度上にあるdom7なら連鎖確定
+      if(interval===5&&(prev.type==='dom7'||prev.type==='7b9')){
+        return{name:'Dominant Chain',phase:'chain',
+          next:{interval:5,types:['dom7','7b9']}};
+      }
+      return null;
+    }
+  },
+  // ── S1: コルトレーン・チェンジ（短3度連鎖） ──
+  // 短3度ずつ転調、3回で元のキーに戻る構造
+  // Eb→G7→C→E7→A→Db7→Gb...
+  coltraneChanges:{
+    name:'Coltrane Changes',
+    detect(hist){
+      if(hist.length<3)return null;
+      const c0=hist[hist.length-1];
+      const c1=hist[hist.length-2];
+      const c2=hist[hist.length-3];
+      const i01=((ni(c0.root)-ni(c1.root))+12)%12;
+      const i12=((ni(c1.root)-ni(c2.root))+12)%12;
+      // 短3度(3)または長3度(4)の連鎖かチェック
+      const is3rdChain=(i01===3||i01===4)&&(i12===3||i12===4);
+      // dom7を含む連鎖（Coltrane的）
+      const hasDom7=(c0.type==='dom7'||c1.type==='dom7'||c2.type==='dom7');
+      if(is3rdChain&&hasDom7){
+        const nextInterval=i01; // 同じ間隔で継続
+        return{name:'Coltrane Changes',phase:'chain',
+          next:{interval:nextInterval,types:['dom7','major','maj7']}};
+      }
+      return null;
+    }
+  },
+  // ── リーマン: P/R/L変換連鎖 ──
+  // 同じ変換が続く場合にパターン名を表示（S3準拠）
+  neoRiemannChain:{
+    name:'Voice Leading',
+    detect(hist){
+      if(hist.length<2)return null;
+      const cur=hist[hist.length-1];
+      const prev=hist[hist.length-2];
+      const ri=ni(cur.root), pi=ni(prev.root);
+      const interval=((ri-pi)+12)%12;
+      // P変換: 同ルート、メジャー↔マイナー
+      if(cur.root===prev.root&&
+        ((prev.type==='major'&&cur.type==='minor')||(prev.type==='minor'&&cur.type==='major'))){
+        return{name:'Parallel (P)',phase:'transform',next:null};
+      }
+      // R変換: 全音上のマイナー (メジャー→短3度上のマイナー)
+      if(interval===9&&prev.type==='major'&&cur.type==='minor'){
+        return{name:'Relative (R)',phase:'transform',next:null};
+      }
+      if(interval===3&&prev.type==='minor'&&cur.type==='major'){
+        return{name:'Relative (R)',phase:'transform',next:null};
+      }
+      // L変換: 半音下のメジャー (メジャー→短3度下のマイナー)
+      if(interval===8&&prev.type==='major'&&cur.type==='minor'){
+        return{name:'Leading-tone (L)',phase:'transform',next:null};
+      }
+      return null;
+    }
+  },
+  // ── ペダルポイント（同一コード反復） ──
+  pedal:{
+    name:'Pedal Point',
+    detect(hist){
+      if(hist.length<2)return null;
+      const cur=hist[hist.length-1];
+      const prev=hist[hist.length-2];
+      if(cur.root===prev.root&&cur.type===prev.type){
+        return{name:'Pedal / Vamp',phase:'vamp',next:null};
+      }
+      return null;
+    }
+  },
+};
+
+// 現在のS.historyから最もマッチする進行パターンを検出して返す
+// 戻り値: {name, phase, next} or null
+function detectProgression(history){
+  if(!history||history.length<1)return null;
+  for(const key of Object.keys(PROG_PATTERNS)){
+    const result=PROG_PATTERNS[key].detect(history);
+    if(result)return result;
+  }
+  return null;
+}
+
+// 進行ラベル表示用の一時状態
+let chainProgLabel={text:'',alpha:0,timer:null};
+
+// 進行が変わったときにラベルをフェードイン→アウト表示
+function showChainProgLabel(text){
+  if(chainProgLabel.text===text)return; // 同じなら更新しない
+  chainProgLabel.text=text;
+  chainProgLabel.alpha=1.0;
+  if(chainProgLabel.timer)clearTimeout(chainProgLabel.timer);
+  chainProgLabel.timer=setTimeout(()=>{
+    // 2.5秒後にフェードアウト開始（drawChain内でalphaを減衰）
+    chainProgLabel.timer=null;
+  },2500);
+}
 
 // AUTO PLAY進行モード
 let autoMode='free';       // 'free' | 'pattern'
@@ -4242,11 +4410,17 @@ function moveToChord(root,type){
   S.voicing=null;
   S.root=root;S.type=type;
   S.history=S.history.slice(0,S.histIdx+1);S.history.push({root,type});S.histIdx=S.history.length-1;
+  if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
   relCache=null;invalidate();
   document.getElementById('hdr-chord').textContent=cs(root,type);
   renderPath();
   playChord(root,type);
   triggerPhrase(root,type); // ← フレーズ追従
+  // CHAINモード: 進行パターンを検出してラベル更新
+  if(MAP_MODE==='chain'){
+    const progCtx=detectProgression(S.history.slice(0,S.histIdx+1));
+    if(progCtx)showChainProgLabel(progCtx.name);
+  }
   // 課題3: MIDI録音中ならコードをキャプチャ
   if(typeof recordMidiChord==='function')recordMidiChord(root,type,S.voicing);
   // ボイシング自動選択（星評価最高 or 先頭）
@@ -4392,48 +4566,211 @@ function drawLink(ctx,rels){
 // ═══════════════════════
 // MODE: CHAIN
 // ═══════════════════════
+// 変換タイプ別パーティクルカラー（リレーション色に合わせる）
+const CHAIN_RTYPE_COL={
+  diatonic:'#4aaa72', fifth:'#4a90d4', parallel:'#e8c547',
+  modal:'#9a6ad4',    chromatic:'#d4823a', subst:'#d44a6a',
+  default:'#e8c547',
+};
+
+// 2点間の変換タイプを relCache から推定
+function getChainRtype(fromRoot,fromType,toRoot,toType){
+  if(!relCache)return'default';
+  const rel=relCache.find(n=>n.root===toRoot&&n.type===toType);
+  return rel?rel.rtype:'default';
+}
+
+// ストリーム同期: positions が変わったらストリームを再構築
+let _chainPosKey='';
+function syncChainStreams(positions){
+  const key=positions.map(p=>p.k).join(',');
+  if(key===_chainPosKey)return;
+  _chainPosKey=key;
+  CHAIN_FX.streams=[];
+  for(let i=0;i<positions.length-1;i++){
+    const a=positions[i],b=positions[i+1];
+    const rtype=getChainRtype(
+      S.history[i]?.root,S.history[i]?.type,
+      S.history[i+1]?.root,S.history[i+1]?.type
+    );
+    CHAIN_FX.streams.push({
+      ax:a.x,ay:a.y,bx:b.x,by:b.y,
+      col:CHAIN_RTYPE_COL[rtype]||CHAIN_RTYPE_COL.default,
+      particles:[],
+      stepIdx:i,
+    });
+  }
+  CHAIN_FX.nodePulse={};
+}
+
 function drawChain(ctx,rels){
-  // Draw PATH history as arrows on the map
   const history=S.history.slice(0,S.histIdx+1);
   if(history.length<2)return;
-  // Find node positions for each history item
+
+  // ── 座標解決 ──
   const positions=history.map(h=>{
     const k=cs(h.root,h.type);
-    // Center node
     if(k===cs(S.root,S.type))return{x:L.cx,y:L.cy,k};
     const hit=nodeHits.find(n=>n.key===k);
     return hit?{x:hit.x,y:hit.y,k}:null;
   }).filter(Boolean);
   if(positions.length<2)return;
-  // Draw chain arrows
-  for(let i=0;i<positions.length-1;i++){
+
+  // ストリーム同期
+  syncChainStreams(positions);
+  CHAIN_FX.tick+=0.016;
+
+  const totalSteps=positions.length-1;
+
+  // ══ 1. パスライン（下敷き） ══
+  for(let i=0;i<totalSteps;i++){
     const a=positions[i],b=positions[i+1];
-    const dx=b.x-a.x,dy=b.y-a.y;
-    const len=Math.sqrt(dx*dx+dy*dy)||1;
-    const ux=dx/len,uy=dy/len;
-    const x1=a.x+ux*20,y1=a.y+uy*20;
-    const x2=b.x-ux*20,y2=b.y-uy*20;
-    const progress=i/(positions.length-1);
-    const alpha=0.4+progress*0.5;
-    // Line
-    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
-    ctx.strokeStyle='#e8c547';ctx.lineWidth=2;ctx.globalAlpha=alpha;ctx.stroke();ctx.globalAlpha=1;
-    // Arrowhead
-    const ax=x2-ux*8-uy*5,ay=y2-uy*8+ux*5;
-    const bx=x2-ux*8+uy*5,by=y2-uy*8-ux*5;
-    ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(ax,ay);ctx.lineTo(bx,by);ctx.closePath();
-    ctx.fillStyle='#e8c547';ctx.globalAlpha=alpha;ctx.fill();ctx.globalAlpha=1;
-    // Step number
-    ctx.font='bold 8px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle='#e8c547';ctx.globalAlpha=0.7;
-    ctx.fillText(i+1,(x1+x2)/2,(y1+y2)/2-8);ctx.globalAlpha=1;
+    const col=CHAIN_FX.streams[i]?.col||'#e8c547';
+    const [rr,gg,bb]=parseHex(col);
+    const age=i/totalSteps; // 0=古い, 1=新しい
+    const lineAlpha=(0.12+age*0.10);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle=`rgba(${rr},${gg},${bb},${lineAlpha})`;
+    ctx.lineWidth=1.5;ctx.stroke();
   }
-  // Highlight chain nodes with numbered rings
+
+  // ══ 2. パーティクルストリーム ══
+  const MAX_PARTICLES=3; // ストリームあたり最大同時パーティクル数
+  for(let si=0;si<CHAIN_FX.streams.length;si++){
+    const s=CHAIN_FX.streams[si];
+    // 座標を現フレームの positions に追従更新
+    if(positions[si])  {s.ax=positions[si].x;  s.ay=positions[si].y;}
+    if(positions[si+1]){s.bx=positions[si+1].x;s.by=positions[si+1].y;}
+
+    const dx=s.bx-s.ax,dy=s.by-s.ay;
+    const len=Math.sqrt(dx*dx+dy*dy)||1;
+    const age=si/Math.max(totalSteps-1,1);
+    const [rr,gg,bb]=parseHex(s.col);
+
+    // スポーン: 一定時間ごとに新パーティクルを追加
+    const spawnInterval=0.28-age*0.06; // 新しいほど高頻度
+    if(s.particles.length<MAX_PARTICLES){
+      const lastT=s.particles.length?s.particles[s.particles.length-1].t:-(spawnInterval+1);
+      if(CHAIN_FX.tick-lastT>spawnInterval){
+        s.particles.push({
+          t:CHAIN_FX.tick,
+          speed:0.30+Math.random()*0.18, // ライン長さ/フレームで進む割合
+        });
+      }
+    }
+
+    // 描画・更新
+    for(let pi=s.particles.length-1;pi>=0;pi--){
+      const p=s.particles[pi];
+      const elapsed=CHAIN_FX.tick-p.t;
+      const progress=elapsed*p.speed;
+      if(progress>=1.0){s.particles.splice(pi,1);continue;}
+
+      // イージング: 中間で加速、両端でゆっくり
+      const eased=progress<0.5
+        ?2*progress*progress
+        :1-Math.pow(-2*progress+2,2)/2;
+      const px=s.ax+dx*eased;
+      const py=s.ay+dy*eased;
+
+      // 先頭: 明るい点 + にじみ
+      const headAlpha=0.85*(1-Math.abs(eased-0.5)*0.8);
+      const r=2.5+age*1.0;
+      // にじみ（グロー）
+      ctx.beginPath();ctx.arc(px,py,r*2.5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${rr},${gg},${bb},${headAlpha*0.18})`;ctx.fill();
+      // 本体
+      ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${rr},${gg},${bb},${headAlpha*0.9})`;ctx.fill();
+
+      // テール（軌跡）: 5点
+      for(let ti=1;ti<=5;ti++){
+        const tailProg=Math.max(0,eased-ti*0.04);
+        const tx2=s.ax+dx*(tailProg<0.5?2*tailProg*tailProg:1-Math.pow(-2*tailProg+2,2)/2);
+        const ty2=s.ay+dy*(tailProg<0.5?2*tailProg*tailProg:1-Math.pow(-2*tailProg+2,2)/2);
+        const tailA=headAlpha*(0.4-ti*0.07);
+        if(tailA<=0)break;
+        ctx.beginPath();ctx.arc(tx2,ty2,r*0.55,0,Math.PI*2);
+        ctx.fillStyle=`rgba(${rr},${gg},${bb},${tailA})`;ctx.fill();
+      }
+    }
+  }
+
+  // ══ 3. ノードの球体感 ══
   positions.forEach((p,i)=>{
-    ctx.beginPath();ctx.arc(p.x,p.y,24,0,Math.PI*2);
-    ctx.strokeStyle='#e8c547';ctx.lineWidth=1.2;
-    ctx.globalAlpha=0.25+i/(positions.length)*0.5;ctx.stroke();ctx.globalAlpha=1;
+    const isLatest=(i===positions.length-1);
+    const age=i/Math.max(positions.length-1,1); // 0=古い, 1=現在
+    const h=S.history[i];
+    const rtype=i>0?getChainRtype(
+      S.history[i-1]?.root,S.history[i-1]?.type,h?.root,h?.type
+    ):'default';
+    const col=CHAIN_RTYPE_COL[rtype]||CHAIN_RTYPE_COL.default;
+    const [rr,gg,bb]=parseHex(col);
+
+    // ── パルスアニメーション（最新ノードのみ） ──
+    if(isLatest){
+      const pulse=0.5+0.5*Math.sin(CHAIN_FX.tick*4.2);
+      // 外周グロー
+      for(let ri2=3;ri2>=1;ri2--){
+        const glowR=22+ri2*5+pulse*4;
+        const glowA=(0.06-ri2*0.015)*pulse;
+        ctx.beginPath();ctx.arc(p.x,p.y,glowR,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(${rr},${gg},${bb},${glowA})`;
+        ctx.lineWidth=2;ctx.stroke();
+      }
+      // 内側パルスリング
+      ctx.beginPath();ctx.arc(p.x,p.y,20+pulse*6,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(${rr},${gg},${bb},${0.5*pulse})`;
+      ctx.lineWidth=1.2;ctx.stroke();
+    }
+
+    // ── 球体感: 多重リング ──
+    const baseAlpha=0.15+age*0.45;
+    // 外輪（薄）
+    ctx.beginPath();ctx.arc(p.x,p.y,26,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${rr},${gg},${bb},${baseAlpha*0.35})`;
+    ctx.lineWidth=0.8;ctx.stroke();
+    // 中輪
+    ctx.beginPath();ctx.arc(p.x,p.y,20,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${rr},${gg},${bb},${baseAlpha*0.6})`;
+    ctx.lineWidth=1.0;ctx.stroke();
+    // 内輪（明）
+    ctx.beginPath();ctx.arc(p.x,p.y,15,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${rr},${gg},${bb},${baseAlpha*0.85})`;
+    ctx.lineWidth=1.5;ctx.stroke();
+    // 中心点（コア）
+    ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${rr},${gg},${bb},${baseAlpha*1.1})`;ctx.fill();
+
+    // ── ステップ番号 ──
+    ctx.font='bold 8px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(${rr},${gg},${bb},${0.4+age*0.4})`;
+    ctx.fillText(i+1,p.x,p.y-32);
   });
+
+  // ══ 4. 進行名ラベルオーバーレイ ══
+  if(chainProgLabel.alpha>0.005){
+    // タイマー終了後はフェードアウト
+    if(!chainProgLabel.timer){
+      chainProgLabel.alpha*=0.94;
+    }
+    const a=chainProgLabel.alpha;
+    const label=chainProgLabel.text;
+    const lx=L.cx, ly=L.H-22;
+    ctx.font='bold 11px DM Mono,monospace';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    // 背景ピル
+    const tw=ctx.measureText(label).width;
+    ctx.beginPath();
+    ctx.roundRect(lx-tw/2-10, ly-9, tw+20, 18, 6);
+    ctx.fillStyle=`rgba(13,13,16,${a*0.72})`;ctx.fill();
+    ctx.strokeStyle=`rgba(232,197,71,${a*0.5})`;ctx.lineWidth=0.8;ctx.stroke();
+    // テキスト
+    ctx.fillStyle=`rgba(232,197,71,${a})`;
+    ctx.fillText(label,lx,ly);
+  }
+
+  dirty=true; // パーティクルが動く間は常に再描画
 }
 
 // ═══════════════════════
@@ -4757,6 +5094,7 @@ function setMode(mode){
   else if(mode==='link')linkSelected.clear();
   else if(mode==='graph'){graphInited=false;graphTick=0;initGraph();}
   else if(mode==='wave')waveRings=[];
+  else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';}
   relCache=null;invalidate();
 }
 document.querySelectorAll('.mode-btn').forEach(b=>{
