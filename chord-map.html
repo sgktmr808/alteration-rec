@@ -3254,6 +3254,92 @@ function nearestNote(from,candidates){
 // landOn: 着地する音程クラス ('chord'=コードトーン, 'root'=ルート, '5th'=5度)
 // contour: フレーズの輪郭 ('arch'=山型, 'ascend'=上昇, 'descend'=下降, 'wave'=波)
 // tension: テンション使用度 0.0〜1.0
+// ═══════════════════════════════════════════════════════
+// CHORD FIRST VOICE — コードの「第一声」設計
+// Callipari S2トライアッド積み重ね理論 × handoverの感覚マッピング準拠
+//
+// タップ直後の1〜2音でコードの感情色を即座に確定する。
+// 各エントリの意味:
+//   interval : ルートからの半音数（1音目に使う感情開始音程）
+//   dir      : 'up'=上昇 / 'down'=下降 / 'stay'=留まる（2音目への方向感）
+//   quality  : フレーズの感情的色彩（内部メモ用）
+//   rangeShift: 音域オフセット（正=高め, 負=低め）ー 半音単位
+// ═══════════════════════════════════════════════════════
+const CHORD_FIRST_VOICE={
+  // ── メジャー系: 明るく開放的 ──
+  // C + Am上部 → maj7(11)の柔らかさ. 高音域から入り広がりを表現
+  '':       {interval:7,  dir:'up',   quality:'open-bright',    rangeShift:2},
+  'major':  {interval:7,  dir:'up',   quality:'open-bright',    rangeShift:2},
+  // Cmaj7: 長7度を含む夢見るような質感. 高音域の柔らかさ
+  'maj7':   {interval:11, dir:'up',   quality:'dreamy-soft',    rangeShift:3},
+  // Cmaj9: maj7より更に広がり. 9thの明るさ
+  'maj9':   {interval:14, dir:'up',   quality:'airy-bright',    rangeShift:4},
+  // C6: 長6度のノスタルジア. やや中音域で温かみ
+  '6':      {interval:9,  dir:'stay', quality:'nostalgic-warm', rangeShift:1},
+  // Cadd9: 9thの新鮮さ. 中音域から軽い上昇
+  'add9':   {interval:14, dir:'up',   quality:'fresh-open',     rangeShift:2},
+
+  // ── マイナー系: 内省的・哀愁 ──
+  // Am: 短3度から始まる内省的な動き. 哀愁と温かさの同居
+  'm':      {interval:3,  dir:'down', quality:'introspective',  rangeShift:0},
+  'minor':  {interval:3,  dir:'down', quality:'introspective',  rangeShift:0},
+  // Am7: 短3度 + b7の浮遊感. 内省的だが重くない
+  'm7':     {interval:3,  dir:'up',   quality:'floating-minor', rangeShift:1},
+  // Am9: b7から9thへ広がる. 孤独と温かさ
+  'm9':     {interval:10, dir:'up',   quality:'lonely-warm',    rangeShift:1},
+  // Am11: 11thの広がり. 瞑想的
+  'm11':    {interval:5,  dir:'stay', quality:'meditative',     rangeShift:0},
+  // AmM7: 短3度 + 長7度の緊張と美しさ
+  'mmaj7':  {interval:3,  dir:'up',   quality:'bittersweet',    rangeShift:1},
+  // Am6: 長6度(マイナー脈絡)のノスタルジア
+  'm6':     {interval:9,  dir:'down', quality:'nostalgic-dark', rangeShift:0},
+
+  // ── ドミナント7th系: 緊張・推進力 ──
+  // G7: ルートから5度上昇 → 解決への緊張感. 前に進む力
+  '7':      {interval:7,  dir:'up',   quality:'driving-tension',rangeShift:1},
+  // G9: 9thの明るい緊張
+  '9':      {interval:14, dir:'up',   quality:'bright-tension', rangeShift:2},
+  // G7b9: b9の鋭い緊張. フラメンコ的
+  '7b9':    {interval:1,  dir:'down', quality:'sharp-tension',  rangeShift:0},
+  // G7#9: #9のブルース緊張(Hendrixコード)
+  '7s9':    {interval:3,  dir:'up',   quality:'blues-tension',  rangeShift:1},
+  // G7#11: #11のリディアン的明るい緊張
+  '7#11':   {interval:6,  dir:'up',   quality:'lydian-tension', rangeShift:2},
+  // G11: 11thの重い緊張
+  '11':     {interval:5,  dir:'stay', quality:'heavy-tension',  rangeShift:0},
+  // G13: 13thの豊かな緊張(解決直前の充足感)
+  '13':     {interval:9,  dir:'up',   quality:'rich-tension',   rangeShift:2},
+
+  // ── ディミニッシュ系: 不安定・浮遊 ──
+  // Bdim: 短3度の下降. 不安定で浮遊する
+  'dim':    {interval:3,  dir:'down', quality:'unstable-fall',  rangeShift:-1},
+  // Bdim7: dim7の解決待ち. 4つの可能性の緊張
+  'dim7':   {interval:3,  dir:'down', quality:'suspended-dim',  rangeShift:-1},
+  // Bm7b5(ハーフディム): dim7より柔らかい不安定感
+  'm7b5':   {interval:3,  dir:'stay', quality:'soft-unstable',  rangeShift:0},
+
+  // ── オーギュメント系: 浮遊・変容 ──
+  // G+: 増5度の浮遊感. V+→I 解決前の高揚
+  'aug':    {interval:8,  dir:'up',   quality:'floating-rise',  rangeShift:2},
+
+  // ── Sus系: 開放・宙吊り ──
+  // Csus4: 4度の宙吊り. 解決を待つ開放感
+  'sus4':   {interval:5,  dir:'down', quality:'suspended-open', rangeShift:1},
+  // Csus2: 2度の透明感. 空気のような開放
+  'sus2':   {interval:2,  dir:'up',   quality:'transparent',    rangeShift:2},
+
+  // ── デフォルト ──
+  'default':{interval:7,  dir:'up',   quality:'neutral',        rangeShift:1},
+};
+
+// コードタイプのCT sym → CHORD_FIRST_VOICEキーの変換
+// CT.sym が '7' 'M7' 'm' などの記号なので、typeキー名と一致させる
+function getFirstVoice(type){
+  return CHORD_FIRST_VOICE[type]
+    || CHORD_FIRST_VOICE[type.replace('major','').replace('minor','m')]
+    || CHORD_FIRST_VOICE['default'];
+}
+
 const CATCHY_HOOKS={
   pop:{
     motifs:[[0,2,4,2],[0,4,2,0,2],[0,2,0,-2,0],[4,5,4,2,0]], // 順次進行中心
@@ -3382,6 +3468,58 @@ function getStyleScale(root,type,preset){
   return{scaleTones,chordTones};
 }
 
+// ═══════════════════════════════════════════════════════
+// 感覚マッピング — サークル座標 × フレーズ質感
+// handover v2 の5パターン × Callipari S7明暗軸 準拠
+// SLスライダー(bright/tense/warm/complex/moving/strange)から
+// フレーズパラメータを動的生成する
+// ═══════════════════════════════════════════════════════
+function getSensoryParams(){
+  // SLスライダー現在値を取得（-1〜+1）
+  const bright = sv('bright');  // Dark↔Bright
+  const tense  = sv('tense');   // Calm↔Tense
+  const warm   = sv('warm');    // Cold↔Warm
+  const moving = sv('moving');  // Static↔Moving
+  const strange= sv('strange'); // Familiar↔Strange
+
+  // ── 音域シフト: Bright→高音域、Dark→低音域 ──
+  // -6〜+6 半音（3オクターブの中で上下に動かす）
+  const rangeShift = Math.round(bright * 5);
+
+  // ── arcのspanサイズ: Tense→広い跳躍、Calm→狭い ──
+  // 基本span=7 に ±4 で 3〜11 の範囲
+  const spanMod = Math.round(tense * 4);
+
+  // ── 休符密度: Bright×Calm→多い空白、Dark×Moving→少ない ──
+  // 0.04〜0.25 の範囲
+  const restBoost = (bright > 0 && tense < 0)
+    ? (bright - tense) * 0.06   // Bright×Calm: 空白が多い
+    : (moving > 0)
+      ? -moving * 0.04            // Moving: 休符減らす
+      : 0;
+
+  // ── テンション確率ブースト: Tense→テンション音多用 ──
+  const tensionBoost = Math.max(0, tense * 0.25);
+
+  // ── ベロシティ傾向: Warm→柔らかく、Cold→シャープ ──
+  // 1.0基準、±0.15
+  const velMod = 1.0 - warm * 0.12;
+
+  return { rangeShift, spanMod, restBoost, tensionBoost, velMod };
+}
+
+// arcTarget に感覚マッピングのspanModを加味した拡張版
+function arcTargetSensory(pos, contour, baseNote, spanMod){
+  const span = Math.max(3, Math.min(14, 7 + spanMod));
+  switch(contour){
+    case 'arch':    return baseNote+Math.sin(pos*Math.PI)*span;
+    case 'ascend':  return baseNote+pos*span;
+    case 'descend': return baseNote+(1-pos)*span*0.7-span*0.15;
+    case 'wave':    return baseNote+Math.sin(pos*Math.PI*2)*span*0.5;
+    default:        return baseNote;
+  }
+}
+
 // 加重ランダム選択
 function weightedPick(items, wFn){
   const ws=items.map(wFn);
@@ -3415,31 +3553,60 @@ function nearestChordTone(prevNote, chordTones){
 
 // ── テンションノート定義 (コードタイプ別) ──
 // コード上で「意図的な外し」として機能する音程（半音）
+// ── テンションノート定義 (Callipari S2 トライアッド積み重ね理論準拠) ──
+// 各コードタイプに対して「上部トライアッド」として機能する音程（半音）
+// 例: C + Dm上部 = C(add9,11,13) → テンション音は D(2), F(5), A(9)
 const TENSION_TONES={
-  // メジャー系
-  '':       [2,6,9],    // 9th, #11, 13th
-  'maj7':   [2,6,9],
-  'maj9':   [6,9],
-  '6':      [2,11],
-  // マイナー系
-  'm':      [1,2,10],   // b9, 9, b7
-  'm7':     [1,2,6],
-  'm9':     [1,6],
-  'm11':    [1,6],
-  // ドミナント系（テンション豊富）
-  '7':      [1,2,6,8,10], // b9, 9, #11, b13, b7
-  '9':      [1,6,8],
-  '7b9':    [1,6,8],
-  '7#11':   [1,2,8],
-  // dim/aug
-  'dim':    [2,5],
-  'dim7':   [2,5],
-  'aug':    [1,2],
-  // sus
-  'sus2':   [6,10],
-  'sus4':   [1,2],
-  // デフォルト
-  'default':[2,6,10],
+  // ── メジャー系 ──
+  // C + Dm → add9(2), add11(5), add13(9)
+  // C + Em → maj7(11), add13(9)  ← Emの特徴: maj7 + b13
+  // C + Am → maj7(11), add9(2), add13(9) ← Amの特徴: 豊かな上部
+  '':       [2,5,9,11],  // 9th, 11th, 13th, maj7
+  'major':  [2,5,9,11],
+  // C + Am/Em上部 → maj7(11), add9(2), add13(9)
+  'maj7':   [2,5,9],     // 9th, 11th, 13th (maj7はコードトーン)
+  'maj9':   [5,9],       // 11th, 13th (maj7・9thはコードトーン)
+  '6':      [2,5,11],    // 9th, 11th, maj7
+  'add9':   [5,9,11],    // 11th, 13th, maj7
+  // ── マイナー系 ──
+  // Dm + Em → m(add9)(2), add11(5), b13(8)  ← Emは短調では緊張感ある上部
+  // Dm + Am → m7(10), add9(2)
+  // Dm + F  → m7(10), maj7をFからみると#11
+  'm':      [2,5,8,10],  // 9th, 11th, b13th, b7
+  'minor':  [2,5,8,10],
+  // Dm7 = Dm + F上部 → maj9(2), #11(6通常はb13扱い), maj7的
+  'm7':     [1,2,5,9],   // b9, 9th, 11th, 6th(13th)
+  'm9':     [1,5,8],     // b9, 11th, b13th
+  'm11':    [1,8],       // b9, b13th (11thはコードトーン)
+  'mmaj7':  [2,5,9],     // 9th, 11th, 13th (mmaj7の上部はメジャー的)
+  'm6':     [2,5,11],    // 9th, 11th, maj7
+  // ── ドミナント7th系（最も豊富 — S2では7コードが最多の上部組み合わせ）──
+  // G + Dm → G7(add9,11) : テンション9th(2), 11th(5)
+  // G + Em → G(add9,11,13) : 9th(2), 11th(5), 13th(9)
+  // G + Am → G(add9) + Am7: 9th(2)
+  // G + B° → G7(add9,13) : b9(1), 13th(9)
+  '7':      [1,2,5,6,8,9], // b9, 9, 11, #11, b13, 13 — ドミナント全テンション
+  '9':      [1,5,6,8],     // b9, 11, #11, b13
+  '7b9':    [1,5,6,8],     // b9固定 + 11, #11, b13
+  '7s9':    [3,5,6,8],     // #9固定 + 11, #11, b13
+  '7#11':   [1,2,8,9],     // b9, 9, b13, 13 (#11はコードトーン)
+  '11':     [1,2,8],       // b9, 9, b13
+  '13':     [1,2,5,6],     // b9, 9, 11, #11
+  // ── ディミニッシュ系 (S5等価グループ準拠) ──
+  // dim7は3グループの等価性から: 代理ノートが豊富
+  'dim':    [1,2,4,10],    // b9, 9, M3(異名), b7(解決先)
+  'dim7':   [1,2,5,10],    // b9, 9, 11, b7(dim7はb7がないのでアプローチとして)
+  'm7b5':   [1,2,8,10],    // b9, 9, b13, b7
+  // ── オーギュメント系 ──
+  // aug = 長3度スタック: 3グループ(C/E/Ab, Db/F/A, D/F#/Bb, Eb/G/B)
+  // V+ → I 解決: D(全音上)→E への声部進行
+  'aug':    [1,2,5],       // b9, 9, 11 — 解決への緊張感
+  // ── Sus系 ──
+  // Sus4: 4度(コードトーン)からの解決 → 2度や7度が自然なテンション
+  'sus4':   [2,5,10,11],   // 9th, さらに4th系の展開, b7, maj7
+  'sus2':   [5,8,10,11],   // 11th, b13, b7, maj7
+  // ── その他 ──
+  'default':[2,5,9,11],    // 汎用: 9th, 11th, 13th, maj7
 };
 
 function getTensionTones(type, ri){
@@ -3535,16 +3702,27 @@ function buildPhraseCore(params){
     const frac=i/noteCount;
     let note;
 
-    // ── 起フェーズ: モチーフ提示 ──
+    // ── 起フェーズ: 第一声 + モチーフ提示 ──
     if(frac<boundary.ki){
-      const mi=i%baseMotif.length;
-      const candidate=startNote+baseMotif[mi];
-      // スケール上に吸着、ただし強拍はコードトーン優先
-      const isAccent=hook.accentBeats.includes(i%4);
-      if(i===0||isAccent){
-        note=nearestChordTone(snapToScale(candidate,scaleTones), chordTones);
+      if(i===0){
+        // 第一声: コードの感情色を1音目で確定
+        const fv=getFirstVoice(type);
+        const ri2=ni(root);
+        const emotionPitch=(ri2+fv.interval)%12;
+        const baseOct=Math.floor(phraseLastNote/12)+fv.rangeShift;
+        const candidate=baseOct*12+emotionPitch;
+        note=nearestChordTone(candidate, chordTones);
+        note=Math.max(52,Math.min(83,note));
       } else {
-        note=snapToScale(candidate, scaleTones);
+        // 2音目以降: モチーフ提示（i-1でずらす）
+        const mi=(i-1)%baseMotif.length;
+        const candidate=startNote+baseMotif[mi];
+        const isAccent=hook.accentBeats.includes(i%4);
+        if(isAccent){
+          note=nearestChordTone(snapToScale(candidate,scaleTones), chordTones);
+        } else {
+          note=snapToScale(candidate, scaleTones);
+        }
       }
     }
 
@@ -3749,6 +3927,8 @@ function playMelodyPhrase(root, type, durationMs){
     const{scaleTones,chordTones}=getStyleScale(cr,ct,CURRENT_PRESET||'theory');
     const ri=ni(cr);
     const tensionTones=getTensionTones(ct,ri);
+    // 感覚マッピングパラメータ（SLスライダー現在値から動的生成）
+    const sp=getSensoryParams();
 
     // 次コード予測（Progressive）
     const nextInfo=phraseChordHistory.length>=2
@@ -3774,18 +3954,33 @@ function playMelodyPhrase(root, type, durationMs){
     const motif=hook.motifs[motifIdx];
 
     if(frac<boundary.ki){
-      // 起: モチーフ提示
-      const mi=i%motif.length;
-      const candidate=startNote+motif[mi];
-      const isAccent=hook.accentBeats.includes(i%4);
-      midi=isAccent
-        ?nearestChordTone(snapToScale(candidate,scaleTones),chordTones)
-        :snapToScale(candidate,scaleTones);
+      if(i===0){
+        // ── 第一声: コードの感情色を1音目で確定 ──
+        // CHORD_FIRST_VOICEテーブルからコードタイプ別の感情開始音程を取得
+        const fv=getFirstVoice(ct);
+        const ri2=ni(cr);
+        // 感情開始音 = ルート音 + interval（最近傍オクターブに配置）
+        const emotionPitch=(ri2+fv.interval)%12;
+        // phraseLastNoteの近傍オクターブ + rangeShiftで音域を調整
+        const baseOct=Math.floor(phraseLastNote/12)+fv.rangeShift;
+        const candidate=baseOct*12+emotionPitch;
+        // コードトーンに吸着（第一声はコードの輪郭を明確に）
+        midi=nearestChordTone(candidate, chordTones);
+        midi=Math.max(52,Math.min(83,midi));
+      } else {
+        // 起フェーズ2音目以降: モチーフ提示（1音目はfirst voiceのため1ずらす）
+        const mi=(i-1)%motif.length;
+        const candidate=startNote+motif[mi];
+        const isAccent=hook.accentBeats.includes(i%4);
+        midi=isAccent
+          ?nearestChordTone(snapToScale(candidate,scaleTones),chordTones)
+          :snapToScale(candidate,scaleTones);
+      }
 
     } else if(frac<boundary.sho){
-      // 承: モチーフ展開+アーク
+      // 承: モチーフ展開+アーク（感覚マッピングのspanModを適用）
       const subFrac=(frac-boundary.ki)/(boundary.sho-boundary.ki);
-      const arcNote=arcTarget(subFrac,hook.contour,startNote);
+      const arcNote=arcTargetSensory(subFrac,hook.contour,startNote,sp.spanMod);
       const candidate=prev_phraseNote()*0.5+arcNote*0.5;
       midi=snapToScale(candidate,scaleTones);
       if(Math.random()<(cx==='easy'?0.5:0.2))
@@ -3797,7 +3992,7 @@ function playMelodyPhrase(root, type, durationMs){
         const target=nearestChordTone(phraseLastNote,chordTones);
         midi=Math.max(52,Math.min(83,getApproachNotes(target)[0]));
       } else if(cx==='difficult'){
-        const useTension=Math.random()<hook.tension+0.15;
+        const useTension=Math.random()<hook.tension+0.15+sp.tensionBoost;
         if(useTension&&tensionTones.length>0){
           const near=tensionTones.filter(n=>Math.abs(n-phraseLastNote)<=8);
           midi=weightedPick(near.length?near:tensionTones,n=>1/(Math.abs(n-phraseLastNote)*0.3+1));
@@ -3838,15 +4033,17 @@ function playMelodyPhrase(root, type, durationMs){
 
     midi=Math.max(48,Math.min(84,midi));
 
-    // 休符判定
-    const restProb={easy:0.07,difficult:0.11,progressive:0.13}[cx]||0.1;
+    // 休符判定（感覚マッピングのrestBoostを加算: Bright×Calm→空白多い）
+    const baseRest={easy:0.07,difficult:0.11,progressive:0.13}[cx]||0.1;
+    const restProb=Math.max(0.02,Math.min(0.28,baseRest+sp.restBoost));
     const noteDurSec=(durations[i]*beatMs)/1000;
     const deadline=phraseStartTime+durationMs/1000-0.08;
 
     if(t<deadline&&Math.random()>=restProb){
       const isAccent=hook.accentBeats.includes(i%4);
-      const vel=p.vol*(isAccent?1.0:0.70)*(0.88+Math.random()*0.12);
-      playPhraseNote(ctx,midi,t,vel);
+      // velModで Warm→柔らかく / Cold→シャープな音量傾向
+      const vel=p.vol*(isAccent?1.0:0.70)*(0.88+Math.random()*0.12)*sp.velMod;
+      playPhraseNote(ctx,midi,t,Math.max(0.05,Math.min(1.0,vel)));
       phraseLastNote=midi;
     }
 
