@@ -212,6 +212,33 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .saved-del:hover{color:var(--col-subst);}
 .saved-empty{font-family:var(--fm);font-size:9px;color:var(--dim);padding:6px 2px;opacity:.6;}
 
+/* ── S2 POLY BUILDER パネル ── */
+.s2-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
+.s2-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px 4px;cursor:pointer;user-select:none;}
+.s2-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
+.s2-tog{font-size:9px;color:var(--dim);}
+.s2-wrap{overflow:hidden;transition:max-height .22s;max-height:0;}
+.s2-wrap.open{max-height:220px;}
+.s2-inner{padding:8px 12px 10px;display:flex;flex-direction:column;gap:8px;}
+.s2-row{display:flex;align-items:center;gap:8px;}
+.s2-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);width:42px;flex-shrink:0;letter-spacing:.05em;}
+.s2-pills{display:flex;flex-wrap:wrap;gap:3px;flex:1;}
+.s2-pill{font-family:var(--fm);font-size:9px;padding:2px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:var(--surf);cursor:pointer;
+  transition:border-color .12s,color .12s,background .12s;white-space:nowrap;}
+.s2-pill.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
+.s2-pill.upper.on{border-color:#9a6ad4;color:#9a6ad4;background:rgba(154,106,212,0.1);}
+.s2-result{font-family:var(--fm);font-size:11px;color:var(--acc);letter-spacing:.08em;
+  padding:4px 0 2px;min-height:18px;}
+.s2-tensions{font-family:var(--fm);font-size:8px;color:var(--dim);letter-spacing:.05em;}
+.s2-play{font-family:var(--fm);font-size:8px;padding:4px 12px;
+  border:1px solid rgba(154,106,212,0.5);border-radius:var(--r);
+  color:#9a6ad4;background:transparent;cursor:pointer;
+  transition:background .12s;white-space:nowrap;}
+.s2-play:active{background:rgba(154,106,212,0.15);}
+
 /* ── EMO MAP トグルボタン ── */
 #emo-map-btn{
   font-family:var(--fm);font-size:7.5px;padding:3px 7px;
@@ -520,6 +547,33 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div class="pos-wrap open" id="pos-wrap">
             <div class="pos-scroll" id="pos-scroll">
               <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);padding:16px">…</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- S2 POLY BUILDER -->
+        <div class="s2-zone" id="s2-zone">
+          <div class="s2-hdr" id="s2-hdr">
+            <span class="s2-hdr-l">S2 · POLY BUILDER</span>
+            <span class="s2-tog" id="s2-tog">▼</span>
+          </div>
+          <div class="s2-wrap" id="s2-wrap">
+            <div class="s2-inner">
+              <div class="s2-row">
+                <span class="s2-lbl">BASE</span>
+                <div class="s2-pills" id="s2-base-pills"></div>
+              </div>
+              <div class="s2-row">
+                <span class="s2-lbl">UPPER</span>
+                <div class="s2-pills" id="s2-upper-pills"></div>
+              </div>
+              <div class="s2-row" style="justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div class="s2-result" id="s2-result">—</div>
+                  <div class="s2-tensions" id="s2-tensions"></div>
+                </div>
+                <button class="s2-play" id="s2-play-btn" onclick="playS2Chord()">▶ PLAY</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1334,6 +1388,12 @@ function buildRelations(root,type){
     });
   }
   res.sort((a,b)=>b.score-a.score);
+  // 2-B: Sus解決スコアブースト（ソート前に適用すると順位が崩れるためソート後に再適用して再ソート）
+  applySusResolveBoost(res, root, type);
+  // 2-C: Dimパッシングスコアブースト
+  applyDimPassingBoost(res, root, type);
+  // ブースト後に再ソート
+  res.sort((a,b)=>b.score-a.score);
   // Normalize score to 0..1 for opacity
   const maxS=res[0]?.score||1,minS=res[res.length-1]?.score||0;
   const range=maxS-minS||1;
@@ -1747,7 +1807,37 @@ function drawFrame(){
       ctx.beginPath();ctx.arc(x,y,nr,0,Math.PI*2);
       ctx.fillStyle=emoToHsl(ev, 0.25*op);ctx.fill();
     }
-  });
+
+    // ── 2-A: 1音変化ハイライト（SNC — S6） ──
+    if(sncCache){
+      const snc=sncCache.results.find(s=>s.root===node.root&&s.type===node.type);
+      if(snc){
+        ctx.beginPath();ctx.arc(x,y,nr+7,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,255,255,0.55)';
+        ctx.lineWidth=1.5;ctx.globalAlpha=0.65*op;ctx.stroke();
+        const sncLbl=(snc.semitone>0?'+':'')+snc.semitone+' '+snc.changedFrom+'→'+snc.changedTo;
+        ctx.font='5.5px DM Mono,monospace';
+        ctx.fillStyle='rgba(255,255,255,0.80)';
+        ctx.globalAlpha=0.80*op;ctx.textAlign='center';
+        ctx.fillText(sncLbl, x, y+nr+20);
+        ctx.globalAlpha=1;
+      }
+    }
+    // ── 2-B: Sus解決ラベル ──
+    if(node.susResolveLabel){
+      ctx.font='5.5px DM Mono,monospace';
+      ctx.fillStyle='#e8c547';ctx.globalAlpha=0.80*op;ctx.textAlign='center';
+      ctx.fillText(node.susResolveLabel, x, y-nr-8);
+      ctx.globalAlpha=1;
+    }
+    // ── 2-C: Dimパッシングラベル ──
+    if(node.dimPassLabel){
+      ctx.font='5.5px DM Mono,monospace';
+      ctx.fillStyle='#9a6ad4';ctx.globalAlpha=0.80*op;ctx.textAlign='center';
+      ctx.fillText(node.dimPassLabel, x, y-nr-8);
+      ctx.globalAlpha=1;
+    }
+  }); // end rels.forEach
 
   // ── Center node ──
   if(moodOn()){
@@ -2082,6 +2172,309 @@ function toggleEmoMap(){
   if(btn)btn.classList.toggle('on',emoMapMode);
   invalidate();
 }
+
+// ═══════════════════════════════════════════════════════
+// 2-A: 1音変化エクスプローラー（Single Note Change — S6）
+// Callipari S6「トライアッド変換空間」準拠
+//
+// ルール: 現在コードの構成音のうち1音だけを半音上下させて
+//         到達できる全コードをリストアップする。
+//
+// 戻り値: [{root, type, changedFrom, changedTo, semitone(+1/-1)}]
+// ═══════════════════════════════════════════════════════
+let sncCache=null; // {key: string, results: [...]}
+
+function computeSingleNoteChanges(root, type){
+  const cacheKey=root+'__'+type;
+  if(sncCache&&sncCache.key===cacheKey) return sncCache.results;
+
+  const ri=ni(root);
+  const ivs=CT[type]?.iv??[0,4,7];
+  const srcPCs=ivs.map(iv=>(ri+iv)%12); // 現コードの音名(PC)
+
+  const results=[];
+  const seen=new Set();
+
+  // 全コードタイプ × 全ルートを探索
+  for(const [tKey,tDef] of Object.entries(CT)){
+    if(!tDef?.iv) continue;
+    for(let ri2=0;ri2<12;ri2++){
+      if(ri2===ri&&tKey===type) continue;
+      const tPCs=tDef.iv.map(iv=>(ri2+iv)%12);
+
+      // 共通音セット
+      const srcSet=new Set(srcPCs);
+      const tSet=new Set(tPCs);
+      const common=[...srcSet].filter(n=>tSet.has(n));
+
+      // 「1音変化」の条件:
+      //   - 元コード構成音のうち1音だけが変化している
+      //   - 変化量は半音1つ (±1)
+      //   - 新コードに同じ音数 or ±0の音数（トライアッド→トライアッドが基本）
+      if(srcPCs.length!==tPCs.length) continue; // 音数が違うコードは除外
+
+      const diffSrc=srcPCs.filter(n=>!tSet.has(n));
+      const diffTgt=tPCs.filter(n=>!srcSet.has(n));
+      if(diffSrc.length!==1||diffTgt.length!==1) continue;
+
+      const fromPC=diffSrc[0];
+      const toPC=diffTgt[0];
+      const semitone=((toPC-fromPC+12)%12===1)?1:((toPC-fromPC+12)%12===11)?-1:0;
+      if(semitone===0) continue; // 半音1つでない
+
+      const k=`${ri2}__${tKey}`;
+      if(seen.has(k)) continue;
+      seen.add(k);
+
+      results.push({
+        root:NOTES[ri2], type:tKey,
+        changedFrom:NOTES[fromPC], changedTo:NOTES[toPC],
+        semitone,
+      });
+    }
+  }
+
+  sncCache={key:cacheKey, results};
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════
+// 2-B: Sus解決パターン — buildRelationsへのスコアブースト
+// Callipari S8「拡張ダイアトニック」準拠
+//
+// Susコードが選択されているとき、その自然な解決先コードを
+// buildRelationsのスコアで +25 ブーストして最上位に引き上げる。
+//
+// テーブル形式: { [susType]: [{resolveRoot offset, resolveType, label}] }
+// ═══════════════════════════════════════════════════════
+const SUS_RESOLVE={
+  // C4(CFG) → C(CEG): F→E 半音下降
+  'sus4':[
+    {ivOff:0, rType:'major',  label:'→3rd↓'},  // sus4→同ルートmaj（F→E）
+    {ivOff:0, rType:'dom7',   label:'→V7'},     // G4→G7
+    {ivOff:0, rType:'maj7',   label:'→M7'},
+  ],
+  // C2(CDG) → C(CEG): D→E 全音上昇
+  'sus2':[
+    {ivOff:0, rType:'major',  label:'→3rd↑'},  // sus2→同ルートmaj（D→E）
+    {ivOff:0, rType:'minor',  label:'→m3↑'},   // D2→Dm
+    {ivOff:0, rType:'m7',     label:'→m7'},
+    {ivOff:7, rType:'dom7',   label:'V7→'},    // C2→G7→C
+  ],
+};
+
+// buildRelations末尾で呼ぶ: Sus解決スコアブースト
+function applySusResolveBoost(res, root, type){
+  const table=SUS_RESOLVE[type];
+  if(!table) return;
+  const ri=ni(root);
+  res.forEach(n=>{
+    for(const{ivOff,rType,label} of table){
+      const targetRi=(ri+ivOff)%12;
+      if(ni(n.root)===targetRi && n.type===rType){
+        n.score+=25;
+        n.susResolveLabel=label; // 描画時ラベル用
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// 2-C: ディミニッシュパッシング — CHAINモード時のスコアブースト
+// Callipari S5「ディミニッシュ等価グループ」準拠
+//
+// 現在コードの短9度上(b9)のdim7が最も自然なパッシングdim。
+// CHAINモードかつ現コードが非dim系のとき、そのdim7に +20 ブースト。
+// また、1小節前のコードへのパッシングdim(解決先の短9度上)も +15。
+// ═══════════════════════════════════════════════════════
+function applyDimPassingBoost(res, root, type){
+  // dim系コードはパッシング挿入対象外
+  if(type==='dim'||type==='dim7'||type==='m7b5') return;
+  // CHAINモード以外では適用しない
+  if(typeof MAP_MODE!=='undefined'&&MAP_MODE!=='chain') return;
+
+  const ri=ni(root);
+
+  // ① 現コードの短9度上のdim7（= 最もよく使われるパッシング）
+  const b9Ri=(ri+1)%12;
+  res.forEach(n=>{
+    if(ni(n.root)===b9Ri&&n.type==='dim7'){
+      n.score+=20;
+      n.dimPassLabel='b9°'; // ラベル用
+    }
+  });
+
+  // ② S.historyの次のコード（移動先予測）への短9度上のdim7
+  if(typeof S!=='undefined'&&S.history&&S.histIdx>=0){
+    const nextCtx=typeof detectProgression==='function'
+      ?detectProgression(S.history.slice(0,S.histIdx+1)):null;
+    if(nextCtx&&nextCtx.next){
+      const nextRi=((ri+12-nextCtx.next.interval)%12+12)%12;
+      const nextB9=(nextRi+1)%12;
+      res.forEach(n=>{
+        if(ni(n.root)===nextB9&&n.type==='dim7'&&!n.dimPassLabel){
+          n.score+=15;
+          n.dimPassLabel='→b9°';
+        }
+      });
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// S2 POLY BUILDER — ポリコード・ヴォイシングビルダー
+// Callipari S2「トライアッド積み重ね」準拠
+//
+// ベーストライアッド × 上部トライアッドの全音を合成し
+// コード名（テンション表記）をリアルタイムで推定する。
+// ═══════════════════════════════════════════════════════
+
+// 全12ルート
+const S2_ROOTS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+// ベース/上部に使えるトライアッド種別
+const S2_BASE_TYPES =['major','minor','aug','dim','sus4','sus2'];
+const S2_UPPER_TYPES=['major','minor','aug','dim','sus4','sus2'];
+
+// S2状態
+let s2BaseRoot ='C';
+let s2BaseType ='major';
+let s2UpperRoot='G';
+let s2UpperType='major';
+let s2Open=false;
+
+// コード名推定: 全音のインターバルセットからCTに照合
+function inferChordName(allPCs, bassPC){
+  // bassをルートとして試みる
+  const ri=bassPC;
+  const ivSet=new Set(allPCs.map(n=>((n-ri)+12)%12));
+  // CTの全タイプと照合（完全一致を優先、部分一致をフォールバック）
+  let bestKey=null, bestMatch=0;
+  for(const[k,def] of Object.entries(CT)){
+    if(!def?.iv) continue;
+    const defSet=new Set(def.iv);
+    const match=[...defSet].filter(iv=>ivSet.has(iv)).length;
+    const total=defSet.size;
+    if(match===total&&total>bestMatch){bestMatch=total;bestKey=k;}
+  }
+  if(bestKey) return{root:NOTES[ri],type:bestKey,exact:true};
+  // 部分一致フォールバック（最多一致）
+  let fbKey=null,fbScore=0;
+  for(const[k,def] of Object.entries(CT)){
+    if(!def?.iv) continue;
+    const defSet=new Set(def.iv);
+    const m=[...defSet].filter(iv=>ivSet.has(iv)).length;
+    const score=m/(defSet.size+0.5);
+    if(score>fbScore){fbScore=score;fbKey=k;}
+  }
+  return{root:NOTES[ri],type:fbKey||'major',exact:false};
+}
+
+// テンション名リスト生成（ベースルートからの追加音程）
+function getPolyTensions(allPCs, bassPC){
+  const baseIvs=new Set((CT[s2BaseType]?.iv??[0,4,7]).map(iv=>(ni(s2BaseRoot)+iv)%12));
+  const extra=allPCs.filter(pc=>!baseIvs.has(pc));
+  return extra.map(pc=>{
+    const iv=((pc-bassPC)+12)%12;
+    return INAME[iv]??`+${iv}`;
+  });
+}
+
+// S2パネルのDOM更新
+function renderS2Panel(){
+  // base pills
+  const bpEl=document.getElementById('s2-base-pills');
+  const upEl=document.getElementById('s2-upper-pills');
+  if(!bpEl||!upEl) return;
+
+  // root pills（共通: 12音）
+  // 上部は「ベース上のルート + タイプ」で表示
+  bpEl.innerHTML=S2_BASE_TYPES.map(t=>{
+    const on=(t===s2BaseType)?'on':'';
+    return`<span class="s2-pill ${on}" data-t="${t}" onclick="s2SetBase(null,'${t}')">${CT[t]?.sym||t||'M'}</span>`;
+  }).join('')+'<span style="font-family:var(--fm);font-size:8px;color:var(--dim);padding:2px 0 0 4px;align-self:center;">'+S2_ROOTS.map(r=>{
+    const on=(r===s2BaseRoot)?'on':'';
+    return`<span class="s2-pill ${on}" data-r="${r}" onclick="s2SetBase('${r}',null)" style="margin:1px;">${r}</span>`;
+  }).join('')+'</span>';
+
+  upEl.innerHTML=S2_UPPER_TYPES.map(t=>{
+    const on=(t===s2UpperType)?'on upper':'upper';
+    return`<span class="s2-pill ${on}" data-t="${t}" onclick="s2SetUpper(null,'${t}')">${CT[t]?.sym||t||'M'}</span>`;
+  }).join('')+'<span style="font-family:var(--fm);font-size:8px;color:var(--dim);padding:2px 0 0 4px;align-self:center;">'+S2_ROOTS.map(r=>{
+    const on=(r===s2UpperRoot)?'on upper':'upper';
+    return`<span class="s2-pill ${on}" data-r="${r}" onclick="s2SetUpper('${r}',null)" style="margin:1px;">${r}</span>`;
+  }).join('')+'</span>';
+
+  updateS2Result();
+}
+
+function s2SetBase(root,type){
+  if(root) s2BaseRoot=root;
+  if(type) s2BaseType=type;
+  renderS2Panel();
+}
+function s2SetUpper(root,type){
+  if(root) s2UpperRoot=root;
+  if(type) s2UpperType=type;
+  renderS2Panel();
+}
+
+function updateS2Result(){
+  const bri=ni(s2BaseRoot);
+  const uri=ni(s2UpperRoot);
+  const bPCs=(CT[s2BaseType]?.iv??[0,4,7]).map(iv=>(bri+iv)%12);
+  const uPCs=(CT[s2UpperType]?.iv??[0,4,7]).map(iv=>(uri+iv)%12);
+  const allPCs=[...new Set([...bPCs,...uPCs])];
+
+  const inferred=inferChordName(allPCs, bri);
+  const tensions=getPolyTensions(allPCs, bri);
+
+  const resEl=document.getElementById('s2-result');
+  const tenEl=document.getElementById('s2-tensions');
+  if(!resEl||!tenEl) return;
+
+  const sym=CT[inferred.type]?.sym??'';
+  const exact=inferred.exact?'':' ~';
+  resEl.textContent=inferred.root+sym+exact;
+  tenEl.textContent=tensions.length
+    ? 'add: '+tensions.join(', ')
+    : 'base triad only';
+}
+
+function playS2Chord(){
+  const ctx=getCtx();
+  if(!ctx) return;
+  if(ctx.state==='suspended') ctx.resume();
+  const bri=ni(s2BaseRoot);
+  const uri=ni(s2UpperRoot);
+  const bIvs=CT[s2BaseType]?.iv??[0,4,7];
+  const uIvs=CT[s2UpperType]?.iv??[0,4,7];
+  const bPCs=bIvs.map(iv=>(bri+iv)%12);
+  const uPCs=uIvs.map(iv=>(uri+iv)%12);
+  const allPCs=[...new Set([...bPCs,...uPCs])];
+  // ベースはオクターブ3、上部はオクターブ4〜5
+  const t=ctx.currentTime;
+  bIvs.forEach((iv,i)=>{
+    const pc=(bri+iv)%12;
+    const midi=48+pc; // oct3
+    pluck(ctx,midi2hz(midi),t+i*0.04,0.55);
+  });
+  const uUniq=uPCs.filter(pc=>!bPCs.includes(pc));
+  uUniq.forEach((pc,i)=>{
+    const midi=60+pc; // oct4
+    pluck(ctx,midi2hz(midi),t+0.12+i*0.04,0.45);
+  });
+}
+
+// S2パネルのアコーディオン
+document.addEventListener('DOMContentLoaded',()=>{
+  const hdr=document.getElementById('s2-hdr');
+  if(hdr) hdr.addEventListener('click',()=>{
+    s2Open=!s2Open;
+    document.getElementById('s2-wrap').className='s2-wrap'+(s2Open?' open':'');
+    document.getElementById('s2-tog').textContent=s2Open?'▲':'▼';
+    if(s2Open) renderS2Panel();
+  });
+});
 
 function hexToRgba(hex,alpha){
   var h=hex.replace('#','');
@@ -2921,123 +3314,6 @@ function nearestChordTone(prevNote, chordTones){
   return chordTones.reduce((b,n)=>Math.abs(n-prevNote)<Math.abs(b-prevNote)?n:b, chordTones[0]);
 }
 
-// ═══════════════════════════════════════════════════════
-// A. 声部進行の滑らかさ — 2ステップ先読みDP
-// ネオ・リーマン「最小声部移動」原則をフレーズエンジンに適用
-//
-// コスト計算:
-//   intervalCost : 音程差（半音）× 1.0
-//   dirPenalty   : 前回と逆方向への移動に +2.5（急激な折り返し抑制）
-//   lookAheadCost: 2音先の最小コスト × 0.4（割引先読み）
-//
-// prevNote       : 直前のMIDIノート
-// chordTones     : 今ステップの候補コードトーン群
-// lookAheadTones : 次ステップの候補コードトーン群（nullなら先読みなし）
-// prevDir        : 直前の移動方向（正=上昇, 負=下降, 0=静止）
-// ═══════════════════════════════════════════════════════
-function smoothChordTone(prevNote, chordTones, lookAheadTones, prevDir){
-  if(!chordTones||chordTones.length===0) return prevNote;
-  const dir=prevDir||0;
-  let best=chordTones[0], bestCost=Infinity;
-  for(const n of chordTones){
-    const interval=Math.abs(n-prevNote);
-    // 同方向継続はコスト低、逆転はペナルティ
-    const moved=n-prevNote;
-    const dirPenalty=(dir!==0&&Math.sign(moved)!==0&&Math.sign(moved)!==Math.sign(dir))?2.5:0;
-    // 2音先コスト: lookAheadTonesでnへの最近傍コスト×0.4
-    let laMin=0;
-    if(lookAheadTones&&lookAheadTones.length){
-      laMin=Math.min(...lookAheadTones.map(m=>Math.abs(m-n)))*0.4;
-    }
-    const cost=interval+dirPenalty+laMin;
-    if(cost<bestCost){bestCost=cost;best=n;}
-  }
-  return best;
-}
-
-// ═══════════════════════════════════════════════════════
-// B. 結フェーズ着地の重み付け — コードタイプ別解決先テーブル
-// handover原則「フレーズの終わり方」準拠
-//
-// 各エントリ: [{interval(半音), weight}, ...]
-//   interval: ルートからの半音距離（コードトーン音程と照合）
-//   weight  : 選ばれやすさの相対比率
-// ═══════════════════════════════════════════════════════
-const RESOLVE_WEIGHTS={
-  // メジャー系: 3度(4)>ルート(0)>5度(7)
-  '':       [{iv:4,w:40},{iv:0,w:35},{iv:7,w:25}],
-  'major':  [{iv:4,w:40},{iv:0,w:35},{iv:7,w:25}],
-  'maj7':   [{iv:11,w:35},{iv:4,w:35},{iv:0,w:30}],  // M7>3度>ルート
-  'maj9':   [{iv:4,w:35},{iv:2,w:30},{iv:0,w:35}],   // 3度>9th>ルート
-  '6':      [{iv:9,w:40},{iv:4,w:35},{iv:0,w:25}],   // 6度>3度>ルート
-  'add9':   [{iv:4,w:40},{iv:2,w:30},{iv:0,w:30}],
-  // マイナー系: ルート>3度>5度（安定重視）
-  'm':      [{iv:0,w:50},{iv:3,w:30},{iv:7,w:20}],
-  'minor':  [{iv:0,w:50},{iv:3,w:30},{iv:7,w:20}],
-  'm7':     [{iv:0,w:45},{iv:3,w:30},{iv:10,w:25}],  // ルート>b3>b7
-  'm9':     [{iv:3,w:40},{iv:0,w:35},{iv:2,w:25}],   // b3>ルート>9th
-  'mmaj7':  [{iv:11,w:40},{iv:3,w:35},{iv:0,w:25}],  // M7>b3>ルート（緊張残し）
-  'm6':     [{iv:9,w:40},{iv:3,w:35},{iv:0,w:25}],
-  // ドミナント7th系: 3度>b7>ルート（解決感重視）
-  '7':      [{iv:4,w:50},{iv:10,w:30},{iv:0,w:20}],
-  '9':      [{iv:4,w:45},{iv:2,w:30},{iv:10,w:25}],
-  '7b9':    [{iv:4,w:50},{iv:1,w:30},{iv:10,w:20}],  // 3度>b9>b7
-  '7s9':    [{iv:4,w:45},{iv:3,w:30},{iv:10,w:25}],  // 3度>#9>b7
-  '11':     [{iv:5,w:45},{iv:4,w:30},{iv:10,w:25}],
-  '13':     [{iv:9,w:40},{iv:4,w:35},{iv:10,w:25}],
-  // ディミニッシュ系: 最近傍優先（不安定感維持）→ nearestChordToneのまま
-  'dim':    null,
-  'dim7':   null,
-  'm7b5':   [{iv:3,w:40},{iv:10,w:35},{iv:6,w:25}],
-  // オーギュメント: 増5度>ルート（解決前の高揚感）
-  'aug':    [{iv:8,w:50},{iv:0,w:30},{iv:4,w:20}],
-  // Sus系: Sus解決先としての自然な着地
-  'sus4':   [{iv:4,w:45},{iv:0,w:35},{iv:7,w:20}],  // Sus→3度解決（定番）
-  'sus2':   [{iv:4,w:40},{iv:2,w:30},{iv:0,w:30}],
-};
-
-// コードタイプ別の重み付き着地音を返す
-// RESOLVE_WEIGHTSがnull（dim等）の場合はnearestChordToneにフォールバック
-function weightedResolveTone(prev, chordTones, type, root){
-  const table=RESOLVE_WEIGHTS[type];
-  if(!table) return nearestChordTone(prev, chordTones);
-  const ri=ni(root);
-  const candidates=[];
-  for(const{iv,w} of table){
-    const pc=(ri+iv)%12;
-    // chordTonesの中でこのピッチクラスに属する音を全て収集
-    const matched=chordTones.filter(n=>n%12===pc);
-    if(matched.length){
-      // 複数オクターブある場合は最近傍を選ぶ
-      const nearest=nearestChordTone(prev,matched);
-      candidates.push({note:nearest,w});
-    }
-  }
-  if(!candidates.length) return nearestChordTone(prev,chordTones);
-  return weightedPick(candidates.map(c=>c.note), (_,idx)=>candidates[idx].w);
-}
-
-// ═══════════════════════════════════════════════════════
-// C. マイクロタイミングゆらぎ — 人間味のある発音タイミング
-//
-// アクセント拍: ゆらぎ小（安定感・グルーヴの骨格を保つ）
-// 裏拍・オフビート: ゆらぎ大（ラッシュ/レイドバックの自然さ）
-// モード別:
-//   melody : accent=±5ms, 裏拍=±12ms
-//   adlib  : accent=±8ms, 裏拍=±20ms
-//
-// t       : Web Audio API 時刻（秒）
-// isAccent: アクセント拍フラグ
-// isAdlib : ADLIBモードならtrue（ゆらぎ大）
-// ═══════════════════════════════════════════════════════
-function humanizeT(t, isAccent, isAdlib){
-  const accentMs= isAdlib? 8:  5;
-  const offMs   = isAdlib?20: 12;
-  const rangeMs = isAccent? accentMs: offMs;
-  // ±rangeMs の一様ランダム（秒換算）
-  return t+(Math.random()*2-1)*rangeMs*0.001;
-}
-
 // ── EASY: キャッチーモチーフ生成 ──
 // ジャンルのキャッチーポイントを使ってモチーフをコードに当てはめる
 
@@ -3315,20 +3591,18 @@ function buildPhraseCore(params){
     else {
       const subFrac=(frac-boundary.ten)/(boundary.ketsu-boundary.ten);
       if(subFrac<0.5&&complexity!=='easy'){
-        // 結の前半: A(smoothChordTone)でアプローチ先を滑らかに決定してから半音接近
-        const finalTarget=smoothChordTone(prev, chordTones, null, prev-notes[notes.length-1]||0);
+        // 結の前半: アプローチノートで着地を予告
+        const finalTarget=nearestChordTone(prev, chordTones);
         const approach=getApproachNotes(finalTarget)[Math.floor(Math.random()*2)];
         note=Math.max(52,Math.min(83,approach));
       } else {
-        // 結の後半: B(weightedResolveTone)でコードタイプ別の重み付き着地
+        // 結の後半: コードトーンへ完全解決
+        note=nearestChordTone(prev, chordTones);
+        // ジャンルによってルートへの着地を優先
         if(hook.landOn==='root'){
           const ri2=ni(phraseCurrentChord.root);
           const rootTones=chordTones.filter(n=>n%12===ri2);
-          note=rootTones.length>0
-            ?nearestChordTone(prev, rootTones)
-            :weightedResolveTone(prev, chordTones, type, root);
-        } else {
-          note=weightedResolveTone(prev, chordTones, type, root);
+          if(rootTones.length>0) note=nearestChordTone(prev, rootTones);
         }
       }
     }
@@ -3547,11 +3821,8 @@ function playMelodyPhrase(root, type, durationMs){
       const arcNote=arcTargetSensory(subFrac,arcContour,startNote,sp.spanMod);
       const candidate=prev_phraseNote()*0.5+arcNote*0.5;
       midi=snapToScale(candidate,scaleTones);
-      // A: smoothChordTone で引力をかける（方向性維持しながらコードトーンへ）
-      if(Math.random()<(cx==='easy'?0.5:0.2)){
-        const prevDir=phraseLastNote-startNote;
-        midi=smoothChordTone(midi,chordTones,null,prevDir);
-      }
+      if(Math.random()<(cx==='easy'?0.5:0.2))
+        midi=nearestChordTone(midi,chordTones);
 
     } else if(frac<boundary.ten){
       // 転: テンション・外し + 進行アーク対応
@@ -3607,22 +3878,18 @@ function playMelodyPhrase(root, type, durationMs){
         midi=Math.max(52,Math.min(83,getApproachNotes(finalTarget)[0]));
       } else {
         if(resolveChordTones&&(cx==='progressive'||(cx==='difficult'&&useLeadingTone))){
-          // ii-V-I / ドミナントチェーン: A(smoothChordTone)で滑らかに次コードへ解決
-          const prevDir=phraseLastNote-startNote;
-          midi=smoothChordTone(phraseLastNote,resolveChordTones,null,prevDir);
+          // ii-V-I / ドミナントチェーン: 次コード(I/V)のルートへ完全解決
+          const resTarget=nearestChordTone(phraseLastNote,resolveChordTones);
+          midi=resTarget;
         } else if(parallelChangeTones&&Math.random()<0.72){
-          // 同主調転換: 転調の色変化を強調する特徴音で着地
+          // 同主調転換: 転調の色変化を強調する特徴音（b3/b6/b7 or M3/M6/M7）で着地
           midi=nearestChordTone(phraseLastNote,parallelChangeTones);
         } else {
-          // B: コードタイプ別の重み付き着地
+          midi=nearestChordTone(phraseLastNote,chordTones);
           if(hook.landOn==='root'){
             const ri2=ni(phraseCurrentChord.root);
             const rootTs=chordTones.filter(n=>n%12===ri2);
-            midi=rootTs.length>0
-              ?nearestChordTone(phraseLastNote,rootTs)
-              :weightedResolveTone(phraseLastNote,chordTones,ct,cr);
-          } else {
-            midi=weightedResolveTone(phraseLastNote,chordTones,ct,cr);
+            if(rootTs.length>0) midi=nearestChordTone(phraseLastNote,rootTs);
           }
         }
         midi=Math.max(52,Math.min(83,midi));
@@ -3641,9 +3908,7 @@ function playMelodyPhrase(root, type, durationMs){
       const isAccent=hook.accentBeats.includes(i%4);
       // velModで Warm→柔らかく / Cold→シャープな音量傾向
       const vel=p.vol*(isAccent?1.0:0.70)*(0.88+Math.random()*0.12)*sp.velMod;
-      // C: マイクロタイミングゆらぎ（melody: accent=±5ms, 裏拍=±12ms）
-      const tHuman=humanizeT(t, isAccent, /*isAdlib=*/false);
-      playPhraseNote(ctx,midi,tHuman,Math.max(0.05,Math.min(1.0,vel)));
+      playPhraseNote(ctx,midi,t,Math.max(0.05,Math.min(1.0,vel)));
       phraseLastNote=midi;
     }
 
@@ -3912,9 +4177,7 @@ function playAdlibPhrase(root,type,durationMs){
       // アクセント: 偶数拍（0, 2拍）はやや強く
       const isAccent=(beatIdx%4===0)||(beatIdx%4===2);
       const vol=p.vol*(isAccent?0.82:0.62)*(0.85+Math.random()*0.15)*sp.velMod;
-      // C: マイクロタイミングゆらぎ（adlib: accent=±8ms, 裏拍=±20ms）
-      const tHuman=humanizeT(t, isAccent, /*isAdlib=*/true);
-      playPhraseNote(ctx,clamped,tHuman,Math.max(0.05,Math.min(1.0,vol)));
+      playPhraseNote(ctx,clamped,t,Math.max(0.05,Math.min(1.0,vol)));
       phraseLastNote=clamped;
 
       // コールモチーフ記録（後半レスポンスで変形使用）
@@ -4060,7 +4323,7 @@ function moveToChord(root,type){
   S.root=root;S.type=type;
   S.history=S.history.slice(0,S.histIdx+1);S.history.push({root,type});S.histIdx=S.history.length-1;
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
-  relCache=null;invalidate();
+  relCache=null; sncCache=null; invalidate();
   document.getElementById('hdr-chord').textContent=cs(root,type);
   renderPath();
   playChord(root,type);
