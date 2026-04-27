@@ -1552,6 +1552,7 @@ let phraseChordHistory=[]; // [{root,type},...] Progressive用
 let phraseMotif=null;      // Progressiveモチーフ
 let phraseTimer=null;
 let phraseLastNote=57;      // 前ノート(A3=57)、スムーズな声部進行のため保持
+let phraseInertia=0;        // 原則5: 連続方向カウンタ（+上昇 / -下降）コード変化時も引き継ぐ
 // EXPAND mode: tree of expanded nodes {root,type,parentKey,children,rels,depth}
 let expandTree=null; // root node of tree
 let expandNodes=[];  // flat list for hit detection
@@ -3365,6 +3366,54 @@ function pickRhythm(complexity, preset){
   return patterns[Math.floor(Math.random()*patterns.length)];
 }
 
+// ═══════════════════════════════════════════════════════
+// 原則4: フレーズピーク計算 — calcPhraseTarget
+// フレーズ開始時に「転フェーズで到達すべき最高音」を決める。
+// コードタイプ別オフセット + SL bright値補正。
+// ═══════════════════════════════════════════════════════
+const PEAK_OFFSET={
+  '':7,'major':7,'maj7':10,'maj9':12,'add9':9,'6':8,
+  'm':5,'minor':5,'m7':7,'m9':8,'mmaj7':9,'m6':6,'m11':5,
+  '7':9,'9':10,'7b9':8,'7s9':9,'11':7,'13':10,
+  'dim':4,'dim7':5,'m7b5':5,'aug':11,
+  'sus4':8,'sus2':9,
+};
+
+function calcPhraseTarget(startNote, type){
+  const offset=PEAK_OFFSET[type]??7;
+  const bright=typeof sv==='function'?sv('bright'):0;
+  return Math.max(52,Math.min(83, startNote+offset+Math.round(bright*3)));
+}
+
+// ═══════════════════════════════════════════════════════
+// 原則5: 慣性（Inertia）制御
+// 連続方向追跡 + 逆方向バイアス + 大跳躍後の順次進行強制
+// ═══════════════════════════════════════════════════════
+function updateInertia(prevNote, nextNote){
+  const diff=nextNote-prevNote;
+  if(diff===0) return;
+  phraseInertia=diff>0
+    ?Math.min(5, Math.max(0,phraseInertia)+1)
+    :Math.max(-5,Math.min(0,phraseInertia)-1);
+}
+
+// inertia>=3 なら逆方向候補を優先して返す
+function applyInertiaBias(candidates, prev, inertia){
+  if(!candidates||!candidates.length) return candidates;
+  if(Math.abs(inertia)>=3){
+    const dir=inertia>0?-1:1;
+    const preferred=candidates.filter(n=>(n-prev)*dir>0);
+    if(preferred.length>=1) return preferred;
+  }
+  return candidates;
+}
+
+// 大跳躍(leapSemitones以上)後に順次進行候補(maxStep以内)を返す
+function stepCandidates(prev, tones, maxStep){
+  const near=tones.filter(n=>n!==prev&&Math.abs(n-prev)<=maxStep&&n>=52&&n<=83);
+  return near.length?near:tones;
+}
+
 // prevNoteに最近傍のコードトーンを返す
 function nearestChordTone(prevNote, chordTones){
   return chordTones.reduce((b,n)=>Math.abs(n-prevNote)<Math.abs(b-prevNote)?n:b, chordTones[0]);
@@ -3590,13 +3639,30 @@ function buildPhraseCore(params){
       if(Math.random()<(complexity==='easy'?0.5:0.25)){
         note=nearestChordTone(note, chordTones);
       }
+      // 原則5: 慣性補正（3音以上同方向継続→逆バイアス）
+      if(Math.abs(phraseInertia)>=3){
+        const pool=applyInertiaBias(scaleTones.filter(n=>n>=52&&n<=83), prev, phraseInertia);
+        const biased=snapToScale(note, pool);
+        if(Math.abs(biased-prev)<=6) note=biased;
+      }
+      // 原則5: 大跳躍後は順次進行を優先
+      if(notes.length>0&&Math.abs(note-notes[notes.length-1])>=7){
+        note=snapToScale(note, stepCandidates(prev, scaleTones, 3));
+      }
     }
 
     // ── 転フェーズ: テンション・外し ──
     else if(frac<boundary.ten){
       const subFrac=(frac-boundary.sho)/(boundary.ten-boundary.sho);
-
-      if(complexity==='easy'){
+      // 原則4: 転フェーズ前半でピーク目標に誘導（easy以外）
+      const buildTarget=calcPhraseTarget(startNote, type);
+      if(subFrac<0.4&&complexity!=='easy'&&Math.random()<0.50){
+        const peakPool=[...scaleTones,...tensionTones].filter(n=>n>=52&&n<=83);
+        const near=peakPool.filter(n=>Math.abs(n-buildTarget)<=4);
+        const pool=near.length?near:peakPool;
+        note=pool.reduce((b,n)=>Math.abs(n-buildTarget)<Math.abs(b-buildTarget)?n:b, pool[0]);
+        note=Math.max(52,Math.min(83,note));
+      } else if(complexity==='easy'){
         // Easy: テンションは控えめ、アプローチノートのみ
         if(subFrac>0.5){
           // アプローチノート（次の着地点の半音上下）
@@ -3665,9 +3731,13 @@ function buildPhraseCore(params){
 
     // 音域クランプ
     note=Math.max(52,Math.min(83,note));
+    // 原則5: 慣性追跡（buildPhraseCore内でもphraseInertiaを更新）
+    updateInertia(prev, note);
     notes.push(note);
     prev=note;
   }
+  // 結フェーズ終了後に慣性を半減させて次フレーズの出発を穏やかに
+  phraseInertia=Math.round(phraseInertia*0.5);
 
   return notes;
 }
@@ -3760,6 +3830,12 @@ function playMelodyPhrase(root, type, durationMs){
   // S.historyから現在の進行パターンを検出してフレーズ構造に反映する
   // phraseProgCtxはscheduleNoteクロージャで参照する
   const phraseProgCtx=detectProgression(S.history.slice(0,S.histIdx+1));
+
+  // 原則4: このフレーズの「ピーク目標音」（転フェーズ冒頭で目指す最高音）
+  // scheduleNoteクロージャで参照する
+  const phraseTarget=calcPhraseTarget(phraseLastNote, type);
+  // 原則5: 前フレーズの慣性を引き継ぐ（コード変化をまたいで流れを維持）
+  // phraseInertiaはグローバル変数、updateInertiaで更新される
 
   // 同主調転換検出: 前回と同ルート・異モード（Major↔Minor）
   const prevHistEntry=phraseChordHistory.length>=2
@@ -3879,10 +3955,38 @@ function playMelodyPhrase(root, type, durationMs){
       midi=snapToScale(candidate,scaleTones);
       if(Math.random()<(cx==='easy'?0.5:0.2))
         midi=nearestChordTone(midi,chordTones);
+      // 原則5: 慣性補正 — 3音以上同方向継続なら逆バイアス
+      if(Math.abs(phraseInertia)>=3){
+        const pool=applyInertiaBias(
+          scaleTones.filter(n=>n>=52&&n<=83), phraseLastNote, phraseInertia);
+        const biased=snapToScale(midi, pool);
+        // 元の候補と±5以内なら採用（急激な飛躍を避ける）
+        if(Math.abs(biased-phraseLastNote)<=6) midi=biased;
+      }
+      // 原則5: 大跳躍（7半音以上）の直後は順次進行を優先
+      if(Math.abs(phraseLastNote-startNote)>=7){
+        const stepped=stepCandidates(phraseLastNote, scaleTones, 3);
+        midi=snapToScale(midi, stepped);
+      }
 
     } else if(frac<boundary.ten){
       // 転: テンション・外し + 進行アーク対応
-      if(cx==='easy'){
+      // ── 原則4: ピーク誘導 ──
+      // 転フェーズの前半（subFrac<0.4）でphraseTargetへ向かう引力をかける
+      // テンション選択ロジックより先に評価し、ピーク方向に誘導する
+      const tenSubFrac=(frac-boundary.sho)/(boundary.ten-boundary.sho);
+      const peakPull=tenSubFrac<0.4&&cx!=='easy'; // 転前半かつeasy以外で発動
+      if(peakPull&&Math.random()<0.55){
+        // phraseTargetに最も近いスケール音・テンション音を選ぶ
+        const peakPool=[
+          ...scaleTones.filter(n=>n>=52&&n<=83),
+          ...tensionTones.filter(n=>n>=52&&n<=83),
+        ];
+        const nearPeak=peakPool.filter(n=>Math.abs(n-phraseTarget)<=4);
+        const pool=nearPeak.length?nearPeak:peakPool;
+        midi=pool.reduce((b,n)=>Math.abs(n-phraseTarget)<Math.abs(b-phraseTarget)?n:b, pool[0]);
+        midi=Math.max(52,Math.min(83,midi));
+      } else if(cx==='easy'){
         const target=nearestChordTone(phraseLastNote,chordTones);
         midi=Math.max(52,Math.min(83,getApproachNotes(target)[0]));
       } else if(cx==='difficult'){
@@ -3963,9 +4067,18 @@ function playMelodyPhrase(root, type, durationMs){
     if(t<deadline&&Math.random()>=restProb){
       const isAccent=hook.accentBeats.includes(i%4);
       // velModで Warm→柔らかく / Cold→シャープな音量傾向
-      const vel=p.vol*(isAccent?1.0:0.70)*(0.88+Math.random()*0.12)*sp.velMod;
+      // 原則4: ピーク付近（phraseTargetとの差≦2半音）は音量を少し上げて感情頂点を強調
+      const isNearPeak=Math.abs(midi-phraseTarget)<=2;
+      const vel=p.vol*(isAccent?1.0:0.70)*(0.88+Math.random()*0.12)*sp.velMod
+                *(isNearPeak?1.12:1.0);
       playPhraseNote(ctx,midi,t,Math.max(0.05,Math.min(1.0,vel)));
+      // 原則5: 慣性を更新（発音した音と前音の方向を記録）
+      updateInertia(phraseLastNote, midi);
       phraseLastNote=midi;
+    }
+    // 結フェーズ末尾（最後の2音）では慣性を減衰させてフレーズを穏やかに締める
+    if(frac>=(boundary.ten+(1.0-boundary.ten)*0.5)){
+      phraseInertia=Math.round(phraseInertia*0.5);
     }
 
     t+=noteDurSec;
@@ -3973,10 +4086,18 @@ function playMelodyPhrase(root, type, durationMs){
     phraseTimer=setTimeout(()=>scheduleNote(i+1), Math.max(0,nextDelay));
   }
 
-  // Progressive: モチーフ初期化
-  if(cx==='progressive'&&(!phraseMotif||Math.random()<0.3)){
-    phraseMotif=hook.motifs[Math.floor(Math.random()*hook.motifs.length)]
-      .map(interval=>({interval,durMult:1}));
+  // Progressive: モチーフ初期化（慣性の方向性を引き継いで連続性を高める）
+  if(cx==='progressive'){
+    if(!phraseMotif||Math.random()<0.3){
+      phraseMotif=hook.motifs[Math.floor(Math.random()*hook.motifs.length)]
+        .map(interval=>({interval,durMult:1}));
+    }
+    // 慣性が上昇気味（>1）ならモチーフを上昇変形、下降気味（<-1）なら反転
+    if(phraseInertia>1&&phraseMotif){
+      phraseMotif=phraseMotif.map(m=>({...m,interval:Math.abs(m.interval)}));
+    } else if(phraseInertia<-1&&phraseMotif){
+      phraseMotif=phraseMotif.map(m=>({...m,interval:-Math.abs(m.interval)}));
+    }
   }
 
   if(phraseTimer){clearTimeout(phraseTimer);phraseTimer=null;}
