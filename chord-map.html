@@ -212,6 +212,20 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .saved-del:hover{color:var(--col-subst);}
 .saved-empty{font-family:var(--fm);font-size:9px;color:var(--dim);padding:6px 2px;opacity:.6;}
 
+/* ── EMO MAP トグルボタン ── */
+#emo-map-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#emo-map-btn.on{
+  border-color:#d44a6a;color:#d44a6a;
+  background:rgba(212,74,106,0.1);
+}
+
 /* MODE BUTTONS */
 .mode-bar{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:10;align-items:flex-end;}
 .mode-row{display:flex;gap:3px;}
@@ -476,6 +490,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="mode-btn" data-mode="graph">GRAPH</div>
               <div class="mode-btn" data-mode="wave">WAVE</div>
               <div class="mode-btn" data-mode="bridge">BRIDGE</div>
+              <div id="emo-map-btn" onclick="toggleEmoMap()">EMO</div>
             </div>
           </div>
         </div>
@@ -2710,6 +2725,22 @@ function drawFrame(){
       ctx.fillText(node.label,x,y+nr+9);
     }
     ctx.globalAlpha=1;
+
+    // ── EMO MAP: 感情カラーハロー ──
+    if(emoMapMode){
+      const ev=getChordEmotionVec(node.root,node.type);
+      // 外側ハロー（明度レイヤー × 3段）
+      for(let ei=3;ei>=1;ei--){
+        const haloR=nr+ei*6;
+        const haloA=(0.28-ei*0.06)*op*ev.tension; // テンションが高いほど強いハロー
+        ctx.beginPath();ctx.arc(x,y,haloR,0,Math.PI*2);
+        ctx.strokeStyle=emoToHsl(ev, haloA);
+        ctx.lineWidth=ei===1?2.5:1.2;ctx.stroke();
+      }
+      // 感情カラーの塗りオーバーレイ
+      ctx.beginPath();ctx.arc(x,y,nr,0,Math.PI*2);
+      ctx.fillStyle=emoToHsl(ev, 0.25*op);ctx.fill();
+    }
   });
 
   // ── Center node ──
@@ -2728,6 +2759,24 @@ function drawFrame(){
   ctx.fillStyle='#e8c547';ctx.fillText(S.root,cx,cy-7);
   ctx.font='9px DM Mono,monospace';ctx.fillStyle='#b0a060';
   ctx.fillText(CT[S.type]?.sym||'maj',cx,cy+9);
+
+  // ── EMO MAP: 中央ノードに感情ベクトル表示 + カラーリング ──
+  if(emoMapMode){
+    const cev=getChordEmotionVec(S.root,S.type);
+    // 中央ノード外周を感情カラーでリング描画
+    for(let ei=2;ei>=1;ei--){
+      ctx.beginPath();ctx.arc(cx,cy,31+ei*5,0,Math.PI*2);
+      ctx.strokeStyle=emoToHsl(cev, 0.5-ei*0.15);
+      ctx.lineWidth=ei===1?2.5:1.0;ctx.stroke();
+    }
+    // 感情インジケーターテキスト（中央ノード下）
+    ctx.font='6px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='top';
+    const bLabel='B:'+(cev.brightness*10|0).toString();
+    const tLabel=' T:'+(cev.tension*10|0).toString();
+    const rLabel=' R:'+(cev.resolution*10|0).toString();
+    ctx.fillStyle=emoToHsl(cev,0.75);
+    ctx.fillText(bLabel+tLabel+rLabel, cx, cy+37);
+  }
 
   // ── Arc sliders — only in radial mode ──
   if(MAP_MODE==='radial'){
@@ -2931,6 +2980,92 @@ function initCanvas(){
 // ═══════════════════════
 const ICOL={0:'#e8c547',3:'#4a90d4',4:'#4a90d4',7:'#4aaa72',10:'#9a6ad4',11:'#9a6ad4',2:'#d4823a',1:'#d4823a',5:'#5a90b0',9:'#5a90b0',6:'#777',8:'#777'};
 // #rrggbb[aa] → rgba() 変換（Safari 15以前の#rrggbbAA非対応対策）
+// ═══════════════════════════════════════════════════════
+// CHORD EMOTION MAP — Callipari S7明暗軸 × S10バルトーク軸
+// 各コードに (brightness, tension, resolution) の3次元ベクトルを付与
+// ═══════════════════════════════════════════════════════
+
+// S7モーダル地図の明暗スコア（#数 - b数 の近似）
+// Lydian(最明)→Locrian(最暗) の7段階を0〜1に正規化
+const MODE_BRIGHTNESS={
+  // メジャー系
+  'major':  0.65, 'maj7': 0.72, 'maj9': 0.75, '6': 0.62, 'add9': 0.68,
+  // ドミナント系（緊張感 → やや暗め）
+  'dom7':   0.52, '9': 0.55, '7b9': 0.35, '7s9': 0.40, '7#11': 0.60,
+  '11': 0.48, '13': 0.58,
+  // マイナー系（暗い方向）
+  'minor':  0.35, 'm7': 0.40, 'm9': 0.45, 'm11': 0.42, 'mmaj7': 0.48, 'm6': 0.38,
+  // ディミニッシュ（最暗）
+  'dim':    0.15, 'dim7': 0.12, 'm7b5': 0.22,
+  // オーギュメント（浮遊・中間）
+  'aug':    0.58,
+  // Sus系（開放・中間）
+  'sus4':   0.55, 'sus2': 0.62,
+  // デフォルト
+  'default':0.50,
+};
+
+// S10バルトーク軸: T=Tonic安定(高), S=Subdominant中間, D=Dominant緊張(低)
+// resolution: 1.0=完全安定, 0.0=最緊張
+const BARTOK_RESOLUTION={
+  // Tonic機能（安定）
+  'major':  0.85, 'maj7': 0.90, 'maj9': 0.88, 'm7': 0.78, 'minor': 0.75,
+  'm9': 0.80, 'm11': 0.76, 'mmaj7': 0.72, '6': 0.82, 'm6': 0.70,
+  // Subdominant機能（中間）
+  'sus2':   0.62, 'sus4': 0.58, 'add9': 0.65, '11': 0.55, '13': 0.60,
+  // Dominant機能（緊張）
+  'dom7':   0.30, '9': 0.35, '7b9': 0.15, '7s9': 0.18, '7#11': 0.28,
+  // Diminished（最緊張）
+  'dim':    0.10, 'dim7': 0.08, 'm7b5': 0.20,
+  // Augmented（中間的緊張）
+  'aug':    0.35,
+  'default':0.50,
+};
+
+// tension: コードの不安定度 (0=安定 〜 1=最緊張)
+// resolution の逆数 + コード音の半音クラスター度
+function getChordEmotionVec(root, type){
+  const bright=MODE_BRIGHTNESS[type]??MODE_BRIGHTNESS.default;
+  const resol=BARTOK_RESOLUTION[type]??BARTOK_RESOLUTION.default;
+  const tension=1.0-resol;
+
+  // コード音のクラスター度（半音が隣接するほど緊張感を追加）
+  const ri=ni(root);
+  const ivs=CT[type]?.iv??[0,4,7];
+  let cluster=0;
+  for(let i=0;i<ivs.length-1;i++){
+    const diff=Math.abs(ivs[i+1]-ivs[i]);
+    if(diff===1||diff===2)cluster+=0.08;
+  }
+  const tensionFinal=Math.min(1.0, tension+cluster);
+
+  return{brightness:bright, tension:tensionFinal, resolution:resol};
+}
+
+// 感情ベクトル → HSLカラー文字列
+// brightness → 色相（0=赤暖色, 120=緑中間, 240=青寒色）
+// tension    → 彩度 (40%〜90%)
+// resolution → 明度 (30%〜65%)
+function emoToHsl(vec, alpha){
+  // brightness: 高→暖色(橙〜黄), 低→寒色(青〜紫)
+  // 0.0(暗) → hue 260(青紫) / 1.0(明) → hue 45(黄橙)
+  const hue=Math.round(260 - vec.brightness*215); // 260〜45
+  const sat=Math.round(40 + vec.tension*50);       // 40%〜90%
+  const lit=Math.round(30 + vec.resolution*35);    // 30%〜65%
+  if(alpha!==undefined)return`hsla(${hue},${sat}%,${lit}%,${alpha})`;
+  return`hsl(${hue},${sat}%,${lit}%)`;
+}
+
+// EMO MAPモード状態
+let emoMapMode=false;
+
+function toggleEmoMap(){
+  emoMapMode=!emoMapMode;
+  const btn=document.getElementById('emo-map-btn');
+  if(btn)btn.classList.toggle('on',emoMapMode);
+  invalidate();
+}
+
 function hexToRgba(hex,alpha){
   var h=hex.replace('#','');
   if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
