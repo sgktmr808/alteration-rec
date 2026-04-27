@@ -169,6 +169,49 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:var(--surf2);color:var(--dim);border-radius:var(--r);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
 .tp.on{background:var(--acc-a);border-color:var(--acc);color:var(--acc);}
 
+/* ── CHAIN SAVE BUTTON ── */
+#chain-save-btn{
+  position:absolute;bottom:44px;right:10px;z-index:15;
+  font-family:var(--fm);font-size:8px;letter-spacing:.1em;
+  padding:5px 10px;border-radius:var(--r);cursor:pointer;
+  border:1px solid rgba(232,197,71,0.45);
+  background:rgba(13,13,16,0.88);color:var(--acc);
+  display:none;  /* CHAINモード時のみJS側でflex表示 */
+  align-items:center;gap:5px;
+  transition:background .15s,border-color .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#chain-save-btn:active{background:rgba(232,197,71,0.15);}
+#chain-save-btn.flash{background:rgba(232,197,71,0.25);border-color:var(--acc);}
+
+/* ── SAVED PROGRESSIONS パネル ── */
+.saved-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
+.saved-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px 4px;cursor:pointer;user-select:none;}
+.saved-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
+.saved-tog{font-size:9px;color:var(--dim);}
+.saved-wrap{overflow:hidden;transition:max-height .25s;max-height:0;}
+.saved-wrap.open{max-height:200px;}
+.saved-list{display:flex;flex-wrap:wrap;gap:5px;padding:4px 10px 10px;overflow-y:auto;max-height:170px;}
+.saved-item{
+  display:flex;align-items:center;gap:0;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  background:var(--surf);overflow:hidden;flex-shrink:0;
+}
+.saved-play{
+  font-family:var(--fm);font-size:9px;color:var(--dim);
+  padding:4px 8px;cursor:pointer;
+  transition:background .12s,color .12s;
+}
+.saved-play:hover,.saved-play:active{color:var(--acc);background:var(--acc-a);}
+.saved-del{
+  font-size:10px;color:rgba(255,255,255,0.18);
+  padding:4px 6px 4px 0;cursor:pointer;
+  transition:color .12s;
+}
+.saved-del:hover{color:var(--col-subst);}
+.saved-empty{font-family:var(--fm);font-size:9px;color:var(--dim);padding:6px 2px;opacity:.6;}
+
 /* MODE BUTTONS */
 .mode-bar{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:10;align-items:flex-end;}
 .mode-row{display:flex;gap:3px;}
@@ -436,6 +479,9 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             </div>
           </div>
         </div>
+        <!-- CHAIN SAVE ボタン (CHAINモード時のみ表示) -->
+        <button id="chain-save-btn" onclick="saveCurrentProgression()">★ SAVE</button>
+
         <!-- 上スワイプ促進インジケーター -->
         <div class="swipe-pip" id="swipe-pip">
           <div class="swipe-pip-bar"></div>
@@ -465,6 +511,17 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 
         <!-- PATH -->
         <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
+
+        <!-- SAVED PROGRESSIONS -->
+        <div class="saved-zone" id="saved-zone">
+          <div class="saved-hdr" id="saved-hdr" onclick="toggleSavedPanel()">
+            <span class="saved-hdr-l">★ SAVED</span>
+            <span class="saved-tog" id="saved-tog">▼</span>
+          </div>
+          <div class="saved-wrap" id="saved-wrap">
+            <div class="saved-list" id="saved-list"></div>
+          </div>
+        </div>
 
         <!-- LEARN BAR -->
         <div class="learn-bar" id="learn-bar">
@@ -4433,6 +4490,128 @@ function moveToChord(root,type){
   }
   renderPosZone();
 }
+// ═══════════════════════════════════════════════════════
+// SAVED PROGRESSIONS — 進行保存・再生機能
+// ═══════════════════════════════════════════════════════
+const SAVED_PROGS_KEY='chord_saved_progs';
+
+function loadSavedProgs(){
+  try{
+    return JSON.parse(localStorage.getItem(SAVED_PROGS_KEY)||'[]');
+  }catch(e){return[];}
+}
+
+function storeSavedProgs(progs){
+  try{localStorage.setItem(SAVED_PROGS_KEY,JSON.stringify(progs));}
+  catch(e){console.warn('saveProgression: localStorage失敗',e);}
+}
+
+// 現在のS.historyを保存する
+function saveCurrentProgression(){
+  const history=S.history.slice(0,S.histIdx+1);
+  if(history.length<2){
+    flashSaveBtn('2コード以上必要');
+    return;
+  }
+  // 進行名: detectProgressionの結果 or 自動採番
+  const progCtx=detectProgression(history);
+  const progs=loadSavedProgs();
+  const name=progCtx
+    ?progCtx.name+' #'+(progs.length+1)
+    :'Prog #'+(progs.length+1);
+
+  const entry={
+    id:Date.now(),
+    name,
+    chords:history.map(h=>({root:h.root,type:h.type})),
+    savedAt:new Date().toISOString(),
+    key:S.root, // 保存時のキー（参考情報）
+  };
+  progs.unshift(entry); // 最新を先頭に
+  if(progs.length>20)progs.length=20; // 最大20件
+  storeSavedProgs(progs);
+  flashSaveBtn('★ SAVED!');
+  renderSavedList();
+}
+
+// SAVEボタンを一瞬フラッシュしてフィードバック
+function flashSaveBtn(msg){
+  const btn=document.getElementById('chain-save-btn');
+  if(!btn)return;
+  const orig=btn.textContent;
+  btn.textContent=msg;
+  btn.classList.add('flash');
+  setTimeout(()=>{btn.textContent='★ SAVE';btn.classList.remove('flash');},900);
+}
+
+// 保存済み進行をautoMode='pattern'相当でステップ再生
+function playSavedProg(id){
+  const progs=loadSavedProgs();
+  const entry=progs.find(p=>p.id===id);
+  if(!entry||!entry.chords.length)return;
+
+  // CHAINモードに切り替えてビジュアルも連動
+  if(MAP_MODE!=='chain')setMode('chain');
+
+  // 先頭コードに移動
+  moveToChord(entry.chords[0].root,entry.chords[0].type);
+
+  // 以降のコードをBPMに合わせてタイマー再生
+  const interval=Math.round(60000/autoBpm*2);
+  let idx=1;
+  function step(){
+    if(idx>=entry.chords.length)return;
+    const c=entry.chords[idx++];
+    moveToChord(c.root,c.type);
+    if(idx<entry.chords.length)setTimeout(step,interval);
+  }
+  if(entry.chords.length>1)setTimeout(step,interval);
+}
+
+// 保存済みリストを削除
+function deleteSavedProg(id){
+  const progs=loadSavedProgs().filter(p=>p.id!==id);
+  storeSavedProgs(progs);
+  renderSavedList();
+}
+
+// SAVEDパネルの開閉
+let savedPanelOpen=false;
+function toggleSavedPanel(){
+  savedPanelOpen=!savedPanelOpen;
+  const wrap=document.getElementById('saved-wrap');
+  const tog=document.getElementById('saved-tog');
+  if(wrap)wrap.classList.toggle('open',savedPanelOpen);
+  if(tog)tog.textContent=savedPanelOpen?'▲':'▼';
+  if(savedPanelOpen)renderSavedList();
+}
+
+// SAVEDリストをDOMに描画
+function renderSavedList(){
+  const list=document.getElementById('saved-list');
+  if(!list)return;
+  const progs=loadSavedProgs();
+  if(!progs.length){
+    list.innerHTML='<span class="saved-empty">まだ保存した進行はありません</span>';
+    return;
+  }
+  list.innerHTML=progs.map(p=>{
+    const chordStr=p.chords.slice(0,6).map(c=>cs(c.root,c.type)).join('→')
+      +(p.chords.length>6?'…':'');
+    return `<div class="saved-item">
+      <div class="saved-play" onclick="playSavedProg(${p.id})" title="${chordStr}">${p.name}</div>
+      <div class="saved-del" onclick="deleteSavedProg(${p.id})" title="削除">✕</div>
+    </div>`;
+  }).join('');
+}
+
+// CHAINモード時にSAVEボタンの表示/非表示を切り替え
+function updateSaveBtnVisibility(){
+  const btn=document.getElementById('chain-save-btn');
+  if(!btn)return;
+  btn.style.display=(MAP_MODE==='chain')?'flex':'none';
+}
+
 function renderPath(){
   const bar=document.getElementById('path-bar');const items=S.history.slice(0,S.histIdx+1);
   bar.innerHTML='<span class="ph-lbl">PATH</span>';
@@ -5096,6 +5275,7 @@ function setMode(mode){
   else if(mode==='wave')waveRings=[];
   else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';}
   relCache=null;invalidate();
+  updateSaveBtnVisibility();
 }
 document.querySelectorAll('.mode-btn').forEach(b=>{
   b.addEventListener('click',()=>setMode(b.dataset.mode));
@@ -6246,6 +6426,8 @@ document.getElementById('hdr-chord').textContent=cs(S.root,S.type);
 renderPath();
 renderPosZone();
 updatePrLockUI();
+renderSavedList();     // 保存済み進行を初期描画
+updateSaveBtnVisibility(); // SAVEボタン初期状態
 
 // ── MAP スワイプ切り替え ──
 (function(){
