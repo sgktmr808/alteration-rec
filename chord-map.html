@@ -253,6 +253,34 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:rgba(212,74,106,0.1);
 }
 
+/* ── S9 PIVOT: 目標キー選択オーバーレイ ── */
+#pivot-overlay{
+  position:absolute;top:8px;left:8px;z-index:10;
+  display:none;flex-direction:column;gap:4px;align-items:flex-start;
+}
+#pivot-overlay.on{display:flex;}
+.pivot-row{display:flex;gap:3px;align-items:center;}
+.pivot-lbl{font-family:var(--fm);font-size:7px;color:var(--dim);
+  letter-spacing:.08em;padding:2px 0;}
+.pivot-sel{
+  font-family:var(--fm);font-size:8px;padding:2px 6px;
+  border:1px solid rgba(74,144,212,0.55);border-radius:var(--r);
+  color:#4a90d4;background:rgba(13,13,16,0.92);
+  cursor:pointer;-webkit-appearance:none;appearance:none;
+}
+.pivot-go{
+  font-family:var(--fm);font-size:7.5px;padding:2px 8px;
+  border:1px solid rgba(74,144,212,0.55);border-radius:var(--r);
+  color:#4a90d4;background:rgba(13,13,16,0.92);
+  cursor:pointer;white-space:nowrap;
+  transition:background .12s;user-select:none;
+}
+.pivot-go:active{background:rgba(74,144,212,0.18);}
+.pivot-steps{
+  font-family:var(--fm);font-size:7px;color:rgba(74,144,212,0.75);
+  letter-spacing:.04em;min-height:10px;
+}
+
 /* MODE BUTTONS */
 .mode-bar{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:10;align-items:flex-end;}
 .mode-row{display:flex;gap:3px;}
@@ -506,6 +534,22 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <div id="map-screen">
         <div id="map-wrap">
           <canvas id="map-canvas"></canvas>
+          <!-- S9 PIVOT: 目標キー選択オーバーレイ（左上） -->
+          <div id="pivot-overlay">
+            <div class="pivot-row">
+              <span class="pivot-lbl">PIVOT TO →</span>
+              <select class="pivot-sel" id="pivot-to-sel">
+                <option value="C">C</option><option value="G">G</option>
+                <option value="D">D</option><option value="A">A</option>
+                <option value="E">E</option><option value="B">B</option>
+                <option value="F#">F#</option><option value="Db">Db</option>
+                <option value="Ab">Ab</option><option value="Eb">Eb</option>
+                <option value="Bb">Bb</option><option value="F">F</option>
+              </select>
+              <div class="pivot-go" id="pivot-go-btn" onclick="runPivotBFS()">▶ GO</div>
+            </div>
+            <div class="pivot-steps" id="pivot-steps-lbl"></div>
+          </div>
           <div class="mode-bar">
             <div class="mode-row">
               <div class="mode-btn on" data-mode="radial">RADIAL</div>
@@ -518,6 +562,9 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="mode-btn" data-mode="wave">WAVE</div>
               <div class="mode-btn" data-mode="bridge">BRIDGE</div>
               <div id="emo-map-btn" onclick="toggleEmoMap()">EMO</div>
+            </div>
+            <div class="mode-row">
+              <div class="mode-btn" data-mode="pivot">PIVOT</div>
             </div>
           </div>
         </div>
@@ -1953,6 +2000,14 @@ function drawFrame(){
     ctx.fillStyle='rgba(232,197,71,0.3)';ctx.fillText('CHAIN',10,10);
   } else if(MAP_MODE==='bridge'){
     drawBridge(ctx,rels);
+  } else if(MAP_MODE==='pivot'){
+    drawPivotMode(ctx);
+    ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
+    ctx.fillStyle='rgba(74,144,212,0.4)';ctx.fillText('PIVOT S9: TAP TO MOVE',10,10);
+  }
+  // ── S4 AUGハブ: aug系コードが中央のときRADIALに重ねてオーバーレイ ──
+  if((MAP_MODE==='radial'||MAP_MODE==='pivot')&&isAugChord(S.type)){
+    drawAugOverlay(ctx);
   }
   // ── AUTO PLAY overlay (always on top) ──
   drawAutoOverlay(ctx);
@@ -2037,6 +2092,7 @@ function initCanvas(){
       else if(MAP_MODE==='graph'){moveToChord(hit.root,hit.type);graphInited=false;initGraph();}
       else if(MAP_MODE==='wave'){moveToChord(hit.root,hit.type);waveRings=[];}
       else if(MAP_MODE==='bridge'){moveToChord(hit.root,hit.type);}
+      else if(MAP_MODE==='pivot'){moveToChord(hit.root,hit.type);}
     }
   });
 
@@ -4989,6 +5045,233 @@ function drawWave(ctx){
   });
 }
 
+
+// ═══════════════════════════════════════════════════════
+// S4: オーギュメントハブ（RADIALオーバーレイ）
+// Callipari S4準拠: aug構成音を±1半音変化させて6コード派生
+// ═══════════════════════════════════════════════════════
+
+const AUG_GROUPS=[
+  new Set(['C','E','G#']),
+  new Set(['C#','F','A']),
+  new Set(['D','F#','A#']),
+  new Set(['D#','G','B']),
+];
+
+function getAugGroup(root){
+  const r=nn(ni(root));
+  return AUG_GROUPS.find(g=>g.has(r))||null;
+}
+
+function computeAugHub(root){
+  const ri=ni(root);
+  const augPCs=[(ri)%12,(ri+4)%12,(ri+8)%12];
+  const majors=[], minors=[];
+  augPCs.forEach(pc=>{
+    // 1半音下げ → メジャー
+    const mRoot=NOTES[(pc+11)%12];
+    majors.push({root:mRoot, type:'major', fromNote:NOTES[pc], toNote:mRoot, semitone:-1});
+    // 1半音上げ → そのpcを5度とするマイナー（root = pc-7 = pc+5）
+    const mnRoot=NOTES[(pc+5)%12];
+    minors.push({root:mnRoot, type:'minor', fromNote:NOTES[pc], toNote:NOTES[(pc+1)%12], semitone:+1});
+  });
+  const group=getAugGroup(root)||new Set([NOTES[ri],NOTES[(ri+4)%12],NOTES[(ri+8)%12]]);
+  const equivAugs=[...group].filter(r=>r!==NOTES[ri]).map(r=>({root:r,type:'aug'}));
+  return{majors, minors, equivAugs};
+}
+
+function drawAugOverlay(ctx){
+  const hub=computeAugHub(S.root);
+  const allDerived=[...hub.majors,...hub.minors];
+  allDerived.forEach(d=>{
+    const hit=nodeHits.find(h=>h.root===d.root&&h.type===d.type);
+    if(!hit) return;
+    const col=d.type==='major'?'#ff9eb5':'#87ceeb';
+    for(let ei=2;ei>=1;ei--){
+      ctx.beginPath();ctx.arc(hit.x,hit.y,hit.r+ei*5,0,Math.PI*2);
+      ctx.strokeStyle=col;ctx.lineWidth=ei===1?2:1;
+      ctx.globalAlpha=0.55-ei*0.1;ctx.stroke();
+    }
+    const arrow=d.semitone<0?'v':'^';
+    const lbl=d.fromNote+(d.semitone<0?'->':'->')+d.toNote+' '+arrow;
+    ctx.font='5.5px DM Mono,monospace';ctx.textAlign='center';
+    ctx.fillStyle=col;ctx.globalAlpha=0.85;
+    ctx.fillText(lbl, hit.x, hit.y-hit.r-8);
+    ctx.globalAlpha=1;
+  });
+  hub.equivAugs.forEach(ea=>{
+    const hit=nodeHits.find(h=>h.root===ea.root&&h.type===ea.type);
+    if(!hit) return;
+    ctx.beginPath();ctx.arc(hit.x,hit.y,hit.r+8,0,Math.PI*2);
+    ctx.strokeStyle='#00ff88';ctx.lineWidth=1.5;
+    ctx.setLineDash([3,3]);ctx.globalAlpha=0.55;ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+    ctx.font='5.5px DM Mono,monospace';ctx.textAlign='center';
+    ctx.fillStyle='#00ff88';ctx.globalAlpha=0.7;
+    ctx.fillText('=aug', hit.x, hit.y-hit.r-8);
+    ctx.globalAlpha=1;
+  });
+  ctx.font='bold 7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
+  ctx.fillStyle='#00ff88';ctx.globalAlpha=0.6;
+  ctx.fillText('AUG HUB S4', 10, L.H-36);
+  ctx.globalAlpha=1;
+}
+
+function isAugChord(type){
+  return type==='aug';
+}
+
+// ═══════════════════════════════════════════════════════
+// S9: ピボット転調（MAP_MODE='pivot'）
+// Callipari S9準拠: 5度圏BFSで最短転調経路を求めアニメーション表示
+// ═══════════════════════════════════════════════════════
+
+const PIVOT_KEYS=['C','G','D','A','E','B','F#','Db','Ab','Eb','Bb','F'];
+
+function getDiatonicChords(keyRoot){
+  const ri=ni(keyRoot);
+  if(ri<0) return[];
+  return[
+    {root:NOTES[ri],         type:'major', degree:'I'},
+    {root:NOTES[(ri+2)%12],  type:'minor', degree:'IIm'},
+    {root:NOTES[(ri+4)%12],  type:'minor', degree:'IIIm'},
+    {root:NOTES[(ri+5)%12],  type:'major', degree:'IV'},
+    {root:NOTES[(ri+7)%12],  type:'dom7',  degree:'V7'},
+    {root:NOTES[(ri+9)%12],  type:'minor', degree:'VIm'},
+    {root:NOTES[(ri+11)%12], type:'m7b5',  degree:'VII'},
+  ];
+}
+
+function getPivotChords(keyA, keyB){
+  const da=getDiatonicChords(keyA);
+  const db=getDiatonicChords(keyB);
+  const result=[];
+  da.forEach(ca=>{
+    const match=db.find(cb=>cb.root===ca.root&&cb.type===ca.type);
+    if(match) result.push({root:ca.root,type:ca.type,degreeA:ca.degree,degreeB:match.degree});
+  });
+  return result;
+}
+
+function findPivotPath(fromKey, toKey){
+  if(fromKey===toKey) return[];
+  const n=PIVOT_KEYS.length;
+  const visited=new Map();
+  visited.set(fromKey,null);
+  const queue=[fromKey];
+  while(queue.length){
+    const cur=queue.shift();
+    if(cur===toKey) break;
+    const ci=PIVOT_KEYS.indexOf(cur);
+    if(ci<0) continue;
+    [PIVOT_KEYS[(ci+1)%n], PIVOT_KEYS[(ci+n-1)%n]].forEach(nb=>{
+      if(!visited.has(nb)){visited.set(nb,cur);queue.push(nb);}
+    });
+  }
+  if(!visited.has(toKey)) return[];
+  const keyPath=[];
+  let cur=toKey;
+  while(cur!==null){keyPath.unshift(cur);cur=visited.get(cur)||null;}
+  const steps=[];
+  for(let i=0;i<keyPath.length-1;i++){
+    steps.push({fromKey:keyPath[i],toKey:keyPath[i+1],pivots:getPivotChords(keyPath[i],keyPath[i+1])});
+  }
+  return steps;
+}
+
+let pivotPath=[];
+let pivotStepIdx=-1;
+let pivotTimer=null;
+let pivotHighlight=new Set();
+let pivotTargetKey='G';
+
+function runPivotBFS(){
+  const sel=document.getElementById('pivot-to-sel');
+  if(sel) pivotTargetKey=sel.value;
+  const ALT={'Gb':'F#','C#':'Db','D#':'Eb','G#':'Ab','A#':'Bb'};
+  const fromKey=PIVOT_KEYS.includes(S.root)?S.root:(ALT[S.root]||'C');
+  pivotPath=findPivotPath(fromKey, pivotTargetKey);
+  pivotHighlight=new Set();
+  pivotStepIdx=-1;
+  if(pivotTimer){clearTimeout(pivotTimer);pivotTimer=null;}
+  const stepsEl=document.getElementById('pivot-steps-lbl');
+  if(stepsEl){
+    if(!pivotPath.length){stepsEl.textContent='same key';}
+    else{
+      const route=pivotPath.map(s=>s.fromKey).concat(pivotPath[pivotPath.length-1].toKey).join('>');
+      stepsEl.textContent=route+' ('+pivotPath.length+'step)';
+    }
+  }
+  animatePivotStep(0);
+  invalidate();
+}
+
+function animatePivotStep(idx){
+  pivotHighlight=new Set();
+  if(idx>=pivotPath.length){
+    pivotPath.forEach(s=>s.pivots.forEach(p=>pivotHighlight.add(p.root+'__'+p.type)));
+    pivotStepIdx=pivotPath.length;
+    invalidate();
+    return;
+  }
+  pivotStepIdx=idx;
+  const step=pivotPath[idx];
+  if(step) step.pivots.forEach(p=>pivotHighlight.add(p.root+'__'+p.type));
+  invalidate();
+  pivotTimer=setTimeout(()=>animatePivotStep(idx+1),400);
+}
+
+function drawStar(ctx,x,y,r,points,col,alpha){
+  const inner=r*0.45;
+  ctx.save();ctx.globalAlpha=alpha;
+  ctx.beginPath();
+  for(let i=0;i<points*2;i++){
+    const angle=(i*Math.PI/points)-Math.PI/2;
+    const rad=i%2===0?r:inner;
+    i===0?ctx.moveTo(x+rad*Math.cos(angle),y+rad*Math.sin(angle))
+         :ctx.lineTo(x+rad*Math.cos(angle),y+rad*Math.sin(angle));
+  }
+  ctx.closePath();
+  ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.restore();
+}
+
+function drawPivotMode(ctx){
+  if(!pivotHighlight.size) return;
+  nodeHits.forEach(h=>{
+    if(!pivotHighlight.has(h.root+'__'+h.type)) return;
+    let degA='',degB='',fromK='',toK='';
+    pivotPath.forEach(step=>{
+      const pv=step.pivots.find(p=>p.root===h.root&&p.type===h.type);
+      if(pv){degA=pv.degreeA;degB=pv.degreeB;fromK=step.fromKey;toK=step.toKey;}
+    });
+    const pulse=Math.sin(Date.now()*0.004)*0.25+0.75;
+    ctx.beginPath();ctx.arc(h.x,h.y,h.r+9,0,Math.PI*2);
+    ctx.strokeStyle='#4a90d4';ctx.lineWidth=2.5;
+    ctx.globalAlpha=0.8*pulse;ctx.stroke();
+    ctx.beginPath();ctx.arc(h.x,h.y,h.r+15,0,Math.PI*2);
+    ctx.strokeStyle='#4a90d4';ctx.lineWidth=1;
+    ctx.globalAlpha=0.3*pulse;ctx.stroke();
+    ctx.globalAlpha=1;
+    if(degA&&degB){
+      const lbl=fromK+':'+degA+'>'+toK+':'+degB;
+      ctx.font='5.5px DM Mono,monospace';ctx.textAlign='center';
+      ctx.fillStyle='#4a90d4';ctx.globalAlpha=0.9;
+      ctx.fillText(lbl,h.x,h.y+h.r+11);
+      ctx.globalAlpha=1;
+    }
+    dirty=true;
+  });
+  const tonicHit=nodeHits.find(h=>h.root===pivotTargetKey&&h.type==='major');
+  if(tonicHit) drawStar(ctx,tonicHit.x,tonicHit.y,tonicHit.r+18,5,'#4a90d4',0.75);
+  if(pivotPath.length){
+    ctx.font='7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillStyle='rgba(74,144,212,0.65)';
+    const route=pivotPath.map(s=>s.fromKey).concat(pivotPath[pivotPath.length-1].toKey).join('>');
+    ctx.fillText('PIVOT: '+route,10,L.H-10);
+  }
+}
+
 // ═══════════════════════
 // MODE: BRIDGE
 // ═══════════════════════
@@ -5129,7 +5412,28 @@ function setMode(mode){
   else if(mode==='graph'){graphInited=false;graphTick=0;initGraph();}
   else if(mode==='wave')waveRings=[];
   else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';}
-  relCache=null;invalidate();
+  else if(mode==='pivot'){
+    // PIVOTオーバーレイを表示・目標キーのデフォルトを現在から1ステップ先に
+    const ov=document.getElementById('pivot-overlay');
+    if(ov) ov.classList.add('on');
+    // デフォルト目標キー: 5度圏で1つ先
+    const altMap={'Gb':'F#','C#':'Db','D#':'Eb','G#':'Ab','A#':'Bb'};
+    const fromKey=PIVOT_KEYS.includes(S.root)?S.root:(altMap[S.root]||'C');
+    const ci=PIVOT_KEYS.indexOf(fromKey);
+    const defaultTo=PIVOT_KEYS[(ci+2)%12]; // 2ステップ先
+    pivotTargetKey=defaultTo;
+    const sel=document.getElementById('pivot-to-sel');
+    if(sel) sel.value=defaultTo;
+    pivotPath=[];pivotHighlight=new Set();
+    if(pivotTimer){clearTimeout(pivotTimer);pivotTimer=null;}
+  }
+  // PIVOT以外ではオーバーレイを非表示
+  if(mode!=='pivot'){
+    const ov=document.getElementById('pivot-overlay');
+    if(ov) ov.classList.remove('on');
+    if(pivotTimer){clearTimeout(pivotTimer);pivotTimer=null;}
+  }
+  relCache=null; sncCache=null; invalidate();
   updateSaveBtnVisibility();
 }
 document.querySelectorAll('.mode-btn').forEach(b=>{
