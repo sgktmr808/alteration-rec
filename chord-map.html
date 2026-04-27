@@ -3834,6 +3834,28 @@ const TENSION_TONES={
   'default':[2,5,9,11],    // 汎用: 9th, 11th, 13th, maj7
 };
 
+// ═══════════════════════════════════════════════════════
+// Callipari S5: ディミニッシュ等価グループ
+// 各グループの4音は互いに代理可能（dim7の対称性）
+// ドミナント7thのb9上のdim7が代理として機能する
+// ═══════════════════════════════════════════════════════
+const DIM_GROUPS=[
+  new Set(['B','D','F','Ab']),    // グループ1: Bdim7=Ddim7=Fdim7=Abdim7
+  new Set(['C','Eb','Gb','A']),   // グループ2: Cdim7=Ebdim7=Gbdim7=Adim7
+  new Set(['C#','E','G','Bb']),   // グループ3: C#dim7=Edim7=Gdim7=Bbdim7
+];
+
+// ドミナント7thのルートに対応するパッシングdim音程（半音インターバル）を返す
+// S5: dom7のb9上のdimが代理 → ルートの半音上のグループ
+function getDimPassingIntervals(domRoot){
+  const b9Root=nn((ni(domRoot)+1)%12); // 半音上 = b9
+  const group=DIM_GROUPS.find(g=>g.has(b9Root));
+  if(!group)return[];
+  // そのグループの全音をインターバルとして返す（ルートからの距離）
+  const ri=ni(domRoot);
+  return [...group].map(n=>((ni(n)-ri+12)%12));
+}
+
 function getTensionTones(type, ri){
   const ivs=TENSION_TONES[type]||TENSION_TONES.default;
   // 全音域に展開
@@ -4363,53 +4385,268 @@ function playMelodyPhrase(root, type, durationMs){
 // prevNoteのラッパー（scheduleNote内でphraseLastNoteを参照）
 function prev_phraseNote(){ return phraseLastNote; }
 
+// ═══════════════════════════════════════════════════════
+// ADLIB PHRASE ENGINE v2 — ジャズスタイル
+// Callipari S2テンション × S5ディミニッシュ × コール&レスポンス
+//
+// 構造:
+//   コール（前半）: モチーフ提示。コードトーンから動き出す
+//   レスポンス（後半）: モチーフを変形・応答。テンションへ踏み込んで解決
+//
+// 難易度:
+//   easy:        コードトーン中心。シンプルなスケール上昇/下降
+//   difficult:   enclosure（包囲アプローチ）+ テンション音の意図的使用
+//   progressive: ビバップ完全実装（クロマチック、dim7パッシング、ロングテンション保留）
+// ═══════════════════════════════════════════════════════
+
+// enclosure（包囲）: ターゲット音を上下の半音で挟むビバップ的アプローチ
+// [target+2, target-1, target] または [target-2, target+1, target]
+function getEnclosure(target){
+  return Math.random()<0.5
+    ?[target+2, target-1, target]
+    :[target-2, target+1, target];
+}
+
+// スケール上の上昇/下降ランを生成（ビバップライン的）
+function getBebopRun(fromNote, toNote, scaleTones, addChromatic){
+  const dir=toNote>fromNote?1:-1;
+  const run=[];
+  let cur=fromNote;
+  const limit=Math.abs(toNote-fromNote)+2;
+  for(let step=0;step<limit&&Math.abs(cur-toNote)>1;step++){
+    cur+=dir;
+    // クロマチック追加: scaleTones上にない音でも確率で挿入（ビバップ的）
+    if(scaleTones.some(n=>n%12===cur%12)||
+      (addChromatic&&Math.random()<0.35)){
+      run.push(Math.max(48,Math.min(84,cur)));
+    }
+  }
+  run.push(Math.max(48,Math.min(84,toNote)));
+  return run.slice(0,6); // 最大6音
+}
+
 function playAdlibPhrase(root,type,durationMs){
   if(phraseMode!=='adlib')return;
   const ctx=getCtx();
   if(ctx.state==='suspended')ctx.resume();
+
+  phraseCurrentChord={root,type};
   phraseIsPlaying=true;
+
   const preset=CURRENT_PRESET||'theory';
   const cx=phraseComplexity;
-  const{chordTones,scaleTones}=getStyleScale(root,type,preset);
   const beatMs=60000/autoBpm;
-  let t=ctx.currentTime+0.05;
-  let prevNote=nearestChordTone(phraseLastNote,chordTones);
   const p=TIMBRE_PROPS[phraseTIMBRE]||TIMBRE_PROPS.crystal;
+
+  // コード情報取得
+  const{chordTones,scaleTones}=getStyleScale(root,type,preset);
+  const ri=ni(root);
+  const tensionTones=getTensionTones(type,ri);
+  const sp=getSensoryParams();
+
+  // dim7パッシング音（S5: dom7系のみ）
+  const isDom=(type==='dom7'||type==='7b9'||type==='7s9'||type==='7#11');
+  const dimPassIntervals=isDom?getDimPassingIntervals(root):[];
+  const dimPassTones=dimPassIntervals.length
+    ?[3,4,5].flatMap(oct=>dimPassIntervals.map(iv=>12*(oct+1)+((ri+iv)%12)))
+    :[];
+
+  // 進行コンテキスト（CHAINアーク連携）
+  phraseChordHistory.push({root,type});
+  if(phraseChordHistory.length>6)phraseChordHistory.shift();
+  const adlibProgCtx=detectProgression(S.history.slice(0,S.histIdx+1));
+
+  // フレーズ全体の時間軸
+  let t=ctx.currentTime+0.05;
+  const phraseEnd=t+durationMs/1000;
   const totalBeats=durationMs/beatMs;
-  const cells=Math.max(2,Math.round(totalBeats/2));
 
-  for(let cell=0;cell<cells;cell++){
-    const cellDur=(durationMs/cells)/1000;
-    const notesInCell=2+Math.floor(Math.random()*3);
-    for(let j=0;j<notesInCell;j++){
-      if(t>=ctx.currentTime+durationMs/1000-0.05)break;
-      const frac=j/notesInCell;
-      const noteDur=cellDur/notesInCell;
-      if(Math.random()<0.12){t+=noteDur;continue;}
+  // コール用モチーフ（後でレスポンスが変形して使う）
+  let callMotif=[];
+  // ロングテンション保留フラグ（Evans風）
+  let holdingTension=false;
+  let holdNote=null;
 
-      let note;
-      if(frac>=0.75) note=nearestChordTone(prevNote,chordTones);
-      else if(frac>0.5&&Math.random()<0.4){
-        const target=nearestChordTone(prevNote,chordTones);
-        note=Math.max(45,Math.min(81,target+(Math.random()<0.5?1:-1)));
-      } else {
-        const nearby=scaleTones.filter(n=>Math.abs(n-prevNote)<=6);
-        const pool=nearby.length?nearby:scaleTones;
-        note=weightedPick(pool,n=>{
-          const isChord=chordTones.some(c=>c%12===n%12);
-          return(isChord?4:1)/(Math.abs(n-prevNote)*0.3+1);
-        });
-        note=Math.max(45,Math.min(81,note));
+  // ── 逐次スケジュール方式（scheduleAdlibBeat）──
+  // beatIdx: 拍インデックス（0.5拍単位）
+  let beatIdx=0;
+  const totalHalfBeats=Math.floor(totalBeats*2);
+  const halfBeatSec=beatMs/1000*0.5;
+
+  // コール/レスポンスの境界
+  const callEnd=Math.floor(totalHalfBeats*0.5);
+
+  function pickAdlibNote(phase, halfBeat){
+    // phase: 'call' | 'response'
+    // 直前の音
+    const prev=phraseLastNote;
+
+    // ─ easy: コードトーン中心 ─
+    if(cx==='easy'){
+      const useChord=Math.random()<0.72;
+      if(useChord){
+        return nearestChordTone(prev+(Math.random()<0.5?2:-2), chordTones);
       }
-      const vol=p.vol*(noteDur<beatMs/1000*0.4?0.5:0.75)*(0.8+Math.random()*0.2);
-      playPhraseNote(ctx,note,t,vol);
-      prevNote=note;
-      t+=noteDur;
+      const near=scaleTones.filter(n=>Math.abs(n-prev)<=4);
+      return near.length?near[Math.floor(Math.random()*near.length)]:nearestChordTone(prev,chordTones);
     }
-    if(Math.random()<0.35)t+=beatMs/1000*0.25;
+
+    // ─ difficult: enclosure + テンション ─
+    if(cx==='difficult'){
+      const phasePos=halfBeat/totalHalfBeats;
+      // 転域（50〜75%）でテンション・enclosure
+      if(phasePos>0.50&&phasePos<0.75){
+        if(Math.random()<0.45&&tensionTones.length){
+          const near=tensionTones.filter(n=>Math.abs(n-prev)<=7);
+          return weightedPick(near.length?near:tensionTones,n=>1/(Math.abs(n-prev)*0.3+1));
+        }
+        // enclosure: 次のコードトーンへの包囲アプローチ
+        const target=nearestChordTone(prev+(Math.random()<0.5?3:-3),chordTones);
+        const enc=getEnclosure(target);
+        // enclosureの最初の音を返す（以降は次の呼び出しで）
+        return Math.max(48,Math.min(84,enc[0]));
+      }
+      // 結域（75%〜）でコードトーン解決
+      if(phasePos>=0.75){
+        return nearestChordTone(prev,chordTones);
+      }
+      // 通常域: スケール + コードトーン混在
+      const nearScale=scaleTones.filter(n=>Math.abs(n-prev)<=5);
+      const pool=nearScale.length?nearScale:scaleTones;
+      return weightedPick(pool,n=>{
+        const isChord=chordTones.some(c=>c%12===n%12);
+        return(isChord?3.5:1)/(Math.abs(n-prev)*0.25+1);
+      });
+    }
+
+    // ─ progressive: ビバップ完全実装 ─
+    const phasePos=halfBeat/totalHalfBeats;
+
+    // コールフェーズ（前半）: 特徴的なモチーフを提示
+    if(phase==='call'){
+      if(halfBeat===0){
+        // 1音目: 感情開始音（第一声設計流用）
+        const fv=getFirstVoice(type);
+        const ep=(ri+fv.interval)%12;
+        const bo=Math.floor(prev/12)+fv.rangeShift;
+        return nearestChordTone(bo*12+ep,chordTones);
+      }
+      // コール中盤: スケール上のビバップライン
+      if(phasePos<0.3){
+        const dir=Math.random()<0.55?1:-1;
+        const target=snapToScale(prev+dir*3,scaleTones);
+        return Math.max(48,Math.min(84,target));
+      }
+      // コール後半: dim7パッシングまたはテンション
+      if(phasePos<0.45&&dimPassTones.length&&Math.random()<0.50){
+        const near=dimPassTones.filter(n=>Math.abs(n-prev)<=6);
+        return near.length?near[Math.floor(Math.random()*near.length)]
+          :nearestChordTone(prev,chordTones);
+      }
+      return snapToScale(prev+(Math.random()<0.5?2:-2),scaleTones);
+    }
+
+    // レスポンスフェーズ（後半）: コールに応答・発展
+    // Evans風ロングテンション保留
+    if(!holdingTension&&phasePos>0.55&&phasePos<0.72&&tensionTones.length&&Math.random()<0.40){
+      holdingTension=true;
+      const near=tensionTones.filter(n=>Math.abs(n-prev)<=8);
+      holdNote=weightedPick(near.length?near:tensionTones,n=>1/(Math.abs(n-prev)*0.4+1));
+      holdNote=Math.max(48,Math.min(84,holdNote));
+      return holdNote;
+    }
+    // 保留中は同音を繰り返す（リリースタイミングまで）
+    if(holdingTension&&holdNote!==null&&phasePos<0.78){
+      if(Math.random()<0.60)return holdNote; // 60%で保留維持
+      holdingTension=false; // 解放
+    }
+
+    // 解決域（78%〜）: コードトーンへ下降解決
+    if(phasePos>=0.78){
+      holdingTension=false;
+      // 進行アーク: ii-V-I の V ならI方向へ
+      if(adlibProgCtx&&adlibProgCtx.phase==='V'&&adlibProgCtx.next){
+        const resRi=((ri+12-adlibProgCtx.next.interval)%12+12)%12;
+        const resIvs=CT[adlibProgCtx.next.types[0]]?.iv??[0,4,7];
+        const resTones=[3,4,5,6].flatMap(oct=>resIvs.map(iv=>12*(oct+1)+((resRi+iv)%12)));
+        return nearestChordTone(prev,resTones);
+      }
+      return nearestChordTone(prev,chordTones);
+    }
+
+    // クロマチックアプローチ（ビバップライン）
+    if(Math.random()<0.38){
+      const target=nearestChordTone(prev+(Math.random()<0.55?3:-3),chordTones);
+      const run=getBebopRun(prev,target,scaleTones,true);
+      if(run.length)return run[0]; // ランの先頭音
+    }
+
+    // dim7パッシング挿入（S5）
+    if(dimPassTones.length&&Math.random()<0.35){
+      const near=dimPassTones.filter(n=>Math.abs(n-prev)<=5);
+      if(near.length)return near[Math.floor(Math.random()*near.length)];
+    }
+
+    // テンション → スケール混在
+    const useTension=Math.random()<(hook_tension||0.35)+sp.tensionBoost;
+    if(useTension&&tensionTones.length){
+      const near=tensionTones.filter(n=>Math.abs(n-prev)<=7);
+      return weightedPick(near.length?near:tensionTones,n=>1/(Math.abs(n-prev)*0.35+1));
+    }
+    const nearScale=scaleTones.filter(n=>Math.abs(n-prev)<=5);
+    return weightedPick(nearScale.length?nearScale:scaleTones,n=>{
+      const isChord=chordTones.some(c=>c%12===n%12);
+      return(isChord?2.5:1)/(Math.abs(n-prev)*0.25+1);
+    });
   }
-  phraseLastNote=prevNote;
-  phraseIsPlaying=false;
+
+  // hookのtension値（プリセット別テンション確率）
+  const hook_tension=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default']?.tension||0.2;
+
+  function scheduleAdlibBeat(){
+    if(beatIdx>=totalHalfBeats){
+      phraseLastNote=phraseLastNote; // 最終音を保持
+      phraseIsPlaying=false;
+      return;
+    }
+    if(t>=phraseEnd-0.06){
+      phraseIsPlaying=false;
+      return;
+    }
+
+    // コード追従
+    const{root:cr,type:ct}=phraseCurrentChord;
+    const phase=beatIdx<callEnd?'call':'response';
+
+    // 休符判定（ADLIBは少し多め）
+    const baseRest={easy:0.10,difficult:0.14,progressive:0.12}[cx]||0.12;
+    const restProb=Math.max(0.03,Math.min(0.30,baseRest+sp.restBoost));
+    const shouldRest=Math.random()<restProb;
+
+    if(!shouldRest){
+      // コード追従: 音選び
+      const{chordTones:cct}=getStyleScale(cr,ct,preset);
+      const note=pickAdlibNote(phase,beatIdx);
+      const clamped=Math.max(48,Math.min(84,note));
+
+      // アクセント: 偶数拍（0, 2拍）はやや強く
+      const isAccent=(beatIdx%4===0)||(beatIdx%4===2);
+      const vol=p.vol*(isAccent?0.82:0.62)*(0.85+Math.random()*0.15)*sp.velMod;
+      playPhraseNote(ctx,clamped,t,Math.max(0.05,Math.min(1.0,vol)));
+      phraseLastNote=clamped;
+
+      // コールモチーフ記録（後半レスポンスで変形使用）
+      if(phase==='call'&&callMotif.length<6)callMotif.push(clamped);
+    }
+
+    t+=halfBeatSec;
+    beatIdx++;
+    const nextDelay=(t-ctx.currentTime)*1000-40;
+    phraseTimer=setTimeout(scheduleAdlibBeat, Math.max(0,nextDelay));
+  }
+
+  if(phraseTimer){clearTimeout(phraseTimer);phraseTimer=null;}
+  scheduleAdlibBeat();
 }
 
 // コード変化時にフレーズを起動 or コード情報を更新
