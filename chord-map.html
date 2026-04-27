@@ -4133,6 +4133,19 @@ function playMelodyPhrase(root, type, durationMs){
   phraseChordHistory.push({root,type});
   if(phraseChordHistory.length>6)phraseChordHistory.shift();
 
+  // ── CHAIN対応フレーズアーク: 進行コンテキストを取得 ──
+  // S.historyから現在の進行パターンを検出してフレーズ構造に反映する
+  // phraseProgCtxはscheduleNoteクロージャで参照する
+  const phraseProgCtx=detectProgression(S.history.slice(0,S.histIdx+1));
+
+  // 同主調転換検出: 前回と同ルート・異モード（Major↔Minor）
+  const prevHistEntry=phraseChordHistory.length>=2
+    ?phraseChordHistory[phraseChordHistory.length-2]:null;
+  const isParallelChange=prevHistEntry&&prevHistEntry.root===root
+    &&((prevHistEntry.type==='major'&&(type==='minor'||type==='m7'))
+      ||(prevHistEntry.type==='minor'&&(type==='major'||type==='maj7'))
+      ||((prevHistEntry.type==='m7'||prevHistEntry.type==='minor')&&(type==='major'||type==='maj7')));
+
   // フレーズノート列を生成（ビルダーv4）
   // scheduleNote内でphraseCurrentChordを参照してコード追従
   let t=ctx.currentTime+0.05;
@@ -4155,7 +4168,7 @@ function playMelodyPhrase(root, type, durationMs){
     // 感覚マッピングパラメータ（SLスライダー現在値から動的生成）
     const sp=getSensoryParams();
 
-    // 次コード予測（Progressive）
+    // 次コード予測（Progressive + 進行アーク）
     const nextInfo=phraseChordHistory.length>=2
       ?phraseChordHistory[phraseChordHistory.length-2]:null;
     let nextChordTones=null;
@@ -4163,6 +4176,36 @@ function playMelodyPhrase(root, type, durationMs){
       const nri=ni(nextInfo.root);
       const nIvs=CT[nextInfo.type]?.iv??[0,4,7];
       nextChordTones=[3,4,5,6].flatMap(oct=>nIvs.map(iv=>12*(oct+1)+((nri+iv)%12)));
+    }
+
+    // ── 進行アーク: ii-V-I の V フェーズなら解決先(I)のコードトーンを生成 ──
+    let resolveChordTones=null;  // 解決先コードトーン（結フェーズで使用）
+    let useLeadingTone=false;    // 転フェーズでリーディングトーンを使うか
+    if(phraseProgCtx){
+      if(phraseProgCtx.phase==='V'&&phraseProgCtx.next){
+        // V フェーズ: 解決先（I）= 現在ルートから 5度下
+        const{interval:resInterval,types:resTypes}=phraseProgCtx.next;
+        const resRi=((ri+12-resInterval)%12+12)%12; // 5度下
+        const resType=resTypes[0]||'major';
+        const resIvs=CT[resType]?.iv??[0,4,7];
+        resolveChordTones=[3,4,5,6].flatMap(oct=>resIvs.map(iv=>12*(oct+1)+((resRi+iv)%12)));
+        useLeadingTone=true; // 転フェーズでリーディングトーンを積極使用
+      } else if(phraseProgCtx.name==='Dominant Chain'){
+        // ドミナントチェーン: 解決先はさらに5度下のdom7
+        const resRi=((ri+12-5)%12+12)%12;
+        const resIvs=CT['dom7']?.iv??[0,4,7,10];
+        resolveChordTones=[3,4,5,6].flatMap(oct=>resIvs.map(iv=>12*(oct+1)+((resRi+iv)%12)));
+      }
+    }
+
+    // 同主調転換時: 暗転する特徴音（b3/b6/b7）のMIDIノートセット
+    let parallelChangeTones=null;
+    if(isParallelChange){
+      const isGoingMinor=(type==='minor'||type==='m7');
+      // マイナーへ: b3(3半音), b6(8半音), b7(10半音) を特徴音として用意
+      // メジャーへ: M3(4半音), M6(9半音), M7(11半音)
+      const colorIntervals=isGoingMinor?[3,8,10]:[4,9,11];
+      parallelChangeTones=[3,4,5,6].flatMap(oct=>colorIntervals.map(iv=>12*(oct+1)+((ri+iv)%12)));
     }
 
     // 1音ぶんの起承転結フェーズ計算
@@ -4203,32 +4246,49 @@ function playMelodyPhrase(root, type, durationMs){
       }
 
     } else if(frac<boundary.sho){
-      // 承: モチーフ展開+アーク（感覚マッピングのspanModを適用）
+      // 承: モチーフ展開+アーク（感覚マッピング + 進行アーク補正）
       const subFrac=(frac-boundary.ki)/(boundary.sho-boundary.ki);
-      const arcNote=arcTargetSensory(subFrac,hook.contour,startNote,sp.spanMod);
+      // ドミナントチェーン中は下降傾向のcontourを使って進行感を強調
+      const arcContour=(phraseProgCtx&&phraseProgCtx.name==='Dominant Chain')
+        ?'descend' : hook.contour;
+      const arcNote=arcTargetSensory(subFrac,arcContour,startNote,sp.spanMod);
       const candidate=prev_phraseNote()*0.5+arcNote*0.5;
       midi=snapToScale(candidate,scaleTones);
       if(Math.random()<(cx==='easy'?0.5:0.2))
         midi=nearestChordTone(midi,chordTones);
 
     } else if(frac<boundary.ten){
-      // 転: テンション・外し
+      // 転: テンション・外し + 進行アーク対応
       if(cx==='easy'){
         const target=nearestChordTone(phraseLastNote,chordTones);
         midi=Math.max(52,Math.min(83,getApproachNotes(target)[0]));
       } else if(cx==='difficult'){
-        const useTension=Math.random()<hook.tension+0.15+sp.tensionBoost;
-        if(useTension&&tensionTones.length>0){
-          const near=tensionTones.filter(n=>Math.abs(n-phraseLastNote)<=8);
-          midi=weightedPick(near.length?near:tensionTones,n=>1/(Math.abs(n-phraseLastNote)*0.3+1));
+        // ii-V-I の V フェーズ: リーディングトーン（解決先への半音接近）を積極使用
+        if(useLeadingTone&&resolveChordTones&&Math.random()<0.65){
+          // 解決先コードトーンへのアプローチノート
+          const resTarget=nearestChordTone(phraseLastNote,resolveChordTones);
+          const approaches=getApproachNotes(resTarget);
+          midi=approaches[Math.floor(Math.random()*2)];
           midi=Math.max(52,Math.min(83,midi));
         } else {
-          const target=nearestChordTone(phraseLastNote,chordTones);
-          midi=Math.max(52,Math.min(83,getApproachNotes(target)[0]));
+          const useTension=Math.random()<hook.tension+0.15+sp.tensionBoost;
+          if(useTension&&tensionTones.length>0){
+            const near=tensionTones.filter(n=>Math.abs(n-phraseLastNote)<=8);
+            midi=weightedPick(near.length?near:tensionTones,n=>1/(Math.abs(n-phraseLastNote)*0.3+1));
+            midi=Math.max(52,Math.min(83,midi));
+          } else {
+            const target=nearestChordTone(phraseLastNote,chordTones);
+            midi=Math.max(52,Math.min(83,getApproachNotes(target)[0]));
+          }
         }
       } else {
-        // Progressive: 先取り音 or テンション跳躍
-        if(nextChordTones&&Math.random()<0.55){
+        // Progressive: 進行アーク優先 → 先取り音 → テンション跳躍
+        if(useLeadingTone&&resolveChordTones&&Math.random()<0.70){
+          // ii-V-I の V: 解決先へのリーディングトーン（長7度か半音アプローチ）
+          const resTarget=nearestChordTone(phraseLastNote,resolveChordTones);
+          midi=getApproachNotes(resTarget)[0]; // 半音上(=長7度に近い位置)から
+          midi=Math.max(48,Math.min(84,midi));
+        } else if(nextChordTones&&Math.random()<0.55){
           midi=nearestChordTone(phraseLastNote,nextChordTones);
         } else if(tensionTones.length>0){
           const far=tensionTones.filter(n=>Math.abs(n-phraseLastNote)>=4&&Math.abs(n-phraseLastNote)<=10);
@@ -4241,18 +4301,31 @@ function playMelodyPhrase(root, type, durationMs){
       }
 
     } else {
-      // 結: 解決・着地
+      // 結: 解決・着地 + 進行アーク対応
       const subFrac=(frac-boundary.ten)/(1.0-boundary.ten);
       if(subFrac<0.45&&cx!=='easy'){
-        const finalTarget=nearestChordTone(phraseLastNote,chordTones);
+        // アプローチノート
+        const finalTarget=resolveChordTones
+          ?nearestChordTone(phraseLastNote,resolveChordTones)   // 解決先が確定している場合
+          :nearestChordTone(phraseLastNote,chordTones);
         midi=Math.max(48,Math.min(84,getApproachNotes(finalTarget)[0]));
       } else {
-        midi=nearestChordTone(phraseLastNote,chordTones);
-        if(hook.landOn==='root'){
-          const ri2=ni(phraseCurrentChord.root);
-          const rootTs=chordTones.filter(n=>n%12===ri2);
-          if(rootTs.length>0) midi=nearestChordTone(phraseLastNote,rootTs);
+        if(resolveChordTones&&(cx==='progressive'||(cx==='difficult'&&useLeadingTone))){
+          // ii-V-I / ドミナントチェーン: 次コード(I/V)のルートへ完全解決
+          const resTarget=nearestChordTone(phraseLastNote,resolveChordTones);
+          midi=resTarget;
+        } else if(parallelChangeTones&&Math.random()<0.72){
+          // 同主調転換: 転調の色変化を強調する特徴音（b3/b6/b7 or M3/M6/M7）で着地
+          midi=nearestChordTone(phraseLastNote,parallelChangeTones);
+        } else {
+          midi=nearestChordTone(phraseLastNote,chordTones);
+          if(hook.landOn==='root'){
+            const ri2=ni(phraseCurrentChord.root);
+            const rootTs=chordTones.filter(n=>n%12===ri2);
+            if(rootTs.length>0) midi=nearestChordTone(phraseLastNote,rootTs);
+          }
         }
+        midi=Math.max(48,Math.min(84,midi));
       }
     }
 
