@@ -223,6 +223,14 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 .saved-del:hover{color:var(--col-subst);}
 .saved-empty{font-family:var(--fm);font-size:9px;color:var(--dim);padding:6px 2px;opacity:.6;}
+/* ── P2: SUS版ボタン ── */
+.saved-sus{
+  font-family:var(--fm);font-size:8px;color:rgba(74,170,114,0.75);
+  padding:4px 6px;cursor:pointer;border-left:1px solid var(--bdr);
+  transition:background .12s,color .12s;letter-spacing:.04em;white-space:nowrap;
+}
+.saved-sus:hover,.saved-sus:active{color:#4aaa72;background:rgba(74,170,114,0.10);}
+.saved-sus.playing{color:#4aaa72;background:rgba(74,170,114,0.15);}
 
 /* ── S2 POLY BUILDER パネル ── */
 .s2-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
@@ -4865,6 +4873,98 @@ function deleteSavedProg(id){
   renderSavedList();
 }
 
+// ═══════════════════════════════════════════════════════
+// P2: Sus解決パターンライブラリ (§19-7)
+//
+// SUS_VERSION: コードタイプ → Susへの変換テーブル
+//   変換できないタイプはそのまま通す（dim/aug等）
+//
+// convertToSusProgression(chords)
+//   → コード配列全体をSus版に変換して返す
+//
+// playSusProg(id)
+//   → 保存済み進行をSus変換してplaySavedProgと同じパイプラインで再生
+// ═══════════════════════════════════════════════════════
+
+const SUS_VERSION={
+  'major':  [{type:'sus4', label:'sus4'},{type:'sus2', label:'sus2'}],
+  'minor':  [{type:'sus4', label:'sus4'},{type:'sus2', label:'sus2'}],
+  'dom7':   [{type:'sus4', label:'7sus4'}],
+  'maj7':   [{type:'sus4', label:'sus4'},{type:'sus2', label:'sus2'}],
+  'm7':     [{type:'sus4', label:'sus4'},{type:'sus2', label:'sus2'}],
+  'add9':   [{type:'sus2', label:'sus2'}],
+  '9':      [{type:'sus4', label:'7sus4'}],
+  'maj9':   [{type:'sus2', label:'sus2'}],
+  'm9':     [{type:'sus2', label:'sus2'}],
+  '6':      [{type:'sus2', label:'sus2'}],
+  'm6':     [{type:'sus4', label:'sus4'}],
+  'mmaj7':  [{type:'sus4', label:'sus4'}],
+  // sus系・dim系・aug はそのまま通す（変換なし）
+};
+
+function convertToSusProgression(chords){
+  return chords.map(c=>{
+    const versions=SUS_VERSION[c.type];
+    if(!versions||!versions.length) return{root:c.root,type:c.type}; // 変換なし
+    // 進行の流れを維持するため先頭バリアント（sus4優先）を使う
+    return{root:c.root, type:versions[0].type};
+  });
+}
+
+// Sus版プレビュー再生用タイマー（savedProgTimerと共用）
+function playSusProg(id){
+  const progs=loadSavedProgs();
+  const entry=progs.find(p=>p.id===id);
+  if(!entry||!entry.chords.length) return;
+
+  const susChords=convertToSusProgression(entry.chords);
+  // 変換できたコードがあるか確認
+  const hasChange=susChords.some((c,i)=>c.type!==entry.chords[i].type);
+
+  // 既存の再生を中断
+  if(savedProgTimer){clearTimeout(savedProgTimer);savedProgTimer=null;}
+
+  if(MAP_MODE!=='chain') setMode('chain');
+
+  // フレーズモード一時切り替え（playSavedProgと同じロジック）
+  const prevPhraseMode=phraseMode;
+  const forcedPhrase=(phraseMode==='off');
+  if(forcedPhrase){
+    phraseMode='melody';
+    const pms=document.getElementById('phrase-mode-sel');
+    if(pms) pms.value='melody';
+  }
+
+  // SUSボタンをplaying状態に
+  const susBtn=document.querySelector(`.saved-sus[data-id="${id}"]`);
+  if(susBtn) susBtn.classList.add('playing');
+
+  const interval=Math.round(60000/autoBpm*2);
+  moveToChord(susChords[0].root, susChords[0].type);
+
+  let idx=1;
+  function step(){
+    if(idx>=susChords.length){
+      savedProgTimer=null;
+      if(susBtn) susBtn.classList.remove('playing');
+      if(forcedPhrase){
+        setTimeout(()=>{
+          phraseMode=prevPhraseMode;
+          const pms=document.getElementById('phrase-mode-sel');
+          if(pms) pms.value=prevPhraseMode;
+        }, interval);
+      }
+      return;
+    }
+    const c=susChords[idx++];
+    moveToChord(c.root, c.type);
+    savedProgTimer=setTimeout(step, interval);
+  }
+  if(susChords.length>1){
+    savedProgTimer=setTimeout(step, interval);
+  }
+}
+
 // SAVEDパネルの開閉
 let savedPanelOpen=false;
 function toggleSavedPanel(){
@@ -4888,8 +4988,15 @@ function renderSavedList(){
   list.innerHTML=progs.map(p=>{
     const chordStr=p.chords.slice(0,6).map(c=>cs(c.root,c.type)).join('→')
       +(p.chords.length>6?'…':'');
+    // Sus変換できるコードが1つ以上あるか判定（SUSボタン表示条件）
+    const susChords=convertToSusProgression(p.chords);
+    const hasSus=susChords.some((c,i)=>c.type!==p.chords[i].type);
+    const susBtn=hasSus
+      ?`<div class="saved-sus" data-id="${p.id}" onclick="playSusProg(${p.id})" title="Sus版で再生">SUS</div>`
+      :'';
     return `<div class="saved-item">
       <div class="saved-play" onclick="playSavedProg(${p.id})" title="${chordStr}">${p.name}</div>
+      ${susBtn}
       <div class="saved-del" onclick="deleteSavedProg(${p.id})" title="削除">✕</div>
     </div>`;
   }).join('');
