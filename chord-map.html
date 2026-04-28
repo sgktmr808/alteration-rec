@@ -150,6 +150,18 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);cursor:pointer;
   background:var(--surf);white-space:nowrap;transition:border-color .15s,color .15s;}
 .ph-midi-btn:hover,.ph-midi-btn:active{border-color:var(--acc);color:var(--acc);}
+/* ── P1: +dim ミニボタン ── */
+.ph-dim-btn{
+  font-family:var(--fm);font-size:7px;padding:1px 4px;flex-shrink:0;
+  border:1px solid rgba(180,100,220,0.35);border-radius:var(--r);
+  color:rgba(180,100,220,0.7);cursor:pointer;background:transparent;
+  white-space:nowrap;transition:border-color .15s,color .15s,background .15s;
+  letter-spacing:.04em;user-select:none;-webkit-user-select:none;
+}
+.ph-dim-btn:hover,.ph-dim-btn:active{
+  border-color:rgba(180,100,220,0.9);color:#c87af0;
+  background:rgba(180,100,220,0.12);
+}
 
 /* SELECTOR */
 .sel-view{flex:1;overflow-y:auto;padding:12px 14px;}
@@ -2426,6 +2438,79 @@ function applyDimPassingBoost(res, root, type){
       });
     }
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// P1: Dimパッシング自動挿入 (§19-6)
+//
+// suggestDimPassing(fromChord, toChord)
+//   → fromとtoの間に挿入できるdim7候補を最大3件返す
+//   理論: S5「dim3等価グループ」準拠
+//         解決先(to)の短9度上(b9)がパッシングdimの基本形
+//         dim7は3半音間隔で同じ機能を持つ等価グループ
+//
+// insertDimPassing(afterIdx, dimRoot)
+//   → S.history[afterIdx]の直後にdim7を挿入してrenderPath
+// ═══════════════════════════════════════════════════════
+
+function suggestDimPassing(fromChord, toChord){
+  // dim系コードはパッシング挿入対象外
+  if(!fromChord||!toChord) return [];
+  if(toChord.type==='dim'||toChord.type==='dim7'||toChord.type==='m7b5') return [];
+
+  const toRi=ni(toChord.root);
+  // 解決先の短9度上(b9 = +1半音) → dim7等価グループの基本形
+  const b9Ri=(toRi+1)%12;
+
+  // dim7の等価グループ: b9, b9+3, b9+6, b9+9 (3半音間隔)
+  // 最もよく使われる順に並べる（解決先への近さ優先）
+  const fromRi=ni(fromChord.root);
+  const candidates=[];
+  for(let k=0;k<4;k++){
+    const cRi=(b9Ri+k*3)%12;
+    const cRoot=NOTES[cRi];
+    // fromからtoへの経路上にある音を優先
+    const dist=Math.min(
+      Math.abs(cRi-fromRi),
+      12-Math.abs(cRi-fromRi)
+    );
+    candidates.push({root:cRoot, type:'dim7', dist});
+  }
+  // 距離近い順でソート（ただし最初の基本形 b9 は常に先頭）
+  candidates.sort((a,b)=>{
+    const aIsB9=(ni(a.root)===b9Ri)?0:1;
+    const bIsB9=(ni(b.root)===b9Ri)?0:1;
+    if(aIsB9!==bIsB9) return aIsB9-bIsB9;
+    return a.dist-b.dist;
+  });
+  // 最大3件返す
+  return candidates.slice(0,3);
+}
+
+function insertDimPassing(afterIdx, dimRoot){
+  // afterIdx の直後に dim7 を挿入
+  const items=S.history.slice(0,S.histIdx+1);
+  if(afterIdx<0||afterIdx>=items.length-1) return; // 末尾には挿入しない（fromとtoが必要）
+
+  const newChord={root:dimRoot, type:'dim7'};
+  // afterIdxの後ろに挿入
+  const newHistory=[
+    ...items.slice(0,afterIdx+1),
+    newChord,
+    ...items.slice(afterIdx+1)
+  ];
+  // S.historyを置き換えてhist位置を挿入後のdimに合わせる
+  S.history=newHistory;
+  S.histIdx=afterIdx+1; // dimコードに移動
+  S.root=dimRoot;
+  S.type='dim7';
+  relCache=null; sncCache=null;
+  invalidate();
+  const hdrEl=document.getElementById('hdr-chord');
+  if(hdrEl) hdrEl.textContent=cs(dimRoot,'dim7');
+  renderPath();
+  renderPosZone&&renderPosZone();
+  playChord(dimRoot,'dim7');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4820,13 +4905,69 @@ function updateSaveBtnVisibility(){
 function renderPath(){
   const bar=document.getElementById('path-bar');const items=S.history.slice(0,S.histIdx+1);
   bar.innerHTML='<span class="ph-lbl">PATH</span>';
+  const inChainMode=(typeof MAP_MODE!=='undefined'&&MAP_MODE==='chain');
   items.forEach((c,i)=>{
-    if(i>0){const a=document.createElement('span');a.className='ph-arr';a.textContent='›';bar.appendChild(a);}
+    if(i>0){
+      // CHAINモード時のみ+dimボタンを表示
+      if(inChainMode&&items[i-1]&&!(c.type==='dim7'||c.type==='dim'||items[i-1].type==='dim7'||items[i-1].type==='dim')){
+        const dimCands=suggestDimPassing(items[i-1],c);
+        if(dimCands.length>0){
+          const dimBtn=document.createElement('span');
+          dimBtn.className='ph-dim-btn';
+          dimBtn.textContent='+dim';
+          dimBtn.title=dimCands.map(d=>cs(d.root,d.type)).join(' / ');
+          // タップ: 最有力候補（b9）を即挿入
+          dimBtn.addEventListener('click',e=>{
+            e.stopPropagation();
+            insertDimPassing(i-1, dimCands[0].root);
+          });
+          // 長押し/右クリック: 3候補からポップアップ選択
+          dimBtn.addEventListener('contextmenu',e=>{
+            e.preventDefault();
+            showDimMenu(dimBtn, i-1, dimCands);
+          });
+          bar.appendChild(dimBtn);
+        }
+      }
+      const a=document.createElement('span');a.className='ph-arr';a.textContent='›';bar.appendChild(a);
+    }
     const n=document.createElement('div');n.className='ph'+(i===S.histIdx?' cur':'');n.textContent=cs(c.root,c.type);
     n.addEventListener('click',()=>{S.histIdx=i;S.root=c.root;S.type=c.type;relCache=null;invalidate();document.getElementById('hdr-chord').textContent=cs(c.root,c.type);renderPath();renderPosZone();playChord(c.root,c.type);});
     bar.appendChild(n);
   });
   bar.scrollLeft=bar.scrollWidth;
+}
+
+// +dimボタン長押し時: 3候補選択メニューを表示
+function showDimMenu(anchor, afterIdx, cands){
+  // 既存メニューを閉じる
+  const old=document.getElementById('dim-menu');if(old)old.remove();
+  const menu=document.createElement('div');menu.id='dim-menu';
+  Object.assign(menu.style,{
+    position:'fixed',zIndex:9999,
+    background:'var(--surf2)',border:'1px solid rgba(180,100,220,0.4)',
+    borderRadius:'6px',padding:'4px',display:'flex',flexDirection:'column',gap:'2px',
+    boxShadow:'0 4px 16px rgba(0,0,0,0.5)',
+  });
+  cands.forEach(cand=>{
+    const btn=document.createElement('div');
+    btn.textContent=cs(cand.root,cand.type);
+    Object.assign(btn.style,{
+      fontFamily:'var(--fm)',fontSize:'11px',padding:'5px 12px',cursor:'pointer',
+      color:'#c87af0',borderRadius:'4px',whiteSpace:'nowrap',
+    });
+    btn.addEventListener('mouseenter',()=>btn.style.background='rgba(180,100,220,0.15)');
+    btn.addEventListener('mouseleave',()=>btn.style.background='');
+    btn.addEventListener('click',()=>{menu.remove();insertDimPassing(afterIdx, cand.root);});
+    menu.appendChild(btn);
+  });
+  // アンカー位置に配置
+  const rect=anchor.getBoundingClientRect();
+  menu.style.left=Math.min(rect.left, window.innerWidth-120)+'px';
+  menu.style.top=(rect.bottom+4)+'px';
+  document.body.appendChild(menu);
+  // 外クリックで閉じる
+  setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),0);
 }
 
 // ═══════════════════════
@@ -6042,7 +6183,7 @@ function setMode(mode){
   else if(mode==='link')linkSelected.clear();
   else if(mode==='graph'){graphInited=false;graphTick=0;initGraph();}
   else if(mode==='wave')waveRings=[];
-  else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';}
+  else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';renderPath();}
   else if(mode==='pivot'){
     // PIVOTオーバーレイを表示・目標キーのデフォルトを現在から1ステップ先に
     const ov=document.getElementById('pivot-overlay');
