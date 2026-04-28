@@ -145,6 +145,13 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .ph{font-family:var(--fm);font-size:10px;padding:2px 7px;border:1px solid var(--bdr2);
   border-radius:var(--r);color:var(--dim);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:border-color .15s,color .15s;}
 .ph.cur{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
+/* Q3: CHAIN再生パルスアニメーション */
+@keyframes phPulse{
+  0%  {transform:scale(1);   box-shadow:0 0 0 0 rgba(232,197,71,0.55);}
+  40% {transform:scale(1.18);box-shadow:0 0 0 6px rgba(232,197,71,0);}
+  100%{transform:scale(1);   box-shadow:0 0 0 0 rgba(232,197,71,0);}
+}
+.ph.pulse{animation:phPulse 0.22s ease-out;}
 .ph-arr{color:var(--dim);font-size:10px;flex-shrink:0;}
 .ph-midi-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;flex-shrink:0;margin-left:auto;
   border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);cursor:pointer;
@@ -816,6 +823,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="ai-result-row">
                 <div class="ai-result" id="ai-result">現在のコードを起点に進行を生成します</div>
                 <div class="ai-play-btn" id="ai-play-btn" onclick="playAiProgression()">▶ PLAY</div>
+                <div class="ai-play-btn" id="ai-save-btn" onclick="saveAiProgression()" style="display:none;background:rgba(232,197,71,0.15);border-color:rgba(232,197,71,0.4);">★ SAVE</div>
               </div>
             </div>
           </div>
@@ -4879,6 +4887,13 @@ function moveToChord(root,type){
   relCache=null; sncCache=null; invalidate();
   document.getElementById('hdr-chord').textContent=cs(root,type);
   renderPath();
+  // Q3: CHAIN再生中（savedProgTimer動作中）はPATHの現在チップにパルスアニメーション
+  if(savedProgTimer){
+    setTimeout(()=>{
+      const cur=document.querySelector('.ph.cur');
+      if(cur){cur.classList.remove('pulse');void cur.offsetWidth;cur.classList.add('pulse');}
+    },30);
+  }
   playChord(root,type);
   triggerPhrase(root,type); // ← フレーズ追従
   // CHAINモード: 進行パターンを検出してラベル更新
@@ -5255,6 +5270,9 @@ Return ONLY the JSON array.`;
     resultEl.className='ai-result ok';
     resultEl.textContent=preview;
     playBtn.classList.add('show');
+    // SAVEボタンを表示
+    const saveBtn=document.getElementById('ai-save-btn');
+    if(saveBtn) saveBtn.style.display='flex';
   } catch(err){
     resultEl.className='ai-result err';
     resultEl.textContent='エラー: '+err.message;
@@ -5262,6 +5280,32 @@ Return ONLY the JSON array.`;
   } finally{
     btn.classList.remove('loading');
     btn.textContent='✦ GENERATE';
+  }
+}
+
+// Q1: AI生成進行をSAVEDリストに保存
+function saveAiProgression(){
+  if(!aiLastChords||!aiLastChords.length) return;
+  const progs=loadSavedProgs();
+  const aiCount=progs.filter(p=>p.label&&p.label.startsWith('AI')).length;
+  const label='AI #'+(aiCount+1);
+  const preview=aiLastChords.map(c=>cs(c.root,c.type)).join(' › ');
+  progs.unshift({
+    id:Date.now(),
+    label,
+    preview,
+    steps:aiLastChords.map(c=>({root:c.root,type:c.type})),
+    bpm:autoBpm,
+  });
+  if(progs.length>20) progs.length=20;
+  saveSavedProgs(progs);
+  renderSavedList();
+  // フィードバック
+  const btn=document.getElementById('ai-save-btn');
+  if(btn){
+    const orig=btn.textContent;
+    btn.textContent='✓ SAVED!';
+    setTimeout(()=>{btn.textContent=orig;},1200);
   }
 }
 
@@ -6827,8 +6871,24 @@ function compassDir(relNode, currentRoot, currentType){
 
 function drawCompassMode(ctx){
   compassHits=[];
-  const W=ctx.canvas.width, H=ctx.canvas.height;
-  const cx=W/2, cy=H/2;
+  const W=L.W, H=L.H;
+  const cx=L.cx, cy=L.cy;
+
+  // ── ヒートマップ: buildRelationsのscoreで色の強度を変える ──
+  const rels=buildRelations(S.root,S.type);
+  const dynRHEX=getRHEX();
+  const maxScore=rels[0]?.score||1;
+  const minScore=rels[rels.length-1]?.score||0;
+  const scoreRange=maxScore-minScore||1;
+  // scoreToHeat: 0〜1 (1=最も親密)
+  function scoreToHeat(score){ return (score-minScore)/scoreRange; }
+  // heatColor: 低=青紫 → 高=黄金
+  function heatColor(heat){
+    const r=Math.round(74 + (232-74)*heat);
+    const g=Math.round(80 + (197-80)*heat);
+    const b=Math.round(200 + (71-200)*heat);
+    return `rgb(${r},${g},${b})`;
+  }
 
   // ── 象限グラデーション背景 ──
   // 北: 黄金→透明（明るい）
@@ -6877,10 +6937,6 @@ function drawCompassMode(ctx){
   ctx.font='bold 10px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillStyle='#e8c547';ctx.fillText(cs(S.root,S.type),cx,cy);
 
-  // ── コードノード配置 ──
-  const rels=buildRelations(S.root,S.type);
-  const dynRHEX=getRHEX();
-
   // 方向ごとにノードを集める
   const buckets={north:[],south:[],east:[],west:[]};
   rels.forEach(n=>{
@@ -6916,16 +6972,26 @@ function drawCompassMode(ctx){
       ny=Math.max(nr+4,Math.min(H-nr-4,ny));
 
       const col=dynRHEX[n.rtype]||'#888';
+      const heat=scoreToHeat(n.score||0);
+      const heatCol=heatColor(heat);
       const isTop=n.opacity>0.82;
       const isCur=(n.root===S.root&&n.type===S.type);
       const drawR=isTop?nr:nr-3;
 
+      // ヒートマップ背景グロー
+      if(heat>0.5){
+        const glowR=drawR+heat*8;
+        const [hr,hg,hb]=parseHex(heatCol.startsWith('rgb')?col:col);
+        ctx.beginPath();ctx.arc(nx,ny,glowR,0,Math.PI*2);
+        ctx.fillStyle=`rgba(232,197,71,${(heat-0.5)*0.18})`;ctx.fill();
+      }
+
       // ノード円
       const [rr,gg,bb]=parseHex(col);
       ctx.beginPath();ctx.arc(nx,ny,drawR,0,Math.PI*2);
-      ctx.fillStyle=`rgba(${rr},${gg},${bb},0.13)`;ctx.fill();
-      ctx.strokeStyle=col;ctx.lineWidth=isTop?1.8:1.2;
-      ctx.globalAlpha=isTop?0.85:0.50;ctx.stroke();ctx.globalAlpha=1;
+      ctx.fillStyle=`rgba(${rr},${gg},${bb},${0.10+heat*0.25})`;ctx.fill();
+      ctx.strokeStyle=isTop?heatCol:col;ctx.lineWidth=isTop?2.0:1.2;
+      ctx.globalAlpha=isTop?0.90:0.55;ctx.stroke();ctx.globalAlpha=1;
 
       // ラベル
       ctx.font=(isTop?'bold ':'')+'8px DM Mono,monospace';
