@@ -5910,13 +5910,13 @@ function drawExpand(ctx){
     }
     node.children.forEach(drawNode);
   };
-  // Update nodeHits for expand mode
+  // Update nodeHits for expand mode（全ノードを登録）
   nodeHits=[];
   const collectHits=(node)=>{
     nodeHits.push({x:node.x,y:node.y,r:node.depth===0?27:15,root:node.root,type:node.type,key:node.key});
     node.children.forEach(collectHits);
   };
-  expandNodes.forEach(n=>{if(n.depth===0)collectHits(n);});
+  expandNodes.forEach(n=>collectHits(n));
   expandTree&&drawNode(expandTree);
 }
 
@@ -7613,9 +7613,9 @@ function drawCompassMode(ctx){
       ctx.globalAlpha=heat.alpha;ctx.stroke();ctx.globalAlpha=1;
 
       // ラベル
-      ctx.font=(isTop?'bold ':'')+'8px DM Mono,monospace';
+      ctx.font=(isTop?'bold ':'')+'11px DM Mono,monospace';
       ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillStyle=col;ctx.globalAlpha=isTop?0.95:0.60;
+      ctx.fillStyle=col;ctx.globalAlpha=isTop?0.95:0.65;
       ctx.fillText(cs(n.root,n.type),nx,ny);
       ctx.globalAlpha=1;
 
