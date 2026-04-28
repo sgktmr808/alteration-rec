@@ -5855,7 +5855,6 @@ function initExpand(){
   expandNodes=[expandTree];invalidate();
 }
 function expandNode(root,type,key){
-  // Find node in tree
   const found=expandNodes.find(n=>n.key===key);
   if(!found)return;
   playChord(root,type);
@@ -5864,14 +5863,16 @@ function expandNode(root,type,key){
     const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n);n.children.forEach(remove);};
     found.children.forEach(remove);found.children=[];
   } else {
-    // Expand: add children around this node
+    // Expand: ツリーにない子のみ追加
     const rels=buildRelations(root,type).slice(0,8);
+    const newRels=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
+    // 展開可能な子が1つもない場合は何もしない
+    if(!newRels.length){ invalidate(); return; }
     const baseAngle=found.parentAngle??0;
     const spread=Math.PI*1.1;
-    rels.forEach((rel,i)=>{
+    newRels.forEach((rel,i)=>{
       const childKey=cs(rel.root,rel.type);
-      if(expandNodes.find(n=>n.key===childKey))return; // already in tree
-      const angle=baseAngle+spread*(i/(rels.length-1||1)-0.5);
+      const angle=baseAngle+spread*(i/(newRels.length-1||1)-0.5);
       const dist=90+found.depth*10;
       const child={root:rel.root,type:rel.type,key:childKey,
         depth:found.depth+1,parent:found,parentAngle:angle,
