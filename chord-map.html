@@ -300,6 +300,19 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   border-color:#4a90d4;color:#4a90d4;
   background:rgba(74,144,212,0.1);
 }
+/* ── P3: AUGMボタン ── */
+#augmod-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#augmod-btn.on{
+  border-color:#ffaa44;color:#ffaa44;
+  background:rgba(255,170,68,0.1);
+}
 #tone-wheel-overlay{
   position:absolute;bottom:12px;left:12px;z-index:10;
   display:none;
@@ -631,6 +644,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="mode-btn" data-mode="pivot">PIVOT</div>
               <div id="modal-map-btn" onclick="toggleModalMap()">MODE</div>
               <div id="twhl-btn" onclick="toggleToneWheel()">TWHL</div>
+              <div id="augmod-btn" onclick="toggleAugMod()">AUGM</div>
             </div>
           </div>
         </div>
@@ -2073,7 +2087,8 @@ function drawFrame(){
     ctx.fillStyle='rgba(74,144,212,0.4)';ctx.fillText('PIVOT S9: TAP TO MOVE',10,10);
   }
   // ── S4 AUGハブ: aug系コードが中央のときRADIALに重ねてオーバーレイ ──
-  if((MAP_MODE==='radial'||MAP_MODE==='pivot')&&isAugChord(S.type)){
+  // P3: RADIALモードでaugModMapModeがONのとき常に描画（転調候補表示）
+  if((MAP_MODE==='radial'||MAP_MODE==='pivot')&&(isAugChord(S.type)||augModMapMode)){
     drawAugOverlay(ctx);
   }
   // ── S7 モーダル・カルトグラフィー: RADIALに重ねてモード隣接ハイライト ──
@@ -2156,6 +2171,11 @@ function initCanvas(){
     }
     const hit=hitNode(x,y);
     if(hit){
+      // P3: AUGMODモード時に転調候補ノードをタップ → moveToChordで転調
+      if(augModMapMode && MAP_MODE==='radial'){
+        const augHit=augModHits.find(h=>{const dx=x-h.x,dy=y-h.y;return dx*dx+dy*dy<=(h.r)*(h.r);});
+        if(augHit){moveToChord(augHit.root,augHit.type);return;}
+      }
       if(MAP_MODE==='radial'){moveToChord(hit.root,hit.type);}
       else if(MAP_MODE==='expand'){expandNode(hit.root,hit.type,hit.key);}
       else if(MAP_MODE==='link'){toggleLinkSelect(hit.root,hit.type);}
@@ -5622,7 +5642,52 @@ function computeAugHub(root){
   return{majors, minors, equivAugs};
 }
 
+// ═══════════════════════════════════════════════════════
+// P3: オーギュメントハブ転調インターフェース (§19-5)
+//
+// 現在コードのV度のaug版を「ハブ」として、
+// そこから派生するmajor×3/minor×3の計6転調先を返す。
+// Coltrane Changes的な3等分転調をサポート。
+//
+// 戻り値: [{root, type, viaAug, targetKey, label}]
+// ═══════════════════════════════════════════════════════
+
+let augModHits=[]; // タップ検出用: [{x,y,r,root,type}]
+
+function suggestAugModulation(root, type){
+  // dim/aug/sus系は対象外
+  if(type==='aug'||type==='dim'||type==='dim7'||type==='m7b5') return [];
+  const ri=ni(root);
+  // V度 = 現在ルートから+7半音
+  const vRi=(ri+7)%12;
+  const vAugRoot=NOTES[vRi];
+  // V度のaugハブから派生する6コードを計算
+  const hub=computeAugHub(vRi);
+  // majors と minors それぞれに転調先キー情報を付加
+  const results=[];
+  hub.majors.forEach(d=>{
+    results.push({
+      root:d.root, type:'major',
+      viaAug:vAugRoot+'aug',
+      targetKey:d.root, // 転調先キー（そのコードのルート）
+      label:'→'+d.root,
+      semitone:d.semitone,
+    });
+  });
+  hub.minors.forEach(d=>{
+    results.push({
+      root:d.root, type:'minor',
+      viaAug:vAugRoot+'aug',
+      targetKey:d.root,
+      label:'→'+d.root+'m',
+      semitone:d.semitone,
+    });
+  });
+  return results;
+}
+
 function drawAugOverlay(ctx){
+  augModHits=[];
   const hub=computeAugHub(S.root);
   const allDerived=[...hub.majors,...hub.minors];
   allDerived.forEach(d=>{
@@ -5657,6 +5722,42 @@ function drawAugOverlay(ctx){
   ctx.fillStyle='#00ff88';ctx.globalAlpha=0.6;
   ctx.fillText('AUG HUB S4', 10, L.H-36);
   ctx.globalAlpha=1;
+
+  // ── P3: 転調候補オーバーレイ（非augコード時に表示）──
+  // V度のaugハブを経由した転調先をオレンジ点線リングで描画
+  if(!isAugChord(S.type)){
+    const modCands=suggestAugModulation(S.root, S.type);
+    if(modCands.length===0) return;
+    const ri=ni(S.root);
+    const vRi=(ri+7)%12;
+    const vAugRoot=NOTES[vRi];
+
+    // ラベル: "via Gaug" を左下に表示
+    ctx.font='bold 7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillStyle='#ffaa44';ctx.globalAlpha=0.65;
+    ctx.fillText('via '+vAugRoot+'aug  P3', 10, L.H-24);
+    ctx.globalAlpha=1;
+
+    modCands.forEach(cand=>{
+      const hit=nodeHits.find(h=>h.root===cand.root&&h.type===cand.type);
+      if(!hit) return;
+
+      // オレンジ点線リング
+      ctx.beginPath();ctx.arc(hit.x,hit.y,hit.r+9,0,Math.PI*2);
+      ctx.strokeStyle='#ffaa44';ctx.lineWidth=1.5;
+      ctx.setLineDash([4,3]);ctx.globalAlpha=0.65;ctx.stroke();
+      ctx.setLineDash([]);ctx.globalAlpha=1;
+
+      // 転調先キーラベル（ノード上）
+      ctx.font='6px DM Mono,monospace';ctx.textAlign='center';
+      ctx.fillStyle='#ffaa44';ctx.globalAlpha=0.90;
+      ctx.fillText(cand.label, hit.x, hit.y-hit.r-10);
+      ctx.globalAlpha=1;
+
+      // タップ検出登録
+      augModHits.push({x:hit.x,y:hit.y,r:hit.r+12,root:cand.root,type:cand.type});
+    });
+  }
 }
 
 function isAugChord(type){
@@ -5822,6 +5923,16 @@ function toggleModalMap(){
   modalMapMode=!modalMapMode;
   const btn=document.getElementById('modal-map-btn');
   if(btn) btn.classList.toggle('on',modalMapMode);
+  invalidate();
+}
+
+// ── P3: AUGMODモードフラグ ──
+// ONにするとRADIALに転調候補オーバーレイを常時表示
+let augModMapMode=false;
+function toggleAugMod(){
+  augModMapMode=!augModMapMode;
+  const btn=document.getElementById('augmod-btn');
+  if(btn) btn.classList.toggle('on',augModMapMode);
   invalidate();
 }
 
