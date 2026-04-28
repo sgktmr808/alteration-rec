@@ -253,6 +253,20 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:rgba(212,74,106,0.1);
 }
 
+/* ── S7 Modal Cartography トグルボタン ── */
+#modal-map-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#modal-map-btn.on{
+  border-color:#9a6ad4;color:#9a6ad4;
+  background:rgba(154,106,212,0.1);
+}
+
 /* ── S9 PIVOT: 目標キー選択オーバーレイ ── */
 #pivot-overlay{
   position:absolute;top:8px;left:8px;z-index:10;
@@ -565,6 +579,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             </div>
             <div class="mode-row">
               <div class="mode-btn" data-mode="pivot">PIVOT</div>
+              <div id="modal-map-btn" onclick="toggleModalMap()">MODE</div>
             </div>
           </div>
         </div>
@@ -2009,6 +2024,10 @@ function drawFrame(){
   // ── S4 AUGハブ: aug系コードが中央のときRADIALに重ねてオーバーレイ ──
   if((MAP_MODE==='radial'||MAP_MODE==='pivot')&&isAugChord(S.type)){
     drawAugOverlay(ctx);
+  }
+  // ── S7 モーダル・カルトグラフィー: RADIALに重ねてモード隣接ハイライト ──
+  if(MAP_MODE==='radial'&&modalMapMode){
+    drawModalOverlay(ctx);
   }
   // ── AUTO PLAY overlay (always on top) ──
   drawAutoOverlay(ctx);
@@ -5335,7 +5354,166 @@ function isAugChord(type){
 }
 
 // ═══════════════════════════════════════════════════════
-// S9: ピボット転調（MAP_MODE='pivot'）
+// S7: モーダル・カルトグラフィー
+// 現在コードが属するモードを判定し、1音差で移行できる
+// 隣接モードをRADIALマップ上にオーバーレイ表示する
+// ═══════════════════════════════════════════════════════
+
+// モードデータ（Callipari §10準拠）
+// scale: コードタイプ → 対応モード名のマッピング
+const MODAL_DATA={
+  'Ionian':   {parent:'Maj',color:'#d44a6a',types:['major','maj7','add9','6','maj9']},
+  'Lydian':   {parent:'Maj',color:'#d44a6a',types:['maj7','maj9']},
+  'LydianDom':{parent:'Me', color:'#4a90d4',types:['7','9','13']},
+  'Mixolydian':{parent:'Maj',color:'#d44a6a',types:['7','9','11','13']},
+  'MixoB13':  {parent:'Me', color:'#4a90d4',types:['7','m7b5']},
+  'PhrygDom': {parent:'Ar', color:'#4aaa72',types:['7b9']},
+  'Aeolian':  {parent:'Maj',color:'#d44a6a',types:['minor','m','m7','m9']},
+  'Phrygian': {parent:'Maj',color:'#d44a6a',types:['m','m7']},
+  'Dorian':   {parent:'Maj',color:'#d44a6a',types:['m','m7','m6']},
+  'DorianB2': {parent:'Me', color:'#4a90d4',types:['m7']},
+  'DorianS4': {parent:'Ar', color:'#4aaa72',types:['m7']},
+  'Melodic':  {parent:'Me', color:'#4a90d4',types:['m','mmaj7','m6']},
+  'Harmonic': {parent:'Ar', color:'#4aaa72',types:['m','mmaj7']},
+};
+
+// 表示名
+const MODAL_DISPLAY={
+  'Ionian':'Ionian','Lydian':'Lydian','LydianDom':'Lydian b7',
+  'Mixolydian':'Mixolydian','MixoB13':'Mixo b13','PhrygDom':'Phrygian Dom',
+  'Aeolian':'Aeolian','Phrygian':'Phrygian','Dorian':'Dorian',
+  'DorianB2':'Dorian b2','DorianS4':'Dorian #4',
+  'Melodic':'Melodic Minor','Harmonic':'Harmonic Minor',
+};
+
+// 1音差接続グラフ（引き継ぎドキュメント §5 + master §10準拠）
+const MODAL_GRAPH_S7={
+  'Ionian':    [{mode:'Lydian',     change:'F→F#', dir:'up'},
+                {mode:'Mixolydian', change:'B→Bb', dir:'down'}],
+  'Lydian':    [{mode:'Ionian',     change:'F#→F', dir:'down'},
+                {mode:'LydianDom',  change:'B→Bb', dir:'down'}],
+  'LydianDom': [{mode:'Mixolydian', change:'F#→F', dir:'down'},
+                {mode:'MixoB13',    change:'A→Ab',  dir:'down'}],
+  'Mixolydian':[{mode:'Ionian',     change:'Bb→B',  dir:'up'},
+                {mode:'LydianDom',  change:'F→F#',  dir:'up'},
+                {mode:'MixoB13',    change:'A→Ab',  dir:'down'}],
+  'MixoB13':  [{mode:'Mixolydian',  change:'Ab→A',  dir:'up'},
+               {mode:'PhrygDom',    change:'D→Db',  dir:'down'}],
+  'PhrygDom': [{mode:'MixoB13',     change:'Db→D',  dir:'up'}],
+  'Aeolian':  [{mode:'Dorian',      change:'Ab→A',  dir:'up'},
+               {mode:'Phrygian',    change:'D→Db',  dir:'down'}],
+  'Phrygian': [{mode:'Aeolian',     change:'Db→D',  dir:'up'}],
+  'Dorian':   [{mode:'Aeolian',     change:'A→Ab',  dir:'down'},
+               {mode:'DorianB2',    change:'D→Db',  dir:'down'},
+               {mode:'DorianS4',    change:'F→F#',  dir:'up'}],
+  'DorianB2': [{mode:'Dorian',      change:'Db→D',  dir:'up'}],
+  'DorianS4': [{mode:'Dorian',      change:'F#→F',  dir:'down'}],
+  'Melodic':  [{mode:'Harmonic',    change:'A→Ab',  dir:'down'}],
+  'Harmonic': [{mode:'Melodic',     change:'Ab→A',  dir:'up'}],
+};
+
+// コードタイプ → モード名を推定（isMinorフラグで大分類）
+function guessMode(type){
+  for(const [mode, data] of Object.entries(MODAL_DATA)){
+    if(data.types.includes(type)) return mode;
+  }
+  // フォールバック
+  const minor=['m','minor','m7','m9','mmaj7','m6','m11'].includes(type);
+  if(minor) return 'Aeolian';
+  if(['dim','dim7','m7b5'].includes(type)) return null;
+  return 'Ionian';
+}
+
+// 現在コードの隣接モード情報を計算して返す
+// 戻り値: [{modeName, display, change, dir, color, chordTypes}]
+function computeModalNeighbors(root, type){
+  const currentMode=guessMode(type);
+  if(!currentMode) return [];
+  const edges=MODAL_GRAPH_S7[currentMode]||[];
+  return edges.map(e=>({
+    fromMode: currentMode,
+    modeName: e.mode,
+    display:  MODAL_DISPLAY[e.mode]||e.mode,
+    change:   e.change,
+    dir:      e.dir,
+    color:    MODAL_DATA[e.mode]?.color||'#9a6ad4',
+    chordTypes: MODAL_DATA[e.mode]?.types||[],
+  }));
+}
+
+// S7オーバーレイ描画
+// RADIALノードのうち隣接モードに属するコードをハイライト
+function drawModalOverlay(ctx){
+  const neighbors=computeModalNeighbors(S.root, S.type);
+  if(!neighbors.length) return;
+
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const cx=W/2, cy=H/2;
+
+  // 現在モード名を中央下に表示
+  const currentMode=guessMode(S.type);
+  if(currentMode){
+    const mData=MODAL_DATA[currentMode];
+    const mColor=mData?.color||'#9a6ad4';
+    ctx.save();
+    ctx.font='bold 7px DM Mono,monospace';
+    ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillStyle=mColor;
+    ctx.globalAlpha=0.75;
+    ctx.fillText('MODE: '+(MODAL_DISPLAY[currentMode]||currentMode), cx, cy+42);
+    ctx.restore();
+  }
+
+  // 隣接モードごとにノードをハイライト
+  neighbors.forEach(nb=>{
+    nodeHits.forEach(hit=>{
+      if(!nb.chordTypes.includes(hit.type)) return;
+      // 現在コードは除外
+      if(hit.root===S.root&&hit.type===S.type) return;
+
+      const {x,y}=hit;
+      ctx.save();
+
+      // 外周パルスリング（モード色）
+      ctx.beginPath();ctx.arc(x,y,20,0,Math.PI*2);
+      ctx.strokeStyle=nb.color;
+      ctx.lineWidth=1.5;
+      ctx.globalAlpha=0.60;
+      ctx.stroke();
+
+      // 方向インジケーター（↑上昇=明るい / ↓下降=暗い）
+      const arrow=nb.dir==='up'?'↑':'↓';
+      ctx.font='bold 8px DM Mono,monospace';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=nb.color;
+      ctx.globalAlpha=0.85;
+      ctx.fillText(arrow, x, y-24);
+
+      // 変化音ラベル
+      ctx.font='5.5px DM Mono,monospace';
+      ctx.textBaseline='top';
+      ctx.globalAlpha=0.70;
+      ctx.fillText(nb.change, x, y+21);
+
+      // モード名（ノードの少し外側）
+      ctx.font='5px DM Mono,monospace';
+      ctx.fillStyle=nb.color;
+      ctx.globalAlpha=0.55;
+      ctx.fillText(nb.display, x, y+29);
+
+      ctx.restore();
+    });
+  });
+}
+
+// MODALモードフラグ
+let modalMapMode=false;
+function toggleModalMap(){
+  modalMapMode=!modalMapMode;
+  const btn=document.getElementById('modal-map-btn');
+  if(btn) btn.classList.toggle('on',modalMapMode);
+  invalidate();
+}
 // Callipari S9準拠: 5度圏BFSで最短転調経路を求めアニメーション表示
 // ═══════════════════════════════════════════════════════
 
