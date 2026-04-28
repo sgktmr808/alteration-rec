@@ -5536,24 +5536,33 @@ function initAiPanelUI(){
 // ── 進行タイプ別生成ロジック ──
 function buildLocalProgression(root, type, progType, len){
   const rels=buildRelations(root,type);
-  const diat=rels.filter(r=>r.rtype==='diatonic');
-  const fifths=rels.filter(r=>r.rtype==='5th');
-  const modal=rels.filter(r=>r.rtype==='modal');
-  const subst=rels.filter(r=>r.rtype==='subst');
 
   // コードオブジェクト生成ヘルパー
   const chord=(r,t)=>({root:r,type:t});
-  const pick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
+  const pick=(arr)=>arr.length?arr[Math.floor(Math.random()*arr.length)]:null;
   const start=chord(root,type);
+
+  // relから度数を計算するヘルパー（半音数）
+  const semitones=(r)=>((ni(r.root)-ni(root))+12)%12;
+
+  // 全relから各度数を探す
+  const findBySemitone=(st)=>rels.find(r=>semitones(r)===st);
+  const findByRtype=(rt)=>rels.filter(r=>r.rtype===rt);
+
+  const diat=findByRtype('diatonic');
+  const fifths=findByRtype('5th');
+  const modal=findByRtype('modal');
 
   // ── II-V-I ──
   if(progType==='251'){
-    // buildRelationsからIIm・V7・Iを探す
-    const five=fifths[0]||diat[0];
-    const two=diat.find(r=>r.type==='m7'||r.type==='minor')||diat[1];
-    const one=start;
-    const base=[two,five,one].filter(Boolean).map(r=>chord(r.root,r.type));
-    // lenに合わせて繰り返し・拡張
+    // V = 完全5度上（7半音）、II = 長2度上（2半音）
+    const five=findBySemitone(7)||fifths[0];
+    const two =findBySemitone(2)||diat.find(r=>r.type==='m7'||r.type==='minor');
+    if(!five||!two){
+      // 見つからない場合はfreeにフォールバック
+      return buildLocalProgression(root,type,'free',len);
+    }
+    const base=[chord(two.root,two.type), chord(five.root,five.type), start];
     const prog=[];
     while(prog.length<len) prog.push(...base);
     return prog.slice(0,len);
@@ -5561,10 +5570,13 @@ function buildLocalProgression(root, type, progType, len){
 
   // ── I-VI-II-V ──
   if(progType==='1625'){
-    const six=diat.find(r=>r.type==='minor'||r.type==='m7')||diat[0];
-    const two=diat.find(r=>r.type==='m7')||diat[1];
-    const five=fifths[0]||diat[2];
-    const base=[start,six,two,five].filter(Boolean).map(r=>r===start?start:chord(r.root,r.type));
+    const six =findBySemitone(9)||diat.find(r=>r.type==='minor'||r.type==='m7');
+    const two =findBySemitone(2)||diat.find(r=>r.type==='m7'||r.type==='minor');
+    const five=findBySemitone(7)||fifths[0];
+    if(!six||!two||!five){
+      return buildLocalProgression(root,type,'free',len);
+    }
+    const base=[start, chord(six.root,six.type), chord(two.root,two.type), chord(five.root,five.type)];
     const prog=[];
     while(prog.length<len) prog.push(...base);
     return prog.slice(0,len);
@@ -5572,51 +5584,51 @@ function buildLocalProgression(root, type, progType, len){
 
   // ── BLUES ──
   if(progType==='blues'){
-    // 12小節ブルース: I I I I IV IV I I V IV I V
-    const four=diat.find(r=>{
-      const iv=((ni(r.root)-ni(root))+12)%12;
-      return iv===5;
-    })||diat[0];
-    const five=fifths[0]||diat[1];
-    const I=start;
-    const IV=four?chord(four.root,four.type||'dom7'):start;
-    const V=five?chord(five.root,five.type||'dom7'):start;
+    const four=findBySemitone(5)||diat[0];
+    const five=findBySemitone(7)||fifths[0];
+    if(!four||!five){
+      return buildLocalProgression(root,type,'free',len);
+    }
+    // dom7に変換（ブルースらしさのため）
+    const I =chord(root, type.includes('m')&&!type.includes('maj')?type:'dom7');
+    const IV=chord(four.root,'dom7');
+    const V =chord(five.root,'dom7');
     const blues12=[I,I,I,I,IV,IV,I,I,V,IV,I,V];
-    // lenに合わせてスライス
     return blues12.slice(0,len);
   }
 
   // ── MODAL ──
   if(progType==='modal'){
-    // モーダル隣接コードを中心に、同一モードの中でゆっくり動く
-    const pool=[start,...modal.slice(0,3),...diat.slice(0,3)].filter(Boolean);
+    const pool=[start,...modal.slice(0,4),...diat.slice(0,3)]
+      .filter(r=>r)
+      .map(r=>r===start?start:chord(r.root,r.type));
+    if(pool.length<2) return buildLocalProgression(root,type,'free',len);
     const prog=[start];
     while(prog.length<len){
-      // 直前と異なるコードをpoolから選ぶ
       const last=prog[prog.length-1];
       const candidates=pool.filter(r=>!(r.root===last.root&&r.type===last.type));
-      const next=pick(candidates)||pool[0];
-      prog.push(next===start?start:chord(next.root,next.type));
+      const next=pick(candidates);
+      if(next) prog.push(next);
+      else prog.push(pool[0]);
     }
     return prog.slice(0,len);
   }
 
   // ── FREE ──
-  // buildRelationsのスコア上位からランダムに選択
   if(progType==='free'){
-    const pool=[start,...rels.slice(0,10)].filter(Boolean);
+    // buildRelationsスコア上位10件からランダムに選択
+    const pool=[start,...rels.slice(0,10).map(r=>chord(r.root,r.type))];
     const prog=[start];
     while(prog.length<len){
       const last=prog[prog.length-1];
-      // 直前と異なる上位候補から選ぶ（重み付き）
       const candidates=pool.filter(r=>!(r.root===last.root&&r.type===last.type));
-      const next=pick(candidates)||pool[0];
-      prog.push(next===start?start:chord(next.root,next.type));
+      const next=pick(candidates);
+      if(next) prog.push(next);
+      else prog.push(pool[Math.floor(Math.random()*pool.length)]);
     }
     return prog.slice(0,len);
   }
 
-  // フォールバック: 現在コードをlen回
   return Array(len).fill(start);
 }
 
