@@ -5216,7 +5216,7 @@ function drawGroovePulse(ctx){
   ctx.globalAlpha=1;
 }
 
-
+function drawAutoOverlay(ctx){
   if(!autoPlay&&autoFlash<=0.01)return;
   // Phase animation per frame
   autoPhase=Math.min(autoPhase+autoPhaseDelta,1);
@@ -6902,9 +6902,7 @@ function drawModalOverlay(ctx){
   ctx.fillStyle='#ffffff';ctx.globalAlpha=0.35;
   ctx.fillText(`S7:${s7OnlyCount} S6:${s6OnlyCount} BOTH:${bothCount} IC:${icCount}`, 10, H-10);
   ctx.restore();
-}
 
-// MODALモードフラグ
   nodeHits.forEach(hit=>{
     if(hit.root===S.root&&hit.type===S.type) return;
     const k=hit.root+'__'+hit.type;
@@ -8577,19 +8575,6 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
   icRec?.addEventListener('click',()=>{
     if(icRecLongFired){icRecLongFired=false;return;} // 長押し後はclickを無視
     toggleMidiRec();
-    setTimeout(()=>{
-      if(midiRec){
-        icRec.classList.add('on');
-        if(icRecSym) icRecSym.textContent='■';
-        if(icRecSub) icRecSub.textContent='rec…';
-      } else {
-        icRec.classList.remove('on');
-        if(icRecSym) icRecSym.textContent='●';
-        const n=midiEvs.filter(e=>e.type==='on').length;
-        if(icRecSub) icRecSub.textContent=n?`${n} notes`:'MIDI off';
-      }
-    },0);
-  });
     setTimeout(()=>{
       if(midiRec){
         icRec.classList.add('on');
