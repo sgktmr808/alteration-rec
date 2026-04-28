@@ -804,46 +804,36 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <!-- PATH -->
         <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
 
-        <!-- AI 進行提案 (P5) -->
+        <!-- PROGRESSION (旧AI SUGGEST) -->
         <div class="ai-zone" id="ai-zone">
           <div class="ai-hdr" onclick="toggleAiPanel()">
-            <span class="ai-hdr-l">✦ AI SUGGEST <span class="ai-hdr-badge">BETA</span></span>
+            <span class="ai-hdr-l">♩ PROGRESSION</span>
             <span class="ai-tog" id="ai-tog">▼</span>
           </div>
           <div class="ai-wrap" id="ai-wrap">
             <div class="ai-inner">
-              <!-- ムードスライダー -->
-              <div class="ai-mood-row">
-                <span class="ai-mood-lbl">MOOD</span>
-                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
-                  <div class="ai-mood-track" id="ai-mood-track">
-                    <div class="ai-mood-thumb" id="ai-mood-thumb"></div>
-                  </div>
-                  <div class="ai-mood-labels"><span>Dark</span><span>Neutral</span><span>Bright</span></div>
-                </div>
-              </div>
-              <!-- スタイル選択 -->
+              <!-- 進行タイプ -->
               <div class="ai-style-row">
-                <span class="ai-style-lbl">STYLE</span>
+                <span class="ai-style-lbl">TYPE</span>
                 <div id="ai-style-pills" style="display:flex;flex-wrap:wrap;gap:4px;">
-                  <div class="ai-style-pill on" data-style="pop">Pop</div>
-                  <div class="ai-style-pill" data-style="jazz">Jazz</div>
-                  <div class="ai-style-pill" data-style="bossa">Bossa</div>
-                  <div class="ai-style-pill" data-style="blues">Blues</div>
-                  <div class="ai-style-pill" data-style="modal">Modal</div>
+                  <div class="ai-style-pill on" data-style="251">II-V-I</div>
+                  <div class="ai-style-pill" data-style="1625">I-VI-II-V</div>
+                  <div class="ai-style-pill" data-style="blues">BLUES</div>
+                  <div class="ai-style-pill" data-style="modal">MODAL</div>
+                  <div class="ai-style-pill" data-style="free">FREE</div>
                 </div>
               </div>
               <!-- 長さ選択 -->
               <div class="ai-len-row">
                 <span class="ai-len-lbl">BARS</span>
                 <div id="ai-len-pills" style="display:flex;gap:4px;">
-                  <div class="ai-len-pill" data-len="4">4</div>
-                  <div class="ai-len-pill on" data-len="6">6</div>
+                  <div class="ai-len-pill on" data-len="4">4</div>
+                  <div class="ai-len-pill" data-len="6">6</div>
                   <div class="ai-len-pill" data-len="8">8</div>
                 </div>
               </div>
               <!-- 生成ボタン -->
-              <div class="ai-gen-btn" id="ai-gen-btn" onclick="generateProgression()">✦ GENERATE</div>
+              <div class="ai-gen-btn" id="ai-gen-btn" onclick="generateProgression()">→ BUILD</div>
               <!-- 結果表示 -->
               <div class="ai-result-row">
                 <div class="ai-result" id="ai-result">現在のコードを起点に進行を生成します</div>
@@ -5507,20 +5497,16 @@ function playSusProg(id){
 
 // ═══════════════════════════════════════════════════════
 // P5: AI進行提案エンジン (§20-5)
-// Anthropic API (claude-sonnet-4-20250514) を呼び出し
-// 現在コード・ムード・スタイルを入力として
-// 4〜8小節のコード進行をJSON形式で生成する。
+// ═══════════════════════════════════════════════════════
+// PROGRESSION — ローカル進行生成エンジン（API不使用）
+// buildRelations・バルトーク軸・ピボット転調データを活用
 // ═══════════════════════════════════════════════════════
 
-// AI状態
 let aiPanelOpen=false;
-let aiMood=0.5;         // 0.0=Dark 〜 1.0=Bright
-let aiStyle='pop';
-let aiLen=6;
-let aiLastChords=null;  // 最後に生成されたコード配列
-let aiGenTimer=null;
+let aiStyle='251';   // 進行タイプ
+let aiLen=4;
+let aiLastChords=null;
 
-// パネル開閉
 function toggleAiPanel(){
   aiPanelOpen=!aiPanelOpen;
   const wrap=document.getElementById('ai-wrap');
@@ -5530,9 +5516,7 @@ function toggleAiPanel(){
   if(aiPanelOpen) initAiPanelUI();
 }
 
-// UI初期化（スライダー・ピル）
 function initAiPanelUI(){
-  // スタイルピル
   document.querySelectorAll('.ai-style-pill').forEach(p=>{
     p.classList.toggle('on', p.dataset.style===aiStyle);
     p.onclick=()=>{
@@ -5540,7 +5524,6 @@ function initAiPanelUI(){
       document.querySelectorAll('.ai-style-pill').forEach(q=>q.classList.toggle('on',q===p));
     };
   });
-  // 長さピル
   document.querySelectorAll('.ai-len-pill').forEach(p=>{
     p.classList.toggle('on', parseInt(p.dataset.len)===aiLen);
     p.onclick=()=>{
@@ -5548,125 +5531,132 @@ function initAiPanelUI(){
       document.querySelectorAll('.ai-len-pill').forEach(q=>q.classList.toggle('on',q===p));
     };
   });
-  // ムードスライダー（ポインターイベント）
-  initMoodSlider();
 }
 
-function initMoodSlider(){
-  const track=document.getElementById('ai-mood-track');
-  const thumb=document.getElementById('ai-mood-thumb');
-  if(!track||!thumb) return;
-  // サムの位置を現在のaiMood値に同期
-  thumb.style.left=(aiMood*100)+'%';
-  let dragging=false;
-  const setMood=e=>{
-    const rect=track.getBoundingClientRect();
-    const x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-    aiMood=x;
-    thumb.style.left=(x*100)+'%';
-  };
-  track.onpointerdown=e=>{dragging=true;track.setPointerCapture(e.pointerId);setMood(e);};
-  track.onpointermove=e=>{if(dragging)setMood(e);};
-  track.onpointerup=()=>{dragging=false;};
+// ── 進行タイプ別生成ロジック ──
+function buildLocalProgression(root, type, progType, len){
+  const rels=buildRelations(root,type);
+  const diat=rels.filter(r=>r.rtype==='diatonic');
+  const fifths=rels.filter(r=>r.rtype==='5th');
+  const modal=rels.filter(r=>r.rtype==='modal');
+  const subst=rels.filter(r=>r.rtype==='subst');
+
+  // コードオブジェクト生成ヘルパー
+  const chord=(r,t)=>({root:r,type:t});
+  const pick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
+  const start=chord(root,type);
+
+  // ── II-V-I ──
+  if(progType==='251'){
+    // buildRelationsからIIm・V7・Iを探す
+    const five=fifths[0]||diat[0];
+    const two=diat.find(r=>r.type==='m7'||r.type==='minor')||diat[1];
+    const one=start;
+    const base=[two,five,one].filter(Boolean).map(r=>chord(r.root,r.type));
+    // lenに合わせて繰り返し・拡張
+    const prog=[];
+    while(prog.length<len) prog.push(...base);
+    return prog.slice(0,len);
+  }
+
+  // ── I-VI-II-V ──
+  if(progType==='1625'){
+    const six=diat.find(r=>r.type==='minor'||r.type==='m7')||diat[0];
+    const two=diat.find(r=>r.type==='m7')||diat[1];
+    const five=fifths[0]||diat[2];
+    const base=[start,six,two,five].filter(Boolean).map(r=>r===start?start:chord(r.root,r.type));
+    const prog=[];
+    while(prog.length<len) prog.push(...base);
+    return prog.slice(0,len);
+  }
+
+  // ── BLUES ──
+  if(progType==='blues'){
+    // 12小節ブルース: I I I I IV IV I I V IV I V
+    const four=diat.find(r=>{
+      const iv=((ni(r.root)-ni(root))+12)%12;
+      return iv===5;
+    })||diat[0];
+    const five=fifths[0]||diat[1];
+    const I=start;
+    const IV=four?chord(four.root,four.type||'dom7'):start;
+    const V=five?chord(five.root,five.type||'dom7'):start;
+    const blues12=[I,I,I,I,IV,IV,I,I,V,IV,I,V];
+    // lenに合わせてスライス
+    return blues12.slice(0,len);
+  }
+
+  // ── MODAL ──
+  if(progType==='modal'){
+    // モーダル隣接コードを中心に、同一モードの中でゆっくり動く
+    const pool=[start,...modal.slice(0,3),...diat.slice(0,3)].filter(Boolean);
+    const prog=[start];
+    while(prog.length<len){
+      // 直前と異なるコードをpoolから選ぶ
+      const last=prog[prog.length-1];
+      const candidates=pool.filter(r=>!(r.root===last.root&&r.type===last.type));
+      const next=pick(candidates)||pool[0];
+      prog.push(next===start?start:chord(next.root,next.type));
+    }
+    return prog.slice(0,len);
+  }
+
+  // ── FREE ──
+  // buildRelationsのスコア上位からランダムに選択
+  if(progType==='free'){
+    const pool=[start,...rels.slice(0,10)].filter(Boolean);
+    const prog=[start];
+    while(prog.length<len){
+      const last=prog[prog.length-1];
+      // 直前と異なる上位候補から選ぶ（重み付き）
+      const candidates=pool.filter(r=>!(r.root===last.root&&r.type===last.type));
+      const next=pick(candidates)||pool[0];
+      prog.push(next===start?start:chord(next.root,next.type));
+    }
+    return prog.slice(0,len);
+  }
+
+  // フォールバック: 現在コードをlen回
+  return Array(len).fill(start);
 }
 
-// ムード値 → テキスト
-function moodLabel(v){
-  if(v<0.25) return 'dark and tense';
-  if(v<0.45) return 'slightly melancholic';
-  if(v<0.55) return 'neutral';
-  if(v<0.75) return 'hopeful and warm';
-  return 'bright and uplifting';
-}
-
-// API呼び出し本体
-async function generateProgression(){
+function generateProgression(){
   const btn=document.getElementById('ai-gen-btn');
   const resultEl=document.getElementById('ai-result');
   const playBtn=document.getElementById('ai-play-btn');
+  const saveBtn=document.getElementById('ai-save-btn');
   if(!btn||!resultEl) return;
 
   btn.classList.add('loading');
-  btn.textContent='✦ GENERATING...';
+  btn.textContent='→ BUILDING...';
   resultEl.className='ai-result';
   resultEl.textContent='生成中...';
   playBtn.classList.remove('show');
+  if(saveBtn) saveBtn.classList.remove('show');
   aiLastChords=null;
 
-  // 現在コードのbuildRelations結果（上位8件）をコンテキストとして埋め込む
-  const rels=buildRelations(S.root,S.type).slice(0,8)
-    .map(r=>`${cs(r.root,r.type)}(${r.rtype})`).join(', ');
-  const currentMode=guessMode(S.type)||'unknown';
-  const modalNeighbors=computeModalNeighbors(S.root,S.type)
-    .map(n=>`${n.display}(via ${n.change})`).join(', ')||'none';
+  // 少し遅延してUIをフラッシュさせてから生成（体感的な応答感）
+  setTimeout(()=>{
+    try{
+      const chords=buildLocalProgression(S.root,S.type,aiStyle,aiLen);
+      if(!chords||!chords.length) throw new Error('生成失敗');
 
-  // 有効なコードタイプ一覧（CTキー）
-  const validTypes=Object.keys(CT).filter(k=>CT[k]?.iv).join(',');
-  const validRoots=NOTES.join(',');
-
-  const systemPrompt=`You are a music theory assistant that generates chord progressions as JSON.
-Respond ONLY with a valid JSON array, no explanation, no markdown, no backticks.
-Format: [{"root":"C","type":"major"},{"root":"G","type":"dom7"},...]
-Valid roots: ${validRoots}
-Valid types: ${validTypes}`;
-
-  const userPrompt=`Generate a ${aiLen}-chord ${aiStyle} progression.
-Starting chord: ${cs(S.root,S.type)} (mode: ${currentMode})
-Mood: ${moodLabel(aiMood)}
-Related chords: ${rels}
-Modal neighbors: ${modalNeighbors}
-Rules:
-- Start with or near ${cs(S.root,S.type)}
-- Use exactly ${aiLen} chords
-- Match the ${moodLabel(aiMood)} mood
-- Fit ${aiStyle} style
-- Use only the valid roots and types listed
-Return ONLY the JSON array.`;
-
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:400,
-        system:systemPrompt,
-        messages:[{role:'user',content:userPrompt}],
-      }),
-    });
-    const data=await resp.json();
-    const raw=(data.content||[]).map(b=>b.text||'').join('').trim();
-    // JSON配列を抽出（```や余分テキストへの防御）
-    const jsonStr=raw.replace(/```[a-z]*/gi,'').replace(/```/g,'').trim();
-    const parsed=JSON.parse(jsonStr);
-    if(!Array.isArray(parsed)||!parsed.length) throw new Error('空の配列');
-
-    // バリデーション: root・typeが有効か確認
-    const validTypeSet=new Set(Object.keys(CT).filter(k=>CT[k]?.iv));
-    const validRootSet=new Set(NOTES);
-    const validated=parsed.filter(c=>
-      validRootSet.has(c.root)&&validTypeSet.has(c.type)
-    );
-    if(!validated.length) throw new Error('有効なコードなし');
-
-    aiLastChords=validated;
-    const preview=validated.map(c=>cs(c.root,c.type)).join(' → ');
-    resultEl.className='ai-result ok';
-    resultEl.textContent=preview;
-    playBtn.classList.add('show');
-    const saveBtn=document.getElementById('ai-save-btn');
-    if(saveBtn) saveBtn.classList.add('show');
-  } catch(err){
-    resultEl.className='ai-result err';
-    resultEl.textContent='エラー: '+err.message;
-    console.error('AI generation error:',err);
-    const saveBtn=document.getElementById('ai-save-btn');
-    if(saveBtn) saveBtn.classList.remove('show');
-  } finally{
-    btn.classList.remove('loading');
-    btn.textContent='✦ GENERATE';
-  }
+      aiLastChords=chords;
+      const preview=chords.map(c=>cs(c.root,c.type)).join(' › ');
+      resultEl.className='ai-result ok';
+      resultEl.textContent=preview;
+      playBtn.classList.add('show');
+      if(saveBtn) saveBtn.classList.add('show');
+    } catch(err){
+      resultEl.className='ai-result err';
+      resultEl.textContent='エラー: '+err.message;
+    } finally{
+      btn.classList.remove('loading');
+      btn.textContent='→ BUILD';
+    }
+  }, 120);
 }
+
 
 // 生成された進行を再生（playSavedProgと同じパイプライン）
 function playAiProgression(){
