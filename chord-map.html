@@ -3360,8 +3360,14 @@ function nearestNote(from,candidates){
 // tension: テンション使用度 0.0〜1.0
 const CATCHY_HOOKS={
   pop:{
-    motifs:[[0,2,4,2],[0,4,2,0,2],[0,2,0,-2,0],[4,5,4,2,0]], // 順次進行中心
-    contour:'arch', tension:0.1, landOn:'chord',
+    // 80年代バラード質感: 跳躍→順次下行・ペンタ骨格・解決感のある着地
+    motifs:[
+      [0,7,5,4,2],       // 5度跳躍から順次下行（Heaven感）
+      [0,4,5,9,7,5],     // 3度→6度上昇→解決（Time After Time感）
+      [5,4,2,0,-2,0],    // 山型・ため息ライン
+      [0,2,5,4,2,0,2],   // 繰り返しモチーフ付き山型
+    ],
+    contour:'arch', tension:0.12, landOn:'chord',
     rhythmFeel:'straight', accentBeats:[0,2],
   },
   blues:{
@@ -3405,11 +3411,102 @@ const CATCHY_HOOKS={
     rhythmFeel:'straight', accentBeats:[0,2],
   },
   default:{
-    motifs:[[0,2,4,2,0],[0,4,2,0],[0,2,0,-2],[2,4,5,4,2,0]],
-    contour:'arch', tension:0.2, landOn:'chord',
+    // コードトーン骨格＋口ずさめる輪郭・程よい跳躍と解決
+    motifs:[
+      [0,4,7,5,4,2],     // ルート→3度→5度→下行解決（安定感）
+      [7,5,4,2,0,2,4],   // 5度から下行→折り返し（呼吸感）
+      [0,2,4,7,5,2],     // 緩やかな上昇→着地
+      [4,5,7,5,4,0],     // 3度→山→ルート帰還
+    ],
+    contour:'arch', tension:0.15, landOn:'chord',
     rhythmFeel:'straight', accentBeats:[0,2],
   },
 };
+
+// ═══════════════════════════════════════════════════════
+// EMOTION PHRASE PARAMS — SLスライダー → フレーズパラメータ変換
+// タップ瞬間にスナップショットして使用（playMelodyPhrase等の先頭で呼ぶ）
+// ═══════════════════════════════════════════════════════
+function getEmotionPhraseParams(){
+  // SLスライダーが全て0に近い場合はnullを返しデフォルト動作を維持
+  if(!moodOn()) return null;
+
+  const bright  = sv('bright');   // -1(Dark)  〜 +1(Bright)
+  const tense   = sv('tense');    // -1(Calm)   〜 +1(Tense)
+  const warm    = sv('warm');     // -1(Cold)   〜 +1(Warm)
+  const complex = sv('complex');  // -1(Simple) 〜 +1(Complex)
+  const moving  = sv('moving');   // -1(Static) 〜 +1(Moving)
+  const strange = sv('strange');  // -1(Familiar)〜 +1(Strange)
+
+  // ── コンター（フレーズ輪郭）──
+  // moving+ → 上昇, bright+ → arch, moving- → wave, bright- → 下降
+  let contour;
+  if(moving > 0.3)       contour = 'ascend';
+  else if(moving < -0.3) contour = 'wave';
+  else if(bright < -0.3) contour = 'descend';
+  else                   contour = 'arch';
+
+  // ── モチーフ選択 ──
+  // strange+ → 大きな跳躍モチーフ, bright+ → 高音域モチーフ
+  // warm+ → 中域穏やかモチーフ, 組み合わせで決定
+  let motifs;
+  if(strange > 0.4){
+    motifs = [[0,7,2,5,3],[0,-5,2,-3,0],[5,0,7,-2,4],[0,3,-2,7,4,2]];
+  } else if(bright > 0.4){
+    motifs = [[0,7,9,7,5,4],[4,7,9,12,9,7],[0,5,9,7,5,4,2],[7,9,7,5,4,2,0]];
+  } else if(warm > 0.4){
+    motifs = [[0,4,7,5,4,2],[4,5,4,2,0,2],[0,4,5,4,0,2,4],[2,4,5,4,2,0]];
+  } else if(bright < -0.4){
+    motifs = [[0,-2,-3,-2,0],[-2,-3,-5,-3,-2],[-2,0,-2,-3,-5,-3],[-5,-3,-2,0,-2,-3]];
+  } else {
+    motifs = null; // デフォルトhookのモチーフをそのまま使う
+  }
+
+  // ── テンション強度 ──
+  // tense+ → テンション積極使用, tense- → コードトーン安定重視
+  // strange+ でさらに上乗せ
+  const tensionBase = 0.15 + tense * 0.28 + Math.max(0, strange) * 0.15;
+  const tension = Math.max(0.02, Math.min(0.7, tensionBase));
+
+  // ── 音域シフト（MIDI クランプ値） ──
+  // bright+ → 高音域, bright- → 低音域
+  // warm+ → 中域収束（分散を下げる）
+  const brightShift = Math.round(bright * 6);  // -6〜+6半音
+  const warmShrink  = Math.max(0, warm) * 4;   // 高音側を下げて中域に収束
+  const noteMin = Math.round(48 + brightShift - Math.max(0,-bright)*4);
+  const noteMax = Math.round(84 + brightShift - warmShrink);
+  const clampMin = Math.max(40, Math.min(noteMin, 68));
+  const clampMax = Math.max(clampMin+12, Math.min(noteMax, 92));
+
+  // ── コードトーン引力（複雑さの逆数） ──
+  // complex- → コードトーンにより強く吸着（シンプル）
+  // complex+ → 非コードトーンを許容（複雑）
+  // strangeが強い場合さらに解放
+  const chordPull_easy      = Math.max(0.1, 0.55 - complex*0.25 - Math.max(0,strange)*0.1);
+  const chordPull_difficult = Math.max(0.05, 0.22 - complex*0.12 - Math.max(0,strange)*0.08);
+
+  // ── 休符確率 ──
+  // warm+ / moving- → 休符増（呼吸感）, moving+ → 密度UP（休符減）
+  const restBonus = warm*0.04 - moving*0.03;
+
+  // ── accentBeats ──
+  // moving+ → シンコペ気味（奇数拍）, それ以外 → 偶数拍
+  const accentBeats = (moving > 0.4) ? [1,3] : [0,2];
+
+  // ── landOn ──
+  // bright+/warm+ → コードトーン着地, strange+ → ランダム寄り
+  const landOn = (strange > 0.5) ? 'chord' : 'chord';
+
+  return {
+    contour, tension, accentBeats, landOn,
+    motifs,              // nullの場合は呼び出し側でhookのモチーフを保持
+    clampMin, clampMax,
+    chordPull_easy, chordPull_difficult,
+    restBonus,
+    brightShift,
+  };
+}
+
 
 // SECTORSプリセット → キャッチーフック
 const PRESET_HOOK_MAP={
@@ -3927,6 +4024,9 @@ function playMelodyPhrase(root, type, durationMs){
   const beatMs=60000/autoBpm;
   const p=TIMBRE_PROPS[phraseTIMBRE]||TIMBRE_PROPS.crystal;
 
+  // ── タップ瞬間の感情パラメータをスナップショット ──
+  const ep=getEmotionPhraseParams(); // null = スライダー中立
+
   // リズムパターン決定
   const rhythmDurs=pickRhythm(cx,preset);
   const totalBeats=durationMs/beatMs;
@@ -3944,6 +4044,27 @@ function playMelodyPhrase(root, type, durationMs){
   const phraseStartTime=t;
   phraseEndTime=phraseStartTime+durationMs/1000;
   const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
+
+  // ── epによるhookオーバーライド（感情空間の投影）──
+  const eHook = ep ? {
+    motifs:     ep.motifs || hook.motifs,
+    contour:    ep.contour,
+    tension:    ep.tension,
+    accentBeats:ep.accentBeats,
+    landOn:     ep.landOn,
+    rhythmFeel: hook.rhythmFeel,
+  } : hook;
+
+  // 音域クランプ（epがあれば感情軸でシフト、なければデフォルト）
+  const noteClampMin = ep ? ep.clampMin : 48;
+  const noteClampMax = ep ? ep.clampMax : 84;
+
+  // コードトーン引力
+  const pullEasy      = ep ? ep.chordPull_easy      : 0.50;
+  const pullDifficult = ep ? ep.chordPull_difficult  : 0.22;
+
+  // 休符確率ボーナス
+  const restBonus = ep ? ep.restBonus : 0;
 
   // フレーズ開始時にエントリーノートをリセット
   phraseEntry=null;
@@ -3986,8 +4107,8 @@ function playMelodyPhrase(root, type, durationMs){
 
     let midi;
     const startNote=phraseEntry?phraseEntry.resolveNote:nearestChordTone(phraseLastNote, chordTones);
-    const motifIdx=phraseChordHistory.length%hook.motifs.length;
-    const motif=hook.motifs[motifIdx];
+    const motifIdx=phraseChordHistory.length%eHook.motifs.length;
+    const motif=eHook.motifs[motifIdx];
 
     if(frac<boundary.ki){
       // 起: 第一声設計
@@ -4002,7 +4123,7 @@ function playMelodyPhrase(root, type, durationMs){
         // 起フェーズ残り: モチーフ提示
         const mi=(i-1)%motif.length;
         const candidate=startNote+motif[mi];
-        const isAccent=hook.accentBeats.includes(i%4);
+        const isAccent=eHook.accentBeats.includes(i%4);
         midi=isAccent
           ?nearestChordTone(snapToScale(candidate,scaleTones),chordTones)
           :snapToScale(candidate,scaleTones);
@@ -4011,26 +4132,26 @@ function playMelodyPhrase(root, type, durationMs){
     } else if(frac<boundary.sho){
       // 承: モチーフ展開+アーク
       const subFrac=(frac-boundary.ki)/(boundary.sho-boundary.ki);
-      const arcNote=arcTarget(subFrac,hook.contour,startNote);
+      const arcNote=arcTarget(subFrac,eHook.contour,startNote);
       const candidate=prev_phraseNote()*0.5+arcNote*0.5;
       midi=snapToScale(candidate,scaleTones);
-      if(Math.random()<(cx==='easy'?0.5:0.2))
+      if(Math.random()<(cx==='easy'?pullEasy:pullDifficult))
         midi=nearestChordTone(midi,chordTones);
 
     } else if(frac<boundary.ten){
       // 転: テンション・外し
       if(cx==='easy'){
         const target=nearestChordTone(phraseLastNote,chordTones);
-        midi=Math.max(52,Math.min(83,getApproachNotes(target)[0]));
+        midi=Math.max(noteClampMin+4,Math.min(noteClampMax-1,getApproachNotes(target)[0]));
       } else if(cx==='difficult'){
-        const useTension=Math.random()<hook.tension+0.15;
+        const useTension=Math.random()<eHook.tension+0.15;
         if(useTension&&tensionTones.length>0){
           const near=tensionTones.filter(n=>Math.abs(n-phraseLastNote)<=8);
           midi=weightedPick(near.length?near:tensionTones,n=>1/(Math.abs(n-phraseLastNote)*0.3+1));
-          midi=Math.max(52,Math.min(83,midi));
+          midi=Math.max(noteClampMin+4,Math.min(noteClampMax-1,midi));
         } else {
           const target=nearestChordTone(phraseLastNote,chordTones);
-          midi=Math.max(52,Math.min(83,getApproachNotes(target)[0]));
+          midi=Math.max(noteClampMin+4,Math.min(noteClampMax-1,getApproachNotes(target)[0]));
         }
       } else {
         // Progressive: 先取り音 or テンション跳躍
@@ -4040,7 +4161,7 @@ function playMelodyPhrase(root, type, durationMs){
           const far=tensionTones.filter(n=>Math.abs(n-phraseLastNote)>=4&&Math.abs(n-phraseLastNote)<=10);
           const pool=far.length?far:tensionTones;
           midi=pool[Math.floor(Math.random()*pool.length)];
-          midi=Math.max(48,Math.min(84,midi));
+          midi=Math.max(noteClampMin,Math.min(noteClampMax,midi));
         } else {
           midi=snapToScale(phraseLastNote+(Math.random()<0.5?5:-5),scaleTones);
         }
@@ -4051,10 +4172,10 @@ function playMelodyPhrase(root, type, durationMs){
       const subFrac=(frac-boundary.ten)/(1.0-boundary.ten);
       if(subFrac<0.45&&cx!=='easy'){
         const finalTarget=nearestChordTone(phraseLastNote,chordTones);
-        midi=Math.max(48,Math.min(84,getApproachNotes(finalTarget)[0]));
+        midi=Math.max(noteClampMin,Math.min(noteClampMax,getApproachNotes(finalTarget)[0]));
       } else {
         midi=nearestChordTone(phraseLastNote,chordTones);
-        if(hook.landOn==='root'){
+        if(eHook.landOn==='root'){
           const ri2=ni(phraseCurrentChord.root);
           const rootTs=chordTones.filter(n=>n%12===ri2);
           if(rootTs.length>0) midi=nearestChordTone(phraseLastNote,rootTs);
@@ -4062,10 +4183,11 @@ function playMelodyPhrase(root, type, durationMs){
       }
     }
 
-    midi=Math.max(48,Math.min(84,midi));
+    midi=Math.max(noteClampMin,Math.min(noteClampMax,midi));
 
-    // 休符判定
-    const restProb={easy:0.07,difficult:0.11,progressive:0.13}[cx]||0.1;
+    // 休符判定（感情パラメータで確率調整）
+    const restBase={easy:0.07,difficult:0.11,progressive:0.13}[cx]||0.1;
+    const restProb=Math.max(0.03,Math.min(0.3, restBase+restBonus));
     // 第一声のtempo設定をnoteDurSecに反映
     const tempoMult=(i<=1&&phraseEntry)
       ?{slow:1.5,quick:0.6,normal:1.0}[phraseEntry.tempo]||1.0
@@ -4074,7 +4196,7 @@ function playMelodyPhrase(root, type, durationMs){
     const deadline=phraseStartTime+durationMs/1000-0.08;
 
     if(t<deadline&&Math.random()>=restProb){
-      const isAccent=hook.accentBeats.includes(i%4);
+      const isAccent=eHook.accentBeats.includes(i%4);
       // 第一声（i=0,1）はエントリー設定に基づいてベロシティを制御
       let vel;
       if(i===0&&phraseEntry){
@@ -4102,7 +4224,7 @@ function playMelodyPhrase(root, type, durationMs){
 
   // Progressive: モチーフ初期化
   if(cx==='progressive'&&(!phraseMotif||Math.random()<0.3)){
-    phraseMotif=hook.motifs[Math.floor(Math.random()*hook.motifs.length)]
+    phraseMotif=eHook.motifs[Math.floor(Math.random()*eHook.motifs.length)]
       .map(interval=>({interval,durMult:1}));
   }
 
@@ -4128,9 +4250,19 @@ function playAdlibPhrase(root,type,durationMs){
   const totalBeats=durationMs/beatMs;
   const cells=Math.max(2,Math.round(totalBeats/2));
 
+  // ── タップ瞬間の感情パラメータをスナップショット ──
+  const ep=getEmotionPhraseParams();
+  const adlibClampMin = ep ? ep.clampMin : 45;
+  const adlibClampMax = ep ? ep.clampMax : 81;
+  // moving+ → セル内ノート数増加（密度UP）, moving- → 減少
+  const movingMod = ep ? ep.brightShift/6 : 0; // -1〜+1に正規化再利用
+  const densityBonus = ep ? Math.round(sv('moving')*1.5) : 0;
+  // chordトーン引力: complex- → 高い（シンプル), complex+ → 低い（外し許容）
+  const adlibChordWeight = ep ? Math.max(1.5, 4 - sv('complex')*2) : 4;
+
   for(let cell=0;cell<cells;cell++){
     const cellDur=(durationMs/cells)/1000;
-    const notesInCell=2+Math.floor(Math.random()*3);
+    const notesInCell=Math.max(2, 2+Math.floor(Math.random()*3)+densityBonus);
     for(let j=0;j<notesInCell;j++){
       if(t>=ctx.currentTime+durationMs/1000-0.05)break;
       const frac=j/notesInCell;
@@ -4141,15 +4273,15 @@ function playAdlibPhrase(root,type,durationMs){
       if(frac>=0.75) note=nearestChordTone(prevNote,chordTones);
       else if(frac>0.5&&Math.random()<0.4){
         const target=nearestChordTone(prevNote,chordTones);
-        note=Math.max(45,Math.min(81,target+(Math.random()<0.5?1:-1)));
+        note=Math.max(adlibClampMin,Math.min(adlibClampMax,target+(Math.random()<0.5?1:-1)));
       } else {
         const nearby=scaleTones.filter(n=>Math.abs(n-prevNote)<=6);
         const pool=nearby.length?nearby:scaleTones;
         note=weightedPick(pool,n=>{
           const isChord=chordTones.some(c=>c%12===n%12);
-          return(isChord?4:1)/(Math.abs(n-prevNote)*0.3+1);
+          return(isChord?adlibChordWeight:1)/(Math.abs(n-prevNote)*0.3+1);
         });
-        note=Math.max(45,Math.min(81,note));
+        note=Math.max(adlibClampMin,Math.min(adlibClampMax,note));
       }
       const vol=p.vol*(noteDur<beatMs/1000*0.4?0.5:0.75)*(0.8+Math.random()*0.2);
       playPhraseNote(ctx,note,t,vol);
