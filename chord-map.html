@@ -3419,6 +3419,89 @@ function nearestChordTone(prevNote, chordTones){
   return chordTones.reduce((b,n)=>Math.abs(n-prevNote)<Math.abs(b-prevNote)?n:b, chordTones[0]);
 }
 
+// ═══════════════════════════════════════════════════════
+// 1-A: 声部進行の滑らかさ（smoothChordTone）
+// コスト = 音程差 + 方向転換ペナルティ(+2.5) + 2音先コスト×0.4
+// ═══════════════════════════════════════════════════════
+function smoothChordTone(prevNote, chordTones, lookAheadTones, prevDir){
+  if(!chordTones||chordTones.length===0) return prevNote;
+  const dir=prevDir||0;
+  let best=chordTones[0], bestCost=Infinity;
+  for(const n of chordTones){
+    const interval=Math.abs(n-prevNote);
+    const moved=n-prevNote;
+    const dirPenalty=(dir!==0&&Math.sign(moved)!==0&&Math.sign(moved)!==Math.sign(dir))?2.5:0;
+    let laMin=0;
+    if(lookAheadTones&&lookAheadTones.length){
+      laMin=Math.min(...lookAheadTones.map(m=>Math.abs(m-n)))*0.4;
+    }
+    const cost=interval+dirPenalty+laMin;
+    if(cost<bestCost){bestCost=cost;best=n;}
+  }
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════
+// 1-B: フレーズ終わり方の重み付け（weightedResolveTone）
+// コードタイプ別着地音の確率テーブル
+// ═══════════════════════════════════════════════════════
+const RESOLVE_WEIGHTS={
+  '':       [{iv:4,w:40},{iv:0,w:35},{iv:7,w:25}],
+  'major':  [{iv:4,w:40},{iv:0,w:35},{iv:7,w:25}],
+  'maj7':   [{iv:11,w:35},{iv:4,w:35},{iv:0,w:30}],
+  'm':      [{iv:0,w:50},{iv:3,w:30},{iv:7,w:20}],
+  'minor':  [{iv:0,w:50},{iv:3,w:30},{iv:7,w:20}],
+  'm7':     [{iv:0,w:45},{iv:3,w:30},{iv:10,w:25}],
+  '7':      [{iv:4,w:50},{iv:10,w:30},{iv:0,w:20}],
+  'maj9':   [{iv:4,w:35},{iv:2,w:30},{iv:0,w:35}],
+  '6':      [{iv:9,w:40},{iv:4,w:35},{iv:0,w:25}],
+  'add9':   [{iv:4,w:40},{iv:2,w:30},{iv:0,w:30}],
+  'm9':     [{iv:3,w:40},{iv:0,w:35},{iv:2,w:25}],
+  'mmaj7':  [{iv:11,w:40},{iv:3,w:35},{iv:0,w:25}],
+  'm6':     [{iv:9,w:40},{iv:3,w:35},{iv:0,w:25}],
+  '9':      [{iv:4,w:45},{iv:2,w:30},{iv:10,w:25}],
+  '7b9':    [{iv:4,w:50},{iv:1,w:30},{iv:10,w:20}],
+  '7s9':    [{iv:4,w:45},{iv:3,w:30},{iv:10,w:25}],
+  '11':     [{iv:5,w:45},{iv:4,w:30},{iv:10,w:25}],
+  '13':     [{iv:9,w:40},{iv:4,w:35},{iv:10,w:25}],
+  'dim':    null,
+  'dim7':   null,
+  'm7b5':   [{iv:3,w:40},{iv:10,w:35},{iv:6,w:25}],
+  'aug':    [{iv:8,w:50},{iv:0,w:30},{iv:4,w:20}],
+  'sus4':   [{iv:4,w:45},{iv:0,w:35},{iv:7,w:20}],
+  'sus2':   [{iv:4,w:40},{iv:2,w:30},{iv:0,w:30}],
+};
+
+function weightedResolveTone(prev, chordTones, type, root){
+  const table=RESOLVE_WEIGHTS[type];
+  if(!table) return nearestChordTone(prev, chordTones);
+  const ri=ni(root);
+  const candidates=[];
+  for(const{iv,w} of table){
+    const pc=(ri+iv)%12;
+    const matched=chordTones.filter(n=>n%12===pc);
+    if(matched.length){
+      const nearest=nearestChordTone(prev,matched);
+      candidates.push({note:nearest,w});
+    }
+  }
+  if(!candidates.length) return nearestChordTone(prev,chordTones);
+  return weightedPick(candidates.map(c=>c.note), (_,idx)=>candidates[idx].w);
+}
+
+// ═══════════════════════════════════════════════════════
+// 1-C: マイクロタイミングゆらぎ（humanizeT）
+// accent拍はゆらぎ小、裏拍はゆらぎ大
+// melody: accent=±5ms / 裏拍=±12ms
+// adlib:  accent=±8ms / 裏拍=±20ms
+// ═══════════════════════════════════════════════════════
+function humanizeT(t, isAccent, isAdlib){
+  const accentMs = isAdlib ? 8 : 5;
+  const offMs    = isAdlib ? 20 : 12;
+  const rangeMs  = isAccent ? accentMs : offMs;
+  return t + (Math.random()*2-1) * rangeMs * 0.001;
+}
+
 // ── EASY: キャッチーモチーフ生成 ──
 // ジャンルのキャッチーポイントを使ってモチーフをコードに当てはめる
 
@@ -3713,13 +3796,14 @@ function buildPhraseCore(params){
     else {
       const subFrac=(frac-boundary.ten)/(boundary.ketsu-boundary.ten);
       if(subFrac<0.5&&complexity!=='easy'){
-        // 結の前半: アプローチノートで着地を予告
-        const finalTarget=nearestChordTone(prev, chordTones);
+        // 結の前半: アプローチノートで着地を予告 (1-A: smoothChordTone)
+        const prevDir=notes.length>=2?notes[notes.length-1]-notes[notes.length-2]:0;
+        const finalTarget=smoothChordTone(prev, chordTones, null, prevDir);
         const approach=getApproachNotes(finalTarget)[Math.floor(Math.random()*2)];
         note=Math.max(52,Math.min(83,approach));
       } else {
-        // 結の後半: コードトーンへ完全解決
-        note=nearestChordTone(prev, chordTones);
+        // 結の後半: コードトーンへ完全解決 (1-B: weightedResolveTone)
+        note=weightedResolveTone(prev, chordTones, phraseCurrentChord.type, phraseCurrentChord.root);
         // ジャンルによってルートへの着地を優先
         if(hook.landOn==='root'){
           const ri2=ni(phraseCurrentChord.root);
@@ -3953,8 +4037,10 @@ function playMelodyPhrase(root, type, durationMs){
       const arcNote=arcTargetSensory(subFrac,arcContour,startNote,sp.spanMod);
       const candidate=prev_phraseNote()*0.5+arcNote*0.5;
       midi=snapToScale(candidate,scaleTones);
-      if(Math.random()<(cx==='easy'?0.5:0.2))
-        midi=nearestChordTone(midi,chordTones);
+      if(Math.random()<(cx==='easy'?0.5:0.2)){
+        const prevDir2=phraseLastNote-startNote;
+        midi=smoothChordTone(midi,chordTones,null,prevDir2);
+      }
       // 原則5: 慣性補正 — 3音以上同方向継続なら逆バイアス
       if(Math.abs(phraseInertia)>=3){
         const pool=applyInertiaBias(
@@ -4031,10 +4117,11 @@ function playMelodyPhrase(root, type, durationMs){
       // 結: 解決・着地 + 進行アーク対応
       const subFrac=(frac-boundary.ten)/(1.0-boundary.ten);
       if(subFrac<0.45&&cx!=='easy'){
-        // アプローチノート
+        // アプローチノート (1-A: smoothChordTone)
+        const prevDir3=phraseLastNote-startNote;
         const finalTarget=resolveChordTones
-          ?nearestChordTone(phraseLastNote,resolveChordTones)   // 解決先が確定している場合
-          :nearestChordTone(phraseLastNote,chordTones);
+          ?smoothChordTone(phraseLastNote,resolveChordTones,null,prevDir3)
+          :smoothChordTone(phraseLastNote,chordTones,null,prevDir3);
         midi=Math.max(52,Math.min(83,getApproachNotes(finalTarget)[0]));
       } else {
         if(resolveChordTones&&(cx==='progressive'||(cx==='difficult'&&useLeadingTone))){
@@ -4045,7 +4132,8 @@ function playMelodyPhrase(root, type, durationMs){
           // 同主調転換: 転調の色変化を強調する特徴音（b3/b6/b7 or M3/M6/M7）で着地
           midi=nearestChordTone(phraseLastNote,parallelChangeTones);
         } else {
-          midi=nearestChordTone(phraseLastNote,chordTones);
+          // 1-B: weightedResolveTone で着地音を重み付け選択
+          midi=weightedResolveTone(phraseLastNote,chordTones,phraseCurrentChord.type,phraseCurrentChord.root);
           if(hook.landOn==='root'){
             const ri2=ni(phraseCurrentChord.root);
             const rootTs=chordTones.filter(n=>n%12===ri2);
@@ -4071,7 +4159,9 @@ function playMelodyPhrase(root, type, durationMs){
       const isNearPeak=Math.abs(midi-phraseTarget)<=2;
       const vel=p.vol*(isAccent?1.0:0.70)*(0.88+Math.random()*0.12)*sp.velMod
                 *(isNearPeak?1.12:1.0);
-      playPhraseNote(ctx,midi,t,Math.max(0.05,Math.min(1.0,vel)));
+      // 1-C: マイクロタイミングゆらぎ
+      const tHuman=humanizeT(t, isAccent, /*isAdlib=*/false);
+      playPhraseNote(ctx,midi,tHuman,Math.max(0.05,Math.min(1.0,vel)));
       // 原則5: 慣性を更新（発音した音と前音の方向を記録）
       updateInertia(phraseLastNote, midi);
       phraseLastNote=midi;
@@ -4354,7 +4444,9 @@ function playAdlibPhrase(root,type,durationMs){
       // アクセント: 偶数拍（0, 2拍）はやや強く
       const isAccent=(beatIdx%4===0)||(beatIdx%4===2);
       const vol=p.vol*(isAccent?0.82:0.62)*(0.85+Math.random()*0.15)*sp.velMod;
-      playPhraseNote(ctx,clamped,t,Math.max(0.05,Math.min(1.0,vol)));
+      // 1-C: マイクロタイミングゆらぎ
+      const tHuman=humanizeT(t, isAccent, /*isAdlib=*/true);
+      playPhraseNote(ctx,clamped,tHuman,Math.max(0.05,Math.min(1.0,vol)));
       phraseLastNote=clamped;
 
       // コールモチーフ記録（後半レスポンスで変形使用）
