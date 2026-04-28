@@ -267,6 +267,31 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:rgba(154,106,212,0.1);
 }
 
+/* ── S11 トーンホイール ── */
+#twhl-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#twhl-btn.on{
+  border-color:#4a90d4;color:#4a90d4;
+  background:rgba(74,144,212,0.1);
+}
+#tone-wheel-overlay{
+  position:absolute;bottom:12px;left:12px;z-index:10;
+  display:none;
+  background:rgba(13,13,16,0.88);
+  border:1px solid rgba(74,144,212,0.35);
+  border-radius:8px;
+  padding:6px;
+  flex-direction:column;gap:4px;align-items:center;
+}
+#tone-wheel-overlay.on{ display:flex; }
+#tone-wheel-canvas{ display:block; cursor:grab; touch-action:none; }
+
 /* ── S9 PIVOT: 目標キー選択オーバーレイ ── */
 #pivot-overlay{
   position:absolute;top:8px;left:8px;z-index:10;
@@ -564,6 +589,11 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             </div>
             <div class="pivot-steps" id="pivot-steps-lbl"></div>
           </div>
+          <!-- S11: トーンホイール（左下） -->
+          <div id="tone-wheel-overlay">
+            <canvas id="tone-wheel-canvas" width="160" height="160"></canvas>
+            <div style="font-family:var(--fm);font-size:6px;color:rgba(74,144,212,0.6);letter-spacing:.1em;text-align:center;">TAP TO SET KEY · DRAG TO ROTATE</div>
+          </div>
           <div class="mode-bar">
             <div class="mode-row">
               <div class="mode-btn on" data-mode="radial">RADIAL</div>
@@ -580,6 +610,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <div class="mode-row">
               <div class="mode-btn" data-mode="pivot">PIVOT</div>
               <div id="modal-map-btn" onclick="toggleModalMap()">MODE</div>
+              <div id="twhl-btn" onclick="toggleToneWheel()">TWHL</div>
             </div>
           </div>
         </div>
@@ -4623,6 +4654,8 @@ function moveToChord(root,type){
   }
   // 課題3: MIDI録音中ならコードをキャプチャ
   if(typeof recordMidiChord==='function')recordMidiChord(root,type,S.voicing);
+  // S11: トーンホイール表示中なら中央コード表示を同期
+  if(toneWheelOpen&&twCtx) drawToneWheel();
   // ボイシング自動選択（星評価最高 or 先頭）
   const pos=getVoicings(root,type);
   if(pos.length){
@@ -4688,27 +4721,56 @@ function flashSaveBtn(msg){
 }
 
 // 保存済み進行をautoMode='pattern'相当でステップ再生
+let savedProgTimer=null; // 再生中タイマー（重複起動防止用）
+
 function playSavedProg(id){
   const progs=loadSavedProgs();
   const entry=progs.find(p=>p.id===id);
   if(!entry||!entry.chords.length)return;
 
+  // 既存の再生を中断
+  if(savedProgTimer){clearTimeout(savedProgTimer);savedProgTimer=null;}
+
   // CHAINモードに切り替えてビジュアルも連動
   if(MAP_MODE!=='chain')setMode('chain');
 
-  // 先頭コードに移動
-  moveToChord(entry.chords[0].root,entry.chords[0].type);
+  // phraseMode が off なら melody に一時切り替え（再生後に元に戻す）
+  const prevPhraseMode=phraseMode;
+  const forcedPhrase=(phraseMode==='off');
+  if(forcedPhrase){
+    phraseMode='melody';
+    const pms=document.getElementById('phrase-mode-sel');
+    if(pms) pms.value='melody';
+  }
 
-  // 以降のコードをBPMに合わせてタイマー再生
   const interval=Math.round(60000/autoBpm*2);
+  const chords=entry.chords;
+
+  // 先頭コードに移動
+  moveToChord(chords[0].root,chords[0].type);
+
   let idx=1;
   function step(){
-    if(idx>=entry.chords.length)return;
-    const c=entry.chords[idx++];
+    if(idx>=chords.length){
+      savedProgTimer=null;
+      // フレーズを一時切り替えしていた場合は元に戻す
+      if(forcedPhrase){
+        // 最後のフレーズが終わるのを少し待ってから戻す
+        setTimeout(()=>{
+          phraseMode=prevPhraseMode;
+          const pms=document.getElementById('phrase-mode-sel');
+          if(pms) pms.value=prevPhraseMode;
+        }, interval);
+      }
+      return;
+    }
+    const c=chords[idx++];
     moveToChord(c.root,c.type);
-    if(idx<entry.chords.length)setTimeout(step,interval);
+    savedProgTimer=setTimeout(step, interval);
   }
-  if(entry.chords.length>1)setTimeout(step,interval);
+  if(chords.length>1){
+    savedProgTimer=setTimeout(step, interval);
+  }
 }
 
 // 保存済みリストを削除
@@ -5514,7 +5576,185 @@ function toggleModalMap(){
   if(btn) btn.classList.toggle('on',modalMapMode);
   invalidate();
 }
-// Callipari S9準拠: 5度圏BFSで最短転調経路を求めアニメーション表示
+
+// ═══════════════════════════════════════════════════════
+// S11: トーンホイール（回転式12キー選択UI）
+// Callipari §14準拠: 24コードリング（Major+minor交互）
+// ドラッグで回転、タップでキー選択
+// ═══════════════════════════════════════════════════════
+
+// 5度圏順の12キー（Major/minor交互 = 24スロット）
+const TW_KEYS=['C','G','D','A','E','B','F#','Db','Ab','Eb','Bb','F'];
+// コードリング（master §14-3準拠）: Major→minor交互に24コード
+const TW_CHORD_RING=[
+  {root:'C',type:'major'},{root:'A',type:'minor'},
+  {root:'F',type:'major'},{root:'D',type:'minor'},
+  {root:'Bb',type:'major'},{root:'G',type:'minor'},
+  {root:'Eb',type:'major'},{root:'C',type:'minor'},
+  {root:'Ab',type:'major'},{root:'F',type:'minor'},
+  {root:'Db',type:'major'},{root:'Bb',type:'minor'},
+  {root:'F#',type:'major'},{root:'Eb',type:'minor'},
+  {root:'B',type:'major'},{root:'Ab',type:'minor'},
+  {root:'E',type:'major'},{root:'C#',type:'minor'},
+  {root:'A',type:'major'},{root:'F#',type:'minor'},
+  {root:'D',type:'major'},{root:'B',type:'minor'},
+  {root:'G',type:'major'},{root:'E',type:'minor'},
+];
+const TW_N=TW_CHORD_RING.length; // 24
+
+let toneWheelOpen=false;
+let twRotation=0;      // 現在の回転角（ラジアン）
+let twDragStart=null;  // {angle, rotation}
+let twCanvas=null, twCtx=null;
+
+function toggleToneWheel(){
+  toneWheelOpen=!toneWheelOpen;
+  const btn=document.getElementById('twhl-btn');
+  const ov=document.getElementById('tone-wheel-overlay');
+  if(btn) btn.classList.toggle('on',toneWheelOpen);
+  if(ov){
+    ov.classList.toggle('on',toneWheelOpen);
+    if(toneWheelOpen) initToneWheel();
+  }
+}
+
+function initToneWheel(){
+  twCanvas=document.getElementById('tone-wheel-canvas');
+  if(!twCanvas)return;
+  twCtx=twCanvas.getContext('2d');
+
+  // 現在コードのキーに合わせて初期回転を設定
+  const rootIdx=TW_CHORD_RING.findIndex(c=>c.root===S.root&&c.type===S.type);
+  if(rootIdx>=0) twRotation=-rootIdx*(Math.PI*2/TW_N);
+
+  drawToneWheel();
+
+  // イベント（重複登録を防ぐためcloneAndReplace）
+  const nc=twCanvas.cloneNode(true);
+  twCanvas.parentNode.replaceChild(nc,twCanvas);
+  twCanvas=nc; twCtx=twCanvas.getContext('2d');
+
+  // タッチ/マウス: ドラッグ回転 + タップ選択
+  let pointerDown=false, moved=false, startA=0;
+
+  function getAngle(e){
+    const rect=twCanvas.getBoundingClientRect();
+    const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+    const px=(e.clientX||e.touches?.[0]?.clientX)||0;
+    const py=(e.clientY||e.touches?.[0]?.clientY)||0;
+    return Math.atan2(py-cy,px-cx);
+  }
+
+  twCanvas.addEventListener('pointerdown',e=>{
+    pointerDown=true; moved=false;
+    startA=getAngle(e);
+    twDragStart={angle:startA,rotation:twRotation};
+    twCanvas.setPointerCapture(e.pointerId);
+  });
+  twCanvas.addEventListener('pointermove',e=>{
+    if(!pointerDown)return;
+    const a=getAngle(e);
+    const delta=a-twDragStart.angle;
+    twRotation=twDragStart.rotation+delta;
+    if(Math.abs(delta)>0.04) moved=true;
+    drawToneWheel();
+  });
+  twCanvas.addEventListener('pointerup',e=>{
+    if(!moved){
+      // タップ: どのスロットか判定して選択
+      const rect=twCanvas.getBoundingClientRect();
+      const W=twCanvas.width, H=twCanvas.height;
+      const px=(e.clientX-rect.left)*(W/rect.width);
+      const py=(e.clientY-rect.top)*(H/rect.height);
+      const cx=W/2, cy=H/2;
+      const R_OUT=68, R_IN=30;
+      const dx=px-cx, dy=py-cy;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>=R_IN&&dist<=R_OUT){
+        const rawA=Math.atan2(dy,dx);
+        const slotA=(rawA-twRotation+Math.PI*2)%(Math.PI*2);
+        const idx=Math.round(slotA/(Math.PI*2/TW_N))%TW_N;
+        const c=TW_CHORD_RING[idx];
+        if(c){
+          moveToChord(c.root, c.type);
+          // 選択したスロットが上（12時）に来るよう回転を調整
+          const targetRot=-idx*(Math.PI*2/TW_N)-Math.PI/2;
+          twRotation=targetRot;
+          drawToneWheel();
+        }
+      }
+    }
+    pointerDown=false;
+  });
+
+  drawToneWheel();
+}
+
+function drawToneWheel(){
+  if(!twCtx)return;
+  const W=twCanvas.width, H=twCanvas.height;
+  const cx=W/2, cy=H/2;
+  const R_OUT=68, R_MID=50, R_IN=30;
+  const step=Math.PI*2/TW_N;
+
+  twCtx.clearRect(0,0,W,H);
+
+  // ── 背景ガイドリング ──
+  twCtx.beginPath();twCtx.arc(cx,cy,R_OUT+4,0,Math.PI*2);
+  twCtx.strokeStyle='rgba(74,144,212,0.15)';twCtx.lineWidth=1;twCtx.stroke();
+  twCtx.beginPath();twCtx.arc(cx,cy,R_IN,0,Math.PI*2);
+  twCtx.strokeStyle='rgba(74,144,212,0.10)';twCtx.lineWidth=1;twCtx.stroke();
+
+  // ── 各スロット描画 ──
+  TW_CHORD_RING.forEach((chord,i)=>{
+    const a=twRotation+i*step;
+    const aNext=a+step;
+    const isMajor=(chord.type==='major'||chord.type==='');
+    const isActive=(chord.root===S.root&&chord.type===S.type);
+
+    // 扇形の塗り
+    const baseCol=isMajor?'rgba(232,197,71,':'rgba(74,144,212,';
+    twCtx.beginPath();
+    twCtx.moveTo(cx+R_IN*Math.cos(a),cy+R_IN*Math.sin(a));
+    twCtx.arc(cx,cy,R_OUT,a,aNext);
+    twCtx.arc(cx,cy,R_IN,aNext,a,true);
+    twCtx.closePath();
+    twCtx.fillStyle=isActive?baseCol+'0.35)':baseCol+'0.06)';
+    twCtx.fill();
+    twCtx.strokeStyle=isActive?baseCol+'0.70)':'rgba(255,255,255,0.06)';
+    twCtx.lineWidth=isActive?1.5:0.5;
+    twCtx.stroke();
+
+    // ラベル
+    const midA=a+step/2;
+    const midR=(R_IN+R_OUT)/2;
+    const tx=cx+midR*Math.cos(midA);
+    const ty=cy+midR*Math.sin(midA);
+    twCtx.save();
+    twCtx.translate(tx,ty);
+    twCtx.rotate(midA+Math.PI/2);
+    twCtx.font=isActive?'bold 7px DM Mono,monospace':'6px DM Mono,monospace';
+    twCtx.textAlign='center';twCtx.textBaseline='middle';
+    twCtx.fillStyle=isActive?(isMajor?'#e8c547':'#4a90d4'):'rgba(200,200,210,0.55)';
+    const label=chord.root+(isMajor?'':'m');
+    twCtx.fillText(label,0,0);
+    twCtx.restore();
+  });
+
+  // ── 中央: 現在コード表示 ──
+  twCtx.font='bold 10px DM Mono,monospace';
+  twCtx.textAlign='center';twCtx.textBaseline='middle';
+  twCtx.fillStyle='#e8c547';
+  twCtx.fillText(cs(S.root,S.type),cx,cy-4);
+  twCtx.font='6px DM Mono,monospace';
+  twCtx.fillStyle='rgba(200,200,210,0.45)';
+  twCtx.fillText('S11',cx,cy+8);
+
+  // ── 12時インジケーター ──
+  twCtx.beginPath();
+  twCtx.moveTo(cx,cy-R_OUT-2);twCtx.lineTo(cx,cy-R_OUT-8);
+  twCtx.strokeStyle='rgba(74,144,212,0.70)';twCtx.lineWidth=2;twCtx.stroke();
+}
 // ═══════════════════════════════════════════════════════
 
 const PIVOT_KEYS=['C','G','D','A','E','B','F#','Db','Ab','Eb','Bb','F'];
