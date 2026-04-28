@@ -5851,10 +5851,11 @@ function showDimMenu(anchor, afterIdx, cands){
 // ═══════════════════════
 function initExpand(){
   expandTree={root:S.root,type:S.type,key:cs(S.root,S.type),depth:0,
-    x:L.cx,y:L.cy,children:[],expandable:true,
+    x:L.cx,y:L.cy,children:[],
     rels:buildRelations(S.root,S.type)};
   expandNodes=[expandTree];invalidate();
 }
+
 function expandNode(root,type,key){
   const found=expandNodes.find(n=>n.key===key);
   if(!found)return;
@@ -5864,38 +5865,29 @@ function expandNode(root,type,key){
     const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n);n.children.forEach(remove);};
     found.children.forEach(remove);
     found.children=[];
-    // 折りたたんだので再び展開可能かチェック
-    const rels=buildRelations(root,type).slice(0,8);
-    found.expandable=rels.some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
   } else {
-    // expandableでない場合は何もしない（音は鳴らす）
-    if(!found.expandable){ invalidate(); return; }
-    const rels=buildRelations(root,type).slice(0,8);
+    // 未展開→展開。ツリーにないコードのみ子として追加（上位12件）
+    const rels=buildRelations(root,type);
     const newRels=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
-    if(!newRels.length){ found.expandable=false; invalidate(); return; }
+    if(!newRels.length){ invalidate(); return; }
+    // 表示は最大8件に絞る
+    const toAdd=newRels.slice(0,8);
     const baseAngle=found.parentAngle??0;
     const spread=Math.PI*1.1;
-    newRels.forEach((rel,i)=>{
-      const childKey=cs(rel.root,rel.type);
-      const angle=baseAngle+spread*(i/(newRels.length-1||1)-0.5);
+    toAdd.forEach((rel,i)=>{
+      const angle=baseAngle+spread*(i/(toAdd.length-1||1)-0.5);
       const dist=90+found.depth*10;
-      // 子ノードが展開可能かを初期計算
-      const childRels=buildRelations(rel.root,rel.type).slice(0,8);
-      const childExpandable=childRels.some(r=>
-        r.root!==root&&!expandNodes.find(n=>n.key===cs(r.root,r.type))
-      );
       const child={
-        root:rel.root,type:rel.type,key:childKey,
+        root:rel.root,type:rel.type,key:cs(rel.root,rel.type),
         depth:found.depth+1,parent:found,parentAngle:angle,
         x:found.x+Math.cos(angle)*dist,
         y:found.y+Math.sin(angle)*dist,
-        children:[],expandable:childExpandable,
+        children:[],
         rtype:rel.rtype,score:rel.score,opacity:rel.opacity
       };
       found.children.push(child);
       expandNodes.push(child);
     });
-    found.expandable=false;
   }
   invalidate();
 }
@@ -5905,7 +5897,10 @@ function drawExpand(ctx){
     const isTop=node.opacity>0.82;
     const nr=node.depth===0?27:isTop?15:12;
     const isExpanded=node.children.length>0;
-    const isExpandable=!!node.expandable;
+    // 展開可能 = 子なし・かつツリーにない関連コードが存在する（全件対象）
+    const canExpand=!isExpanded&&
+      buildRelations(node.root,node.type)
+        .some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
 
     // Line to parent
     if(node.parent){
@@ -5924,13 +5919,13 @@ function drawExpand(ctx){
     ctx.strokeStyle=col;
     ctx.lineWidth=node.depth===0?2:isExpanded?2:isTop?1.5:0.8;
     ctx.globalAlpha=node.depth===0?1:isExpanded?0.90:node.opacity||0.6;
-    ctx.setLineDash(isExpandable?[3,2]:[]);
+    ctx.setLineDash(canExpand?[3,2]:[]);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha=1;
 
     // 展開可能ノードに外周リング
-    if(isExpandable){
+    if(canExpand){
       ctx.beginPath();ctx.arc(node.x,node.y,nr+4,0,Math.PI*2);
       ctx.strokeStyle=`rgba(${rr},${gg},${bb},0.28)`;
       ctx.lineWidth=1;ctx.setLineDash([2,3]);
@@ -5945,7 +5940,7 @@ function drawExpand(ctx){
     ctx.fillText(node.key,node.x,node.y);ctx.globalAlpha=1;
 
     // 展開可能ノードのみ「+」を表示
-    if(isExpandable){
+    if(canExpand){
       ctx.font=`bold ${isTop?10:8}px DM Mono,monospace`;
       ctx.fillStyle=col;
       ctx.globalAlpha=isTop?0.85:0.55;
