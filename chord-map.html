@@ -5851,7 +5851,8 @@ function showDimMenu(anchor, afterIdx, cands){
 // ═══════════════════════
 function initExpand(){
   expandTree={root:S.root,type:S.type,key:cs(S.root,S.type),depth:0,
-    x:L.cx,y:L.cy,children:[],rels:buildRelations(S.root,S.type)};
+    x:L.cx,y:L.cy,children:[],expandable:false,
+    rels:buildRelations(S.root,S.type)};
   expandNodes=[expandTree];invalidate();
 }
 function expandNode(root,type,key){
@@ -5859,15 +5860,16 @@ function expandNode(root,type,key){
   if(!found)return;
   playChord(root,type);
   if(found.children.length>0){
-    // Collapse
+    // 展開済み→折りたたむ
     const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n);n.children.forEach(remove);};
     found.children.forEach(remove);found.children=[];
+    found.expandable=true; // 折りたたんだので再び展開可能に
   } else {
-    // Expand: ツリーにない子のみ追加
+    // 展開可能フラグがない場合は何もしない
+    if(!found.expandable){ invalidate(); return; }
     const rels=buildRelations(root,type).slice(0,8);
     const newRels=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
-    // 展開可能な子が1つもない場合は何もしない
-    if(!newRels.length){ invalidate(); return; }
+    if(!newRels.length){ found.expandable=false; invalidate(); return; }
     const baseAngle=found.parentAngle??0;
     const spread=Math.PI*1.1;
     newRels.forEach((rel,i)=>{
@@ -5877,19 +5879,36 @@ function expandNode(root,type,key){
       const child={root:rel.root,type:rel.type,key:childKey,
         depth:found.depth+1,parent:found,parentAngle:angle,
         x:found.x+Math.cos(angle)*dist,y:found.y+Math.sin(angle)*dist,
-        children:[],rels:[],rtype:rel.rtype,score:rel.score,opacity:rel.opacity};
+        children:[],expandable:true,
+        rtype:rel.rtype,score:rel.score,opacity:rel.opacity};
       found.children.push(child);expandNodes.push(child);
     });
+    found.expandable=false; // 展開済みに
   }
   invalidate();
 }
 function drawExpand(ctx){
+  // expandableフラグを全ノードに事前計算
+  // （ツリーにない関連コードが1つでもある = 展開可能）
+  const updateExpandable=(node)=>{
+    if(node.children.length>0){
+      node.expandable=false; // 展開済みは+不要
+    } else if(node.depth===0){
+      node.expandable=false; // ルートは別扱い
+    } else {
+      node.expandable=buildRelations(node.root,node.type).slice(0,8)
+        .some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
+    }
+    node.children.forEach(updateExpandable);
+  };
+  if(expandTree) updateExpandable(expandTree);
+
   const drawNode=(node)=>{
     const col=node.depth===0?'#e8c547':(RHEX[node.rtype]||'#888');
     const isTop=node.opacity>0.82;
     const nr=node.depth===0?27:isTop?15:12;
     const isExpanded=node.children.length>0;
-    const isTappable=node.depth>0&&!isExpanded; // 未展開＝タップ可能
+    const isExpandable=!!node.expandable;
 
     // Line to parent
     if(node.parent){
@@ -5901,23 +5920,22 @@ function drawExpand(ctx){
     // Node fill
     const[rr,gg,bb]=parseHex(col);
     ctx.beginPath();ctx.arc(node.x,node.y,nr,0,Math.PI*2);
-    // 展開済み→塗り強め / タップ可能→薄め / ルート→中間
     const fillAlpha=node.depth===0?0.25:isExpanded?0.45:isTop?0.18:0.10;
     ctx.fillStyle=`rgba(${rr},${gg},${bb},${fillAlpha})`;ctx.fill();
 
-    // Node stroke
+    // Node stroke（展開可能→点線 / 展開済み→実線太め / それ以外→実線細め）
     ctx.strokeStyle=col;
     ctx.lineWidth=node.depth===0?2:isExpanded?2:isTop?1.5:0.8;
     ctx.globalAlpha=node.depth===0?1:isExpanded?0.90:node.opacity||0.6;
-    ctx.setLineDash(isTappable?[3,2]:[]); // タップ可能→点線
+    ctx.setLineDash(isExpandable?[3,2]:[]);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha=1;
 
-    // タップ可能ノードに外周の「展開ヒント」リング
-    if(isTappable){
+    // 展開可能ノードに外周リング
+    if(isExpandable){
       ctx.beginPath();ctx.arc(node.x,node.y,nr+4,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(${rr},${gg},${bb},0.30)`;
+      ctx.strokeStyle=`rgba(${rr},${gg},${bb},0.28)`;
       ctx.lineWidth=1;ctx.setLineDash([2,3]);
       ctx.stroke();ctx.setLineDash([]);
     }
@@ -5929,27 +5947,23 @@ function drawExpand(ctx){
     ctx.globalAlpha=node.depth===0?1:isExpanded?0.95:node.opacity||0.6;
     ctx.fillText(node.key,node.x,node.y);ctx.globalAlpha=1;
 
-    // タップ可能ノードに「+」を表示
-    // 実際に展開可能（ツリーにない子が存在する）かをチェック
-    if(isTappable){
-      const expandable=buildRelations(node.root,node.type).slice(0,8)
-        .some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
-      if(expandable){
-        ctx.font=`bold ${isTop?10:8}px DM Mono,monospace`;
-        ctx.fillStyle=col;
-        ctx.globalAlpha=isTop?0.80:0.50;
-        ctx.fillText('+',node.x,node.y+nr+8);
-        ctx.globalAlpha=1;
-      }
+    // 展開可能ノードのみ「+」を表示
+    if(isExpandable){
+      ctx.font=`bold ${isTop?10:8}px DM Mono,monospace`;
+      ctx.fillStyle=col;
+      ctx.globalAlpha=isTop?0.85:0.55;
+      ctx.fillText('+',node.x,node.y+nr+8);
+      ctx.globalAlpha=1;
     }
 
     node.children.forEach(drawNode);
   };
-  // Update nodeHits for expand mode
-  // ルートノードから再帰して全子ノードを登録
+
+  // nodeHits: ルートから再帰して全ノードを登録
   nodeHits=[];
   const collectHits=(node)=>{
-    nodeHits.push({x:node.x,y:node.y,r:node.depth===0?27:15,root:node.root,type:node.type,key:node.key});
+    nodeHits.push({x:node.x,y:node.y,r:node.depth===0?27:15,
+      root:node.root,type:node.type,key:node.key});
     node.children.forEach(collectHits);
   };
   if(expandTree) collectHits(expandTree);
