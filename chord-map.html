@@ -2358,8 +2358,8 @@ function initCanvas(){
         drag={idx,startAngle:angle,startVal:SL[idx].val};return;
       }
     }
-    // Center node — tap to play chord, long tap or AUTO mode toggles auto
-    if(dist<32){
+    // Center node — tap to play chord（EXPANDモード時はスキップ）
+    if(dist<32&&MAP_MODE!=='expand'){
       if(autoPlay){stopAuto();}
       else{
         playChord(S.root,S.type);
