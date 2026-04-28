@@ -5858,19 +5858,19 @@ function initExpand(){
 
 function expandNode(root,type,key){
   const found=expandNodes.find(n=>n.key===key);
-  if(!found)return;
+  if(!found){ playChord(root,type); return; }
   playChord(root,type);
+  triggerPhrase(root,type);
   if(found.children.length>0){
     // 展開済み→折りたたむ
     const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n);n.children.forEach(remove);};
     found.children.forEach(remove);
     found.children=[];
   } else {
-    // 未展開→展開。ツリーにないコードのみ子として追加（上位12件）
+    // 未展開→展開。ツリーにないコードのみ子として追加
     const rels=buildRelations(root,type);
     const newRels=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
     if(!newRels.length){ invalidate(); return; }
-    // 表示は最大8件に絞る
     const toAdd=newRels.slice(0,8);
     const baseAngle=found.parentAngle??0;
     const spread=Math.PI*1.1;
@@ -5897,10 +5897,8 @@ function drawExpand(ctx){
     const isTop=node.opacity>0.82;
     const nr=node.depth===0?27:isTop?15:12;
     const isExpanded=node.children.length>0;
-    // 展開可能 = 子なし・かつツリーにない関連コードが存在する（全件対象）
-    const canExpand=!isExpanded&&
-      buildRelations(node.root,node.type)
-        .some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
+    // 展開可能表示 = 子なし && depth>0（実際に展開できるかはタップ時に判定）
+    const canExpand=!isExpanded&&node.depth>0;
 
     // Line to parent
     if(node.parent){
