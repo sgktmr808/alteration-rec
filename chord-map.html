@@ -196,6 +196,69 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 #chain-save-btn:active{background:rgba(232,197,71,0.15);}
 #chain-save-btn.flash{background:rgba(232,197,71,0.25);border-color:var(--acc);}
 
+/* ── P5: AI進行提案パネル ── */
+.ai-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
+.ai-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px 4px;cursor:pointer;user-select:none;}
+.ai-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;
+  display:flex;align-items:center;gap:6px;}
+.ai-hdr-badge{font-size:7px;padding:1px 5px;border-radius:3px;
+  background:rgba(99,102,241,0.18);color:#818cf8;border:1px solid rgba(99,102,241,0.35);
+  letter-spacing:.08em;}
+.ai-tog{font-size:9px;color:var(--dim);}
+.ai-wrap{overflow:hidden;transition:max-height .25s;max-height:0;}
+.ai-wrap.open{max-height:260px;}
+.ai-inner{padding:8px 12px 10px;display:flex;flex-direction:column;gap:7px;}
+.ai-mood-row{display:flex;align-items:center;gap:8px;}
+.ai-mood-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);width:36px;flex-shrink:0;}
+.ai-mood-track{flex:1;position:relative;height:4px;border-radius:2px;
+  background:linear-gradient(to right,#4a90d4,#7c6ad4,#d4823a);cursor:pointer;}
+.ai-mood-thumb{position:absolute;top:50%;transform:translate(-50%,-50%);
+  width:12px;height:12px;border-radius:50%;
+  background:#818cf8;border:2px solid rgba(255,255,255,0.4);
+  cursor:grab;transition:background .15s;}
+.ai-mood-labels{display:flex;justify-content:space-between;
+  font-family:var(--fm);font-size:7px;color:var(--dim);margin-top:-2px;}
+.ai-style-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.ai-style-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);width:36px;flex-shrink:0;}
+.ai-style-pill{font-family:var(--fm);font-size:8px;padding:2px 8px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:var(--surf);cursor:pointer;white-space:nowrap;
+  transition:border-color .12s,color .12s,background .12s;}
+.ai-style-pill.on{border-color:#818cf8;color:#818cf8;background:rgba(99,102,241,0.1);}
+.ai-len-row{display:flex;align-items:center;gap:6px;}
+.ai-len-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);width:36px;flex-shrink:0;}
+.ai-len-pill{font-family:var(--fm);font-size:8px;padding:2px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:var(--surf);cursor:pointer;
+  transition:border-color .12s,color .12s,background .12s;}
+.ai-len-pill.on{border-color:#818cf8;color:#818cf8;background:rgba(99,102,241,0.1);}
+.ai-gen-btn{
+  font-family:var(--fm);font-size:9px;letter-spacing:.1em;
+  padding:6px 0;border-radius:var(--r);cursor:pointer;
+  border:1px solid rgba(99,102,241,0.5);
+  background:rgba(99,102,241,0.12);color:#818cf8;
+  transition:background .15s,border-color .15s;
+  text-align:center;user-select:none;
+}
+.ai-gen-btn:hover,.ai-gen-btn:active{background:rgba(99,102,241,0.22);border-color:#818cf8;}
+.ai-gen-btn.loading{color:rgba(129,140,248,0.5);pointer-events:none;
+  border-color:rgba(99,102,241,0.25);}
+.ai-result-row{display:flex;align-items:center;gap:6px;}
+.ai-result{flex:1;font-family:var(--fm);font-size:8px;color:var(--dim);
+  padding:4px 6px;border:1px solid var(--bdr);border-radius:var(--r);
+  background:var(--surf);min-height:22px;letter-spacing:.04em;word-break:break-all;}
+.ai-result.ok{color:rgba(129,140,248,0.9);}
+.ai-result.err{color:rgba(212,74,106,0.8);}
+.ai-play-btn{
+  display:none;font-family:var(--fm);font-size:8px;padding:4px 10px;
+  border:1px solid rgba(99,102,241,0.4);border-radius:var(--r);
+  color:#818cf8;background:rgba(99,102,241,0.08);cursor:pointer;
+  transition:background .12s;letter-spacing:.06em;white-space:nowrap;flex-shrink:0;
+}
+.ai-play-btn.show{display:inline-block;}
+.ai-play-btn:hover{background:rgba(99,102,241,0.18);}
+
 /* ── SAVED PROGRESSIONS パネル ── */
 .saved-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
 .saved-hdr{display:flex;align-items:center;justify-content:space-between;
@@ -707,6 +770,55 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 
         <!-- PATH -->
         <div class="path-bar" id="path-bar"><span class="ph-lbl">PATH</span></div>
+
+        <!-- AI 進行提案 (P5) -->
+        <div class="ai-zone" id="ai-zone">
+          <div class="ai-hdr" onclick="toggleAiPanel()">
+            <span class="ai-hdr-l">✦ AI SUGGEST <span class="ai-hdr-badge">BETA</span></span>
+            <span class="ai-tog" id="ai-tog">▼</span>
+          </div>
+          <div class="ai-wrap" id="ai-wrap">
+            <div class="ai-inner">
+              <!-- ムードスライダー -->
+              <div class="ai-mood-row">
+                <span class="ai-mood-lbl">MOOD</span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                  <div class="ai-mood-track" id="ai-mood-track">
+                    <div class="ai-mood-thumb" id="ai-mood-thumb"></div>
+                  </div>
+                  <div class="ai-mood-labels"><span>Dark</span><span>Neutral</span><span>Bright</span></div>
+                </div>
+              </div>
+              <!-- スタイル選択 -->
+              <div class="ai-style-row">
+                <span class="ai-style-lbl">STYLE</span>
+                <div id="ai-style-pills" style="display:flex;flex-wrap:wrap;gap:4px;">
+                  <div class="ai-style-pill on" data-style="pop">Pop</div>
+                  <div class="ai-style-pill" data-style="jazz">Jazz</div>
+                  <div class="ai-style-pill" data-style="bossa">Bossa</div>
+                  <div class="ai-style-pill" data-style="blues">Blues</div>
+                  <div class="ai-style-pill" data-style="modal">Modal</div>
+                </div>
+              </div>
+              <!-- 長さ選択 -->
+              <div class="ai-len-row">
+                <span class="ai-len-lbl">BARS</span>
+                <div id="ai-len-pills" style="display:flex;gap:4px;">
+                  <div class="ai-len-pill" data-len="4">4</div>
+                  <div class="ai-len-pill on" data-len="6">6</div>
+                  <div class="ai-len-pill" data-len="8">8</div>
+                </div>
+              </div>
+              <!-- 生成ボタン -->
+              <div class="ai-gen-btn" id="ai-gen-btn" onclick="generateProgression()">✦ GENERATE</div>
+              <!-- 結果表示 -->
+              <div class="ai-result-row">
+                <div class="ai-result" id="ai-result">現在のコードを起点に進行を生成します</div>
+                <div class="ai-play-btn" id="ai-play-btn" onclick="playAiProgression()">▶ PLAY</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- SAVED PROGRESSIONS -->
         <div class="saved-zone" id="saved-zone">
@@ -4983,6 +5095,203 @@ function playSusProg(id){
   if(susChords.length>1){
     savedProgTimer=setTimeout(step, interval);
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// P5: AI進行提案エンジン (§20-5)
+// Anthropic API (claude-sonnet-4-20250514) を呼び出し
+// 現在コード・ムード・スタイルを入力として
+// 4〜8小節のコード進行をJSON形式で生成する。
+// ═══════════════════════════════════════════════════════
+
+// AI状態
+let aiPanelOpen=false;
+let aiMood=0.5;         // 0.0=Dark 〜 1.0=Bright
+let aiStyle='pop';
+let aiLen=6;
+let aiLastChords=null;  // 最後に生成されたコード配列
+let aiGenTimer=null;
+
+// パネル開閉
+function toggleAiPanel(){
+  aiPanelOpen=!aiPanelOpen;
+  const wrap=document.getElementById('ai-wrap');
+  const tog=document.getElementById('ai-tog');
+  if(wrap) wrap.classList.toggle('open',aiPanelOpen);
+  if(tog) tog.textContent=aiPanelOpen?'▲':'▼';
+  if(aiPanelOpen) initAiPanelUI();
+}
+
+// UI初期化（スライダー・ピル）
+function initAiPanelUI(){
+  // スタイルピル
+  document.querySelectorAll('.ai-style-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.style===aiStyle);
+    p.onclick=()=>{
+      aiStyle=p.dataset.style;
+      document.querySelectorAll('.ai-style-pill').forEach(q=>q.classList.toggle('on',q===p));
+    };
+  });
+  // 長さピル
+  document.querySelectorAll('.ai-len-pill').forEach(p=>{
+    p.classList.toggle('on', parseInt(p.dataset.len)===aiLen);
+    p.onclick=()=>{
+      aiLen=parseInt(p.dataset.len);
+      document.querySelectorAll('.ai-len-pill').forEach(q=>q.classList.toggle('on',q===p));
+    };
+  });
+  // ムードスライダー（ポインターイベント）
+  initMoodSlider();
+}
+
+function initMoodSlider(){
+  const track=document.getElementById('ai-mood-track');
+  const thumb=document.getElementById('ai-mood-thumb');
+  if(!track||!thumb) return;
+  // サムの位置を現在のaiMood値に同期
+  thumb.style.left=(aiMood*100)+'%';
+  let dragging=false;
+  const setMood=e=>{
+    const rect=track.getBoundingClientRect();
+    const x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    aiMood=x;
+    thumb.style.left=(x*100)+'%';
+  };
+  track.onpointerdown=e=>{dragging=true;track.setPointerCapture(e.pointerId);setMood(e);};
+  track.onpointermove=e=>{if(dragging)setMood(e);};
+  track.onpointerup=()=>{dragging=false;};
+}
+
+// ムード値 → テキスト
+function moodLabel(v){
+  if(v<0.25) return 'dark and tense';
+  if(v<0.45) return 'slightly melancholic';
+  if(v<0.55) return 'neutral';
+  if(v<0.75) return 'hopeful and warm';
+  return 'bright and uplifting';
+}
+
+// API呼び出し本体
+async function generateProgression(){
+  const btn=document.getElementById('ai-gen-btn');
+  const resultEl=document.getElementById('ai-result');
+  const playBtn=document.getElementById('ai-play-btn');
+  if(!btn||!resultEl) return;
+
+  btn.classList.add('loading');
+  btn.textContent='✦ GENERATING...';
+  resultEl.className='ai-result';
+  resultEl.textContent='生成中...';
+  playBtn.classList.remove('show');
+  aiLastChords=null;
+
+  // 現在コードのbuildRelations結果（上位8件）をコンテキストとして埋め込む
+  const rels=buildRelations(S.root,S.type).slice(0,8)
+    .map(r=>`${cs(r.root,r.type)}(${r.rtype})`).join(', ');
+  const currentMode=guessMode(S.type)||'unknown';
+  const modalNeighbors=computeModalNeighbors(S.root,S.type)
+    .map(n=>`${n.display}(via ${n.change})`).join(', ')||'none';
+
+  // 有効なコードタイプ一覧（CTキー）
+  const validTypes=Object.keys(CT).filter(k=>CT[k]?.iv).join(',');
+  const validRoots=NOTES.join(',');
+
+  const systemPrompt=`You are a music theory assistant that generates chord progressions as JSON.
+Respond ONLY with a valid JSON array, no explanation, no markdown, no backticks.
+Format: [{"root":"C","type":"major"},{"root":"G","type":"dom7"},...]
+Valid roots: ${validRoots}
+Valid types: ${validTypes}`;
+
+  const userPrompt=`Generate a ${aiLen}-chord ${aiStyle} progression.
+Starting chord: ${cs(S.root,S.type)} (mode: ${currentMode})
+Mood: ${moodLabel(aiMood)}
+Related chords: ${rels}
+Modal neighbors: ${modalNeighbors}
+Rules:
+- Start with or near ${cs(S.root,S.type)}
+- Use exactly ${aiLen} chords
+- Match the ${moodLabel(aiMood)} mood
+- Fit ${aiStyle} style
+- Use only the valid roots and types listed
+Return ONLY the JSON array.`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:400,
+        system:systemPrompt,
+        messages:[{role:'user',content:userPrompt}],
+      }),
+    });
+    const data=await resp.json();
+    const raw=(data.content||[]).map(b=>b.text||'').join('').trim();
+    // JSON配列を抽出（```や余分テキストへの防御）
+    const jsonStr=raw.replace(/```[a-z]*/gi,'').replace(/```/g,'').trim();
+    const parsed=JSON.parse(jsonStr);
+    if(!Array.isArray(parsed)||!parsed.length) throw new Error('空の配列');
+
+    // バリデーション: root・typeが有効か確認
+    const validTypeSet=new Set(Object.keys(CT).filter(k=>CT[k]?.iv));
+    const validRootSet=new Set(NOTES);
+    const validated=parsed.filter(c=>
+      validRootSet.has(c.root)&&validTypeSet.has(c.type)
+    );
+    if(!validated.length) throw new Error('有効なコードなし');
+
+    aiLastChords=validated;
+    const preview=validated.map(c=>cs(c.root,c.type)).join(' → ');
+    resultEl.className='ai-result ok';
+    resultEl.textContent=preview;
+    playBtn.classList.add('show');
+  } catch(err){
+    resultEl.className='ai-result err';
+    resultEl.textContent='エラー: '+err.message;
+    console.error('AI generation error:',err);
+  } finally{
+    btn.classList.remove('loading');
+    btn.textContent='✦ GENERATE';
+  }
+}
+
+// 生成された進行を再生（playSavedProgと同じパイプライン）
+function playAiProgression(){
+  if(!aiLastChords||!aiLastChords.length) return;
+  if(savedProgTimer){clearTimeout(savedProgTimer);savedProgTimer=null;}
+  if(MAP_MODE!=='chain') setMode('chain');
+
+  const prevPhraseMode=phraseMode;
+  const forcedPhrase=(phraseMode==='off');
+  if(forcedPhrase){
+    phraseMode='melody';
+    const pms=document.getElementById('phrase-mode-sel');
+    if(pms) pms.value='melody';
+  }
+
+  const interval=Math.round(60000/autoBpm*2);
+  const chords=aiLastChords;
+  moveToChord(chords[0].root,chords[0].type);
+
+  let idx=1;
+  function step(){
+    if(idx>=chords.length){
+      savedProgTimer=null;
+      if(forcedPhrase){
+        setTimeout(()=>{
+          phraseMode=prevPhraseMode;
+          const pms=document.getElementById('phrase-mode-sel');
+          if(pms) pms.value=prevPhraseMode;
+        },interval);
+      }
+      return;
+    }
+    const c=chords[idx++];
+    moveToChord(c.root,c.type);
+    savedProgTimer=setTimeout(step,interval);
+  }
+  if(chords.length>1) savedProgTimer=setTimeout(step,interval);
 }
 
 // SAVEDパネルの開閉
