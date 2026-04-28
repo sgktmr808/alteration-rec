@@ -5851,7 +5851,7 @@ function showDimMenu(anchor, afterIdx, cands){
 // ═══════════════════════
 function initExpand(){
   expandTree={root:S.root,type:S.type,key:cs(S.root,S.type),depth:0,
-    x:L.cx,y:L.cy,children:[],expandable:false,
+    x:L.cx,y:L.cy,children:[],expandable:true,
     rels:buildRelations(S.root,S.type)};
   expandNodes=[expandTree];invalidate();
 }
@@ -5862,10 +5862,13 @@ function expandNode(root,type,key){
   if(found.children.length>0){
     // 展開済み→折りたたむ
     const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n);n.children.forEach(remove);};
-    found.children.forEach(remove);found.children=[];
-    found.expandable=true; // 折りたたんだので再び展開可能に
+    found.children.forEach(remove);
+    found.children=[];
+    // 折りたたんだので再び展開可能かチェック
+    const rels=buildRelations(root,type).slice(0,8);
+    found.expandable=rels.some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
   } else {
-    // 展開可能フラグがない場合は何もしない
+    // expandableでない場合は何もしない（音は鳴らす）
     if(!found.expandable){ invalidate(); return; }
     const rels=buildRelations(root,type).slice(0,8);
     const newRels=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
@@ -5876,33 +5879,27 @@ function expandNode(root,type,key){
       const childKey=cs(rel.root,rel.type);
       const angle=baseAngle+spread*(i/(newRels.length-1||1)-0.5);
       const dist=90+found.depth*10;
-      const child={root:rel.root,type:rel.type,key:childKey,
+      // 子ノードが展開可能かを初期計算
+      const childRels=buildRelations(rel.root,rel.type).slice(0,8);
+      const childExpandable=childRels.some(r=>
+        r.root!==root&&!expandNodes.find(n=>n.key===cs(r.root,r.type))
+      );
+      const child={
+        root:rel.root,type:rel.type,key:childKey,
         depth:found.depth+1,parent:found,parentAngle:angle,
-        x:found.x+Math.cos(angle)*dist,y:found.y+Math.sin(angle)*dist,
-        children:[],expandable:true,
-        rtype:rel.rtype,score:rel.score,opacity:rel.opacity};
-      found.children.push(child);expandNodes.push(child);
+        x:found.x+Math.cos(angle)*dist,
+        y:found.y+Math.sin(angle)*dist,
+        children:[],expandable:childExpandable,
+        rtype:rel.rtype,score:rel.score,opacity:rel.opacity
+      };
+      found.children.push(child);
+      expandNodes.push(child);
     });
-    found.expandable=false; // 展開済みに
+    found.expandable=false;
   }
   invalidate();
 }
 function drawExpand(ctx){
-  // expandableフラグを全ノードに事前計算
-  // （ツリーにない関連コードが1つでもある = 展開可能）
-  const updateExpandable=(node)=>{
-    if(node.children.length>0){
-      node.expandable=false; // 展開済みは+不要
-    } else if(node.depth===0){
-      node.expandable=false; // ルートは別扱い
-    } else {
-      node.expandable=buildRelations(node.root,node.type).slice(0,8)
-        .some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
-    }
-    node.children.forEach(updateExpandable);
-  };
-  if(expandTree) updateExpandable(expandTree);
-
   const drawNode=(node)=>{
     const col=node.depth===0?'#e8c547':(RHEX[node.rtype]||'#888');
     const isTop=node.opacity>0.82;
@@ -5923,7 +5920,7 @@ function drawExpand(ctx){
     const fillAlpha=node.depth===0?0.25:isExpanded?0.45:isTop?0.18:0.10;
     ctx.fillStyle=`rgba(${rr},${gg},${bb},${fillAlpha})`;ctx.fill();
 
-    // Node stroke（展開可能→点線 / 展開済み→実線太め / それ以外→実線細め）
+    // Node stroke
     ctx.strokeStyle=col;
     ctx.lineWidth=node.depth===0?2:isExpanded?2:isTop?1.5:0.8;
     ctx.globalAlpha=node.depth===0?1:isExpanded?0.90:node.opacity||0.6;
