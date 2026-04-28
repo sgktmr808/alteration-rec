@@ -687,7 +687,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           </div>
           <!-- S11: トーンホイール（左下） -->
           <div id="tone-wheel-overlay">
-            <canvas id="tone-wheel-canvas" width="160" height="160"></canvas>
+            <canvas id="tone-wheel-canvas" width="200" height="200"></canvas>
             <div style="font-family:var(--fm);font-size:6px;color:rgba(74,144,212,0.6);letter-spacing:.1em;text-align:center;">TAP TO SET KEY · DRAG TO ROTATE</div>
           </div>
           <div class="mode-bar">
@@ -6349,6 +6349,13 @@ const TW_CHORD_RING=[
 ];
 const TW_N=TW_CHORD_RING.length; // 24
 
+// P7: Sus外輪リング（TW_CHORD_RINGと同スロット順）
+// Major スロット → sus4、minor スロット → sus2
+const TW_SUS_RING=TW_CHORD_RING.map(c=>({
+  root: c.root,
+  type: (c.type==='major')?'sus4':'sus2',
+}));
+
 let toneWheelOpen=false;
 let twRotation=0;      // 現在の回転角（ラジアン）
 let twDragStart=null;  // {angle, rotation}
@@ -6414,20 +6421,31 @@ function initToneWheel(){
       const px=(e.clientX-rect.left)*(W/rect.width);
       const py=(e.clientY-rect.top)*(H/rect.height);
       const cx=W/2, cy=H/2;
-      const R_OUT=68, R_IN=30;
+      const R_SUS=90, R_OUT=68, R_IN=30;
       const dx=px-cx, dy=py-cy;
       const dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist>=R_IN&&dist<=R_OUT){
+      if(dist>=R_IN&&dist<=R_SUS){
         const rawA=Math.atan2(dy,dx);
         const slotA=(rawA-twRotation+Math.PI*2)%(Math.PI*2);
         const idx=Math.round(slotA/(Math.PI*2/TW_N))%TW_N;
-        const c=TW_CHORD_RING[idx];
-        if(c){
-          moveToChord(c.root, c.type);
-          // 選択したスロットが上（12時）に来るよう回転を調整
-          const targetRot=-idx*(Math.PI*2/TW_N)-Math.PI/2;
-          twRotation=targetRot;
-          drawToneWheel();
+        // Sus外輪タップ（R_OUT〜R_SUS）
+        if(dist>R_OUT){
+          const sus=TW_SUS_RING[idx];
+          if(sus){
+            moveToChord(sus.root, sus.type);
+            const targetRot=-idx*(Math.PI*2/TW_N)-Math.PI/2;
+            twRotation=targetRot;
+            drawToneWheel();
+          }
+        } else {
+          // 内輪タップ（R_IN〜R_OUT）: Major/minor
+          const c=TW_CHORD_RING[idx];
+          if(c){
+            moveToChord(c.root, c.type);
+            const targetRot=-idx*(Math.PI*2/TW_N)-Math.PI/2;
+            twRotation=targetRot;
+            drawToneWheel();
+          }
         }
       }
     }
@@ -6441,18 +6459,62 @@ function drawToneWheel(){
   if(!twCtx)return;
   const W=twCanvas.width, H=twCanvas.height;
   const cx=W/2, cy=H/2;
-  const R_OUT=68, R_MID=50, R_IN=30;
+  // P7: Sus外輪を追加したため半径を拡張
+  const R_SUS=90;   // Sus外輪 外縁
+  const R_OUT=68;   // Major/minor内輪 外縁（既存）
+  const R_MID=50;   // 内輪 中間参照
+  const R_IN=30;    // 内輪 内縁
   const step=Math.PI*2/TW_N;
 
   twCtx.clearRect(0,0,W,H);
 
   // ── 背景ガイドリング ──
-  twCtx.beginPath();twCtx.arc(cx,cy,R_OUT+4,0,Math.PI*2);
+  twCtx.beginPath();twCtx.arc(cx,cy,R_SUS+3,0,Math.PI*2);
+  twCtx.strokeStyle='rgba(160,160,180,0.10)';twCtx.lineWidth=1;twCtx.stroke();
+  twCtx.beginPath();twCtx.arc(cx,cy,R_OUT+1,0,Math.PI*2);
   twCtx.strokeStyle='rgba(74,144,212,0.15)';twCtx.lineWidth=1;twCtx.stroke();
   twCtx.beginPath();twCtx.arc(cx,cy,R_IN,0,Math.PI*2);
   twCtx.strokeStyle='rgba(74,144,212,0.10)';twCtx.lineWidth=1;twCtx.stroke();
 
-  // ── 各スロット描画 ──
+  // ── P7: Sus外輪（R_OUT〜R_SUS）──
+  TW_SUS_RING.forEach((sus,i)=>{
+    const a=twRotation+i*step;
+    const aNext=a+step;
+    const isSus4=sus.type==='sus4';
+    const isActiveSus=(sus.root===S.root&&sus.type===S.type);
+
+    // 扇形
+    twCtx.beginPath();
+    twCtx.moveTo(cx+R_OUT*Math.cos(a), cy+R_OUT*Math.sin(a));
+    twCtx.arc(cx,cy,R_SUS,a,aNext);
+    twCtx.arc(cx,cy,R_OUT,aNext,a,true);
+    twCtx.closePath();
+    // sus4=緑系、sus2=紫系、グレーベース
+    const susCol=isSus4?'rgba(74,170,114,':'rgba(154,106,212,';
+    twCtx.fillStyle=isActiveSus?susCol+'0.32)':susCol+'0.06)';
+    twCtx.fill();
+    twCtx.strokeStyle=isActiveSus?susCol+'0.75)':'rgba(255,255,255,0.05)';
+    twCtx.lineWidth=isActiveSus?1.5:0.4;
+    twCtx.stroke();
+
+    // ラベル（小さめ）
+    const midA=a+step/2;
+    const midR=(R_OUT+R_SUS)/2;
+    const tx=cx+midR*Math.cos(midA);
+    const ty=cy+midR*Math.sin(midA);
+    twCtx.save();
+    twCtx.translate(tx,ty);
+    twCtx.rotate(midA+Math.PI/2);
+    twCtx.font=isActiveSus?'bold 5.5px DM Mono,monospace':'5px DM Mono,monospace';
+    twCtx.textAlign='center';twCtx.textBaseline='middle';
+    // アクティブなら色付き、それ以外は薄いグレー
+    twCtx.fillStyle=isActiveSus?(isSus4?'#4aaa72':'#9a6ad4'):'rgba(180,180,195,0.40)';
+    const susLabel=sus.root+(isSus4?'4':'2');
+    twCtx.fillText(susLabel,0,0);
+    twCtx.restore();
+  });
+
+  // ── Major/minor 内輪（R_IN〜R_OUT）: 既存ロジック ──
   TW_CHORD_RING.forEach((chord,i)=>{
     const a=twRotation+i*step;
     const aNext=a+step;
@@ -6499,8 +6561,13 @@ function drawToneWheel(){
 
   // ── 12時インジケーター ──
   twCtx.beginPath();
-  twCtx.moveTo(cx,cy-R_OUT-2);twCtx.lineTo(cx,cy-R_OUT-8);
+  twCtx.moveTo(cx,cy-R_SUS-1);twCtx.lineTo(cx,cy-R_SUS-7);
   twCtx.strokeStyle='rgba(74,144,212,0.70)';twCtx.lineWidth=2;twCtx.stroke();
+
+  // ── Sus外輪 凡例（外輪右下に小さく） ──
+  twCtx.font='5px DM Mono,monospace';twCtx.textAlign='right';twCtx.textBaseline='bottom';
+  twCtx.fillStyle='rgba(74,170,114,0.55)';twCtx.fillText('sus4',W-4,H-12);
+  twCtx.fillStyle='rgba(154,106,212,0.55)';twCtx.fillText('sus2',W-4,H-4);
 }
 // ═══════════════════════════════════════════════════════
 
