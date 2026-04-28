@@ -5852,68 +5852,138 @@ function computeModalNeighbors(root, type){
   }));
 }
 
-// S7オーバーレイ描画
-// RADIALノードのうち隣接モードに属するコードをハイライト
+// S7 × S6 統合オーバーレイ描画 (P4)
+// ─────────────────────────────────────────────────────
+// 各RADIALノードを以下の3カテゴリに分類してハイライト:
+//   BOTH  : S7（モード隣接）かつ S6（1音変化）→ 紫×橙 二重リング
+//   S7のみ : モード隣接のみ → 紫リング
+//   S6のみ : 1音変化のみ   → 橙リング
+// ラベルは「変化音 / モード名」の2行に統一
 function drawModalOverlay(ctx){
   const neighbors=computeModalNeighbors(S.root, S.type);
-  if(!neighbors.length) return;
-
   const W=ctx.canvas.width, H=ctx.canvas.height;
   const cx=W/2, cy=H/2;
+
+  // S6: 1音変化コードをキーセットで引く（キャッシュ利用）
+  const sncResults=computeSingleNoteChanges(S.root, S.type);
+  const sncMap=new Map(); // 'root__type' → {changedFrom, changedTo, semitone}
+  sncResults.forEach(r=>sncMap.set(r.root+'__'+r.type, r));
+
+  // S7: nodeHits ごとに隣接モード情報を逆引き
+  // nb.chordTypes に含まれるノードが「S7に該当」
+  const s7Map=new Map(); // 'root__type' → neighbor info（最初の一致）
+  neighbors.forEach(nb=>{
+    nodeHits.forEach(hit=>{
+      if(!nb.chordTypes.includes(hit.type)) return;
+      if(hit.root===S.root&&hit.type===S.type) return;
+      const k=hit.root+'__'+hit.type;
+      if(!s7Map.has(k)) s7Map.set(k, nb);
+    });
+  });
 
   // 現在モード名を中央下に表示
   const currentMode=guessMode(S.type);
   if(currentMode){
-    const mData=MODAL_DATA[currentMode];
-    const mColor=mData?.color||'#9a6ad4';
+    const mColor=MODAL_DATA[currentMode]?.color||'#9a6ad4';
     ctx.save();
     ctx.font='bold 7px DM Mono,monospace';
     ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillStyle=mColor;
-    ctx.globalAlpha=0.75;
+    ctx.fillStyle=mColor;ctx.globalAlpha=0.75;
     ctx.fillText('MODE: '+(MODAL_DISPLAY[currentMode]||currentMode), cx, cy+42);
     ctx.restore();
   }
 
-  // 隣接モードごとにノードをハイライト
-  neighbors.forEach(nb=>{
-    nodeHits.forEach(hit=>{
-      if(!nb.chordTypes.includes(hit.type)) return;
-      // 現在コードは除外
-      if(hit.root===S.root&&hit.type===S.type) return;
+  // S6のみ件数・BOTH件数を左下に表示
+  let bothCount=0, s6OnlyCount=0, s7OnlyCount=0;
+  nodeHits.forEach(hit=>{
+    if(hit.root===S.root&&hit.type===S.type) return;
+    const k=hit.root+'__'+hit.type;
+    const inS7=s7Map.has(k), inS6=sncMap.has(k);
+    if(inS7&&inS6) bothCount++;
+    else if(inS6) s6OnlyCount++;
+    else if(inS7) s7OnlyCount++;
+  });
+  ctx.save();
+  ctx.font='bold 6.5px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
+  ctx.fillStyle='#ffffff';ctx.globalAlpha=0.35;
+  ctx.fillText(`S7:${s7OnlyCount} S6:${s6OnlyCount} BOTH:${bothCount}`, 10, H-10);
+  ctx.restore();
 
-      const {x,y}=hit;
-      ctx.save();
+  // ── ノードごとに描画 ──
+  nodeHits.forEach(hit=>{
+    if(hit.root===S.root&&hit.type===S.type) return;
+    const k=hit.root+'__'+hit.type;
+    const nb=s7Map.get(k);    // S7情報（存在しなければundefined）
+    const snc=sncMap.get(k);  // S6情報（存在しなければundefined）
+    if(!nb&&!snc) return;
 
-      // 外周パルスリング（モード色）
-      ctx.beginPath();ctx.arc(x,y,20,0,Math.PI*2);
-      ctx.strokeStyle=nb.color;
-      ctx.lineWidth=1.5;
-      ctx.globalAlpha=0.60;
-      ctx.stroke();
+    const {x,y}=hit;
+    const S7_COL='#9a6ad4'; // 紫
+    const S6_COL='#d4823a'; // 橙
+    const BOTH_COL='#c87af0'; // 明るい紫（BOTH用内リング）
 
-      // 方向インジケーター（↑上昇=明るい / ↓下降=暗い）
+    ctx.save();
+
+    if(nb&&snc){
+      // ━━ BOTH: S7 かつ S6 ━━
+      // 外リング: 橙（S6）
+      ctx.beginPath();ctx.arc(x,y,23,0,Math.PI*2);
+      ctx.strokeStyle=S6_COL;ctx.lineWidth=1.5;
+      ctx.globalAlpha=0.65;ctx.stroke();
+      // 内リング: 紫（S7）
+      ctx.beginPath();ctx.arc(x,y,19,0,Math.PI*2);
+      ctx.strokeStyle=BOTH_COL;ctx.lineWidth=2;
+      ctx.globalAlpha=0.70;ctx.stroke();
+      // 方向矢印（S7）
       const arrow=nb.dir==='up'?'↑':'↓';
       ctx.font='bold 8px DM Mono,monospace';
       ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillStyle=nb.color;
-      ctx.globalAlpha=0.85;
-      ctx.fillText(arrow, x, y-24);
-
-      // 変化音ラベル
-      ctx.font='5.5px DM Mono,monospace';
-      ctx.textBaseline='top';
-      ctx.globalAlpha=0.70;
-      ctx.fillText(nb.change, x, y+21);
-
-      // モード名（ノードの少し外側）
+      ctx.fillStyle=BOTH_COL;ctx.globalAlpha=0.90;
+      ctx.fillText(arrow, x, y-27);
+      // 1行目: 変化音（S6）
+      ctx.font='bold 5.5px DM Mono,monospace';
+      ctx.textAlign='center';ctx.textBaseline='top';
+      ctx.fillStyle=S6_COL;ctx.globalAlpha=0.85;
+      ctx.fillText(snc.changedFrom+'→'+snc.changedTo+(snc.semitone>0?'↑':'↓'), x, y+25);
+      // 2行目: モード名（S7）
       ctx.font='5px DM Mono,monospace';
-      ctx.fillStyle=nb.color;
-      ctx.globalAlpha=0.55;
-      ctx.fillText(nb.display, x, y+29);
+      ctx.fillStyle=BOTH_COL;ctx.globalAlpha=0.70;
+      ctx.fillText(nb.display||nb.modeName, x, y+33);
 
-      ctx.restore();
-    });
+    } else if(nb){
+      // ━━ S7のみ ━━
+      ctx.beginPath();ctx.arc(x,y,20,0,Math.PI*2);
+      ctx.strokeStyle=nb.color||S7_COL;ctx.lineWidth=1.5;
+      ctx.globalAlpha=0.60;ctx.stroke();
+      const arrow=nb.dir==='up'?'↑':'↓';
+      ctx.font='bold 8px DM Mono,monospace';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=nb.color||S7_COL;ctx.globalAlpha=0.85;
+      ctx.fillText(arrow, x, y-24);
+      // ラベル1行目: 変化音（S7グラフの変化音）
+      ctx.font='5.5px DM Mono,monospace';
+      ctx.textBaseline='top';ctx.globalAlpha=0.70;
+      ctx.fillText(nb.change, x, y+21);
+      // ラベル2行目: モード名
+      ctx.font='5px DM Mono,monospace';ctx.globalAlpha=0.55;
+      ctx.fillText(nb.display||nb.modeName, x, y+29);
+
+    } else {
+      // ━━ S6のみ ━━
+      // 橙点線リング
+      ctx.beginPath();ctx.arc(x,y,21,0,Math.PI*2);
+      ctx.strokeStyle=S6_COL;ctx.lineWidth=1.5;
+      ctx.setLineDash([3,3]);ctx.globalAlpha=0.60;ctx.stroke();
+      ctx.setLineDash([]);
+      // 変化音ラベル（1行のみ）
+      const arrow=snc.semitone>0?'↑':'↓';
+      ctx.font='5.5px DM Mono,monospace';
+      ctx.textAlign='center';ctx.textBaseline='top';
+      ctx.fillStyle=S6_COL;ctx.globalAlpha=0.80;
+      ctx.fillText(snc.changedFrom+'→'+snc.changedTo+arrow, x, y+22);
+    }
+
+    ctx.restore();
   });
 }
 
