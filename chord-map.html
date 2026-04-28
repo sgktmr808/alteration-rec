@@ -5928,13 +5928,18 @@ function drawExpand(ctx){
     ctx.globalAlpha=node.depth===0?1:isExpanded?0.95:node.opacity||0.6;
     ctx.fillText(node.key,node.x,node.y);ctx.globalAlpha=1;
 
-    // タップ可能ノードに「+」を表示（サイズアップ・明るく）
-    if(isTappable&&isTop){
-      ctx.font=`bold 10px DM Mono,monospace`;
-      ctx.fillStyle=col;
-      ctx.globalAlpha=0.75;
-      ctx.fillText('+',node.x,node.y+nr+8);
-      ctx.globalAlpha=1;
+    // タップ可能ノードに「+」を表示
+    // 実際に展開可能（ツリーにない子が存在する）かをチェック
+    if(isTappable){
+      const expandable=buildRelations(node.root,node.type).slice(0,8)
+        .some(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
+      if(expandable){
+        ctx.font=`bold ${isTop?10:8}px DM Mono,monospace`;
+        ctx.fillStyle=col;
+        ctx.globalAlpha=isTop?0.80:0.50;
+        ctx.fillText('+',node.x,node.y+nr+8);
+        ctx.globalAlpha=1;
+      }
     }
 
     node.children.forEach(drawNode);
