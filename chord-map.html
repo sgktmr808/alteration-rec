@@ -5900,13 +5900,14 @@ function drawExpand(ctx){
     }
     node.children.forEach(drawNode);
   };
-  // Update nodeHits for expand mode（全ノードを登録）
+  // Update nodeHits for expand mode
+  // ルートノードから再帰して全子ノードを登録
   nodeHits=[];
   const collectHits=(node)=>{
     nodeHits.push({x:node.x,y:node.y,r:node.depth===0?27:15,root:node.root,type:node.type,key:node.key});
     node.children.forEach(collectHits);
   };
-  expandNodes.forEach(n=>collectHits(n));
+  if(expandTree) collectHits(expandTree);
   expandTree&&drawNode(expandTree);
 }
 
