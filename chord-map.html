@@ -5849,29 +5849,59 @@ function showDimMenu(anchor, afterIdx, cands){
 // ═══════════════════════
 // MODE: EXPAND
 // ═══════════════════════
+// 帰還ルール: ルートと同じコードのノードをタップ→パルス→新ルートでリセット
+let expandReturnPulse=0;    // 0〜1 帰還アニメーションフェーズ
+let expandReturnNode=null;  // 帰還中のノード座標
+
+// 優先度別展開ルール
+// P1(diatonic/fifth): 必ず展開 最大6件
+// P2(modal/parallel): 補完 最大4件（P1が少ない場合）
+// P3(chromatic/subst): 展開しない（音だけ）
+const EXPAND_P1=['diatonic','fifth'];
+const EXPAND_P2=['modal','parallel'];
+
 function initExpand(){
+  expandReturnPulse=0;expandReturnNode=null;
   expandTree={root:S.root,type:S.type,key:cs(S.root,S.type),depth:0,
-    x:L.cx,y:L.cy,children:[],
-    rels:buildRelations(S.root,S.type)};
+    x:L.cx,y:L.cy,children:[]};
   expandNodes=[expandTree];invalidate();
 }
 
 function expandNode(root,type,key){
   const found=expandNodes.find(n=>n.key===key);
-  if(!found){ playChord(root,type); return; }
-  playChord(root,type);
-  triggerPhrase(root,type);
+  if(!found){ playChord(root,type);triggerPhrase(root,type);return; }
+
+  // ── 帰還判定 ──
+  // depth>0 かつ ルートと同じコード = 帰還ノード
+  if(found.depth>0 && root===expandTree.root && type===expandTree.type){
+    playChord(root,type);triggerPhrase(root,type);
+    // 帰還パルスアニメーション開始
+    expandReturnPulse=1.0;
+    expandReturnNode={x:found.x,y:found.y};
+    dirty=true;
+    // 0.6秒後に新ルートでリセット
+    setTimeout(()=>{
+      moveToChord(root,type);
+      initExpand();
+    },600);
+    return;
+  }
+
+  playChord(root,type);triggerPhrase(root,type);
+
   if(found.children.length>0){
     // 展開済み→折りたたむ
     const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n);n.children.forEach(remove);};
     found.children.forEach(remove);
     found.children=[];
   } else {
-    // 未展開→展開。ツリーにないコードのみ子として追加
+    // 展開: P1優先・P2補完
     const rels=buildRelations(root,type);
-    const newRels=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
-    if(!newRels.length){ invalidate(); return; }
-    const toAdd=newRels.slice(0,8);
+    const notInTree=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
+    const p1=notInTree.filter(r=>EXPAND_P1.includes(r.rtype)).slice(0,6);
+    const p2=notInTree.filter(r=>EXPAND_P2.includes(r.rtype)).slice(0,Math.max(0,4-p1.length));
+    const toAdd=[...p1,...p2];
+    if(!toAdd.length){ invalidate(); return; }
     const baseAngle=found.parentAngle??0;
     const spread=Math.PI*1.1;
     toAdd.forEach((rel,i)=>{
@@ -5891,68 +5921,96 @@ function expandNode(root,type,key){
   }
   invalidate();
 }
+
 function drawExpand(ctx){
+  const rootKey=expandTree?cs(expandTree.root,expandTree.type):'';
+
   const drawNode=(node)=>{
-    const col=node.depth===0?'#e8c547':(RHEX[node.rtype]||'#888');
+    const isReturn=node.depth>0&&node.key===rootKey; // 帰還ノード
+    const col=node.depth===0?'#e8c547':isReturn?'#e8c547':(RHEX[node.rtype]||'#888');
     const isTop=node.opacity>0.82;
-    const nr=node.depth===0?27:isTop?15:12;
+    const nr=node.depth===0?27:isReturn?18:isTop?15:12;
     const isExpanded=node.children.length>0;
-    // 展開可能表示 = 子なし && depth>0（実際に展開できるかはタップ時に判定）
-    const canExpand=!isExpanded&&node.depth>0;
+
+    // 帰還ノードの判定: P1/P2に展開候補があるか
+    const rels=buildRelations(node.root,node.type);
+    const notInTree=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
+    const hasP1P2=notInTree.some(r=>EXPAND_P1.includes(r.rtype)||EXPAND_P2.includes(r.rtype));
+    const canExpand=!isExpanded&&node.depth>0&&!isReturn&&hasP1P2;
 
     // Line to parent
     if(node.parent){
       ctx.beginPath();ctx.moveTo(node.parent.x,node.parent.y);ctx.lineTo(node.x,node.y);
-      ctx.strokeStyle=col;ctx.lineWidth=isTop?1.5:0.8;
-      ctx.globalAlpha=isTop?0.6:0.25;ctx.stroke();ctx.globalAlpha=1;
+      ctx.strokeStyle=isReturn?'rgba(232,197,71,0.6)':col;
+      ctx.lineWidth=isTop?1.5:0.8;
+      ctx.globalAlpha=isReturn?0.8:isTop?0.6:0.25;ctx.stroke();ctx.globalAlpha=1;
+    }
+
+    const[rr,gg,bb]=parseHex(col);
+
+    // 帰還ノード: 特別な金色グロー
+    if(isReturn){
+      ctx.beginPath();ctx.arc(node.x,node.y,nr+8,0,Math.PI*2);
+      ctx.strokeStyle='rgba(232,197,71,0.35)';ctx.lineWidth=2;
+      ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
+      ctx.beginPath();ctx.arc(node.x,node.y,nr+4,0,Math.PI*2);
+      ctx.strokeStyle='rgba(232,197,71,0.60)';ctx.lineWidth=1.5;
+      ctx.stroke();
     }
 
     // Node fill
-    const[rr,gg,bb]=parseHex(col);
     ctx.beginPath();ctx.arc(node.x,node.y,nr,0,Math.PI*2);
-    const fillAlpha=node.depth===0?0.25:isExpanded?0.45:isTop?0.18:0.10;
+    const fillAlpha=node.depth===0?0.25:isReturn?0.30:isExpanded?0.45:isTop?0.18:0.10;
     ctx.fillStyle=`rgba(${rr},${gg},${bb},${fillAlpha})`;ctx.fill();
 
     // Node stroke
     ctx.strokeStyle=col;
-    ctx.lineWidth=node.depth===0?2:isExpanded?2:isTop?1.5:0.8;
-    ctx.globalAlpha=node.depth===0?1:isExpanded?0.90:node.opacity||0.6;
+    ctx.lineWidth=node.depth===0?2:isReturn?2:isExpanded?2:isTop?1.5:0.8;
+    ctx.globalAlpha=node.depth===0?1:isReturn?1:isExpanded?0.90:node.opacity||0.6;
     ctx.setLineDash(canExpand?[3,2]:[]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha=1;
-
-    // 展開可能ノードに外周リング
-    if(canExpand){
-      ctx.beginPath();ctx.arc(node.x,node.y,nr+4,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(${rr},${gg},${bb},0.28)`;
-      ctx.lineWidth=1;ctx.setLineDash([2,3]);
-      ctx.stroke();ctx.setLineDash([]);
-    }
+    ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
 
     // Label
-    ctx.font=`bold ${node.depth===0?12:isExpanded?10:9}px DM Mono,monospace`;
+    ctx.font=`bold ${node.depth===0?12:isReturn?10:isExpanded?10:9}px DM Mono,monospace`;
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle=node.depth===0?'#e8c547':isExpanded?'#fff':'rgba(255,255,255,0.75)';
-    ctx.globalAlpha=node.depth===0?1:isExpanded?0.95:node.opacity||0.6;
+    ctx.fillStyle=node.depth===0?'#e8c547':isReturn?'#e8c547':isExpanded?'#fff':'rgba(255,255,255,0.75)';
+    ctx.globalAlpha=node.depth===0?1:isReturn?1:isExpanded?0.95:node.opacity||0.6;
     ctx.fillText(node.key,node.x,node.y);ctx.globalAlpha=1;
 
-    // 展開可能ノードのみ「+」を表示
-    if(canExpand){
+    // 帰還ノードラベル（↩）
+    if(isReturn){
+      ctx.font='bold 8px DM Mono,monospace';
+      ctx.fillStyle='#e8c547';ctx.globalAlpha=0.85;
+      ctx.fillText('↩',node.x,node.y+nr+9);ctx.globalAlpha=1;
+    }
+    // 展開可能ノードに「+」
+    else if(canExpand){
       ctx.font=`bold ${isTop?10:8}px DM Mono,monospace`;
-      ctx.fillStyle=col;
-      ctx.globalAlpha=isTop?0.85:0.55;
-      ctx.fillText('+',node.x,node.y+nr+8);
-      ctx.globalAlpha=1;
+      ctx.fillStyle=col;ctx.globalAlpha=isTop?0.85:0.55;
+      ctx.fillText('+',node.x,node.y+nr+8);ctx.globalAlpha=1;
     }
 
     node.children.forEach(drawNode);
   };
 
-  // nodeHits: ルートから再帰して全ノードを登録
+  // 帰還パルスアニメーション
+  if(expandReturnPulse>0.01&&expandReturnNode){
+    const p=expandReturnPulse;
+    const r=20+p*40;
+    ctx.beginPath();ctx.arc(expandReturnNode.x,expandReturnNode.y,r,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(232,197,71,${p*0.7})`;ctx.lineWidth=2.5;
+    ctx.stroke();
+    ctx.beginPath();ctx.arc(expandReturnNode.x,expandReturnNode.y,r*0.6,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(232,197,71,${p*0.4})`;ctx.lineWidth=1.5;
+    ctx.stroke();
+    expandReturnPulse*=0.88;
+    dirty=true;
+  }
+
+  // nodeHits
   nodeHits=[];
   const collectHits=(node)=>{
-    nodeHits.push({x:node.x,y:node.y,r:node.depth===0?27:15,
+    nodeHits.push({x:node.x,y:node.y,r:node.depth===0?27:18,
       root:node.root,type:node.type,key:node.key});
     node.children.forEach(collectHits);
   };
