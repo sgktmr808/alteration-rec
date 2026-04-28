@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Chord Map — Chord Link</title>
@@ -2286,6 +2286,12 @@ function initCanvas(){
       }
       return;
     }
+    // COMPASSモードは独立したhit検出（nodeHitsを使わない）
+    if(MAP_MODE==='compass'){
+      const ch=compassHits.find(h=>{const dx=x-h.x,dy=y-h.y;return dx*dx+dy*dy<=(h.r+6)*(h.r+6);});
+      if(ch) moveToChord(ch.root,ch.type);
+      return;
+    }
     const hit=hitNode(x,y);
     if(hit){
       // P3: AUGMODモード時に転調候補ノードをタップ → moveToChordで転調
@@ -2301,10 +2307,6 @@ function initCanvas(){
       else if(MAP_MODE==='wave'){moveToChord(hit.root,hit.type);waveRings=[];}
       else if(MAP_MODE==='bridge'){moveToChord(hit.root,hit.type);}
       else if(MAP_MODE==='pivot'){moveToChord(hit.root,hit.type);}
-      else if(MAP_MODE==='compass'){
-        const ch=compassHits.find(h=>{const dx=x-h.x,dy=y-h.y;return dx*dx+dy*dy<=(h.r+6)*(h.r+6);});
-        if(ch) moveToChord(ch.root,ch.type);
-      }
     }
   });
 
@@ -5484,7 +5486,7 @@ function drawExpand(ctx){
   // Update nodeHits for expand mode
   nodeHits=[];
   const collectHits=(node)=>{
-    if(node.depth>0)nodeHits.push({x:node.x,y:node.y,r:15,root:node.root,type:node.type,key:node.key});
+    nodeHits.push({x:node.x,y:node.y,r:node.depth===0?27:15,root:node.root,type:node.type,key:node.key});
     node.children.forEach(collectHits);
   };
   expandNodes.forEach(n=>{if(n.depth===0)collectHits(n);});
@@ -6179,8 +6181,8 @@ function computeModalNeighbors(root, type){
 // ラベルは「変化音 / モード名」の2行に統一
 function drawModalOverlay(ctx){
   const neighbors=computeModalNeighbors(S.root, S.type);
-  const W=ctx.canvas.width, H=ctx.canvas.height;
-  const cx=W/2, cy=H/2;
+  const W=L.W, H=L.H;
+  const cx=L.cx, cy=L.cy;
 
   // S6: 1音変化コードをキーセットで引く（キャッシュ利用）
   const sncResults=computeSingleNoteChanges(S.root, S.type);
@@ -6827,8 +6829,8 @@ function compassDir(relNode, currentRoot, currentType){
 
 function drawCompassMode(ctx){
   compassHits=[];
-  const W=ctx.canvas.width, H=ctx.canvas.height;
-  const cx=W/2, cy=H/2;
+  const W=L.W, H=L.H;
+  const cx=L.cx, cy=L.cy+30; // L.cyはH/2-30なので補正
 
   // ── 象限グラデーション背景 ──
   // 北: 黄金→透明（明るい）
