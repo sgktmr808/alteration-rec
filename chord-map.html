@@ -696,6 +696,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="mode-btn" data-mode="expand">EXPAND</div>
               <div class="mode-btn" data-mode="link">LINK</div>
               <div class="mode-btn" data-mode="chain">CHAIN</div>
+              <div class="mode-btn" data-mode="compass">COMP</div>
             </div>
             <div class="mode-row">
               <div class="mode-btn" data-mode="graph">GRAPH</div>
@@ -2197,6 +2198,10 @@ function drawFrame(){
     drawPivotMode(ctx);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
     ctx.fillStyle='rgba(74,144,212,0.4)';ctx.fillText('PIVOT S9: TAP TO MOVE',10,10);
+  } else if(MAP_MODE==='compass'){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='rgba(13,13,16,1)';ctx.fillRect(0,0,W,H);
+    drawCompassMode(ctx);
   }
   // ── S4 AUGハブ: aug系コードが中央のときRADIALに重ねてオーバーレイ ──
   // P3: RADIALモードでaugModMapModeがONのとき常に描画（転調候補表示）
@@ -2296,6 +2301,10 @@ function initCanvas(){
       else if(MAP_MODE==='wave'){moveToChord(hit.root,hit.type);waveRings=[];}
       else if(MAP_MODE==='bridge'){moveToChord(hit.root,hit.type);}
       else if(MAP_MODE==='pivot'){moveToChord(hit.root,hit.type);}
+      else if(MAP_MODE==='compass'){
+        const ch=compassHits.find(h=>{const dx=x-h.x,dy=y-h.y;return dx*dx+dy*dy<=(h.r+6)*(h.r+6);});
+        if(ch) moveToChord(ch.root,ch.type);
+      }
     }
   });
 
@@ -6701,6 +6710,173 @@ function drawBridge(ctx,rels){
   ctx.fillStyle='rgba(255,255,255,0.35)';
   ctx.fillText(`CROSS-SECTOR BRIDGES: ${crossEdges.length}`,10,10);
 }
+
+// ═══════════════════════════════════════════════════════
+// P6: COMPASS MODE (§20-1)
+// 画面を4象限「コンパス」として描画する新MAP_MODE。
+//
+// 北（上）= Lydian系  → 明るい・テンション解放
+// 南（下）= Phrygian系 → 暗い・エスニック
+// 東（右）= ドミナント  → 5度上（緊張→解決）
+// 西（左）= サブドミナント → 5度下（安定）
+//
+// buildRelationsの全コードを上記4方向に分類し
+// 象限グラデーション背景の上にノードを配置する。
+// タップでmoveToChordと同様に移動。
+// ═══════════════════════════════════════════════════════
+
+let compassHits=[]; // タップ検出用
+
+// コードをコンパス方向に分類する
+// 戻り値: 'north'|'south'|'east'|'west'|'center'
+function compassDir(relNode, currentRoot, currentType){
+  const ri=ni(currentRoot);
+  const nRi=ni(relNode.root);
+  const rtype=relNode.rtype||'';
+
+  // 5度圏距離（-6〜+6, +方向=時計回り=Dominant方向）
+  let fifthDist=((nRi-ri+12)%12);
+  if(fifthDist>6) fifthDist-=12; // -6〜+6に正規化
+
+  // 東: ドミナント（+7=5度上 or dom7/diatonic系でfifthDist==+7 mod 12）
+  const semitones=(nRi-ri+12)%12;
+  if(semitones===7) return 'east';
+  if(semitones===5) return 'west'; // 西: サブドミナント（+5=4度上=5度下）
+
+  // モード分類でSouth/Northを決定
+  const mode=guessMode(relNode.type)||'';
+  const northModes=['Lydian','LydianDom','Ionian','Mixolydian'];
+  const southModes=['Phrygian','PhrygDom','Aeolian','DorianB2'];
+
+  if(northModes.some(m=>mode.includes(m))) return 'north';
+  if(southModes.some(m=>mode.includes(m))) return 'south';
+
+  // rtypeによるフォールバック
+  if(rtype==='diatonic'||rtype==='fifth') return semitones<=6?'east':'west';
+  if(rtype==='parallel'||rtype==='modal') return 'north';
+  if(rtype==='chromatic'||rtype==='subst') return 'south';
+  return 'north'; // デフォルト
+}
+
+function drawCompassMode(ctx){
+  compassHits=[];
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  const cx=W/2, cy=H/2;
+
+  // ── 象限グラデーション背景 ──
+  // 北: 黄金→透明（明るい）
+  // 南: 青紫→透明（暗い）
+  // 東: 赤橙→透明（緊張）
+  // 西: 青緑→透明（安定）
+  const quads=[
+    {x1:cx,y1:0,   x2:cx,y2:cy, col1:'rgba(232,197,71,0.18)',  col2:'rgba(232,197,71,0)',  label:'LYDIAN',    align:'center', lx:cx,    ly:12},
+    {x1:cx,y1:H,   x2:cx,y2:cy, col1:'rgba(100,80,200,0.18)',  col2:'rgba(100,80,200,0)',  label:'PHRYGIAN',  align:'center', lx:cx,    ly:H-14},
+    {x1:W, y1:cy,  x2:cx,y2:cy, col1:'rgba(212,100,58,0.18)',  col2:'rgba(212,100,58,0)',  label:'DOMINANT',  align:'right',  lx:W-10,  ly:cy},
+    {x1:0, y1:cy,  x2:cx,y2:cy, col1:'rgba(58,160,130,0.18)',  col2:'rgba(58,160,130,0)',  label:'SUBDOMINANT',align:'left', lx:10,    ly:cy},
+  ];
+  quads.forEach(q=>{
+    const grad=ctx.createLinearGradient(q.x1,q.y1,q.x2,q.y2);
+    grad.addColorStop(0,q.col1);grad.addColorStop(1,q.col2);
+    ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+  });
+
+  // ── 十字ライン ──
+  ctx.save();
+  ctx.strokeStyle='rgba(255,255,255,0.07)';ctx.lineWidth=1;
+  ctx.setLineDash([4,6]);
+  ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+
+  // ── 方位ラベル ──
+  ctx.font='bold 7px DM Mono,monospace';ctx.globalAlpha=0.35;
+  const compassLabels=[
+    {text:'N  BRIGHT',  x:cx,    y:14,    align:'center', col:'#e8c547'},
+    {text:'S  DARK',    x:cx,    y:H-6,   align:'center', col:'#9a6ad4'},
+    {text:'E  DOMINANT',x:W-8,   y:cy-8,  align:'right',  col:'#d4823a'},
+    {text:'W  SUB-DOM', x:8,     y:cy-8,  align:'left',   col:'#3aa082'},
+  ];
+  compassLabels.forEach(l=>{
+    ctx.textAlign=l.align;ctx.textBaseline='top';
+    ctx.fillStyle=l.col;ctx.fillText(l.text,l.x,l.y);
+  });
+  ctx.globalAlpha=1;
+
+  // ── 中央: 現在コード ──
+  const centR=22;
+  ctx.beginPath();ctx.arc(cx,cy,centR,0,Math.PI*2);
+  ctx.fillStyle='rgba(232,197,71,0.15)';ctx.fill();
+  ctx.strokeStyle='#e8c547';ctx.lineWidth=2;ctx.globalAlpha=0.9;ctx.stroke();ctx.globalAlpha=1;
+  ctx.font='bold 10px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#e8c547';ctx.fillText(cs(S.root,S.type),cx,cy);
+
+  // ── コードノード配置 ──
+  const rels=buildRelations(S.root,S.type);
+  const dynRHEX=getRHEX();
+
+  // 方向ごとにノードを集める
+  const buckets={north:[],south:[],east:[],west:[]};
+  rels.forEach(n=>{
+    const dir=compassDir(n,S.root,S.type);
+    if(buckets[dir]) buckets[dir].push(n);
+  });
+
+  // 象限ごとの配置パラメータ
+  const quadParams={
+    north:{baseX:cx, baseY:cy-60, spreadX:85, spreadY:55, maxNodes:6},
+    south:{baseX:cx, baseY:cy+60, spreadX:85, spreadY:55, maxNodes:6},
+    east: {baseX:cx+75,baseY:cy, spreadX:55, spreadY:75, maxNodes:6},
+    west: {baseX:cx-75,baseY:cy, spreadX:55, spreadY:75, maxNodes:6},
+  };
+
+  Object.entries(buckets).forEach(([dir,nodes])=>{
+    const p=quadParams[dir];
+    const count=Math.min(nodes.length, p.maxNodes);
+    nodes.slice(0,count).forEach((n,i)=>{
+      const frac=count>1?(i/(count-1)-0.5):0;
+      let nx,ny;
+      if(dir==='north'||dir==='south'){
+        nx=p.baseX + frac*p.spreadX*2;
+        ny=p.baseY + (dir==='north'?-1:1)*(i%2)*18;
+      } else {
+        nx=p.baseX + (dir==='east'?1:-1)*(i%2)*20;
+        ny=p.baseY + frac*p.spreadY*2;
+      }
+
+      // クランプ（画面外に出ない）
+      const nr=14;
+      nx=Math.max(nr+4,Math.min(W-nr-4,nx));
+      ny=Math.max(nr+4,Math.min(H-nr-4,ny));
+
+      const col=dynRHEX[n.rtype]||'#888';
+      const isTop=n.opacity>0.82;
+      const isCur=(n.root===S.root&&n.type===S.type);
+      const drawR=isTop?nr:nr-3;
+
+      // ノード円
+      const [rr,gg,bb]=parseHex(col);
+      ctx.beginPath();ctx.arc(nx,ny,drawR,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${rr},${gg},${bb},0.13)`;ctx.fill();
+      ctx.strokeStyle=col;ctx.lineWidth=isTop?1.8:1.2;
+      ctx.globalAlpha=isTop?0.85:0.50;ctx.stroke();ctx.globalAlpha=1;
+
+      // ラベル
+      ctx.font=(isTop?'bold ':'')+'8px DM Mono,monospace';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=col;ctx.globalAlpha=isTop?0.95:0.60;
+      ctx.fillText(cs(n.root,n.type),nx,ny);
+      ctx.globalAlpha=1;
+
+      // タップ登録
+      compassHits.push({x:nx,y:ny,r:drawR,root:n.root,type:n.type});
+    });
+  });
+
+  // ── COMPASS ラベル（左上） ──
+  ctx.font='bold 7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
+  ctx.fillStyle='rgba(255,255,255,0.25)';ctx.fillText('COMPASS P6',10,10);
+}
+
 // ═══════════════════════
 // SECTOR UI
 // ═══════════════════════
@@ -6780,6 +6956,7 @@ function setMode(mode){
   else if(mode==='link')linkSelected.clear();
   else if(mode==='graph'){graphInited=false;graphTick=0;initGraph();}
   else if(mode==='wave')waveRings=[];
+  else if(mode==='compass'){compassHits=[];}
   else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';renderPath();}
   else if(mode==='pivot'){
     // PIVOTオーバーレイを表示・目標キーのデフォルトを現在から1ステップ先に
