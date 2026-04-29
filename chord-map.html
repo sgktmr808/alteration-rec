@@ -1109,6 +1109,15 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   <span class="synth-sec-title">PAD · JUNO</span>
                   <div class="synth-on-btn" id="pad-on-btn" onclick="togglePad()">OFF</div>
                 </div>
+                <!-- VOICES -->
+                <div class="synth-row">
+                  <span class="synth-lbl">VOICES</span>
+                  <div class="synth-pills" id="pad-voices-pills">
+                    <div class="synth-pill on" data-voices="4">4</div>
+                    <div class="synth-pill" data-voices="6">6</div>
+                    <div class="synth-pill" data-voices="8">8</div>
+                  </div>
+                </div>
                 <!-- ボイシング -->
                 <div class="synth-row">
                   <span class="synth-lbl">VOICING</span>
@@ -8642,25 +8651,42 @@ function buildDelayNodes(actx){
   dlyDestination=inputGain;
 }
 
-// ── JUNOパッドサウンド合成 ──
-// デチューンした2本のSAW + LPF + コーラス風モジュレーション
-// ── PAD用マスターGain（コードチェンジ時のfadeOut制御）──
-let padMasterGain=null;
-let padFadeTimer=null;
+// ════════════════════════════════════════════════════════
+// JUNO PAD — Voice Pool ポリフォニックエンジン
+//
+// 設計:
+//   - 最大padMaxVoices個のVoiceを常駐
+//   - 各VoiceはOSC×2(SAW detuned) + OSCsub(SQ) + LPF + ENV
+//   - コードチェンジ時:
+//       * 継続音 → そのまま保持（共通音は切らない）
+//       * 離れる音 → RELEASE フェード（300ms）
+//       * 新しい音 → ATTACK フェード（40ms）
+//   → JUNO-106のコードチェンジのように共通音が持続する
+// ════════════════════════════════════════════════════════
 
-function getPadMasterGain(actx){
-  if(!padMasterGain||padMasterGain.context!==actx){
-    padMasterGain=actx.createGain();
-    padMasterGain.gain.value=1;
-    padMasterGain.connect(actx.destination);
+let padMaxVoices=4;  // UI選択: 4 / 6 / 8
+
+// Voice構造体
+// { midi, osc1, osc2, oscSub, lpf, env, lfo, gainNode, active, releasing }
+let padVoices=[];
+
+// マスター出力GainNode（PAD全体のvol制御）
+let padMasterOut=null;
+
+function getPadMasterOut(actx){
+  if(!padMasterOut||padMasterOut.context!==actx){
+    padMasterOut=actx.createGain();
+    padMasterOut.gain.value=1.0;
+    padMasterOut.connect(actx.destination);
   }
-  return padMasterGain;
+  return padMasterOut;
 }
 
-function synthJunoPad(actx, midi, startTime, duration, vol, dest){
+// Voiceを1つ作成してmidiに発音開始
+function padVoiceStart(actx, midi, out){
   const hz=midi2hz(midi);
   const cutoffHz=Math.min(padCutoff, actx.sampleRate/2-100);
-  const out=dest||actx.destination;
+  const t=actx.currentTime;
 
   const osc1=actx.createOscillator();
   osc1.type='sawtooth'; osc1.frequency.value=hz;
@@ -8672,65 +8698,105 @@ function synthJunoPad(actx, midi, startTime, duration, vol, dest){
   const oscSub=actx.createOscillator();
   oscSub.type='square'; oscSub.frequency.value=hz/2;
 
+  // LPF
   const lpf=actx.createBiquadFilter();
   lpf.type='lowpass'; lpf.Q.value=1.2;
-  lpf.frequency.setValueAtTime(300, startTime);
-  lpf.frequency.exponentialRampToValueAtTime(cutoffHz, startTime+0.08);
+  lpf.frequency.setValueAtTime(300, t);
+  lpf.frequency.exponentialRampToValueAtTime(cutoffHz, t+0.06);
 
+  // コーラス風LFO
+  let lfo=null;
   if(padChorus!=='off'){
     const rate=padChorus==='i'?0.9:1.8;
     const depth=(padChorus==='i'?0.0015:0.003)*hz;
-    const lfo=actx.createOscillator(); lfo.frequency.value=rate;
+    lfo=actx.createOscillator(); lfo.frequency.value=rate;
     const lg=actx.createGain(); lg.gain.value=depth;
     lfo.connect(lg); lg.connect(osc2.frequency);
-    lfo.start(startTime); lfo.stop(startTime+duration+0.5);
+    lfo.start(t);
   }
 
+  // Voice個別Gain（ATTACK/RELEASE制御）
   const env=actx.createGain();
-  env.gain.setValueAtTime(0.001, startTime);
-  env.gain.linearRampToValueAtTime(vol*0.65, startTime+0.04);
+  env.gain.setValueAtTime(0.001, t);
+  env.gain.linearRampToValueAtTime(padVol*0.70, t+0.04); // ATTACK 40ms
 
-  const subGain=actx.createGain(); subGain.gain.value=0.15;
+  const subGain=actx.createGain(); subGain.gain.value=0.14;
 
   osc1.connect(lpf); osc2.connect(lpf);
   oscSub.connect(subGain); subGain.connect(lpf);
   lpf.connect(env); env.connect(out);
 
-  osc1.start(startTime); osc1.stop(startTime+duration+0.1);
-  osc2.start(startTime); osc2.stop(startTime+duration+0.1);
-  oscSub.start(startTime); oscSub.stop(startTime+duration+0.1);
+  osc1.start(t); osc2.start(t); oscSub.start(t);
+
+  return {midi, osc1, osc2, oscSub, lpf, env, lfo, out,
+          active:true, releasing:false};
 }
 
-// ── PAD発音（即発音 + 旧音フェードアウト）──
-let padQuantTimer=null;
+// Voiceを停止（RELEASE）
+function padVoiceRelease(voice, actx, releaseSec){
+  if(!voice||voice.releasing) return;
+  voice.releasing=true;
+  voice.active=false;
+  const t=actx.currentTime;
+  const rs=releaseSec||0.35;
+  voice.env.gain.cancelScheduledValues(t);
+  voice.env.gain.setValueAtTime(voice.env.gain.value, t);
+  voice.env.gain.linearRampToValueAtTime(0.0001, t+rs);
+  // rs後にOSCを停止
+  setTimeout(()=>{
+    try{ voice.osc1.stop(); }catch(e){}
+    try{ voice.osc2.stop(); }catch(e){}
+    try{ voice.oscSub.stop(); }catch(e){}
+    try{ if(voice.lfo) voice.lfo.stop(); }catch(e){}
+    try{ voice.env.disconnect(); }catch(e){}
+  }, Math.round(rs*1000)+50);
+}
 
+// コードチェンジ: 継続音は保持、不要音はリリース、新音はアタック
 function triggerPad(root, type){
   if(!padOn) return;
   const actx=safeGetCtx();
   if(!actx) return;
   safeResume(actx, ()=>{
-    const master=getPadMasterGain(actx);
-    const now=actx.currentTime;
-    const fadeOutSec=0.07;
-    master.gain.cancelScheduledValues(now);
-    master.gain.setValueAtTime(master.gain.value, now);
-    master.gain.linearRampToValueAtTime(0.001, now+fadeOutSec);
-    if(padFadeTimer) clearTimeout(padFadeTimer);
-    padFadeTimer=setTimeout(()=>{
-      const a2=safeGetCtx(); if(!a2||!padOn) return;
-      safeResume(a2, ()=>{
-        const m2=getPadMasterGain(a2);
-        const t=a2.currentTime;
-        const dur=60/autoBpm*6;
-        m2.gain.cancelScheduledValues(t);
-        m2.gain.setValueAtTime(0.001, t);
-        m2.gain.linearRampToValueAtTime(1.0, t+0.03);
-        buildPadVoicing(root, type, padVoicing).forEach((midi,i)=>{
-          synthJunoPad(a2, midi, t+i*0.007, dur, padVol, m2);
-        });
-      });
-    }, Math.round(fadeOutSec*1000)+15);
+    const out=getPadMasterOut(actx);
+    out.gain.value=1.0;
+
+    // 新コードのMIDIノートセット（最大padMaxVoices音に制限）
+    let newMidis=buildPadVoicing(root, type, padVoicing);
+    if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
+    const newSet=new Set(newMidis);
+
+    // 現在アクティブなVoiceのMIDIセット
+    const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
+    const activeSet=new Set(activeVoices.map(v=>v.midi));
+
+    // 1. 不要になった音をリリース（新コードにない音）
+    activeVoices.forEach(v=>{
+      if(!newSet.has(v.midi)) padVoiceRelease(v, actx, 0.35);
+    });
+
+    // 2. 新しく必要な音のうち、まだ鳴っていない音を発音
+    newMidis.forEach(midi=>{
+      if(!activeSet.has(midi)){
+        // 旧リリース中のVoiceを再利用するか新規作成
+        const voice=padVoiceStart(actx, midi, out);
+        padVoices.push(voice);
+      }
+    });
+
+    // 3. 解放済みVoiceをリストから掃除（メモリ管理）
+    setTimeout(()=>{
+      padVoices=padVoices.filter(v=>v.active||v.releasing);
+    }, 600);
   });
+}
+
+// PAD全停止
+function stopAllPadVoices(){
+  const actx=safeGetCtx();
+  if(!actx) return;
+  padVoices.forEach(v=>padVoiceRelease(v, actx, 0.15));
+  setTimeout(()=>{ padVoices=[]; }, 300);
 }
 
 // ── ARPスケジューラー ──
@@ -8808,8 +8874,9 @@ function togglePad(){
   const btn=document.getElementById('pad-on-btn');
   if(btn){btn.textContent=padOn?'ON':'OFF'; btn.classList.toggle('on',padOn);}
   if(padOn){
-    // 現在のコードを即時発音
     triggerPad(S.root, S.type);
+  } else {
+    stopAllPadVoices();
   }
 }
 
@@ -8852,12 +8919,25 @@ function synthSliderUpdate(el, valId, min, max, unit){
 }
 
 function initSynthUI(){
+  // PAD VOICES pills
+  document.querySelectorAll('#pad-voices-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', parseInt(p.dataset.voices)===padMaxVoices);
+    p.onclick=()=>{
+      padMaxVoices=parseInt(p.dataset.voices);
+      document.querySelectorAll('#pad-voices-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      // 変更後すぐに現在コードを再発音
+      if(padOn) triggerPad(S.root, S.type);
+    };
+  });
+
   // PADボイシングpills
   document.querySelectorAll('#pad-voicing-pills .synth-pill').forEach(p=>{
     p.classList.toggle('on', p.dataset.v===padVoicing);
     p.onclick=()=>{
       padVoicing=p.dataset.v;
       document.querySelectorAll('#pad-voicing-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      // ボイシング変更後に再発音
+      if(padOn){ stopAllPadVoices(); setTimeout(()=>triggerPad(S.root,S.type),200); }
     };
   });
 
