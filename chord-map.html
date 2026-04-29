@@ -2804,8 +2804,9 @@ function initCanvas(){
     if(dist<32&&MAP_MODE!=='expand'){
       if(autoPlay){stopAuto();}
       else{
-        playChord(S.root,S.type);
+        if(!padOn) playChord(S.root,S.type);
         triggerPhrase(S.root,S.type);
+        notifySynth(S.root,S.type);
       }
       return;
     }
@@ -6688,7 +6689,7 @@ function renderPath(){
       const a=document.createElement('span');a.className='ph-arr';a.textContent='›';bar.appendChild(a);
     }
     const n=document.createElement('div');n.className='ph'+(i===S.histIdx?' cur':'');n.textContent=cs(c.root,c.type);
-    n.addEventListener('click',()=>{S.histIdx=i;S.root=c.root;S.type=c.type;relCache=null;invalidate();document.getElementById('hdr-chord').textContent=cs(c.root,c.type);renderPath();renderPosZone();playChord(c.root,c.type);});
+    n.addEventListener('click',()=>{S.histIdx=i;S.root=c.root;S.type=c.type;relCache=null;invalidate();document.getElementById('hdr-chord').textContent=cs(c.root,c.type);renderPath();renderPosZone();if(!padOn)playChord(c.root,c.type);notifySynth(c.root,c.type);});
     bar.appendChild(n);
   });
   bar.scrollLeft=bar.scrollWidth;
@@ -6871,12 +6872,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 function expandNode(root,type,key){
   const found=expandNodes.find(n=>n.key===key);
-  if(!found){ playChord(root,type); triggerPhrase(root,type); return; }
+  if(!found){ if(!padOn)playChord(root,type); triggerPhrase(root,type); notifySynth(root,type); return; }
 
   // 帰還判定
   const retType=getReturnType(found, expandTree.root, expandTree.type);
   if(retType){
-    playChord(root,type); triggerPhrase(root,type);
+    if(!padOn)playChord(root,type); triggerPhrase(root,type); notifySynth(root,type);
     expandReturnPulse=1.0;
     expandReturnNode={x:found.x, y:found.y, retType};
     dirty=true;
@@ -6888,7 +6889,7 @@ function expandNode(root,type,key){
     return;
   }
 
-  playChord(root,type); triggerPhrase(root,type);
+  if(!padOn)playChord(root,type); triggerPhrase(root,type); notifySynth(root,type);
 
   if(found.children.length>0){
     // 折りたたむ
@@ -7071,7 +7072,9 @@ function toggleLinkSelect(root,type){
   const k=cs(root,type);
   if(linkSelected.has(k))linkSelected.delete(k);
   else linkSelected.add(k);
-  playChord(root,type);invalidate();
+  if(!padOn)playChord(root,type);
+  notifySynth(root,type);
+  invalidate();
 }
 function drawLink(ctx,rels){
   // Draw normal radial nodes first (reuse existing drawn nodes from drawFrame)
@@ -8641,108 +8644,64 @@ function buildDelayNodes(actx){
 
 // ── JUNOパッドサウンド合成 ──
 // デチューンした2本のSAW + LPF + コーラス風モジュレーション
-function synthJunoPad(actx, midi, startTime, duration, vol){
+// ── PAD用マスターGain（コードチェンジ時のfadeOut制御）──
+let padMasterGain=null;
+let padFadeTimer=null;
+
+function getPadMasterGain(actx){
+  if(!padMasterGain||padMasterGain.context!==actx){
+    padMasterGain=actx.createGain();
+    padMasterGain.gain.value=1;
+    padMasterGain.connect(actx.destination);
+  }
+  return padMasterGain;
+}
+
+function synthJunoPad(actx, midi, startTime, duration, vol, dest){
   const hz=midi2hz(midi);
-  const detuneCents=padDetune;
   const cutoffHz=Math.min(padCutoff, actx.sampleRate/2-100);
-  const out=actx.destination;
+  const out=dest||actx.destination;
 
-  // ── OSC 1 (メイン) ──
   const osc1=actx.createOscillator();
-  osc1.type='sawtooth';
-  osc1.frequency.value=hz;
+  osc1.type='sawtooth'; osc1.frequency.value=hz;
 
-  // ── OSC 2 (デチューン) ──
   const osc2=actx.createOscillator();
   osc2.type='sawtooth';
-  osc2.frequency.value=hz*Math.pow(2,detuneCents/1200);
+  osc2.frequency.value=hz*Math.pow(2,padDetune/1200);
 
-  // ── サブオシレーター（1oct下・矩形波・音量控えめ）──
   const oscSub=actx.createOscillator();
-  oscSub.type='square';
-  oscSub.frequency.value=hz/2;
+  oscSub.type='square'; oscSub.frequency.value=hz/2;
 
-  // ── LPF ──
   const lpf=actx.createBiquadFilter();
-  lpf.type='lowpass';
-  lpf.frequency.value=200; // アタック時は低いところからスウィープ
-  lpf.Q.value=1.2;
-  lpf.frequency.setValueAtTime(200, startTime);
-  lpf.frequency.exponentialRampToValueAtTime(cutoffHz, startTime+0.06);
+  lpf.type='lowpass'; lpf.Q.value=1.2;
+  lpf.frequency.setValueAtTime(300, startTime);
+  lpf.frequency.exponentialRampToValueAtTime(cutoffHz, startTime+0.08);
 
-  // ── コーラス風LFO ──
-  let chorusDepth=0;
-  let chorusRate=0;
-  if(padChorus==='i'){  chorusDepth=0.0015; chorusRate=0.9; }
-  if(padChorus==='ii'){ chorusDepth=0.003;  chorusRate=1.8; }
-
-  let chorusOut=null;
   if(padChorus!=='off'){
-    const lfo=actx.createOscillator();
-    lfo.frequency.value=chorusRate;
-    const lfoGain=actx.createGain();
-    lfoGain.gain.value=chorusDepth*hz;
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc2.frequency);
-    lfo.start(startTime);
-    lfo.stop(startTime+duration+0.5);
+    const rate=padChorus==='i'?0.9:1.8;
+    const depth=(padChorus==='i'?0.0015:0.003)*hz;
+    const lfo=actx.createOscillator(); lfo.frequency.value=rate;
+    const lg=actx.createGain(); lg.gain.value=depth;
+    lfo.connect(lg); lg.connect(osc2.frequency);
+    lfo.start(startTime); lfo.stop(startTime+duration+0.5);
   }
 
-  // ── エンベロープ ──
   const env=actx.createGain();
-  const attack=0.035, release=0.55;
   env.gain.setValueAtTime(0.001, startTime);
-  env.gain.linearRampToValueAtTime(vol*0.7, startTime+attack);
-  env.gain.setValueAtTime(vol*0.7, startTime+duration-release);
-  env.gain.exponentialRampToValueAtTime(0.001, startTime+duration+0.01);
+  env.gain.linearRampToValueAtTime(vol*0.65, startTime+0.04);
 
-  const subGain=actx.createGain();
-  subGain.gain.value=0.18;
+  const subGain=actx.createGain(); subGain.gain.value=0.15;
 
-  // ── 接続 ──
-  osc1.connect(lpf);
-  osc2.connect(lpf);
-  oscSub.connect(subGain);
-  subGain.connect(lpf);
-  lpf.connect(env);
-  env.connect(out);
+  osc1.connect(lpf); osc2.connect(lpf);
+  oscSub.connect(subGain); subGain.connect(lpf);
+  lpf.connect(env); env.connect(out);
 
   osc1.start(startTime); osc1.stop(startTime+duration+0.1);
   osc2.start(startTime); osc2.stop(startTime+duration+0.1);
   oscSub.start(startTime); oscSub.stop(startTime+duration+0.1);
 }
 
-// ── SH-101風ARPノート合成 ──
-// SAW + ハードなフィルター + 短いデケイ
-function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
-  const hz=midi2hz(Math.max(24,Math.min(108,midi)));
-  const gateSec=gateMs/1000*0.7; // ゲート長（ステップの70%）
-  const target=dest||actx.destination;
-
-  const osc=actx.createOscillator();
-  osc.type='sawtooth';
-  osc.frequency.value=hz;
-
-  const lpf=actx.createBiquadFilter();
-  lpf.type='lowpass';
-  lpf.frequency.setValueAtTime(4000, startTime);
-  lpf.frequency.exponentialRampToValueAtTime(1200, startTime+gateSec*0.6);
-  lpf.Q.value=2.5;
-
-  const env=actx.createGain();
-  env.gain.setValueAtTime(0.001, startTime);
-  env.gain.linearRampToValueAtTime(vol, startTime+0.005);
-  env.gain.setValueAtTime(vol*0.75, startTime+0.02);
-  env.gain.exponentialRampToValueAtTime(0.001, startTime+gateSec);
-
-  osc.connect(lpf);
-  lpf.connect(env);
-  env.connect(target);
-  osc.start(startTime);
-  osc.stop(startTime+gateSec+0.05);
-}
-
-// ── PAD発音（コード変更時に即発音）──
+// ── PAD発音（即発音 + 旧音フェードアウト）──
 let padQuantTimer=null;
 
 function triggerPad(root, type){
@@ -8750,13 +8709,27 @@ function triggerPad(root, type){
   const actx=safeGetCtx();
   if(!actx) return;
   safeResume(actx, ()=>{
-    const notes=buildPadVoicing(root, type, padVoicing);
-    const startTime=actx.currentTime+0.015;
-    const beatSec=60/autoBpm;
-    const duration=beatSec*4; // 4拍ゲート
-    notes.forEach((midi, i)=>{
-      synthJunoPad(actx, midi, startTime+i*0.007, duration, padVol);
-    });
+    const master=getPadMasterGain(actx);
+    const now=actx.currentTime;
+    const fadeOutSec=0.07;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(master.gain.value, now);
+    master.gain.linearRampToValueAtTime(0.001, now+fadeOutSec);
+    if(padFadeTimer) clearTimeout(padFadeTimer);
+    padFadeTimer=setTimeout(()=>{
+      const a2=safeGetCtx(); if(!a2||!padOn) return;
+      safeResume(a2, ()=>{
+        const m2=getPadMasterGain(a2);
+        const t=a2.currentTime;
+        const dur=60/autoBpm*6;
+        m2.gain.cancelScheduledValues(t);
+        m2.gain.setValueAtTime(0.001, t);
+        m2.gain.linearRampToValueAtTime(1.0, t+0.03);
+        buildPadVoicing(root, type, padVoicing).forEach((midi,i)=>{
+          synthJunoPad(a2, midi, t+i*0.007, dur, padVol, m2);
+        });
+      });
+    }, Math.round(fadeOutSec*1000)+15);
   });
 }
 
