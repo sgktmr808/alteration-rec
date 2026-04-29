@@ -8993,6 +8993,9 @@ function synthSliderUpdate(el, valId, min, max, unit){
   const pct=((v-min)/(max-min)*100).toFixed(1);
   el.style.setProperty('--pct', pct+'%');
 
+  // 対応パラメーターに反映（display前に宣言が必要）
+  const id=el.id;
+
   // 表示値フォーマット
   let display;
   if(unit==='Hz' && v>=1000) display=(v/1000).toFixed(1)+'k';
@@ -9000,8 +9003,6 @@ function synthSliderUpdate(el, valId, min, max, unit){
   else display=Math.round(v)+unit;
   if(valEl) valEl.textContent=display;
 
-  // 対応パラメーターに反映
-  const id=el.id;
   if(id==='pad-detune') padDetune=v;
   else if(id==='pad-cutoff') padCutoff=v;
   else if(id==='pad-res') padRes=v;
