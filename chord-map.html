@@ -380,6 +380,51 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .saved-sus:hover,.saved-sus:active{color:#4aaa72;background:rgba(74,170,114,0.10);}
 .saved-sus.playing{color:#4aaa72;background:rgba(74,170,114,0.15);}
 
+/* ══════════════════════════════════════════
+   SYNTH パネル（PAD + ARP）
+══════════════════════════════════════════ */
+.synth-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
+.synth-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px 4px;cursor:pointer;user-select:none;-webkit-user-select:none;}
+.synth-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.14em;
+  color:#e0a0ff;text-transform:uppercase;}
+.synth-tog{font-size:9px;color:var(--dim);}
+.synth-wrap{overflow:hidden;transition:max-height .25s ease;max-height:0;}
+.synth-wrap.open{max-height:600px;}
+.synth-inner{padding:8px 12px 12px;display:flex;flex-direction:column;gap:10px;}
+.synth-sec{display:flex;flex-direction:column;gap:6px;
+  border:1px solid var(--bdr2);border-radius:var(--r);padding:7px 9px;}
+.synth-sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.synth-sec-title{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--dim);}
+.synth-on-btn{font-family:var(--fm);font-size:8px;padding:2px 9px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:transparent;cursor:pointer;
+  transition:border-color .12s,color .12s,background .12s;white-space:nowrap;}
+.synth-on-btn.on{border-color:#e0a0ff;color:#e0a0ff;background:rgba(224,160,255,0.10);}
+.synth-on-btn.on.arp{border-color:#80d4ff;color:#80d4ff;background:rgba(128,212,255,0.10);}
+.synth-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.synth-lbl{font-family:var(--fm);font-size:7.5px;color:var(--dim);
+  width:48px;flex-shrink:0;letter-spacing:.04em;}
+.synth-pills{display:flex;flex-wrap:wrap;gap:3px;flex:1;}
+.synth-pill{font-family:var(--fm);font-size:8px;padding:2px 6px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:var(--surf);cursor:pointer;
+  transition:border-color .1s,color .1s,background .1s;white-space:nowrap;}
+.synth-pill.on{border-color:#e0a0ff;color:#e0a0ff;background:rgba(224,160,255,0.10);}
+.synth-pill.on.arp{border-color:#80d4ff;color:#80d4ff;background:rgba(128,212,255,0.10);}
+.synth-slider{-webkit-appearance:none;appearance:none;
+  width:100%;height:3px;border-radius:2px;outline:none;cursor:pointer;
+  background:linear-gradient(to right,#e0a0ff var(--pct,40%),rgba(255,255,255,0.12) var(--pct,40%));}
+.synth-slider.arp{
+  background:linear-gradient(to right,#80d4ff var(--pct,40%),rgba(255,255,255,0.12) var(--pct,40%));}
+.synth-slider::-webkit-slider-thumb{-webkit-appearance:none;
+  width:12px;height:12px;border-radius:50%;background:#e0a0ff;cursor:pointer;}
+.synth-slider.arp::-webkit-slider-thumb{background:#80d4ff;}
+.synth-val{font-family:var(--fm);font-size:8px;color:var(--dim);
+  width:32px;text-align:right;flex-shrink:0;}
+.arp-pattern-grid{display:flex;flex-wrap:wrap;gap:3px;max-height:72px;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;}
+
 /* ── S2 POLY BUILDER パネル ── */
 .s2-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
 .s2-hdr{display:flex;align-items:center;justify-content:space-between;
@@ -1046,6 +1091,159 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           </div>
           <div class="saved-wrap" id="saved-wrap">
             <div class="saved-list" id="saved-list"></div>
+          </div>
+        </div>
+
+        <!-- SYNTH PAD + ARP パネル -->
+        <div class="synth-zone" id="synth-zone">
+          <div class="synth-hdr" id="synth-hdr" onclick="toggleSynthPanel()">
+            <span class="synth-hdr-l">⬡ SYNTH</span>
+            <span class="synth-tog" id="synth-tog">▼</span>
+          </div>
+          <div class="synth-wrap" id="synth-wrap">
+            <div class="synth-inner">
+
+              <!-- ── PAD セクション ── -->
+              <div class="synth-sec">
+                <div class="synth-sec-hdr">
+                  <span class="synth-sec-title">PAD · JUNO</span>
+                  <div class="synth-on-btn" id="pad-on-btn" onclick="togglePad()">OFF</div>
+                </div>
+                <!-- ボイシング -->
+                <div class="synth-row">
+                  <span class="synth-lbl">VOICING</span>
+                  <div class="synth-pills" id="pad-voicing-pills">
+                    <div class="synth-pill on" data-v="close">CLOSE</div>
+                    <div class="synth-pill" data-v="spread">SPREAD</div>
+                    <div class="synth-pill" data-v="drop2">DROP2</div>
+                    <div class="synth-pill" data-v="open">OPEN</div>
+                  </div>
+                </div>
+                <!-- DETUNE -->
+                <div class="synth-row">
+                  <span class="synth-lbl">DETUNE</span>
+                  <input class="synth-slider" id="pad-detune" type="range" min="0" max="20" value="6"
+                    oninput="synthSliderUpdate(this,'pad-detune-val',0,20,'¢')">
+                  <span class="synth-val" id="pad-detune-val">6¢</span>
+                </div>
+                <!-- CUTOFF -->
+                <div class="synth-row">
+                  <span class="synth-lbl">CUTOFF</span>
+                  <input class="synth-slider" id="pad-cutoff" type="range" min="200" max="8000" value="2400"
+                    oninput="synthSliderUpdate(this,'pad-cutoff-val',200,8000,'Hz')">
+                  <span class="synth-val" id="pad-cutoff-val">2.4k</span>
+                </div>
+                <!-- CHORUS -->
+                <div class="synth-row">
+                  <span class="synth-lbl">CHORUS</span>
+                  <div class="synth-pills" id="pad-chorus-pills">
+                    <div class="synth-pill" data-c="off">OFF</div>
+                    <div class="synth-pill on" data-c="i">I</div>
+                    <div class="synth-pill" data-c="ii">II</div>
+                  </div>
+                </div>
+                <!-- VOLUME -->
+                <div class="synth-row">
+                  <span class="synth-lbl">VOL</span>
+                  <input class="synth-slider" id="pad-vol" type="range" min="0" max="100" value="55"
+                    oninput="synthSliderUpdate(this,'pad-vol-val',0,100,'%')">
+                  <span class="synth-val" id="pad-vol-val">55%</span>
+                </div>
+              </div>
+
+              <!-- ── ARP セクション ── -->
+              <div class="synth-sec">
+                <div class="synth-sec-hdr">
+                  <span class="synth-sec-title">ARP · SH-101</span>
+                  <div class="synth-on-btn arp" id="arp-on-btn" onclick="toggleArp()">OFF</div>
+                </div>
+                <!-- パターン -->
+                <div class="synth-row">
+                  <span class="synth-lbl">PATTERN</span>
+                  <div class="arp-pattern-grid" id="arp-pattern-pills"></div>
+                </div>
+                <!-- レート -->
+                <div class="synth-row">
+                  <span class="synth-lbl">RATE</span>
+                  <div class="synth-pills" id="arp-rate-pills">
+                    <div class="synth-pill arp" data-r="1/4">1/4</div>
+                    <div class="synth-pill arp on" data-r="1/8">1/8</div>
+                    <div class="synth-pill arp" data-r="1/16">1/16</div>
+                    <div class="synth-pill arp" data-r="1/32">1/32</div>
+                    <div class="synth-pill arp" data-r="1/8T">1/8T</div>
+                    <div class="synth-pill arp" data-r="1/16T">1/16T</div>
+                    <div class="synth-pill arp" data-r="free">FREE</div>
+                  </div>
+                </div>
+                <!-- FREE ms（レートがfreeのとき有効） -->
+                <div class="synth-row" id="arp-free-row" style="display:none;">
+                  <span class="synth-lbl">MS</span>
+                  <input class="synth-slider arp" id="arp-free-ms" type="range" min="50" max="1000" value="200"
+                    oninput="synthSliderUpdate(this,'arp-free-ms-val',50,1000,'ms')">
+                  <span class="synth-val" id="arp-free-ms-val">200ms</span>
+                </div>
+                <!-- オクターブ中心 -->
+                <div class="synth-row">
+                  <span class="synth-lbl">OCT CTR</span>
+                  <div class="synth-pills" id="arp-oct-ctr-pills">
+                    <div class="synth-pill arp" data-oc="2">2</div>
+                    <div class="synth-pill arp on" data-oc="3">3</div>
+                    <div class="synth-pill arp" data-oc="4">4</div>
+                    <div class="synth-pill arp" data-oc="5">5</div>
+                  </div>
+                </div>
+                <!-- オクターブ幅 -->
+                <div class="synth-row">
+                  <span class="synth-lbl">OCT RNG</span>
+                  <div class="synth-pills" id="arp-oct-rng-pills">
+                    <div class="synth-pill arp on" data-or="1">±0</div>
+                    <div class="synth-pill arp" data-or="2">±1</div>
+                    <div class="synth-pill arp" data-or="3">±2</div>
+                  </div>
+                </div>
+                <!-- VOLUME -->
+                <div class="synth-row">
+                  <span class="synth-lbl">VOL</span>
+                  <input class="synth-slider arp" id="arp-vol" type="range" min="0" max="100" value="65"
+                    oninput="synthSliderUpdate(this,'arp-vol-val',0,100,'%')">
+                  <span class="synth-val" id="arp-vol-val">65%</span>
+                </div>
+
+                <!-- ── DELAY サブセクション ── -->
+                <div style="border-top:1px solid var(--bdr);padding-top:6px;margin-top:2px;">
+                  <div class="synth-row">
+                    <span class="synth-lbl">DLY TIME</span>
+                    <div class="synth-pills" id="dly-time-pills">
+                      <div class="synth-pill arp" data-dt="off">OFF</div>
+                      <div class="synth-pill arp on" data-dt="1/8">1/8</div>
+                      <div class="synth-pill arp" data-dt="1/4">1/4</div>
+                      <div class="synth-pill arp" data-dt="1/8D">1/8D</div>
+                      <div class="synth-pill arp" data-dt="ping">PING</div>
+                      <div class="synth-pill arp" data-dt="free">FREE</div>
+                    </div>
+                  </div>
+                  <div class="synth-row" id="dly-free-row" style="display:none;">
+                    <span class="synth-lbl">DLY MS</span>
+                    <input class="synth-slider arp" id="dly-free-ms" type="range" min="20" max="800" value="250"
+                      oninput="synthSliderUpdate(this,'dly-free-ms-val',20,800,'ms')">
+                    <span class="synth-val" id="dly-free-ms-val">250ms</span>
+                  </div>
+                  <div class="synth-row">
+                    <span class="synth-lbl">FEEDBACK</span>
+                    <input class="synth-slider arp" id="dly-fb" type="range" min="0" max="85" value="35"
+                      oninput="synthSliderUpdate(this,'dly-fb-val',0,85,'%')">
+                    <span class="synth-val" id="dly-fb-val">35%</span>
+                  </div>
+                  <div class="synth-row">
+                    <span class="synth-lbl">MIX</span>
+                    <input class="synth-slider arp" id="dly-mix" type="range" min="0" max="100" value="40"
+                      oninput="synthSliderUpdate(this,'dly-mix-val',0,100,'%')">
+                    <span class="synth-val" id="dly-mix-val">40%</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
 
@@ -5668,6 +5866,7 @@ function moveToChord(root,type){
   }
   playChord(root,type);
   triggerPhrase(root,type); // ← フレーズ追従
+  notifySynth(root,type);   // ← SYNTH PAD/ARP追従
   // CHAINモード: 進行パターンを検出してラベル更新
   if(MAP_MODE==='chain'){
     const progCtx=detectProgression(S.history.slice(0,S.histIdx+1));
@@ -8123,6 +8322,685 @@ function drawTriadSpaceOverlay(ctx){
 }
 
 
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// SYNTH ENGINE — PAD (JUNO-106/60風) + ARP (SH-101風) + DELAY
+// ═══════════════════════════════════════════════════════════════
+
+// ── 状態変数 ──
+let padOn=false;
+let arpOn=false;
+let synthPanelOpen=false;
+
+// PADパラメーター
+let padVoicing='close';    // close / spread / drop2 / open
+let padDetune=6;           // cents (0-20)
+let padCutoff=2400;        // Hz (200-8000)
+let padChorus='i';         // off / i / ii
+let padVol=0.55;
+
+// ARPパラメーター
+let arpPattern='up';
+let arpRate='1/8';
+let arpFreeMs=200;
+let arpOctCenter=3;
+let arpOctRange=1;         // 1=±0oct, 2=±1oct, 3=±2oct
+let arpVol=0.65;
+
+// DILAYパラメーター
+let dlyTime='1/8';
+let dlyFreeMs=250;
+let dlyFeedback=0.35;
+let dlyMix=0.40;
+
+// ARP内部状態
+let arpTimer=null;
+let arpStep=0;
+let arpSeq=[];             // 現在のアルペジオノート列（MIDI）
+let arpNextBeat=0;         // 次の発音予定AudioContext時刻
+let arpScheduleTimer=null;
+
+// DELAY用AudioNodeキャッシュ
+let dlyNodeL=null, dlyNodeR=null, dlyFbGainL=null, dlyFbGainR=null;
+let dlyWetGainL=null, dlyWetGainR=null, dlyDryGain=null;
+let dlyDestination=null;   // arpノートの出力先（delay経由 or ctx.destination）
+
+// ── ARPパターン定義 ──
+const ARP_PATTERNS=[
+  {id:'up',        label:'UP',        desc:'上行'},
+  {id:'down',      label:'DOWN',      desc:'下行'},
+  {id:'updown',    label:'UP-DN',     desc:'上行→下行'},
+  {id:'downup',    label:'DN-UP',     desc:'下行→上行'},
+  {id:'up2',       label:'UP×2',      desc:'2オクターブ上行'},
+  {id:'down2',     label:'DN×2',      desc:'2オクターブ下行'},
+  {id:'random',    label:'RAND',      desc:'ランダム'},
+  {id:'randoct',   label:'R-OCT',     desc:'ランダム+オクターブ跳躍'},
+  {id:'chord',     label:'CHORD',     desc:'全音同時（ストラム）'},
+  {id:'skip1up',   label:'SKP↑',      desc:'1音飛ばし上行'},
+  {id:'skip1dn',   label:'SKP↓',      desc:'1音飛ばし下行'},
+  {id:'thumbup',   label:'THB↑',      desc:'最低音固定+上行'},
+  {id:'thumbdn',   label:'THB↓',      desc:'最低音固定+下行'},
+  {id:'insideout', label:'IN→OUT',    desc:'内側から外へ'},
+  {id:'outsidein', label:'OUT→IN',    desc:'外側から内へ'},
+  {id:'bounce',    label:'BOUNCE',    desc:'上下交互跳躍'},
+  {id:'upskip2',   label:'UP+2',      desc:'1上→2上→1上'},
+  {id:'pendulum',  label:'PNDLM',     desc:'振り子（中→外→中）'},
+  {id:'cascade',   label:'CASC',      desc:'上行+最高音リピート'},
+  {id:'spiral',    label:'SPIRAL',    desc:'螺旋（oct跳躍しながら上行）'},
+];
+
+// ── ボイシング生成 ──
+// コードのMIDIノート列をボイシングタイプに応じて展開
+function buildPadVoicing(root, type, voicingType){
+  const ri=ni(root);
+  const ivs=CT[type]?.iv??[0,4,7];
+  const baseOct=4; // C4 基準
+  let notes=ivs.map(iv=>12*(baseOct+1)+(ri+iv)%12);
+  // オクターブ内に収める（close）
+  notes=notes.sort((a,b)=>a-b);
+
+  if(voicingType==='close'){
+    // そのまま（最小音域）
+    return notes;
+  }
+  if(voicingType==='spread'){
+    // 1音ずつ1オクターブ上に広げる
+    return notes.map((n,i)=>n+i*12);
+  }
+  if(voicingType==='drop2'){
+    // 上から2番目の音を1オクターブ下げる
+    if(notes.length>=3){
+      const sorted=[...notes].sort((a,b)=>b-a);
+      sorted[1]-=12;
+      return sorted.sort((a,b)=>a-b);
+    }
+    return notes;
+  }
+  if(voicingType==='open'){
+    // ルートをオクターブ下、残りを上に広げる
+    const open=[notes[0]-12,...notes.slice(1).map((n,i)=>n+i*12)];
+    return open.sort((a,b)=>a-b);
+  }
+  return notes;
+}
+
+// ── ARPシーケンス生成 ──
+// arpOctCenter / arpOctRange に基づきMIDIノート列を生成
+function buildArpSeq(root, type){
+  const ri=ni(root);
+  const ivs=CT[type]?.iv??[0,4,7];
+  const center=arpOctCenter;
+  const range=arpOctRange-1; // 0=±0, 1=±1, 2=±2
+
+  // 基準オクターブ範囲内のノートを収集
+  let notes=[];
+  for(let oct=center-range; oct<=center+range; oct++){
+    ivs.forEach(iv=>{
+      notes.push(12*(oct+1)+(ri+iv)%12);
+    });
+  }
+  notes=notes.sort((a,b)=>a-b);
+  if(notes.length===0) return [12*(center+1)+ri];
+
+  const n=notes;
+  const lo=n[0], hi=n[n.length-1];
+  const mid=Math.floor(n.length/2);
+
+  switch(arpPattern){
+    case 'up':       return [...n];
+    case 'down':     return [...n].reverse();
+    case 'updown':   return [...n,...[...n].reverse().slice(1,n.length-1)];
+    case 'downup':   return [...[...n].reverse(),...n.slice(1,n.length-1)];
+    case 'up2':      return [...n,...n.map(x=>x+12)];
+    case 'down2':    return [...n.map(x=>x+12),...n].reverse();
+    case 'random':   return shuffleArr([...n]);
+    case 'randoct':  return shuffleArr([...n,...n.map(x=>x+12)]);
+    case 'chord':    return [n]; // 特殊: 配列の配列（同時発音）
+    case 'skip1up':  return n.filter((_,i)=>i%2===0);
+    case 'skip1dn':  return n.filter((_,i)=>i%2===0).reverse();
+    case 'thumbup':  return [lo,...n.slice(1)].map((x,i)=>i===0?x:x);
+    case 'thumbdn':  return [lo,...n.slice(1).reverse()].map(x=>x);
+    case 'insideout':{
+      // 中央から外へ交互
+      const seq=[];
+      let lo2=mid, hi2=mid;
+      while(lo2>=0||hi2<n.length){
+        if(lo2>=0) seq.push(n[lo2--]);
+        if(hi2<n.length && hi2!==lo2+1) seq.push(n[hi2++]);
+      }
+      return seq;
+    }
+    case 'outsidein':{
+      const seq=[];
+      let l=0, r=n.length-1;
+      while(l<=r){
+        seq.push(n[l++]);
+        if(l<=r) seq.push(n[r--]);
+      }
+      return seq;
+    }
+    case 'bounce':{
+      // 最低音と最高音を交互に挟みながら上行
+      const seq=[];
+      n.forEach((note,i)=>{
+        seq.push(note);
+        if(i%2===0 && i<n.length-1) seq.push(hi);
+        else if(i%2===1 && i<n.length-1) seq.push(lo);
+      });
+      return seq;
+    }
+    case 'upskip2':{
+      // 1上→2上→1上パターン
+      const seq=[];
+      for(let i=0;i<n.length;i++){
+        seq.push(n[i]);
+        if(i+2<n.length) seq.push(n[i+2]);
+        if(i+1<n.length) seq.push(n[i+1]);
+      }
+      return seq;
+    }
+    case 'pendulum':{
+      // 中央→最高→中央→最低の振り子
+      const seq=[];
+      const cNote=n[mid];
+      for(let i=0;i<n.length*2;i++){
+        const phase=i%4;
+        if(phase===0) seq.push(cNote);
+        else if(phase===1) seq.push(hi);
+        else if(phase===2) seq.push(cNote);
+        else seq.push(lo);
+      }
+      return seq.slice(0,n.length*2);
+    }
+    case 'cascade':{
+      // 上行+最高音リピート
+      return [...n, hi, hi];
+    }
+    case 'spiral':{
+      // 各オクターブを経由しながら螺旋上行
+      const seq=[];
+      for(let i=0;i<n.length;i++){
+        seq.push(n[i]);
+        if(i<n.length-1) seq.push(n[i]+12); // オクターブ上
+      }
+      return seq;
+    }
+    default: return [...n];
+  }
+}
+
+function shuffleArr(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+// ── BPMからARPステップ時間(ms)を計算 ──
+function arpStepMs(){
+  if(arpRate==='free') return arpFreeMs;
+  const beatMs=60000/autoBpm;
+  const map={'1/4':beatMs,'1/8':beatMs/2,'1/16':beatMs/4,'1/32':beatMs/8,
+             '1/8T':beatMs/3,'1/16T':beatMs/6};
+  return map[arpRate]??beatMs/2;
+}
+
+// ── BPMクオンタイズ: 次の発音グリッドまでのms ──
+function msToNextGrid(){
+  const stepMs=arpStepMs();
+  const now=performance.now();
+  if(arpNextBeat<=now) return 0;
+  return arpNextBeat-now;
+}
+
+// ── ディレイノードの構築 ──
+function buildDelayNodes(actx){
+  // 既存ノードがあれば切断
+  try{
+    if(dlyNodeL) dlyNodeL.disconnect();
+    if(dlyNodeR) dlyNodeR.disconnect();
+    if(dlyFbGainL) dlyFbGainL.disconnect();
+    if(dlyFbGainR) dlyFbGainR.disconnect();
+    if(dlyWetGainL) dlyWetGainL.disconnect();
+    if(dlyWetGainR) dlyWetGainR.disconnect();
+    if(dlyDryGain) dlyDryGain.disconnect();
+  }catch(e){}
+
+  if(dlyTime==='off'){
+    dlyDestination=actx.destination;
+    return;
+  }
+
+  const beatSec=60/autoBpm;
+  const map={'1/8':beatSec/2,'1/4':beatSec,'1/8D':beatSec*0.75,
+             '1/16':beatSec/4,'free':dlyFreeMs/1000};
+  const delayTimeSec=map[dlyTime]??(beatSec/2);
+
+  // ステレオ分離（PING-PONGはL/Rを互い違い）
+  const splitter=actx.createChannelSplitter(2);
+  const merger=actx.createChannelMerger(2);
+
+  dlyNodeL=actx.createDelay(4.0);
+  dlyNodeR=actx.createDelay(4.0);
+  dlyNodeL.delayTime.value=delayTimeSec;
+  dlyNodeR.delayTime.value=dlyTime==='ping'?delayTimeSec*2:delayTimeSec;
+
+  dlyFbGainL=actx.createGain();
+  dlyFbGainR=actx.createGain();
+  dlyFbGainL.gain.value=dlyFeedback;
+  dlyFbGainR.gain.value=dlyFeedback;
+
+  dlyWetGainL=actx.createGain();
+  dlyWetGainR=actx.createGain();
+  dlyWetGainL.gain.value=dlyMix;
+  dlyWetGainR.gain.value=dlyMix;
+
+  dlyDryGain=actx.createGain();
+  dlyDryGain.gain.value=1-dlyMix*0.5;
+
+  // 入力→dry→dest
+  const inputGain=actx.createGain();
+  inputGain.gain.value=1;
+  inputGain.connect(dlyDryGain);
+  dlyDryGain.connect(actx.destination);
+
+  // 入力→delayL→fbL→delayL（ループ）
+  inputGain.connect(dlyNodeL);
+  dlyNodeL.connect(dlyFbGainL);
+  dlyFbGainL.connect(dlyNodeL);
+  // delayL→wet→dest
+  dlyNodeL.connect(dlyWetGainL);
+  dlyWetGainL.connect(actx.destination);
+
+  // PING: L→R→L クロスフィードバック
+  if(dlyTime==='ping'){
+    inputGain.connect(dlyNodeR);
+    dlyNodeR.connect(dlyFbGainR);
+    dlyFbGainR.connect(dlyNodeL); // クロス
+    dlyFbGainL.connect(dlyNodeR); // クロス
+    dlyNodeR.connect(dlyWetGainR);
+    dlyWetGainR.connect(actx.destination);
+  }
+
+  dlyDestination=inputGain;
+}
+
+// ── JUNOパッドサウンド合成 ──
+// デチューンした2本のSAW + LPF + コーラス風モジュレーション
+function synthJunoPad(actx, midi, startTime, duration, vol){
+  const hz=midi2hz(midi);
+  const detuneCents=padDetune;
+  const cutoffHz=Math.min(padCutoff, actx.sampleRate/2-100);
+  const out=actx.destination;
+
+  // ── OSC 1 (メイン) ──
+  const osc1=actx.createOscillator();
+  osc1.type='sawtooth';
+  osc1.frequency.value=hz;
+
+  // ── OSC 2 (デチューン) ──
+  const osc2=actx.createOscillator();
+  osc2.type='sawtooth';
+  osc2.frequency.value=hz*Math.pow(2,detuneCents/1200);
+
+  // ── サブオシレーター（1oct下・矩形波・音量控えめ）──
+  const oscSub=actx.createOscillator();
+  oscSub.type='square';
+  oscSub.frequency.value=hz/2;
+
+  // ── LPF ──
+  const lpf=actx.createBiquadFilter();
+  lpf.type='lowpass';
+  lpf.frequency.value=200; // アタック時は低いところからスウィープ
+  lpf.Q.value=1.2;
+  lpf.frequency.setValueAtTime(200, startTime);
+  lpf.frequency.exponentialRampToValueAtTime(cutoffHz, startTime+0.06);
+
+  // ── コーラス風LFO ──
+  let chorusDepth=0;
+  let chorusRate=0;
+  if(padChorus==='i'){  chorusDepth=0.0015; chorusRate=0.9; }
+  if(padChorus==='ii'){ chorusDepth=0.003;  chorusRate=1.8; }
+
+  let chorusOut=null;
+  if(padChorus!=='off'){
+    const lfo=actx.createOscillator();
+    lfo.frequency.value=chorusRate;
+    const lfoGain=actx.createGain();
+    lfoGain.gain.value=chorusDepth*hz;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc2.frequency);
+    lfo.start(startTime);
+    lfo.stop(startTime+duration+0.5);
+  }
+
+  // ── エンベロープ ──
+  const env=actx.createGain();
+  const attack=0.035, release=0.55;
+  env.gain.setValueAtTime(0.001, startTime);
+  env.gain.linearRampToValueAtTime(vol*0.7, startTime+attack);
+  env.gain.setValueAtTime(vol*0.7, startTime+duration-release);
+  env.gain.exponentialRampToValueAtTime(0.001, startTime+duration+0.01);
+
+  const subGain=actx.createGain();
+  subGain.gain.value=0.18;
+
+  // ── 接続 ──
+  osc1.connect(lpf);
+  osc2.connect(lpf);
+  oscSub.connect(subGain);
+  subGain.connect(lpf);
+  lpf.connect(env);
+  env.connect(out);
+
+  osc1.start(startTime); osc1.stop(startTime+duration+0.1);
+  osc2.start(startTime); osc2.stop(startTime+duration+0.1);
+  oscSub.start(startTime); oscSub.stop(startTime+duration+0.1);
+}
+
+// ── SH-101風ARPノート合成 ──
+// SAW + ハードなフィルター + 短いデケイ
+function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
+  const hz=midi2hz(Math.max(24,Math.min(108,midi)));
+  const gateSec=gateMs/1000*0.7; // ゲート長（ステップの70%）
+  const target=dest||actx.destination;
+
+  const osc=actx.createOscillator();
+  osc.type='sawtooth';
+  osc.frequency.value=hz;
+
+  const lpf=actx.createBiquadFilter();
+  lpf.type='lowpass';
+  lpf.frequency.setValueAtTime(4000, startTime);
+  lpf.frequency.exponentialRampToValueAtTime(1200, startTime+gateSec*0.6);
+  lpf.Q.value=2.5;
+
+  const env=actx.createGain();
+  env.gain.setValueAtTime(0.001, startTime);
+  env.gain.linearRampToValueAtTime(vol, startTime+0.005);
+  env.gain.setValueAtTime(vol*0.75, startTime+0.02);
+  env.gain.exponentialRampToValueAtTime(0.001, startTime+gateSec);
+
+  osc.connect(lpf);
+  lpf.connect(env);
+  env.connect(target);
+  osc.start(startTime);
+  osc.stop(startTime+gateSec+0.05);
+}
+
+// ── PAD発音（コード変更時にクオンタイズして発音）──
+let padQuantTimer=null;
+let padNextChord=null; // {root, type, triggerTime}
+
+function triggerPad(root, type){
+  if(!padOn) return;
+  const actx=safeGetCtx();
+  if(!actx) return;
+  safeResume(actx, ()=>{
+    // BPMグリッドに合わせてクオンタイズ
+    const stepMs=60000/autoBpm; // 1拍
+    const now=performance.now();
+    const waitMs=msToNextPadGrid(now, stepMs);
+
+    if(padQuantTimer) clearTimeout(padQuantTimer);
+    padNextChord={root,type};
+
+    padQuantTimer=setTimeout(()=>{
+      if(!padOn||!padNextChord) return;
+      const {root:r, type:t}=padNextChord;
+      padNextChord=null;
+      const a2=safeGetCtx();
+      if(!a2) return;
+      safeResume(a2,()=>{
+        const notes=buildPadVoicing(r, t, padVoicing);
+        const startTime=a2.currentTime+0.02;
+        const duration=stepMs*2/1000; // 2拍のゲート
+        notes.forEach((midi,i)=>{
+          synthJunoPad(a2, midi, startTime+i*0.008, duration, padVol);
+        });
+      });
+    }, waitMs);
+  });
+}
+
+// 次の拍頭までのms（PAD用）
+let padLastGrid=performance.now();
+function msToNextPadGrid(now, stepMs){
+  // 直近の拍頭から次の拍頭を計算
+  const elapsed=(now-padLastGrid)%stepMs;
+  const wait=stepMs-elapsed;
+  return wait<20?0:wait; // 20ms以内なら即発音
+}
+
+// ── ARPスケジューラー ──
+// Web Audio の look-ahead scheduling で精密なタイミングを実現
+let arpLookAheadMs=80;   // 先行スケジュール量
+let arpScheduleMs=40;    // スケジューラー呼び出し間隔
+
+function startArpScheduler(){
+  if(arpScheduleTimer) clearInterval(arpScheduleTimer);
+  // ARPシーケンスを現在コードで初期化
+  arpSeq=buildArpSeq(S.root, S.type);
+  arpStep=0;
+
+  const actx=safeGetCtx();
+  if(!actx) return;
+  safeResume(actx);
+  buildDelayNodes(actx);
+
+  // 最初の発音時刻を次の拍グリッドに合わせる
+  const stepSec=arpStepMs()/1000;
+  arpNextBeat=actx.currentTime+0.05;
+
+  arpScheduleTimer=setInterval(()=>scheduleArpNotes(), arpScheduleMs);
+}
+
+function stopArpScheduler(){
+  if(arpScheduleTimer){ clearInterval(arpScheduleTimer); arpScheduleTimer=null; }
+}
+
+function scheduleArpNotes(){
+  if(!arpOn) return;
+  const actx=safeGetCtx();
+  if(!actx) return;
+  const stepSec=arpStepMs()/1000;
+  const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
+
+  while(arpNextBeat<lookAhead){
+    const t=arpNextBeat;
+    const stepMs_=arpStepMs();
+
+    if(arpSeq.length>0){
+      const item=arpSeq[arpStep%arpSeq.length];
+      const dest=dlyDestination||actx.destination;
+
+      if(Array.isArray(item)){
+        // CHORDパターン: 同時発音（ストラム）
+        item.forEach((midi,i)=>{
+          synthSH101Note(actx, midi, t+i*0.012, stepMs_*0.8, arpVol, dest);
+        });
+      } else {
+        synthSH101Note(actx, item, t, stepMs_*0.8, arpVol, dest);
+      }
+      arpStep++;
+    }
+    arpNextBeat+=stepSec;
+  }
+}
+
+// コード変更でARPシーケンスを更新
+function updateArpChord(root, type){
+  if(!arpOn) return;
+  arpSeq=buildArpSeq(root, type);
+  arpStep=0;
+}
+
+// ── UI制御 ──
+function toggleSynthPanel(){
+  synthPanelOpen=!synthPanelOpen;
+  const wrap=document.getElementById('synth-wrap');
+  const tog=document.getElementById('synth-tog');
+  if(wrap) wrap.classList.toggle('open', synthPanelOpen);
+  if(tog) tog.textContent=synthPanelOpen?'▲':'▼';
+  if(synthPanelOpen) initSynthUI();
+}
+
+function togglePad(){
+  padOn=!padOn;
+  const btn=document.getElementById('pad-on-btn');
+  if(btn){btn.textContent=padOn?'ON':'OFF'; btn.classList.toggle('on',padOn);}
+  if(padOn){
+    // 現在のコードを即時発音
+    triggerPad(S.root, S.type);
+  }
+}
+
+function toggleArp(){
+  arpOn=!arpOn;
+  const btn=document.getElementById('arp-on-btn');
+  if(btn){btn.textContent=arpOn?'ON':'OFF'; btn.classList.toggle('on',arpOn);}
+  if(arpOn){
+    startArpScheduler();
+  } else {
+    stopArpScheduler();
+  }
+}
+
+// スライダー値表示更新
+function synthSliderUpdate(el, valId, min, max, unit){
+  const v=parseFloat(el.value);
+  const valEl=document.getElementById(valId);
+
+  // スライダーのグラデーション更新
+  const pct=((v-min)/(max-min)*100).toFixed(1);
+  el.style.setProperty('--pct', pct+'%');
+
+  // 表示値フォーマット
+  let display;
+  if(unit==='Hz' && v>=1000) display=(v/1000).toFixed(1)+'k';
+  else display=Math.round(v)+unit;
+  if(valEl) valEl.textContent=display;
+
+  // 対応パラメーターに反映
+  const id=el.id;
+  if(id==='pad-detune') padDetune=v;
+  else if(id==='pad-cutoff') padCutoff=v;
+  else if(id==='pad-vol') padVol=v/100;
+  else if(id==='arp-free-ms') arpFreeMs=v;
+  else if(id==='arp-vol') arpVol=v/100;
+  else if(id==='dly-free-ms') dlyFreeMs=v;
+  else if(id==='dly-fb') dlyFeedback=v/100;
+  else if(id==='dly-mix') dlyMix=v/100;
+}
+
+function initSynthUI(){
+  // PADボイシングpills
+  document.querySelectorAll('#pad-voicing-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.v===padVoicing);
+    p.onclick=()=>{
+      padVoicing=p.dataset.v;
+      document.querySelectorAll('#pad-voicing-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+    };
+  });
+
+  // PADコーラスpills
+  document.querySelectorAll('#pad-chorus-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.c===padChorus);
+    p.onclick=()=>{
+      padChorus=p.dataset.c;
+      document.querySelectorAll('#pad-chorus-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+    };
+  });
+
+  // ARPパターングリッドを動的生成
+  const grid=document.getElementById('arp-pattern-pills');
+  if(grid && grid.children.length===0){
+    ARP_PATTERNS.forEach(pat=>{
+      const el=document.createElement('div');
+      el.className='synth-pill arp'+(pat.id===arpPattern?' on':'');
+      el.dataset.p=pat.id;
+      el.title=pat.desc;
+      el.textContent=pat.label;
+      el.onclick=()=>{
+        arpPattern=pat.id;
+        document.querySelectorAll('#arp-pattern-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===el));
+        // シーケンス即更新
+        arpSeq=buildArpSeq(S.root, S.type);
+        arpStep=0;
+      };
+      grid.appendChild(el);
+    });
+  }
+
+  // ARPレートpills
+  document.querySelectorAll('#arp-rate-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.r===arpRate);
+    p.onclick=()=>{
+      arpRate=p.dataset.r;
+      document.querySelectorAll('#arp-rate-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      document.getElementById('arp-free-row').style.display=arpRate==='free'?'flex':'none';
+      // ARPが動いていれば再スタート
+      if(arpOn){ stopArpScheduler(); startArpScheduler(); }
+    };
+  });
+
+  // ARPオクターブ中心
+  document.querySelectorAll('#arp-oct-ctr-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', parseInt(p.dataset.oc)===arpOctCenter);
+    p.onclick=()=>{
+      arpOctCenter=parseInt(p.dataset.oc);
+      document.querySelectorAll('#arp-oct-ctr-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      arpSeq=buildArpSeq(S.root, S.type); arpStep=0;
+    };
+  });
+
+  // ARPオクターブ幅
+  document.querySelectorAll('#arp-oct-rng-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', parseInt(p.dataset.or)===arpOctRange);
+    p.onclick=()=>{
+      arpOctRange=parseInt(p.dataset.or);
+      document.querySelectorAll('#arp-oct-rng-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      arpSeq=buildArpSeq(S.root, S.type); arpStep=0;
+    };
+  });
+
+  // ディレイタイムpills
+  document.querySelectorAll('#dly-time-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.dt===dlyTime);
+    p.onclick=()=>{
+      dlyTime=p.dataset.dt;
+      document.querySelectorAll('#dly-time-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      document.getElementById('dly-free-row').style.display=dlyTime==='free'?'flex':'none';
+      // ディレイノード再構築
+      const actx=safeGetCtx();
+      if(actx) safeResume(actx,()=>buildDelayNodes(actx));
+    };
+  });
+
+  // スライダーのグラデーション初期化
+  [['pad-detune',0,20],['pad-cutoff',200,8000],['pad-vol',0,100],
+   ['arp-free-ms',50,1000],['arp-vol',0,100],
+   ['dly-free-ms',20,800],['dly-fb',0,85],['dly-mix',0,100]
+  ].forEach(([id,min,max])=>{
+    const el=document.getElementById(id);
+    if(el){
+      const pct=((parseFloat(el.value)-min)/(max-min)*100).toFixed(1);
+      el.style.setProperty('--pct', pct+'%');
+    }
+  });
+}
+
+// ── moveToChordからSYNTHに通知するフック ──
+// （moveToChord内の最後に呼び出す）
+function notifySynth(root, type){
+  if(padOn) triggerPad(root, type);
+  if(arpOn) updateArpChord(root, type);
+  // PADグリッドのタイムスタンプ更新
+  padLastGrid=performance.now();
+}
 
 function toggleScaleRing(){
   scaleRingMode=!scaleRingMode;
