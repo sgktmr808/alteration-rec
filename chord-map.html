@@ -45,7 +45,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .hdr-title{font-family:var(--fm);font-size:11px;font-weight:500;color:var(--acc);letter-spacing:.15em;flex:1;}
 .hdr-chord{font-family:var(--fm);font-size:18px;font-weight:500;color:var(--text);}
 .legend{flex-shrink:0;background:var(--surf2);border-bottom:1px solid var(--bdr);
-  padding:4px 12px;display:flex;gap:10px;overflow-x:auto;align-items:center;}
+  padding:4px 12px;display:flex;gap:10px;overflow-x:auto;align-items:center;-webkit-overflow-scrolling:touch;}
 .legend::-webkit-scrollbar{display:none;}
 .li{display:flex;align-items:center;gap:3px;white-space:nowrap;}
 .ldot{width:6px;height:6px;border-radius:50%;}
@@ -92,6 +92,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 #ctrl-screen{
   flex:0 0 50%;
   overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
   display:flex;
   flex-direction:column;
   background:var(--bg);
@@ -148,7 +149,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .ph-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);flex-shrink:0;letter-spacing:.1em;}
 .ph{font-family:var(--fm);font-size:10px;padding:2px 7px;border:1px solid var(--bdr2);
   border-radius:var(--r);color:var(--dim);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:border-color .15s,color .15s;}
-.ph.cur{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
+.ph.cur{border-color:var(--acc);color:var(--acc);background:var(--acc-a);will-change:transform;}
 .ph.cur.pulse{animation:phPulse 0.22s ease-out;}
 @keyframes phPulse{
   0%{transform:scale(1.22);background:rgba(232,197,71,0.35);border-color:#fff;}
@@ -173,7 +174,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 
 /* SELECTOR */
-.sel-view{flex:1;overflow-y:auto;padding:12px 14px;}
+.sel-view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;}
 .slbl{font-family:var(--fm);font-size:9px;letter-spacing:.14em;color:var(--dim);
   text-transform:uppercase;margin-bottom:7px;display:block;}
 .rpills{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;}
@@ -204,6 +205,44 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 #chain-save-btn:active{background:rgba(232,197,71,0.15);}
 #chain-save-btn.flash{background:rgba(232,197,71,0.25);border-color:var(--acc);}
+
+/* ── O1: CHAIN → PIVOT 連携ボタン ── */
+#chain-pivot-btn{
+  position:absolute;bottom:44px;right:10px;z-index:15;
+  font-family:var(--fm);font-size:8px;letter-spacing:.1em;
+  padding:5px 10px;border-radius:var(--r);cursor:pointer;
+  border:1px solid rgba(74,144,212,0.5);
+  background:rgba(13,13,16,0.88);color:#4a90d4;
+  display:none;
+  align-items:center;gap:4px;
+  transition:background .15s,border-color .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#chain-pivot-btn:active{background:rgba(74,144,212,0.15);}
+
+/* ── Q4: COMPASS → CHAIN 転送ボタン ── */
+#compass-chain-btn{
+  position:absolute;bottom:44px;left:10px;z-index:15;
+  font-family:var(--fm);font-size:8px;letter-spacing:.1em;
+  padding:5px 10px;border-radius:var(--r);cursor:pointer;
+  border:1px solid rgba(74,200,114,0.45);
+  background:rgba(13,13,16,0.88);color:#4ac872;
+  display:none;
+  align-items:center;gap:4px;
+  transition:background .15s,border-color .15s,opacity .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#compass-chain-btn:active{background:rgba(74,200,114,0.15);}
+#compass-chain-btn.flash{background:rgba(74,200,114,0.22);border-color:#4ac872;}
+#compass-chain-btn.dim{opacity:0.35;pointer-events:none;}
+
+/* PIVOTオーバーレイのソースバッジ */
+#pivot-from-badge{
+  font-family:var(--fm);font-size:6px;letter-spacing:.08em;
+  color:rgba(74,144,212,0.6);padding:1px 5px;
+  border:1px solid rgba(74,144,212,0.25);border-radius:2px;
+  display:none;white-space:nowrap;
+}
 
 /* ── P5: AI進行提案パネル ── */
 .ai-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
@@ -277,6 +316,28 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .ai-save-btn:hover{background:rgba(232,197,71,0.18);}
 .ai-save-btn.flash{background:rgba(232,197,71,0.28);color:#fff;}
 
+/* R3: SUS変換ボタン */
+.ai-sus-btn{
+  display:none;font-family:var(--fm);font-size:8px;padding:4px 9px;
+  border:1px solid rgba(74,170,114,0.4);border-radius:var(--r);
+  color:#4aaa72;background:rgba(74,170,114,0.08);cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+  letter-spacing:.05em;white-space:nowrap;flex-shrink:0;
+}
+.ai-sus-btn.show{display:inline-block;}
+.ai-sus-btn:hover{background:rgba(74,170,114,0.18);}
+.ai-sus-btn.playing{color:#fff;background:rgba(74,170,114,0.22);border-color:#4aaa72;}
+.ai-sus-btn.dim{opacity:0.35;pointer-events:none;}
+
+/* O3: TENSION TIMELINE */
+.ai-wrap.open{max-height:310px;}  /* 拡張: グラフ分 +50px */
+#tension-timeline{
+  display:none;width:100%;height:36px;
+  border-radius:var(--r);
+  cursor:pointer;
+}
+#tension-timeline.show{display:block;}
+
 /* ── SAVED PROGRESSIONS パネル ── */
 .saved-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
 .saved-hdr{display:flex;align-items:center;justify-content:space-between;
@@ -285,15 +346,19 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .saved-tog{font-size:9px;color:var(--dim);}
 .saved-wrap{overflow:hidden;transition:max-height .25s;max-height:0;}
 .saved-wrap.open{max-height:200px;}
-.saved-list{display:flex;flex-wrap:wrap;gap:5px;padding:4px 10px 10px;overflow-y:auto;max-height:170px;}
+.saved-list{display:flex;flex-wrap:wrap;gap:5px;padding:4px 10px 10px;overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:200px;}
 .saved-item{
-  display:flex;align-items:center;gap:0;
+  display:flex;flex-direction:column;gap:0;
   border:1px solid var(--bdr2);border-radius:var(--r);
   background:var(--surf);overflow:hidden;flex-shrink:0;
+  min-width:120px;
+}
+.saved-item-row{
+  display:flex;align-items:center;gap:0;
 }
 .saved-play{
   font-family:var(--fm);font-size:9px;color:var(--dim);
-  padding:4px 8px;cursor:pointer;
+  padding:4px 8px;cursor:pointer;flex:1;
   transition:background .12s,color .12s;
 }
 .saved-play:hover,.saved-play:active{color:var(--acc);background:var(--acc-a);}
@@ -304,6 +369,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 .saved-del:hover{color:var(--col-subst);}
 .saved-empty{font-family:var(--fm);font-size:9px;color:var(--dim);padding:6px 2px;opacity:.6;}
+/* P2: タイムラインmini-canvas */
+.saved-tl{display:block;width:100%;height:20px;}
 /* ── P2: SUS版ボタン ── */
 .saved-sus{
   font-family:var(--fm);font-size:8px;color:rgba(74,170,114,0.75);
@@ -394,6 +461,32 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   border-color:#ffaa44;color:#ffaa44;
   background:rgba(255,170,68,0.1);
 }
+/* O2: SCALE RING トグルボタン */
+#scale-ring-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#scale-ring-btn.on{
+  border-color:#4aaa72;color:#4aaa72;
+  background:rgba(74,170,114,0.1);
+}
+/* R2: TRIAD SPACE オーバーレイトグルボタン */
+#triad-space-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#triad-space-btn.on{
+  border-color:#d4823a;color:#d4823a;
+  background:rgba(212,130,58,0.1);
+}
 #tone-wheel-overlay{
   position:absolute;bottom:12px;left:12px;z-index:10;
   display:none;
@@ -433,6 +526,53 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   font-family:var(--fm);font-size:7px;color:rgba(74,144,212,0.75);
   letter-spacing:.04em;min-height:10px;
 }
+.pivot-play{
+  font-family:var(--fm);font-size:7.5px;padding:2px 8px;
+  border:1px solid rgba(74,144,212,0.55);border-radius:var(--r);
+  color:#4a90d4;background:rgba(13,13,16,0.92);
+  cursor:pointer;white-space:nowrap;
+  transition:background .12s;user-select:none;
+}
+.pivot-play:active{background:rgba(74,144,212,0.18);}
+.pivot-play.playing{
+  border-color:rgba(232,197,71,0.7);color:#e8c547;
+}
+.pivot-prog-bar{
+  font-family:var(--fm);font-size:6px;
+  color:rgba(74,144,212,0.7);
+  letter-spacing:.03em;
+  max-width:200px;
+  display:flex;flex-wrap:wrap;gap:2px;align-items:center;
+  min-height:10px;
+}
+.pivot-prog-bar .pp-chord{
+  padding:1px 4px;border-radius:2px;
+  border:1px solid rgba(74,144,212,0.3);
+  color:rgba(74,144,212,0.85);
+  transition:border-color .15s,color .15s,background .15s;
+}
+.pivot-prog-bar .pp-chord.pp-cur{
+  border-color:#e8c547;color:#e8c547;
+  background:rgba(232,197,71,0.12);
+}
+.pivot-prog-bar .pp-chord.pp-done{
+  opacity:0.45;
+}
+.pivot-prog-bar .pp-arr{
+  color:rgba(74,144,212,0.35);font-size:6px;
+}
+.pivot-step-indicator{
+  display:flex;gap:3px;align-items:center;min-height:8px;
+}
+.pivot-step-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:rgba(74,144,212,0.2);
+  border:1px solid rgba(74,144,212,0.35);
+  transition:background .2s,border-color .2s;
+  flex-shrink:0;
+}
+.pivot-step-dot.active{background:#4a90d4;border-color:#4a90d4;}
+.pivot-step-dot.done{background:rgba(74,144,212,0.45);border-color:rgba(74,144,212,0.45);}
 
 /* MODE BUTTONS */
 .mode-bar{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:10;align-items:flex-end;}
@@ -706,7 +846,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <div id="map-wrap">
           <canvas id="map-canvas"></canvas>
           <!-- EXPAND: BACKボタン -->
-          <div id="expand-back-btn" onclick="expandBack()" style="
+          <div id="expand-back-btn" style="
             display:none;
             position:absolute;
             top:28px;
@@ -722,9 +862,12 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             letter-spacing:.08em;
             z-index:10;
             user-select:none;
+            pointer-events:none;
           ">← BACK</div>
           <!-- S9 PIVOT: 目標キー選択オーバーレイ（左上） -->
           <div id="pivot-overlay">
+            <!-- O1: CHAINからの引き継ぎ表示バッジ -->
+            <div id="pivot-from-badge"></div>
             <div class="pivot-row">
               <span class="pivot-lbl">PIVOT TO →</span>
               <select class="pivot-sel" id="pivot-to-sel">
@@ -738,6 +881,22 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="pivot-go" id="pivot-go-btn" onclick="runPivotBFS()">▶ GO</div>
             </div>
             <div class="pivot-steps" id="pivot-steps-lbl"></div>
+            <!-- N1: ステップインジケーター -->
+            <div class="pivot-step-indicator" id="pivot-step-indicator"></div>
+            <!-- N1: ステップ別ピボットコード表示 -->
+            <div id="pivot-detail" style="
+              font-family:var(--fm);font-size:6.5px;
+              color:rgba(74,144,212,0.8);
+              letter-spacing:.03em;
+              max-width:200px;
+              line-height:1.6;
+            "></div>
+            <!-- N1: 生成コード進行バー -->
+            <div class="pivot-prog-bar" id="pivot-prog-bar"></div>
+            <!-- N1: PLAYボタン -->
+            <div class="pivot-row" id="pivot-play-row" style="display:none;">
+              <div class="pivot-play" id="pivot-play-btn">▶ PLAY</div>
+            </div>
           </div>
           <!-- S11: トーンホイール（左下） -->
           <div id="tone-wheel-overlay">
@@ -763,11 +922,17 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div id="modal-map-btn" onclick="toggleModalMap()">MODE</div>
               <div id="twhl-btn" onclick="toggleToneWheel()">TWHL</div>
               <div id="augmod-btn" onclick="toggleAugMod()">AUGM</div>
+              <div id="scale-ring-btn" onclick="toggleScaleRing()">SCRG</div>
+              <div id="triad-space-btn" onclick="toggleTriadSpace()">TRVS</div>
             </div>
           </div>
         </div>
         <!-- CHAIN SAVE ボタン (CHAINモード時のみ表示) -->
         <button id="chain-save-btn" onclick="saveCurrentProgression()">★ SAVE</button>
+        <!-- O1: CHAIN → PIVOT 連携ボタン (CHAINモード・2コード以上の時のみ表示) -->
+        <button id="chain-pivot-btn" onclick="chainToPivot()">→ PIVOT</button>
+        <!-- Q4: COMPASS → CHAIN 転送ボタン (COMPASSモード時のみ表示) -->
+        <button id="compass-chain-btn" onclick="compassToChain()">+ CHAIN</button>
 
         <!-- 上スワイプ促進インジケーター -->
         <div class="swipe-pip" id="swipe-pip">
@@ -817,7 +982,11 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   <div class="s2-result" id="s2-result">—</div>
                   <div class="s2-tensions" id="s2-tensions"></div>
                 </div>
-                <button class="s2-play" id="s2-play-btn" onclick="playS2Chord()">▶ PLAY</button>
+                <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+                  <button class="s2-play" id="s2-swap-btn" onclick="s2Swap()" title="ベース/上部を入れ替え">⇄</button>
+                  <button class="s2-play" id="s2-main-btn" onclick="s2SendToMain()" title="RADIALに反映">→ MAIN</button>
+                  <button class="s2-play" id="s2-play-btn" onclick="playS2Chord()">▶ PLAY</button>
+                </div>
               </div>
             </div>
           </div>
@@ -860,8 +1029,11 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="ai-result-row">
                 <div class="ai-result" id="ai-result">現在のコードを起点に進行を生成します</div>
                 <div class="ai-play-btn" id="ai-play-btn" onclick="playAiProgression()">▶ PLAY</div>
+                <div class="ai-sus-btn" id="ai-sus-btn" onclick="playAiSusProgression()">→ SUS</div>
                 <div class="ai-save-btn" id="ai-save-btn" onclick="saveAiProgression()">★ SAVE</div>
               </div>
+              <!-- O3: TENSION TIMELINE -->
+              <canvas id="tension-timeline"></canvas>
             </div>
           </div>
         </div>
@@ -2019,6 +2191,12 @@ function drawFrame(){
     if(modalOverlayAlpha>0.999) modalOverlayAlpha=1;
     dirty=true;
   }
+  // R2: トライアッドスペースオーバーレイのフェードイン更新
+  if(triadSpaceMode && triadSpaceAlpha<0.999){
+    triadSpaceAlpha+=(1-triadSpaceAlpha)*0.12;
+    if(triadSpaceAlpha>0.999) triadSpaceAlpha=1;
+    dirty=true;
+  }
   if(!dirty)return;
   dirty=false;
 
@@ -2304,6 +2482,8 @@ function drawFrame(){
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle='rgba(13,13,16,1)';ctx.fillRect(0,0,W,H);
     drawExpand(ctx);
+    // P3: EXPANDモードでもSCRGオーバーレイを表示
+    drawScaleRing(ctx);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
     ctx.fillStyle='rgba(232,197,71,0.4)';ctx.fillText('EXPAND: TAP TO BRANCH / AGAIN TO COLLAPSE',10,10);
   } else if(MAP_MODE==='graph'){
@@ -2333,6 +2513,8 @@ function drawFrame(){
     ctx.fillStyle='rgba(13,13,16,1)';ctx.fillRect(0,0,W,H);
     drawCompassMode(ctx);
   }
+  // ── O2: SCALE RING — RADIALモード外周に12音スケール点表示 ──
+  drawScaleRing(ctx);
   // ── S4 AUGハブ: aug系コードが中央のときRADIALに重ねてオーバーレイ ──
   // P3: RADIALモードでaugModMapModeがONのとき常に描画（転調候補表示）
   if((MAP_MODE==='radial'||MAP_MODE==='pivot')&&(isAugChord(S.type)||augModMapMode)){
@@ -2342,8 +2524,15 @@ function drawFrame(){
   if(MAP_MODE==='radial'&&modalMapMode){
     drawModalOverlay(ctx);
   }
-  // ── F2: ガイドトーンライン可視化（PHRASE ON時 + RADIALモード）──
-  if(MAP_MODE==='radial'&&phraseMode!=='off'){
+  // ── R2: TRIAD SPACE オーバーレイ（RADIAL/EXPAND/CHAIN）──
+  const trvsModes=['radial','expand','chain'];
+  if(trvsModes.includes(MAP_MODE)&&triadSpaceMode){
+    drawTriadSpaceOverlay(ctx);
+  }
+  // ── F2: ガイドトーンライン可視化（PHRASE ON時 + RADIAL/EXPAND/CHAINモード）──
+  // K3: EXPANDとCHAINもnodeHitsが有効なのでガイドトーンを表示可能
+  const gtModes=['radial','expand','chain'];
+  if(gtModes.includes(MAP_MODE)&&phraseMode!=='off'){
     drawGuideToneOverlay(ctx);
     // F3: フォーム位置インジケーター（右下に小さく）
     drawFormPosIndicator(ctx);
@@ -2425,7 +2614,12 @@ function initCanvas(){
     // COMPASSモードは独立したhit検出（nodeHitsを使わない）
     if(MAP_MODE==='compass'){
       const ch=compassHits.find(h=>{const dx=x-h.x,dy=y-h.y;return dx*dx+dy*dy<=(h.r+6)*(h.r+6);});
-      if(ch) moveToChord(ch.root,ch.type);
+      if(ch){
+        moveToChord(ch.root,ch.type);
+        // Q4: タップしたコードを記録 → + CHAINボタンを有効化
+        lastCompassTap={root:ch.root,type:ch.type};
+        updateCompassChainBtn();
+      }
       return;
     }
     const hit=hitNode(x,y);
@@ -2942,6 +3136,15 @@ function playS2Chord(){
     const midi=60+pc; // oct4
     pluck(ctx,midi2hz(midi),t+0.12+i*0.04,0.45);
   });
+  // R4: ピアノロールをS2音セットでオーバーライド（1.5秒後に解除）
+  s2PianoRoot=bri;
+  s2PianoIvSet=new Set(allPCs.map(pc=>((pc-bri)+12)%12));
+  s2PianoOverride=true;
+  drawPianoRoll();
+  setTimeout(()=>{
+    s2PianoOverride=false;
+    drawPianoRoll();
+  },1500);
   }); // safeResume callback end
 }
 
@@ -2952,9 +3155,48 @@ document.addEventListener('DOMContentLoaded',()=>{
     s2Open=!s2Open;
     document.getElementById('s2-wrap').className='s2-wrap'+(s2Open?' open':'');
     document.getElementById('s2-tog').textContent=s2Open?'▲':'▼';
-    if(s2Open) renderS2Panel();
+    if(s2Open){
+      // R4: パネルを開いたとき現在コードをベースに自動セット
+      s2BaseRoot=S.root;
+      s2BaseType=S.type;
+      // 上部は5度上のメジャーをデフォルト
+      s2UpperRoot=NOTES[(ni(S.root)+7)%12];
+      s2UpperType='major';
+      renderS2Panel();
+    }
   });
 });
+
+// R4: ベース / 上部を入れ替え（双方向解釈ボタン）
+function s2Swap(){
+  const tmpRoot=s2BaseRoot, tmpType=s2BaseType;
+  s2BaseRoot=s2UpperRoot; s2BaseType=s2UpperType;
+  s2UpperRoot=tmpRoot;    s2UpperType=tmpType;
+  renderS2Panel();
+}
+
+// R4: 推定コードをmoveToChordでRADIALに反映
+function s2SendToMain(){
+  const bri=ni(s2BaseRoot);
+  const uri=ni(s2UpperRoot);
+  const bPCs=(CT[s2BaseType]?.iv??[0,4,7]).map(iv=>(bri+iv)%12);
+  const uPCs=(CT[s2UpperType]?.iv??[0,4,7]).map(iv=>(uri+iv)%12);
+  const allPCs=[...new Set([...bPCs,...uPCs])];
+  const inferred=inferChordName(allPCs, bri);
+  moveToChord(inferred.root, inferred.type);
+  // ボタンフラッシュ
+  const btn=document.getElementById('s2-main-btn');
+  if(btn){
+    const orig=btn.textContent;
+    btn.textContent='✓ SET';
+    setTimeout(()=>{btn.textContent=orig;},700);
+  }
+}
+
+// R4: S2 PLAY時にピアノロールをS2音セットでオーバーライドする変数
+let s2PianoOverride=false;  // trueのとき drawPianoRoll はS2音セットを表示
+let s2PianoRoot=0;          // ベースルートPC
+let s2PianoIvSet=new Set(); // S2全音のインターバルセット（ベースルートから）
 
 function hexToRgba(hex,alpha){
   var h=hex.replace('#','');
@@ -4478,7 +4720,9 @@ function playMelodyPhrase(root, type, durationMs){
 
   // フレーズノート列を生成（ビルダーv4）
   // scheduleNote内でphraseCurrentChordを参照してコード追従
-  let t=ctx.currentTime+0.05;
+  // K4-M1: currentTime===0はsuspended未解除の可能性。最低0.1秒のオフセットを保証
+  const ctBase=ctx.currentTime>0?ctx.currentTime:(Date.now()/1000);
+  let t=ctBase+0.05;
   const phraseStartTime=t;
   phraseEndTime=phraseStartTime+durationMs/1000;
   const hook=CATCHY_HOOKS[PRESET_HOOK_MAP[preset]||'default'];
@@ -4841,7 +5085,9 @@ function playAdlibPhrase(root,type,durationMs){
   const adlibIsKetsu=adlibFormPos>=0.80;
 
   // フレーズ全体の時間軸
-  let t=ctx.currentTime+0.05;
+  // K4-M1: currentTime===0はsuspended未解除の可能性。最低0.1秒のオフセットを保証
+  const ctBase=ctx.currentTime>0?ctx.currentTime:(Date.now()/1000);
+  let t=ctBase+0.05;
   const phraseEnd=t+durationMs/1000;
   const totalBeats=durationMs/beatMs;
 
@@ -5129,20 +5375,109 @@ function grooveStepMs(){
   return (60000/bpm)/4; // 16分音符1ステップのms
 }
 
+// K2: Groove専用打楽器合成（pluck()非依存）
+// ─ Kick: ピッチエンベロープ付きサイン波 ─
+function synthKick(ctx, t, vol){
+  const osc=ctx.createOscillator();
+  const gain=ctx.createGain();
+  const distortion=ctx.createWaveShaper();
+
+  // 軽いウェーブシェーパーで太さを出す
+  const curve=new Float32Array(256);
+  for(let i=0;i<256;i++){const x=i/128-1; curve[i]=x<0?-Math.pow(-x,0.7):Math.pow(x,0.7);}
+  distortion.curve=curve;
+
+  osc.type='sine';
+  // ピッチエンベロープ: 150Hz→45Hz に急降下
+  osc.frequency.setValueAtTime(150,t);
+  osc.frequency.exponentialRampToValueAtTime(45,t+0.08);
+  osc.frequency.exponentialRampToValueAtTime(30,t+0.25);
+
+  // ボリュームエンベロープ
+  gain.gain.setValueAtTime(vol*1.4,t);
+  gain.gain.exponentialRampToValueAtTime(0.001,t+0.35);
+
+  osc.connect(distortion);
+  distortion.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t+0.4);
+}
+
+// ─ Snare: ノイズ + トーン ─
+function synthSnare(ctx, t, vol){
+  // ノイズ成分
+  const bufLen=ctx.sampleRate*0.2;
+  const buf=ctx.createBuffer(1,bufLen,ctx.sampleRate);
+  const data=buf.getChannelData(0);
+  for(let i=0;i<bufLen;i++) data[i]=(Math.random()*2-1);
+  const noise=ctx.createBufferSource();
+  noise.buffer=buf;
+
+  const bpf=ctx.createBiquadFilter();
+  bpf.type='bandpass';
+  bpf.frequency.value=3000;
+  bpf.Q.value=0.6;
+
+  const noiseGain=ctx.createGain();
+  noiseGain.gain.setValueAtTime(vol*0.8,t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+
+  noise.connect(bpf);
+  bpf.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(t);
+  noise.stop(t+0.22);
+
+  // トーン成分（ボディ感）
+  const osc=ctx.createOscillator();
+  const oscGain=ctx.createGain();
+  osc.type='triangle';
+  osc.frequency.setValueAtTime(220,t);
+  osc.frequency.exponentialRampToValueAtTime(120,t+0.05);
+  oscGain.gain.setValueAtTime(vol*0.4,t);
+  oscGain.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+  osc.connect(oscGain);
+  oscGain.connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t+0.15);
+}
+
+// ─ Hi-hat: ハイパスフィルター済みノイズ ─
+function synthHihat(ctx, t, vol, open){
+  const decay=open?0.28:0.055;
+  const bufLen=Math.ceil(ctx.sampleRate*decay*1.2);
+  const buf=ctx.createBuffer(1,bufLen,ctx.sampleRate);
+  const data=buf.getChannelData(0);
+  for(let i=0;i<bufLen;i++) data[i]=(Math.random()*2-1);
+  const noise=ctx.createBufferSource();
+  noise.buffer=buf;
+
+  const hpf=ctx.createBiquadFilter();
+  hpf.type='highpass';
+  hpf.frequency.value=8000;
+  hpf.Q.value=0.8;
+
+  const gain=ctx.createGain();
+  gain.gain.setValueAtTime(vol*(open?0.35:0.28),t);
+  gain.gain.exponentialRampToValueAtTime(0.001,t+decay);
+
+  noise.connect(hpf);
+  hpf.connect(gain);
+  gain.connect(ctx.destination);
+  noise.start(t);
+  noise.stop(t+decay+0.01);
+}
+
 function playGrooveBeat(ctx, type, hz, t, vol){
-  // kick/snare/hihatを音色を変えて鳴らす
-  const saved=TIMBRE;
   if(type==='kick'){
-    TIMBRE='pulsebass';
-    pluck(ctx,hz*0.5,t,vol*1.2);
+    synthKick(ctx,t,vol);
   } else if(type==='snare'){
-    TIMBRE='detroit';
-    pluck(ctx,hz*2,t,vol*0.7);
+    synthSnare(ctx,t,vol);
   } else {
-    TIMBRE='plucksynth';
-    pluck(ctx,hz*4,t,vol*0.35);
+    // hihat: GROOVE_PRESTSのパターン末尾(open判定は将来拡張)
+    synthHihat(ctx,t,vol,false);
   }
-  TIMBRE=saved;
 }
 
 function grooveTick_step(){
@@ -5319,6 +5654,8 @@ function moveToChord(root,type){
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
   // Q6: モーダルオーバーレイをコード変更時にフェードイン再開
   if(modalMapMode) modalOverlayAlpha=0;
+  // R2: トライアッドスペースオーバーレイもコード変更時にフェードイン再開
+  if(triadSpaceMode) triadSpaceAlpha=0;
   relCache=null; sncCache=null; invalidate();
   document.getElementById('hdr-chord').textContent=cs(root,type);
   renderPath();
@@ -5432,14 +5769,17 @@ function playSavedProg(id){
 
   // 先頭コードに移動
   moveToChord(chords[0].root,chords[0].type);
+  // Q2: ミニタイムライン先頭ハイライト
+  const _tlCvs=()=>document.querySelector(`.saved-tl[data-id="${id}"]`);
+  { const c=_tlCvs(); if(c) drawSavedTimeline(c,chords,0); }
 
   let idx=1;
   function step(){
     if(idx>=chords.length){
       savedProgTimer=null;
-      // フレーズを一時切り替えしていた場合は元に戻す
+      // Q2: 再生終了でハイライト解除
+      { const c=_tlCvs(); if(c) drawSavedTimeline(c,chords,-1); }
       if(forcedPhrase){
-        // 最後のフレーズが終わるのを少し待ってから戻す
         setTimeout(()=>{
           phraseMode=prevPhraseMode;
           const pms=document.getElementById('phrase-mode-sel');
@@ -5448,8 +5788,11 @@ function playSavedProg(id){
       }
       return;
     }
-    const c=chords[idx++];
+    const c=chords[idx];
     moveToChord(c.root,c.type);
+    // Q2: ミニタイムラインのハイライト更新
+    { const cv=_tlCvs(); if(cv) drawSavedTimeline(cv,chords,idx); }
+    idx++;
     savedProgTimer=setTimeout(step, interval);
   }
   if(chords.length>1){
@@ -5693,6 +6036,118 @@ function buildLocalProgression(root, type, progType, len){
   return Array(len).fill(start);
 }
 
+// ═══════════════════════════════════════════════════════
+// O3: TENSION TIMELINE
+// コード進行の各コードを getChordEmotionVec() で評価し
+// brightness(明暗) と tension(緊張度) を折れ線グラフで表示
+// activeIdx: 再生中コードのインデックス（-1=なし）
+// ═══════════════════════════════════════════════════════
+// O3 / P1: タイムラインのヒット検出用データ（drawTensionTimeline が更新）
+let tlHitData=null; // {chords, n, W, H} — pointerdownで参照
+
+function drawTensionTimeline(chords, activeIdx){
+  const canvas=document.getElementById('tension-timeline');
+  if(!canvas||!chords||!chords.length) return;
+
+  // canvasの実ピクセルサイズをCSSから取得
+  const W=canvas.offsetWidth||canvas.width||200;
+  const H=36;
+  canvas.width=W;
+  canvas.height=H;
+  canvas.classList.add('show');
+
+  const ctx2=canvas.getContext('2d');
+  ctx2.clearRect(0,0,W,H);
+
+  // 背景
+  ctx2.fillStyle='rgba(13,13,16,0.7)';
+  ctx2.fillRect(0,0,W,H);
+
+  const n=chords.length;
+  // P1: ヒットデータを更新（pointerdownハンドラで参照）
+  tlHitData={chords, n, W, H};
+  if(n<1) return;
+
+  // 各コードの感情ベクトルを計算
+  const vecs=chords.map(c=>getChordEmotionVec(c.root,c.type));
+
+  // X座標: 均等分割
+  function xOf(i){ return (i+0.5)/n*W; }
+  // brightness(0〜1) → Y: 上=明(小さいY), 下=暗(大きいY)  マージン4px
+  const MY=4;
+  function yBright(v){ return MY + (1-v.brightness)*(H-MY*2)*0.85; }
+  // tension(0〜1) → Y（同様）
+  function yTension(v){ return MY + (1-v.tension)*(H-MY*2)*0.85; }
+
+  // ── brightnessライン（金色） ──
+  ctx2.save();
+  ctx2.beginPath();
+  vecs.forEach((v,i)=>{
+    const x=xOf(i), y=yBright(v);
+    i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+  });
+  ctx2.strokeStyle='rgba(232,197,71,0.55)';
+  ctx2.lineWidth=1.5;
+  ctx2.stroke();
+
+  // ── tensionライン（赤橙） ──
+  ctx2.beginPath();
+  vecs.forEach((v,i)=>{
+    const x=xOf(i), y=yTension(v);
+    i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+  });
+  ctx2.strokeStyle='rgba(212,100,58,0.45)';
+  ctx2.lineWidth=1.2;
+  ctx2.stroke();
+  ctx2.restore();
+
+  // ── 縦グリッド（コード境界） ──
+  ctx2.save();
+  ctx2.strokeStyle='rgba(255,255,255,0.05)';
+  ctx2.lineWidth=1;
+  for(let i=1;i<n;i++){
+    const x=i/n*W;
+    ctx2.beginPath();ctx2.moveTo(x,0);ctx2.lineTo(x,H);ctx2.stroke();
+  }
+  ctx2.restore();
+
+  // ── ノード点 ──
+  vecs.forEach((v,i)=>{
+    const x=xOf(i);
+    const yb=yBright(v);
+    const yt=yTension(v);
+    const isActive=(i===activeIdx);
+
+    // brightnessノード
+    ctx2.beginPath();
+    ctx2.arc(x,yb,isActive?4:2.5,0,Math.PI*2);
+    ctx2.fillStyle=isActive?'#e8c547':`rgba(232,197,71,${0.5+v.brightness*0.4})`;
+    ctx2.fill();
+
+    // tensionノード
+    ctx2.beginPath();
+    ctx2.arc(x,yt,isActive?3.5:2,0,Math.PI*2);
+    ctx2.fillStyle=isActive?'#d4643a':`rgba(212,100,58,${0.35+v.tension*0.5})`;
+    ctx2.fill();
+
+    // アクティブ時: コード名ラベル
+    if(isActive){
+      ctx2.font='bold 6px DM Mono,monospace';
+      ctx2.textAlign='center';ctx2.textBaseline='bottom';
+      ctx2.fillStyle='rgba(255,255,255,0.8)';
+      ctx2.fillText(cs(chords[i].root,chords[i].type),x,H-1);
+    }
+  });
+
+  // ── 凡例（右下） ──
+  ctx2.font='5px DM Mono,monospace';
+  ctx2.textAlign='right';ctx2.textBaseline='top';
+  ctx2.fillStyle='rgba(232,197,71,0.5)';
+  ctx2.fillText('B',W-1,1);
+  ctx2.fillStyle='rgba(212,100,58,0.5)';
+  ctx2.fillText('T',W-7,1);
+}
+
 function generateProgression(){
   const btn=document.getElementById('ai-gen-btn');
   const resultEl=document.getElementById('ai-result');
@@ -5706,7 +6161,13 @@ function generateProgression(){
   resultEl.textContent='生成中...';
   playBtn.classList.remove('show');
   if(saveBtn) saveBtn.classList.remove('show');
+  // R3: SUSボタンも非表示にリセット
+  const susBtn=document.getElementById('ai-sus-btn');
+  if(susBtn){susBtn.classList.remove('show','playing','dim');}
   aiLastChords=null;
+  // O3: 前回のタイムラインを非表示
+  const tlCanvas=document.getElementById('tension-timeline');
+  if(tlCanvas) tlCanvas.classList.remove('show');
 
   // 少し遅延してUIをフラッシュさせてから生成（体感的な応答感）
   setTimeout(()=>{
@@ -5720,6 +6181,15 @@ function generateProgression(){
       resultEl.textContent=preview;
       playBtn.classList.add('show');
       if(saveBtn) saveBtn.classList.add('show');
+      // R3: SUS変換可能なコードが1つ以上あれば有効表示
+      if(susBtn){
+        const susChords=convertToSusProgression(chords);
+        const canSus=susChords.some((c,i)=>c.type!==chords[i].type);
+        susBtn.classList.add('show');
+        susBtn.classList.toggle('dim',!canSus);
+      }
+      // O3: テンションタイムライン描画
+      drawTensionTimeline(chords, -1);
     } catch(err){
       resultEl.className='ai-result err';
       resultEl.textContent='エラー: '+err.message;
@@ -5735,6 +6205,12 @@ function generateProgression(){
 function playAiProgression(){
   if(!aiLastChords||!aiLastChords.length) return;
   if(savedProgTimer){clearTimeout(savedProgTimer);savedProgTimer=null;}
+  // R3: SUS再生中ならボタン状態をリセット
+  if(aiSusPlaying){
+    aiSusPlaying=false;
+    const susBtn=document.getElementById('ai-sus-btn');
+    if(susBtn){susBtn.textContent='→ SUS';susBtn.classList.remove('playing');}
+  }
   if(MAP_MODE!=='chain') setMode('chain');
 
   const prevPhraseMode=phraseMode;
@@ -5748,11 +6224,15 @@ function playAiProgression(){
   const interval=Math.round(60000/autoBpm*2);
   const chords=aiLastChords;
   moveToChord(chords[0].root,chords[0].type);
+  // O3: 再生開始時にタイムラインを0番目ハイライト
+  drawTensionTimeline(chords, 0);
 
   let idx=1;
   function step(){
     if(idx>=chords.length){
       savedProgTimer=null;
+      // O3: 再生終了でハイライト解除
+      drawTensionTimeline(chords, -1);
       if(forcedPhrase){
         setTimeout(()=>{
           phraseMode=prevPhraseMode;
@@ -5762,11 +6242,77 @@ function playAiProgression(){
       }
       return;
     }
-    const c=chords[idx++];
+    const c=chords[idx];
     moveToChord(c.root,c.type);
+    // O3: 再生中コードをハイライト
+    drawTensionTimeline(chords, idx);
+    idx++;
     savedProgTimer=setTimeout(step,interval);
   }
   if(chords.length>1) savedProgTimer=setTimeout(step,interval);
+}
+
+// R3: AI生成進行をSus変換して再生
+// convertToSusProgression()でSus版に変換し、playAiProgressionと同じパイプラインで再生
+// 再生中はボタンラベルを「■ STOP」に変え、もう一度タップで停止
+let aiSusPlaying=false;
+function playAiSusProgression(){
+  const susBtn=document.getElementById('ai-sus-btn');
+
+  // 再生中ならSTOP
+  if(aiSusPlaying){
+    if(savedProgTimer){clearTimeout(savedProgTimer);savedProgTimer=null;}
+    aiSusPlaying=false;
+    if(susBtn){susBtn.textContent='→ SUS';susBtn.classList.remove('playing');}
+    drawTensionTimeline(aiLastChords,-1);
+    return;
+  }
+
+  if(!aiLastChords||!aiLastChords.length) return;
+  const susChords=convertToSusProgression(aiLastChords);
+
+  if(savedProgTimer){clearTimeout(savedProgTimer);savedProgTimer=null;}
+  if(MAP_MODE!=='chain') setMode('chain');
+
+  aiSusPlaying=true;
+  if(susBtn){susBtn.textContent='■ STOP';susBtn.classList.add('playing');}
+
+  const prevPhraseMode=phraseMode;
+  const forcedPhrase=(phraseMode==='off');
+  if(forcedPhrase){
+    phraseMode='melody';
+    const pms=document.getElementById('phrase-mode-sel');
+    if(pms) pms.value='melody';
+  }
+
+  const interval=Math.round(60000/autoBpm*2);
+  moveToChord(susChords[0].root,susChords[0].type);
+  // タイムラインはオリジナル進行のインデックスで連動
+  drawTensionTimeline(aiLastChords,0);
+
+  let idx=1;
+  function step(){
+    if(idx>=susChords.length){
+      savedProgTimer=null;
+      aiSusPlaying=false;
+      if(susBtn){susBtn.textContent='→ SUS';susBtn.classList.remove('playing');}
+      drawTensionTimeline(aiLastChords,-1);
+      if(forcedPhrase){
+        setTimeout(()=>{
+          phraseMode=prevPhraseMode;
+          const pms=document.getElementById('phrase-mode-sel');
+          if(pms) pms.value=prevPhraseMode;
+        },interval);
+      }
+      return;
+    }
+    const c=susChords[idx];
+    moveToChord(c.root,c.type);
+    drawTensionTimeline(aiLastChords,idx);
+    idx++;
+    savedProgTimer=setTimeout(step,interval);
+  }
+  if(susChords.length>1) savedProgTimer=setTimeout(step,interval);
 }
 
 // AI生成進行をSAVEDリストに保存
@@ -5807,6 +6353,51 @@ function toggleSavedPanel(){
 }
 
 // SAVEDリストをDOMに描画
+// P2: SAVEDリスト用ミニタイムライン描画
+// canvas要素と進行配列を受け取り brightness/tension を小さく描画
+function drawSavedTimeline(canvas, chords, activeIdx=-1){
+  if(!canvas||!chords||!chords.length) return;
+  const W=canvas.offsetWidth||120;
+  const H=20;
+  canvas.width=W; canvas.height=H;
+  const ctx2=canvas.getContext('2d');
+  ctx2.clearRect(0,0,W,H);
+  ctx2.fillStyle='rgba(13,13,16,0.6)';
+  ctx2.fillRect(0,0,W,H);
+
+  const n=chords.length;
+  const vecs=chords.map(c=>getChordEmotionVec(c.root,c.type));
+  const MY=3;
+  function xOf(i){ return (i+0.5)/n*W; }
+  function yB(v){ return MY+(1-v.brightness)*(H-MY*2)*0.85; }
+  function yT(v){ return MY+(1-v.tension)*(H-MY*2)*0.85; }
+
+  // brightnessライン
+  ctx2.beginPath();
+  vecs.forEach((v,i)=>{ const x=xOf(i),y=yB(v); i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y); });
+  ctx2.strokeStyle='rgba(232,197,71,0.5)'; ctx2.lineWidth=1.2; ctx2.stroke();
+  // tensionライン
+  ctx2.beginPath();
+  vecs.forEach((v,i)=>{ const x=xOf(i),y=yT(v); i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y); });
+  ctx2.strokeStyle='rgba(212,100,58,0.38)'; ctx2.lineWidth=1.0; ctx2.stroke();
+  // ノード点
+  vecs.forEach((v,i)=>{
+    const x=xOf(i);
+    const isActive=(i===activeIdx);
+    // brightnessノード
+    ctx2.beginPath(); ctx2.arc(x,yB(v),isActive?3.5:2,0,Math.PI*2);
+    ctx2.fillStyle=isActive?'#e8c547':`rgba(232,197,71,${0.4+v.brightness*0.45})`; ctx2.fill();
+    // tensionノード
+    ctx2.beginPath(); ctx2.arc(x,yT(v),isActive?3:1.5,0,Math.PI*2);
+    ctx2.fillStyle=isActive?'#d4643a':`rgba(212,100,58,${0.3+v.tension*0.45})`; ctx2.fill();
+    // アクティブ時: 縦ハイライトライン
+    if(isActive){
+      ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,H);
+      ctx2.strokeStyle='rgba(232,197,71,0.20)'; ctx2.lineWidth=1; ctx2.stroke();
+    }
+  });
+}
+
 function renderSavedList(){
   const list=document.getElementById('saved-list');
   if(!list)return;
@@ -5824,19 +6415,104 @@ function renderSavedList(){
     const susBtn=hasSus
       ?`<div class="saved-sus" data-id="${p.id}" onclick="playSusProg(${p.id})" title="Sus版で再生">SUS</div>`
       :'';
-    return `<div class="saved-item">
-      <div class="saved-play" onclick="playSavedProg(${p.id})" title="${chordStr}">${p.name}</div>
-      ${susBtn}
-      <div class="saved-del" onclick="deleteSavedProg(${p.id})" title="削除">✕</div>
+    return `<div class="saved-item" data-id="${p.id}">
+      <div class="saved-item-row">
+        <div class="saved-play" onclick="playSavedProg(${p.id})" title="${chordStr}">${p.name}</div>
+        ${susBtn}
+        <div class="saved-del" onclick="deleteSavedProg(${p.id})" title="削除">✕</div>
+      </div>
+      <canvas class="saved-tl" data-id="${p.id}"></canvas>
     </div>`;
   }).join('');
+  // P2: innerHTML確定後に各canvasにミニタイムライン描画
+  requestAnimationFrame(()=>{
+    progs.forEach(p=>{
+      const cvs=list.querySelector(`.saved-tl[data-id="${p.id}"]`);
+      if(cvs&&p.chords&&p.chords.length) drawSavedTimeline(cvs,p.chords);
+    });
+  });
 }
 
 // CHAINモード時にSAVEボタンの表示/非表示を切り替え
 function updateSaveBtnVisibility(){
   const btn=document.getElementById('chain-save-btn');
-  if(!btn)return;
-  btn.style.display=(MAP_MODE==='chain')?'flex':'none';
+  if(btn) btn.style.display=(MAP_MODE==='chain')?'flex':'none';
+  // O1: PIVOT連携ボタン — CHAINモード かつ 2コード以上の時のみ表示
+  const pBtn=document.getElementById('chain-pivot-btn');
+  if(pBtn){
+    const chainLen=S.history.slice(0,S.histIdx+1).length;
+    const show=(MAP_MODE==='chain'&&chainLen>=2);
+    pBtn.style.display=show?'flex':'none';
+    // SAVEボタンと重ならないよう右オフセット調整
+    if(show){
+      const saveBtn=document.getElementById('chain-save-btn');
+      const saveW=saveBtn?(saveBtn.offsetWidth||60):60;
+      pBtn.style.right=(saveW+18)+'px';
+    }
+  }
+  // Q4: COMPASSでない時は + CHAINボタンを隠す
+  if(MAP_MODE!=='compass') updateCompassChainBtn();
+}
+
+// ── Q4: COMPASS → CHAIN 転送 ──
+let lastCompassTap=null; // {root, type} — COMPASSで最後にタップしたコード
+
+function updateCompassChainBtn(){
+  const btn=document.getElementById('compass-chain-btn');
+  if(!btn) return;
+  const show=(MAP_MODE==='compass');
+  btn.style.display=show?'flex':'none';
+  if(show){
+    if(lastCompassTap){
+      btn.classList.remove('dim');
+      const lbl=cs(lastCompassTap.root,lastCompassTap.type);
+      btn.textContent='+ CHAIN  '+lbl;
+    } else {
+      btn.classList.add('dim');
+      btn.textContent='+ CHAIN';
+    }
+  }
+}
+
+// COMPASSで最後にタップしたコードをCHAINに追記して遷移
+function compassToChain(){
+  if(!lastCompassTap) return;
+  const {root,type}=lastCompassTap;
+  // CHAINモードへ切り替え（S.history はそのまま維持）
+  setMode('chain');
+  // 末尾に追記（moveToChordでS.historyへ自動push）
+  moveToChord(root,type);
+  // ★SAVEボタンのフラッシュで視覚フィードバック
+  const btn=document.getElementById('chain-save-btn');
+  if(btn){btn.classList.add('flash');setTimeout(()=>btn.classList.remove('flash'),400);}
+}
+
+// O1: CHAINの末尾コードをPIVOTの出発点として引き継ぎ
+function chainToPivot(){
+  const history=S.history.slice(0,S.histIdx+1);
+  if(history.length<2) return;
+
+  // CHAINの末尾コードを引き継ぎ用に記録
+  const lastChord=history[history.length-1];
+  const fromRoot=lastChord.root;
+  const fromType=lastChord.type;
+
+  // PIVOTモードへ切り替え（setMode内でS.rootが基準になる）
+  // → 先にS.root/typeを末尾コードに合わせる
+  S.root=fromRoot; S.type=fromType;
+  S.history=history; S.histIdx=history.length-1;
+  document.getElementById('hdr-chord').textContent=cs(fromRoot,fromType);
+  relCache=null;
+
+  setMode('pivot');
+
+  // PIVOTのデフォルト目標キーを末尾コードから計算（setMode内と同じロジック）
+  // → setMode('pivot')が既に設定済みなのでここでは FROM バッジのみ更新
+  const badge=document.getElementById('pivot-from-badge');
+  if(badge){
+    badge.style.display='block';
+    badge.textContent='FROM CHAIN: '+history.map(h=>cs(h.root,h.type)).join(' › ');
+  }
 }
 
 function renderPath(){
@@ -5873,6 +6549,8 @@ function renderPath(){
     bar.appendChild(n);
   });
   bar.scrollLeft=bar.scrollWidth;
+  // O1: PIVOTボタンの表示状態を進行長に連動して更新
+  updateSaveBtnVisibility();
 }
 
 // +dimボタン長押し時: 3候補選択メニューを表示
@@ -5965,23 +6643,37 @@ function initExpand(originRoot, originType){
     x:L.cx,y:L.cy,children:[]};
   expandNodes=[expandTree];
   // BACKボタンをグレーアウト状態にリセット
-  const backBtn=document.getElementById('expand-back-btn');
-  if(backBtn){backBtn.style.opacity='0.35';backBtn.style.pointerEvents='none';}
+  setBackBtn(true, false);
   invalidate();
 }
 
-// EXPANDモード「戻る」処理
+// M4: BACKボタン状態管理ヘルパー
+// display/pointer-events/opacityを一括管理し、タッチ伝播の競合を防ぐ
+function setBackBtn(visible, canBack){
+  const btn=document.getElementById('expand-back-btn');
+  if(!btn) return;
+  if(visible===false){
+    btn.style.display='none';
+    btn.style.pointerEvents='none';
+  } else {
+    btn.style.display='block';
+    btn.style.opacity=canBack?'1':'0.35';
+    btn.style.pointerEvents=canBack?'auto':'none';
+  }
+}
+// BACKボタンのイベント登録（onclickではなくaddEventListenerで管理）
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=document.getElementById('expand-back-btn');
+  if(!btn) return;
+  btn.addEventListener('pointerdown',e=>{
+    e.stopPropagation(); // canvas pointerdownへの伝播を防ぐ
+    expandBack();
+  });
+});
+
 function expandBack(){
   // 戻れる状態がなければ何もしない
   if(!expandTree) return;
-
-  const backBtn=document.getElementById('expand-back-btn');
-  const updateBackState=()=>{
-    if(!backBtn) return;
-    const canBack=expandNodeHistory.length>0;
-    backBtn.style.opacity=canBack?'1':'0.35';
-    backBtn.style.pointerEvents=canBack?'auto':'none';
-  };
 
   // 通常ノードが展開されている → 最後に展開したノードを1段折りたたむ
   if(expandNodeHistory.length>0){
@@ -5992,21 +6684,47 @@ function expandBack(){
       node.children.forEach(remove);
       node.children=[];
       expandNodeHistory.pop();
-      updateBackState();
+      setBackBtn(true, expandNodeHistory.length>0);
       invalidate();
       return;
     } else {
       // ノードが見つからない・既に折りたたまれている場合はhistoryを掃除して再試行
       expandNodeHistory.pop();
-      updateBackState();
+      setBackBtn(true, expandNodeHistory.length>0);
       expandBack();
       return;
     }
   }
 
-  // historyが空 = 最初の状態 → 何もしない
-  updateBackState();
+  // historyが空 = 最初の状態
+  setBackBtn(true, false);
 }
+
+// N1: PIVOTモード PLAYボタンのイベント登録
+document.addEventListener('DOMContentLoaded',()=>{
+  const playBtn=document.getElementById('pivot-play-btn');
+  if(playBtn){
+    playBtn.addEventListener('pointerdown',e=>{
+      e.stopPropagation();
+      playPivotProg();
+    });
+  }
+  // P1: TENSION TIMELINE タップでコードジャンプ
+  const tlCanvas=document.getElementById('tension-timeline');
+  if(tlCanvas){
+    tlCanvas.addEventListener('pointerdown',e=>{
+      if(!tlHitData) return;
+      const rect=tlCanvas.getBoundingClientRect();
+      const px=e.clientX-rect.left;
+      const {chords,n,W}=tlHitData;
+      const idx=Math.floor(px/W*n);
+      if(idx<0||idx>=n) return;
+      const c=chords[idx];
+      moveToChord(c.root,c.type);
+      drawTensionTimeline(chords,idx);
+    });
+  }
+});
 
 function expandNode(root,type,key){
   const found=expandNodes.find(n=>n.key===key);
@@ -6043,8 +6761,7 @@ function expandNode(root,type,key){
     if(found.depth>0){
       expandNodeHistory.push({key:found.key, node:found});
       // BACKボタンを有効化
-      const backBtn=document.getElementById('expand-back-btn');
-      if(backBtn){backBtn.style.opacity='1';backBtn.style.pointerEvents='auto';}
+      setBackBtn(true, true);
     }
     const rels=buildRelations(root,type);
     const notInTree=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
@@ -6095,7 +6812,25 @@ function expandNode(root,type,key){
 }
 
 function drawExpand(ctx){
+  // Q3: SCRGオン時のスケールセットをあらかじめ計算
+  let _expandScaleSet=null;
+  if(scaleRingMode){
+    const _baseRoot=expandOriginRoot||S.root;
+    const _baseType=expandOriginType||S.type;
+    const _ri=ni(_baseRoot);
+    const _mode=guessMode(_baseType)||'Ionian';
+    const _ivs=SCALE_RING_IVS[_mode]||[0,2,4,5,7,9,11];
+    _expandScaleSet=new Set(_ivs.map(iv=>(_ri+iv)%12));
+  }
+
   const drawNode=(node)=>{
+    // Q3: SCRGオン時にスケール外ノードを減光
+    let scaleAlphaMult=1;
+    if(scaleRingMode&&_expandScaleSet&&node.depth>0){
+      const pitchClass=ni(node.root)%12;
+      if(!_expandScaleSet.has(pitchClass)) scaleAlphaMult=0.35;
+    }
+
     const retType=getReturnType(node, expandTree.root, expandTree.type);
     const isReturn=!!retType;
     const retInfo=retType?RETURN_TYPES[retType]:null;
@@ -6129,12 +6864,12 @@ function drawExpand(ctx){
     // Node fill
     ctx.beginPath();ctx.arc(node.x,node.y,nr,0,Math.PI*2);
     const fillAlpha=node.depth===0?0.25:isReturn?0.28:isExpanded?0.45:isTop?0.18:0.10;
-    ctx.fillStyle=`rgba(${rr},${gg},${bb},${fillAlpha})`;ctx.fill();
+    ctx.fillStyle=`rgba(${rr},${gg},${bb},${fillAlpha*scaleAlphaMult})`;ctx.fill();
 
     // Node stroke
     ctx.strokeStyle=col;
     ctx.lineWidth=node.depth===0?2:isReturn?2:isExpanded?2:isTop?1.5:0.8;
-    ctx.globalAlpha=node.depth===0?1:isReturn?1:isExpanded?0.90:node.opacity||0.6;
+    ctx.globalAlpha=(node.depth===0?1:isReturn?1:isExpanded?0.90:node.opacity||0.6)*scaleAlphaMult;
     ctx.setLineDash(canExpand?[3,2]:[]);
     ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
 
@@ -6142,7 +6877,7 @@ function drawExpand(ctx){
     ctx.font=`bold ${node.depth===0?12:isReturn?9:isExpanded?10:9}px DM Mono,monospace`;
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=node.depth===0?'#e8c547':isReturn?retInfo.col:isExpanded?'#fff':'rgba(255,255,255,0.75)';
-    ctx.globalAlpha=node.depth===0?1:isReturn?1:isExpanded?0.95:node.opacity||0.6;
+    ctx.globalAlpha=(node.depth===0?1:isReturn?1:isExpanded?0.95:node.opacity||0.6)*scaleAlphaMult;
     ctx.fillText(node.key,node.x,node.y);ctx.globalAlpha=1;
 
     // 帰還シンボル
@@ -6786,19 +7521,20 @@ function isAugChord(type){
 // モードデータ（Callipari §10準拠）
 // scale: コードタイプ → 対応モード名のマッピング
 const MODAL_DATA={
-  'Ionian':   {parent:'Maj',color:'#d44a6a',types:['major','maj7','add9','6','maj9']},
-  'Lydian':   {parent:'Maj',color:'#d44a6a',types:['maj7','maj9']},
-  'LydianDom':{parent:'Me', color:'#4a90d4',types:['7','9','13']},
-  'Mixolydian':{parent:'Maj',color:'#d44a6a',types:['7','9','11','13']},
-  'MixoB13':  {parent:'Me', color:'#4a90d4',types:['7','m7b5']},
-  'PhrygDom': {parent:'Ar', color:'#4aaa72',types:['7b9']},
-  'Aeolian':  {parent:'Maj',color:'#d44a6a',types:['minor','m','m7','m9']},
-  'Phrygian': {parent:'Maj',color:'#d44a6a',types:['m','m7']},
-  'Dorian':   {parent:'Maj',color:'#d44a6a',types:['m','m7','m6']},
-  'DorianB2': {parent:'Me', color:'#4a90d4',types:['m7']},
-  'DorianS4': {parent:'Ar', color:'#4aaa72',types:['m7']},
-  'Melodic':  {parent:'Me', color:'#4a90d4',types:['m','mmaj7','m6']},
-  'Harmonic': {parent:'Ar', color:'#4aaa72',types:['m','mmaj7']},
+  // N2: brightness(-1=暗〜+1=明), tension(0=安定〜1=緊張)
+  'Ionian':   {parent:'Maj',color:'#d44a6a',types:['major','maj7','add9','6','maj9'],        brightness:0.5, tension:0.2},
+  'Lydian':   {parent:'Maj',color:'#d44a6a',types:['maj7','maj9'],                            brightness:1.0, tension:0.4},
+  'LydianDom':{parent:'Me', color:'#4a90d4',types:['7','9','13'],                             brightness:0.6, tension:0.7},
+  'Mixolydian':{parent:'Maj',color:'#d44a6a',types:['7','9','11','13'],                       brightness:0.3, tension:0.5},
+  'MixoB13':  {parent:'Me', color:'#4a90d4',types:['7','m7b5'],                              brightness:0.0, tension:0.6},
+  'PhrygDom': {parent:'Ar', color:'#4aaa72',types:['7b9'],                                   brightness:-0.3,tension:0.9},
+  'Aeolian':  {parent:'Maj',color:'#d44a6a',types:['minor','m','m7','m9'],                   brightness:-0.5,tension:0.3},
+  'Phrygian': {parent:'Maj',color:'#d44a6a',types:['m','m7'],                                brightness:-0.9,tension:0.5},
+  'Dorian':   {parent:'Maj',color:'#d44a6a',types:['m','m7','m6'],                           brightness:-0.2,tension:0.3},
+  'DorianB2': {parent:'Me', color:'#4a90d4',types:['m7'],                                    brightness:-0.4,tension:0.6},
+  'DorianS4': {parent:'Ar', color:'#4aaa72',types:['m7'],                                    brightness:-0.1,tension:0.5},
+  'Melodic':  {parent:'Me', color:'#4a90d4',types:['m','mmaj7','m6'],                        brightness:-0.1,tension:0.4},
+  'Harmonic': {parent:'Ar', color:'#4aaa72',types:['m','mmaj7'],                             brightness:-0.3,tension:0.7},
 };
 
 // 表示名
@@ -7276,6 +8012,278 @@ function toggleAugMod(){
 }
 
 // ═══════════════════════════════════════════════════════
+// O2: SCALE RING — RADIALモード外周に12音スケール点表示
+// guessMode() → scaleIvs → 12音ポジションを点列で描画
+// スケール内=明るい緑点、スケール外=暗いグレー点
+// コードトーン=大きい明点で区別
+// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// R2: TRIAD SPACE オーバーレイ（S6 トライアッド変換空間）
+// Callipari S6「トライアッド変換空間」準拠
+// 現在コードから1音変化で到達できるコードを
+// RADIAL/EXPAND/CHAINモードのnodeHits上にオーバーレイ描画
+// ═══════════════════════════════════════════════════════
+
+let triadSpaceMode=false;
+let triadSpaceAlpha=0;  // フェードイン用 0.0〜1.0
+
+function toggleTriadSpace(){
+  triadSpaceMode=!triadSpaceMode;
+  const btn=document.getElementById('triad-space-btn');
+  if(btn) btn.classList.toggle('on',triadSpaceMode);
+  if(triadSpaceMode) triadSpaceAlpha=0;  // ON時はゼロからフェードイン
+  else triadSpaceAlpha=0;                // OFF時もリセット
+  invalidate();
+}
+
+// S6変換種別→表示色・ラベルの定義
+// P変換(parallel)/R変換(relative)/L変換(leading-tone) + Sus族
+const TRVS_TYPE_STYLE={
+  parallel: {col:'#e8c547', label:'P', desc:'同主調'},    // 金：P変換（Cm↔C）
+  relative: {col:'#4aaa72', label:'R', desc:'関係調'},    // 緑：R変換（Am↔C）
+  leading:  {col:'#4a90d4', label:'L', desc:'導音'},      // 青：L変換（Em↔C）
+  sus:      {col:'#9a6ad4', label:'S', desc:'Sus'},       // 紫：Sus族
+  other:    {col:'#d4823a', label:'1♩', desc:'1音変化'},  // 橙：その他1音変化
+};
+
+// 1音変化の種別を判定してTRVS_TYPE_STYLEのキーを返す
+function classifySnc(srcRoot, srcType, tgt){
+  const sri=ni(srcRoot);
+  const tri=ni(tgt.root);
+
+  // P変換: 同ルート・メジャー↔マイナー
+  if(sri===tri){
+    if((srcType==='major'&&tgt.type==='minor')||(srcType==='minor'&&tgt.type==='major')) return 'parallel';
+  }
+
+  // R変換: メジャー→短3度上マイナー、または逆
+  if(srcType==='major'&&tgt.type==='minor'){
+    // メジャーの5度音を全音上→マイナールート: 元ルートから9半音上
+    if((tri-sri+12)%12===9) return 'relative';
+  }
+  if(srcType==='minor'&&tgt.type==='major'){
+    // マイナーの5度音を全音下→メジャールート: 元ルートから3半音上
+    if((tri-sri+12)%12===3) return 'relative';
+  }
+
+  // L変換: メジャー→半音下マイナー、または逆
+  if(srcType==='major'&&tgt.type==='minor'){
+    if((tri-sri+12)%12===4) return 'leading';
+  }
+  if(srcType==='minor'&&tgt.type==='major'){
+    if((tri-sri+12)%12===8) return 'leading';
+  }
+
+  // Sus族（sus2/sus4系）
+  if(tgt.type.startsWith('sus')) return 'sus';
+
+  return 'other';
+}
+
+// RADIAL/EXPANDモード: nodeHitsの各ノードにS6マーカーを重ねる
+function _drawTriadSpaceNodes(ctx, baseRoot, baseType){
+  const sncResults=computeSingleNoteChanges(baseRoot, baseType);
+  const sncMap=new Map();
+  sncResults.forEach(r=>sncMap.set(r.root+'__'+r.type, r));
+
+  nodeHits.forEach(hit=>{
+    if(hit.root===baseRoot&&hit.type===baseType) return;
+    const k=hit.root+'__'+hit.type;
+    const snc=sncMap.get(k);
+    if(!snc) return;
+
+    const kind=classifySnc(baseRoot, baseType, snc);
+    const st=TRVS_TYPE_STYLE[kind]||TRVS_TYPE_STYLE.other;
+    const {x,y}=hit;
+
+    ctx.save();
+
+    // 外周リング（種別色）
+    ctx.beginPath();ctx.arc(x,y,22,0,Math.PI*2);
+    ctx.strokeStyle=st.col;ctx.lineWidth=1.8;
+    ctx.globalAlpha=0.70;ctx.stroke();
+
+    // 種別ラベル（上部）
+    ctx.font='bold 7px DM Mono,monospace';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=st.col;ctx.globalAlpha=0.90;
+    ctx.fillText(st.label, x, y-26);
+
+    // 変化音ラベル（下部）
+    const arrow=snc.semitone>0?'↑':'↓';
+    ctx.font='5.5px DM Mono,monospace';
+    ctx.textBaseline='top';ctx.globalAlpha=0.80;
+    ctx.fillText(snc.changedFrom+'→'+snc.changedTo+arrow, x, y+23);
+
+    ctx.restore();
+  });
+}
+
+// CHAINモード: RADIALの現在コードを基準にnodeHitsをS6判定
+// （RADIALと同じロジックで問題なし）
+
+// RADIAL外周に「TRVS凡例」を表示
+function _drawTriadSpaceLegend(ctx){
+  const W=L.W, H=L.H;
+  const entries=[
+    TRVS_TYPE_STYLE.parallel,
+    TRVS_TYPE_STYLE.relative,
+    TRVS_TYPE_STYLE.leading,
+    TRVS_TYPE_STYLE.sus,
+    TRVS_TYPE_STYLE.other,
+  ];
+  ctx.save();
+  ctx.font='bold 6px DM Mono,monospace';
+  ctx.textBaseline='bottom';
+  let tx=W-10;
+  // 右下に横並びで表示（右から左へ）
+  for(let i=entries.length-1;i>=0;i--){
+    const e=entries[i];
+    ctx.textAlign='right';
+    ctx.fillStyle=e.col;ctx.globalAlpha=0.70;
+    ctx.fillText(e.label+':'+e.desc, tx, H-10);
+    tx-=(ctx.measureText(e.label+':'+e.desc).width+10);
+  }
+  ctx.restore();
+}
+
+function drawTriadSpaceOverlay(ctx){
+  const alpha=Math.min(1,triadSpaceAlpha);
+  if(alpha<=0) return;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+
+  if(MAP_MODE==='radial'||MAP_MODE==='chain'){
+    _drawTriadSpaceNodes(ctx, S.root, S.type);
+    // RADIALのときだけ凡例・ヘッダ表示
+    if(MAP_MODE==='radial'){
+      _drawTriadSpaceLegend(ctx);
+      ctx.font='bold 6.5px DM Mono,monospace';
+      ctx.textAlign='left';ctx.textBaseline='top';
+      ctx.fillStyle='rgba(212,130,58,0.60)';ctx.globalAlpha=0.80;
+      ctx.fillText('TRVS S6: 1音変化コード', 10, 10);
+    }
+  } else if(MAP_MODE==='expand'){
+    // EXPANDはoriginコードを基準に
+    const baseRoot=expandOriginRoot||S.root;
+    const baseType=expandOriginType||S.type;
+    _drawTriadSpaceNodes(ctx, baseRoot, baseType);
+    // モード名表示（左下）
+    ctx.font='bold 6px DM Mono,monospace';
+    ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillStyle='rgba(212,130,58,0.55)';ctx.globalAlpha=0.80;
+    ctx.fillText('TRVS: '+cs(baseRoot,baseType), 10, L.H-10);
+  }
+
+  ctx.restore();
+}
+
+
+
+function toggleScaleRing(){
+  scaleRingMode=!scaleRingMode;
+  const btn=document.getElementById('scale-ring-btn');
+  if(btn) btn.classList.toggle('on',scaleRingMode);
+  invalidate();
+}
+
+// モード名 → スケールインターバル配列
+const SCALE_RING_IVS={
+  'Ionian':    [0,2,4,5,7,9,11],
+  'Lydian':    [0,2,4,6,7,9,11],
+  'LydianDom': [0,2,4,6,7,9,10],
+  'Mixolydian':[0,2,4,5,7,9,10],
+  'MixoB13':   [0,2,4,5,7,8,10],
+  'PhrygDom':  [0,1,4,5,7,8,10],
+  'Aeolian':   [0,2,3,5,7,8,10],
+  'Phrygian':  [0,1,3,5,7,8,10],
+  'Dorian':    [0,2,3,5,7,9,10],
+  'DorianB2':  [0,1,3,5,7,9,10],
+  'DorianS4':  [0,2,3,6,7,9,10],
+  'Melodic':   [0,2,3,5,7,9,11],
+  'Harmonic':  [0,2,3,5,7,8,11],
+};
+
+function drawScaleRing(ctx){
+  if(!scaleRingMode) return;
+  if(MAP_MODE==='radial') _drawScaleRingRadial(ctx);
+  else if(MAP_MODE==='expand') _drawScaleRingExpand(ctx);
+}
+
+// RADIALモード: 外周12音点リング（既存ロジック）
+function _drawScaleRingRadial(ctx){
+  const {cx,cy,SR}=L;
+  const ringR=SR+16;
+
+  const ri=ni(S.root);
+  const mode=guessMode(S.type)||'Ionian';
+  const scaleIvs=SCALE_RING_IVS[mode]||[0,2,4,5,7,9,11];
+  const scaleSet=new Set(scaleIvs);
+  const chordIvs=new Set(CT[S.type]?.iv??[0,4,7]);
+
+  ctx.save();
+  for(let pitch=0;pitch<12;pitch++){
+    const angle=-Math.PI/2+(pitch/12)*Math.PI*2;
+    const px=cx+ringR*Math.cos(angle);
+    const py=cy+ringR*Math.sin(angle);
+    const iv=(pitch-ri+12)%12;
+    const inScale=scaleSet.has(iv);
+    const isChordTone=chordIvs.has(iv);
+    const dotR=isChordTone?4.5:(inScale?3:1.8);
+    ctx.beginPath(); ctx.arc(px,py,dotR,0,Math.PI*2);
+    if(isChordTone){
+      ctx.fillStyle='rgba(74,170,114,0.85)'; ctx.fill();
+      ctx.strokeStyle='rgba(74,170,114,0.4)'; ctx.lineWidth=1; ctx.stroke();
+    } else if(inScale){
+      ctx.fillStyle='rgba(74,170,114,0.40)'; ctx.fill();
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.fill();
+    }
+  }
+  const modeDisplay=MODAL_DISPLAY[mode]||mode;
+  ctx.font='bold 6px DM Mono,monospace';
+  ctx.textAlign='right'; ctx.textBaseline='top';
+  ctx.fillStyle='rgba(74,170,114,0.55)';
+  ctx.fillText(modeDisplay, cx+ringR+10, cy-ringR-4);
+  ctx.restore();
+}
+
+// P3: EXPANDモード: nodeHitsの各ノードにスケール内/外マーカーを重ねる
+function _drawScaleRingExpand(ctx){
+  if(!nodeHits||!nodeHits.length) return;
+  // 基準: originのコードのスケール（展開の起点）
+  const baseRoot=expandOriginRoot||S.root;
+  const baseType=expandOriginType||S.type;
+  const ri=ni(baseRoot);
+  const mode=guessMode(baseType)||'Ionian';
+  const scaleIvs=SCALE_RING_IVS[mode]||[0,2,4,5,7,9,11];
+  const scaleSet=new Set(scaleIvs);
+
+  ctx.save();
+  nodeHits.forEach(hit=>{
+    const hitRi=ni(hit.root);
+    const iv=(hitRi-ri+12)%12;
+    const inScale=scaleSet.has(iv);
+    // ノード右下に小さなインジケータドット
+    const dotX=hit.x+hit.r*0.65;
+    const dotY=hit.y-hit.r*0.65;
+    ctx.beginPath(); ctx.arc(dotX,dotY,3.5,0,Math.PI*2);
+    if(inScale){
+      ctx.fillStyle='rgba(74,170,114,0.80)'; ctx.fill();
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.18)'; ctx.fill();
+    }
+  });
+  // モード名表示（左下）
+  const modeDisplay=MODAL_DISPLAY[mode]||mode;
+  ctx.font='bold 6px DM Mono,monospace';
+  ctx.textAlign='left'; ctx.textBaseline='bottom';
+  ctx.fillStyle='rgba(74,170,114,0.5)';
+  ctx.fillText('SCRG: '+modeDisplay, 10, L.H-10);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
 // S11: トーンホイール（回転式12キー選択UI）
 // Callipari §14準拠: 24コードリング（Major+minor交互）
 // ドラッグで回転、タップでキー選択
@@ -7345,8 +8353,11 @@ function initToneWheel(){
   function getAngle(e){
     const rect=twCanvas.getBoundingClientRect();
     const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
-    const px=(e.clientX||e.touches?.[0]?.clientX)||0;
-    const py=(e.clientY||e.touches?.[0]?.clientY)||0;
+    // M2: Pointer Eventsではe.clientX/Yが常に数値として存在する
+    // e.touches はPointer Events使用時にundefinedのため||によるフォールバックは不正確
+    // pointerTypeがtouchの場合もPointer Events経由でclientX/Yが正しく得られる
+    const px=typeof e.clientX==='number'?e.clientX:(e.touches?.[0]?.clientX??0);
+    const py=typeof e.clientY==='number'?e.clientY:(e.touches?.[0]?.clientY??0);
     return Math.atan2(py-cy,px-cx);
   }
 
@@ -7580,16 +8591,150 @@ let pivotStepIdx=-1;
 let pivotTimer=null;
 let pivotHighlight=new Set();
 let pivotTargetKey='G';
+// N1: 生成コード進行・再生管理
+let pivotProg=[];          // [{root,type,stepIdx}] 生成した転調進行
+let pivotProgTimer=null;   // 再生タイマー
+let pivotPlayIdx=-1;       // 再生中インデックス（-1=停止）
+let pivotPlayNode=null;    // 再生中ノード {root,type}（キャンバスハイライト用）
+
+// N1: ピボット転調コード進行を生成
+// 各ステップ: [ピボットコード] → [目標キーのV7] → [目標キーのI]
+// ただし連続するとくどいので最後のステップのみV7→Iを付ける
+function buildPivotProgression(path){
+  if(!path.length) return [];
+  const prog=[];
+  path.forEach((step,si)=>{
+    const isLast=(si===path.length-1);
+    // ピボットコードを最大2つ追加（重複除去）
+    step.pivots.slice(0,2).forEach(pv=>{
+      if(!prog.length||prog[prog.length-1].root!==pv.root||prog[prog.length-1].type!==pv.type){
+        prog.push({root:pv.root,type:pv.type,stepIdx:si,role:'pivot',
+          label:pv.degreeA+'›'+pv.degreeB});
+      }
+    });
+    if(isLast){
+      // 目標キーのV7
+      const ri=ni(step.toKey);
+      if(ri>=0){
+        const v7root=NOTES[(ri+7)%12];
+        prog.push({root:v7root,type:'dom7',stepIdx:si,role:'v7',label:'V7/'+step.toKey});
+        // 目標キーのI
+        prog.push({root:step.toKey,type:'major',stepIdx:si,role:'tonic',label:'I/'+step.toKey});
+      }
+    }
+  });
+  return prog;
+}
+
+// N1: ステップインジケーターDOMを更新
+function updatePivotStepIndicator(activeIdx){
+  const el=document.getElementById('pivot-step-indicator');
+  if(!el) return;
+  el.innerHTML='';
+  if(!pivotPath.length) return;
+  pivotPath.forEach((_,i)=>{
+    const dot=document.createElement('div');
+    dot.className='pivot-step-dot'+(i<activeIdx?' done':i===activeIdx?' active':'');
+    el.appendChild(dot);
+  });
+}
+
+// N1: prog-bar DOMを更新（ppIdx: 現在再生中インデックス、-1=未再生）
+function updatePivotProgBar(ppIdx){
+  const el=document.getElementById('pivot-prog-bar');
+  if(!el) return;
+  if(!pivotProg.length){el.innerHTML='';return;}
+  el.innerHTML='';
+  pivotProg.forEach((c,i)=>{
+    if(i>0){
+      const arr=document.createElement('span');
+      arr.className='pp-arr';arr.textContent='›';
+      el.appendChild(arr);
+    }
+    const chip=document.createElement('span');
+    chip.className='pp-chord'+(i===ppIdx?' pp-cur':ppIdx>=0&&i<ppIdx?' pp-done':'');
+    chip.textContent=cs(c.root,c.type);
+    chip.title=c.label||'';
+    // タップで直接そのコードに移動
+    chip.addEventListener('pointerdown',e=>{
+      e.stopPropagation();
+      stopPivotPlay();
+      moveToChord(c.root,c.type);
+    });
+    el.appendChild(chip);
+  });
+}
+
+// N1: 再生停止
+function stopPivotPlay(){
+  if(pivotProgTimer){clearTimeout(pivotProgTimer);pivotProgTimer=null;}
+  pivotPlayIdx=-1;
+  pivotPlayNode=null;
+  const btn=document.getElementById('pivot-play-btn');
+  if(btn){btn.textContent='▶ PLAY';btn.classList.remove('playing');}
+  updatePivotProgBar(-1);
+  invalidate();
+}
+
+// N1: 1コードずつ再生
+function playPivotProg(){
+  if(!pivotProg.length) return;
+  if(pivotPlayIdx>=0){stopPivotPlay();return;} // 再生中なら停止
+  const btn=document.getElementById('pivot-play-btn');
+  if(btn){btn.textContent='■ STOP';btn.classList.add('playing');}
+  const interval=900; // 0.9秒/コード
+  let idx=0;
+  function step(){
+    if(idx>=pivotProg.length){
+      // 再生完了
+      setTimeout(stopPivotPlay,300);
+      return;
+    }
+    pivotPlayIdx=idx;
+    const c=pivotProg[idx];
+    pivotPlayNode={root:c.root,type:c.type};
+    // ステップインジケーターも追従
+    updatePivotStepIndicator(c.stepIdx);
+    // prog-bar更新
+    updatePivotProgBar(idx);
+    // コード音を鳴らす（moveToChordは使わず音だけ）
+    const actx=safeGetCtx();
+    if(actx){
+      safeResume(actx,()=>{
+        stopPhraseNow();
+        // ボイシング再生（drawChordのロジックを流用）
+        const ri=ni(c.root);
+        if(ri>=0){
+          const ivs=CT[c.type]?.iv??[0,4,7];
+          const t=actx.currentTime||Date.now()/1000;
+          // ベース音
+          if(typeof pluck==='function') pluck(actx,midi2hz(36+ri),t,0.5);
+          ivs.forEach((iv,j)=>{
+            const midi=60+(ri+iv)%12;
+            if(typeof pluck==='function') pluck(actx,midi2hz(midi),t+j*0.04,0.38);
+          });
+        }
+      });
+    }
+    invalidate();
+    idx++;
+    pivotProgTimer=setTimeout(step,interval);
+  }
+  step();
+}
 
 function runPivotBFS(){
   const sel=document.getElementById('pivot-to-sel');
   if(sel) pivotTargetKey=sel.value;
   const ALT={'Gb':'F#','C#':'Db','D#':'Eb','G#':'Ab','A#':'Bb'};
   const fromKey=PIVOT_KEYS.includes(S.root)?S.root:(ALT[S.root]||'C');
+  // 既存再生を停止
+  stopPivotPlay();
   pivotPath=findPivotPath(fromKey, pivotTargetKey);
   pivotHighlight=new Set();
   pivotStepIdx=-1;
   if(pivotTimer){clearTimeout(pivotTimer);pivotTimer=null;}
+
   const stepsEl=document.getElementById('pivot-steps-lbl');
   if(stepsEl){
     if(!pivotPath.length){stepsEl.textContent='same key';}
@@ -7598,6 +8743,27 @@ function runPivotBFS(){
       stepsEl.textContent=route+' ('+pivotPath.length+'step)';
     }
   }
+  // ステップ別ピボットコード詳細
+  const detailEl=document.getElementById('pivot-detail');
+  if(detailEl){
+    if(!pivotPath.length){
+      detailEl.innerHTML='';
+    } else {
+      detailEl.innerHTML=pivotPath.map(s=>{
+        const pvLabels=s.pivots.slice(0,3).map(p=>`<span style="color:#6ab4f5">${p.root}</span><span style="opacity:.6">${p.degreeA}›${p.degreeB}</span>`).join(' ');
+        return `<div>${s.fromKey}<span style="opacity:.45">›</span>${s.toKey}: ${pvLabels||'—'}</div>`;
+      }).join('');
+    }
+  }
+  // N1: コード進行生成 & prog-bar更新
+  pivotProg=buildPivotProgression(pivotPath);
+  updatePivotProgBar(-1);
+  // N1: PLAYボタン表示制御
+  const playRow=document.getElementById('pivot-play-row');
+  if(playRow) playRow.style.display=pivotProg.length?'flex':'none';
+  // N1: ステップインジケーター初期化
+  updatePivotStepIndicator(-1);
+
   animatePivotStep(0);
   invalidate();
 }
@@ -7605,16 +8771,19 @@ function runPivotBFS(){
 function animatePivotStep(idx){
   pivotHighlight=new Set();
   if(idx>=pivotPath.length){
+    // 全ステップ完了: 全ピボットコードを薄く表示
     pivotPath.forEach(s=>s.pivots.forEach(p=>pivotHighlight.add(p.root+'__'+p.type)));
     pivotStepIdx=pivotPath.length;
+    updatePivotStepIndicator(pivotPath.length); // 全点灯
     invalidate();
     return;
   }
   pivotStepIdx=idx;
   const step=pivotPath[idx];
   if(step) step.pivots.forEach(p=>pivotHighlight.add(p.root+'__'+p.type));
+  updatePivotStepIndicator(idx);
   invalidate();
-  pivotTimer=setTimeout(()=>animatePivotStep(idx+1),400);
+  pivotTimer=setTimeout(()=>animatePivotStep(idx+1),500);
 }
 
 function drawStar(ctx,x,y,r,points,col,alpha){
@@ -7634,32 +8803,90 @@ function drawStar(ctx,x,y,r,points,col,alpha){
 
 function drawPivotMode(ctx){
   if(!pivotHighlight.size) return;
+
+  // N1: ステップ間の経路ライン描画（ステップ通過済みは明るく）
+  if(pivotPath.length>=2){
+    for(let si=0;si<pivotPath.length-1;si++){
+      const stepA=pivotPath[si];
+      const stepB=pivotPath[si+1];
+      const pvA=stepA.pivots[0];
+      const pvB=stepB.pivots[0];
+      if(!pvA||!pvB) continue;
+      const hA=nodeHits.find(h=>h.root===pvA.root&&h.type===pvA.type);
+      const hB=nodeHits.find(h=>h.root===pvB.root&&h.type===pvB.type);
+      if(!hA||!hB) continue;
+      const passed=si<pivotStepIdx;
+      const active=si===pivotStepIdx||si===pivotStepIdx-1;
+      const alpha=passed?0.6:active?0.45:0.2;
+      const mx=(hA.x+hB.x)/2, my=(hA.y+hB.y)/2;
+      const cx2=L.cx+(mx-L.cx)*0.3, cy2=L.cy+(my-L.cy)*0.3;
+      ctx.beginPath();
+      ctx.moveTo(hA.x,hA.y);
+      ctx.quadraticCurveTo(cx2,cy2,hB.x,hB.y);
+      ctx.strokeStyle=passed?'rgba(232,197,71,0.55)':'rgba(74,144,212,0.55)';
+      ctx.lineWidth=passed?2:1.5;
+      ctx.setLineDash(passed?[]:[4,3]);
+      ctx.globalAlpha=alpha;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha=1;
+    }
+  }
+
   nodeHits.forEach(h=>{
     if(!pivotHighlight.has(h.root+'__'+h.type)) return;
-    let degA='',degB='',fromK='',toK='';
-    pivotPath.forEach(step=>{
+    let degA='',degB='',fromK='',toK='',stepI=-1;
+    pivotPath.forEach((step,si)=>{
       const pv=step.pivots.find(p=>p.root===h.root&&p.type===h.type);
-      if(pv){degA=pv.degreeA;degB=pv.degreeB;fromK=step.fromKey;toK=step.toKey;}
+      if(pv){degA=pv.degreeA;degB=pv.degreeB;fromK=step.fromKey;toK=step.toKey;stepI=si;}
     });
+    // N1: ステップ状態に応じた表示強度
+    const passed=stepI<pivotStepIdx;
+    const active=stepI===pivotStepIdx||pivotStepIdx>=pivotPath.length;
+    const baseAlpha=passed?0.5:active?0.9:0.35;
+    const ringColor=passed?'#e8c547':'#4a90d4';
     const pulse=Math.sin(Date.now()*0.004)*0.25+0.75;
+    const outerAlpha=active?0.8*pulse*baseAlpha:0.3*baseAlpha;
+
     ctx.beginPath();ctx.arc(h.x,h.y,h.r+9,0,Math.PI*2);
-    ctx.strokeStyle='#4a90d4';ctx.lineWidth=2.5;
-    ctx.globalAlpha=0.8*pulse;ctx.stroke();
+    ctx.strokeStyle=ringColor;ctx.lineWidth=active?2.5:1.5;
+    ctx.globalAlpha=outerAlpha;ctx.stroke();
     ctx.beginPath();ctx.arc(h.x,h.y,h.r+15,0,Math.PI*2);
-    ctx.strokeStyle='#4a90d4';ctx.lineWidth=1;
-    ctx.globalAlpha=0.3*pulse;ctx.stroke();
+    ctx.strokeStyle=ringColor;ctx.lineWidth=1;
+    ctx.globalAlpha=outerAlpha*0.4;ctx.stroke();
     ctx.globalAlpha=1;
+
     if(degA&&degB){
       const lbl=fromK+':'+degA+'>'+toK+':'+degB;
       ctx.font='5.5px DM Mono,monospace';ctx.textAlign='center';
-      ctx.fillStyle='#4a90d4';ctx.globalAlpha=0.9;
+      ctx.fillStyle=ringColor;ctx.globalAlpha=active?0.9:0.45;
       ctx.fillText(lbl,h.x,h.y+h.r+11);
       ctx.globalAlpha=1;
     }
     dirty=true;
   });
+
+  // N1: 再生中コードのキャンバスハイライト
+  if(pivotPlayNode){
+    const ph=nodeHits.find(h=>h.root===pivotPlayNode.root&&h.type===pivotPlayNode.type);
+    if(ph){
+      const t=Date.now()*0.006;
+      const glow=Math.sin(t)*0.3+0.7;
+      ctx.beginPath();ctx.arc(ph.x,ph.y,ph.r+22,0,Math.PI*2);
+      ctx.strokeStyle='#e8c547';ctx.lineWidth=2;
+      ctx.globalAlpha=0.9*glow;ctx.stroke();
+      ctx.beginPath();ctx.arc(ph.x,ph.y,ph.r+30,0,Math.PI*2);
+      ctx.strokeStyle='#e8c547';ctx.lineWidth=1;
+      ctx.globalAlpha=0.3*glow;ctx.stroke();
+      ctx.globalAlpha=1;
+      dirty=true;
+    }
+  }
+
+  // 目標キーにスター表示
   const tonicHit=nodeHits.find(h=>h.root===pivotTargetKey&&h.type==='major');
   if(tonicHit) drawStar(ctx,tonicHit.x,tonicHit.y,tonicHit.r+18,5,'#4a90d4',0.75);
+
   if(pivotPath.length){
     ctx.font='7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
     ctx.fillStyle='rgba(74,144,212,0.65)';
@@ -7880,11 +9107,13 @@ function drawCompassMode(ctx){
       const col=dynRHEX[n.rtype]||'#888';
       const isTop=n.opacity>0.82;
       const drawR=isTop?nr:nr-3;
-      const heat=scoreToHeat(n.score);
+      // N2: getChordEmotionVec()で感情ベクトルを取得（dim/aug含む全タイプ対応）
+      const ev=getChordEmotionVec(n.root,n.type);
 
-      // ノード円（ヒートマップ塗り）
+      // ノード円（N2: 感情カラー塗り + scoreで透明度補正）
+      const heat=scoreToHeat(n.score);
       ctx.beginPath();ctx.arc(nx,ny,drawR,0,Math.PI*2);
-      ctx.fillStyle=heat.fill;ctx.fill();
+      ctx.fillStyle=emoToHsl(ev, 0.10+ev.tension*0.18);ctx.fill();
       ctx.strokeStyle=col;ctx.lineWidth=isTop?1.8:1.2;
       ctx.globalAlpha=heat.alpha;ctx.stroke();ctx.globalAlpha=1;
 
@@ -7895,6 +9124,29 @@ function drawCompassMode(ctx){
       ctx.fillText(cs(n.root,n.type),nx,ny);
       ctx.globalAlpha=1;
 
+      // N2: 明暗バー（getChordEmotionVecベース・常時表示・null落ちなし）
+      // brightness: -1(暗)〜+1(明)  を 0〜1 に正規化して描画
+      {
+        const br=(ev.brightness-0.5)*2; // MODE_BRIGHTNESSは0〜1→-1〜+1に変換
+        const barW=drawR*1.5;
+        const barH=3;
+        const barX=nx-barW/2;
+        const barY=ny+drawR+3;
+        ctx.fillStyle='rgba(255,255,255,0.10)';
+        ctx.fillRect(barX,barY,barW,barH);
+        // 中央基準: 右=明(金), 左=暗(紫)
+        const bright=Math.max(0, br);
+        const dark  =Math.max(0,-br);
+        if(bright>0){
+          ctx.fillStyle=`rgba(232,197,71,${0.55+bright*0.35})`;
+          ctx.fillRect(barX+barW/2, barY, bright*barW/2, barH);
+        }
+        if(dark>0){
+          ctx.fillStyle=`rgba(100,80,200,${0.55+dark*0.35})`;
+          ctx.fillRect(barX+barW/2-dark*barW/2, barY, dark*barW/2, barH);
+        }
+      }
+
       // タップ登録
       compassHits.push({x:nx,y:ny,r:drawR,root:n.root,type:n.type});
     });
@@ -7903,6 +9155,51 @@ function drawCompassMode(ctx){
   // ── COMPASS ラベル（左上） ──
   ctx.font='bold 7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
   ctx.fillStyle='rgba(255,255,255,0.25)';ctx.fillText('COMPASS P6',10,10);
+
+  // N2: 現在コードのムード表示（中央下）— getChordEmotionVecベースに統一
+  {
+    const cev=getChordEmotionVec(S.root,S.type);
+    // MODE_BRIGHTNESSは0〜1スケールなのでセンタリング調整（0.5=neutral）
+    const br=(cev.brightness-0.5)*2; // -1〜+1
+    const tn=cev.tension;            //  0〜1
+    // ムードラベル判定
+    let moodLabel='';
+    if(br>=0.5)       moodLabel='BRIGHT';
+    else if(br<=-0.5) moodLabel='DARK';
+    else if(tn>=0.65) moodLabel='TENSE';
+    else if(tn<=0.25) moodLabel='STABLE';
+    else              moodLabel='NEUTRAL';
+    // 色: 明暗でグラデーション
+    const moodCol=br>0?`rgba(232,197,71,${0.5+br*0.4})`
+                      :`rgba(100,80,200,${0.5+(-br)*0.4})`;
+    ctx.font='bold 8px DM Mono,monospace';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=moodCol;ctx.globalAlpha=0.85;
+    ctx.fillText(moodLabel,cx,cy+16);
+    ctx.globalAlpha=1;
+    // 明暗メーター（中央下・グラデーション）
+    const mw=52,mh=3;
+    const mx2=cx-mw/2;
+    ctx.fillStyle='rgba(255,255,255,0.1)';ctx.fillRect(mx2,cy+24,mw,mh);
+    // br: -1〜+1 → fillW: 0〜mw
+    const fillW=((br+1)/2)*mw;
+    const mGrad=ctx.createLinearGradient(mx2,0,mx2+mw,0);
+    mGrad.addColorStop(0,'rgba(100,80,200,0.7)');
+    mGrad.addColorStop(1,'rgba(232,197,71,0.7)');
+    ctx.fillStyle=mGrad;ctx.fillRect(mx2,cy+24,fillW,mh);
+    // D/B 端ラベル
+    ctx.font='5px DM Mono,monospace';
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('D',mx2-6,cy+25);
+    ctx.textAlign='right';
+    ctx.fillText('B',mx2+mw+6,cy+25);
+    // テンションドット（メーター下・右寄り）
+    const tdotX=cx+(tn-0.5)*mw;
+    ctx.beginPath();ctx.arc(tdotX,cy+31,2.5,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${0.25+tn*0.45})`;ctx.fill();
+    ctx.globalAlpha=1;
+  }
 }
 
 // ═══════════════════════
@@ -7980,14 +9277,13 @@ function setMode(mode){
   document.querySelectorAll('.mode-btn').forEach(b=>{
     b.classList.toggle('on',b.dataset.mode===mode);
   });
-  // EXPANDモード時のみBACKボタンを表示
-  const backBtn=document.getElementById('expand-back-btn');
-  if(backBtn) backBtn.style.display=mode==='expand'?'block':'none';
+  // EXPANDモード時のみBACKボタンを表示（非表示時はpointer-eventsも無効化）
+  if(mode==='expand'){ setBackBtn(true, false); } else { setBackBtn(false); }
   if(mode==='expand')initExpand();
   else if(mode==='link')linkSelected.clear();
   else if(mode==='graph'){graphInited=false;graphTick=0;initGraph();}
   else if(mode==='wave')waveRings=[];
-  else if(mode==='compass'){compassHits=[];}
+  else if(mode==='compass'){compassHits=[];lastCompassTap=null;updateCompassChainBtn();}
   else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';renderPath();}
   else if(mode==='pivot'){
     // PIVOTオーバーレイを表示・目標キーのデフォルトを現在から1ステップ先に
@@ -8009,6 +9305,11 @@ function setMode(mode){
     const ov=document.getElementById('pivot-overlay');
     if(ov) ov.classList.remove('on');
     if(pivotTimer){clearTimeout(pivotTimer);pivotTimer=null;}
+    // N1: 再生中なら停止
+    stopPivotPlay();
+    // O1: FROM CHAINバッジをリセット
+    const badge=document.getElementById('pivot-from-badge');
+    if(badge){badge.style.display='none';badge.textContent='';}
   }
   relCache=null; sncCache=null; invalidate();
   updateSaveBtnVisibility();
@@ -8607,8 +9908,13 @@ function drawPianoRoll(){
   const ri=ni(S.root);
   const ivSet=chordIvSet(S.type);
 
+  // R4: S2 PLAY時はS2音セットでオーバーライド
+  const _ri   =s2PianoOverride ? s2PianoRoot  : ri;
+  const _ivSet=s2PianoOverride ? s2PianoIvSet : ivSet;
+
   // ポジションモード: 選択ポジションのMIDIノートセットを構築
-  const vArr2=getVoicings(S.root,S.type);
+  // S2オーバーライド中はposMidiSetを使わず音程マッチのみ
+  const vArr2=s2PianoOverride ? [] : getVoicings(S.root,S.type);
   const curPos2=vArr2.length>0?vArr2[Math.min(fbPosIdx,vArr2.length-1)]:null;
   const posMidiSet=new Set();
   if(curPos2){
@@ -8642,9 +9948,9 @@ function drawPianoRoll(){
   for(let oct=0;oct<OCTAVES;oct++){
     WK_SEMI.forEach((semi,wIdx)=>{
       const midi=startMidi+oct*12+semi;
-      const iv=((midi%12)-ri+12)%12;
-      // ロック時: 実MIDIノートのみ / 解除時: 音程マッチ
-      const isChord=prLock&&curPos2?posMidiSet.has(midi):curPos2?posMidiSet.has(midi):ivSet.has(iv);
+      const iv=((midi%12)-_ri+12)%12;
+      // ロック時: 実MIDIノートのみ / 解除時: 音程マッチ / S2時: _ivSet音程マッチ
+      const isChord=prLock&&curPos2?posMidiSet.has(midi):curPos2?posMidiSet.has(midi):_ivSet.has(iv);
       const isRoot=iv===0;
       const kx=(oct*7+wIdx)*wW;
 
@@ -8699,8 +10005,8 @@ function drawPianoRoll(){
     ];
     bkDef.forEach(({wIdx,semi})=>{
       const midi=startMidi+oct*12+semi;
-      const iv=((midi%12)-ri+12)%12;
-      const isChord=prLock&&curPos2?posMidiSet.has(midi):curPos2?posMidiSet.has(midi):ivSet.has(iv);
+      const iv=((midi%12)-_ri+12)%12;
+      const isChord=prLock&&curPos2?posMidiSet.has(midi):curPos2?posMidiSet.has(midi):_ivSet.has(iv);
       // 黒鍵X: 白鍵の右端から bW/2 左にずらす
       const bx=(oct*7+wIdx)*wW + wW - bW/2;
 
@@ -8895,8 +10201,17 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
       if(icAutoSub) icAutoSub.textContent=modeSel?.value?.toUpperCase()||'FREE';
     }
   }
-  // 100ms間隔で同期（startAuto/stopAutoがDOMを更新した後）
-  setInterval(syncAutoIcon,120);
+  // L3: Page Visibility API連動 — 非表示時にsetIntervalを停止してバッテリー消費を抑える
+  let syncAutoTimer=setInterval(syncAutoIcon,120);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      clearInterval(syncAutoTimer);
+      syncAutoTimer=null;
+    } else if(!syncAutoTimer){
+      syncAutoTimer=setInterval(syncAutoIcon,120);
+      syncAutoIcon(); // 復帰時に即時同期
+    }
+  });
 
   // REC
   const icRec=document.getElementById('ic-rec-btn');
@@ -9258,7 +10573,34 @@ function initChordVisuals(){
   drawFretboard();
   drawPianoRoll();
 }
-setTimeout(initChordVisuals, 120);
+// K4-M3: ResizeObserverベースの初期化
+// pane-selectが非表示→表示に切り替わりclientWidthが確定した時点で描画
+// 低速端末でclientWidth===0のまま通過するsetTimeout固定遅延を解消
+(function(){
+  const fbCanvas=document.getElementById('fb-canvas');
+  if(!fbCanvas) return;
+  const target=fbCanvas.parentElement;
+  if(!target) return;
+
+  if(typeof ResizeObserver!=='undefined'){
+    let initialized=false;
+    const ro=new ResizeObserver(entries=>{
+      for(const entry of entries){
+        const w=entry.contentRect.width;
+        if(w>0){
+          ro.disconnect();
+          if(!initialized){ initialized=true; initChordVisuals(); }
+        }
+      }
+    });
+    ro.observe(target);
+    // フォールバック: 2秒以内に発火しなければsetTimeoutで強制実行
+    setTimeout(()=>{ if(!initialized){ initialized=true; ro.disconnect(); initChordVisuals(); } },2000);
+  } else {
+    // ResizeObserver非対応ブラウザ: 従来のsetTimeoutにフォールバック
+    setTimeout(initChordVisuals, 120);
+  }
+})();
 
 // ═══════════════════════
 // INIT — 起動時初期化
@@ -9369,7 +10711,26 @@ document.querySelectorAll('.tab').forEach(function(tab){
     document.querySelectorAll('.pane').forEach(function(p){p.classList.remove('show');});
     this.classList.add('on');
     document.getElementById('pane-'+target).classList.add('show');
-    if(target==='select') setTimeout(initChordVisuals,80);
+    if(target==='select'){
+      // K4-M3: タブ切り替え時もResizeObserverで確実に初期化
+      const fbCanvas=document.getElementById('fb-canvas');
+      const watchTarget=fbCanvas?fbCanvas.parentElement:null;
+      if(watchTarget&&typeof ResizeObserver!=='undefined'){
+        let done=false;
+        const ro=new ResizeObserver(entries=>{
+          for(const entry of entries){
+            if(entry.contentRect.width>0){
+              ro.disconnect();
+              if(!done){done=true;initChordVisuals();}
+            }
+          }
+        });
+        ro.observe(watchTarget);
+        setTimeout(()=>{if(!done){done=true;ro.disconnect();initChordVisuals();}},600);
+      } else {
+        setTimeout(initChordVisuals,80);
+      }
+    }
   });
 });
 </script>
