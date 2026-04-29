@@ -1142,6 +1142,36 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                     oninput="synthSliderUpdate(this,'pad-cutoff-val',200,8000,'Hz')">
                   <span class="synth-val" id="pad-cutoff-val">2.4k</span>
                 </div>
+                <!-- RESONANCE -->
+                <div class="synth-row">
+                  <span class="synth-lbl">RES</span>
+                  <input class="synth-slider" id="pad-res" type="range" min="0.5" max="18" step="0.1" value="1.2"
+                    oninput="synthSliderUpdate(this,'pad-res-val',0.5,18,'')">
+                  <span class="synth-val" id="pad-res-val">1.2</span>
+                </div>
+                <!-- ENV MOD -->
+                <div class="synth-row">
+                  <span class="synth-lbl">ENV MOD</span>
+                  <input class="synth-slider" id="pad-envmod" type="range" min="0" max="100" value="40"
+                    oninput="synthSliderUpdate(this,'pad-envmod-val',0,100,'%')">
+                  <span class="synth-val" id="pad-envmod-val">40%</span>
+                </div>
+                <!-- LFO DEPTH（RateはDepthに自動連動） -->
+                <div class="synth-row">
+                  <span class="synth-lbl">LFO</span>
+                  <input class="synth-slider" id="pad-lfo-depth" type="range" min="0" max="100" value="0"
+                    oninput="synthSliderUpdate(this,'pad-lfo-depth-val',0,100,'%')">
+                  <span class="synth-val" id="pad-lfo-depth-val">0%</span>
+                </div>
+                <!-- KEY FOLLOW -->
+                <div class="synth-row">
+                  <span class="synth-lbl">KEY FOL</span>
+                  <div class="synth-pills" id="pad-keyfollow-pills">
+                    <div class="synth-pill" data-kf="off">OFF</div>
+                    <div class="synth-pill on" data-kf="half">½</div>
+                    <div class="synth-pill" data-kf="full">FULL</div>
+                  </div>
+                </div>
                 <!-- CHORUS -->
                 <div class="synth-row">
                   <span class="synth-lbl">CHORUS</span>
@@ -8348,10 +8378,14 @@ let arpOn=false;
 let synthPanelOpen=false;
 
 // PADパラメーター
-let padVoicing='close';    // close / spread / drop2 / open
-let padDetune=6;           // cents (0-20)
-let padCutoff=2400;        // Hz (200-8000)
-let padChorus='i';         // off / i / ii
+let padVoicing='close';
+let padDetune=6;
+let padCutoff=2400;
+let padRes=1.2;        // フィルターQ値
+let padEnvMod=0.40;    // ENV MOD量（0〜1）
+let padLfoDepth=0;     // LFO Depth（0〜1）
+let padKeyFollow='half'; // off / half / full
+let padChorus='i';
 let padVol=0.55;
 
 // ARPパラメーター
@@ -8685,9 +8719,24 @@ function getPadMasterOut(actx){
 // Voiceを1つ作成してmidiに発音開始
 function padVoiceStart(actx, midi, out){
   const hz=midi2hz(midi);
-  const cutoffHz=Math.min(padCutoff, actx.sampleRate/2-100);
   const t=actx.currentTime;
+  const nyq=actx.sampleRate/2-100;
 
+  // ── KEY FOLLOW: 音程に応じてカットオフを補正 ──
+  // C4(MIDI60)を基準に、半音ごとにカットオフを追従
+  let kfRatio=1.0;
+  if(padKeyFollow==='half')  kfRatio=Math.pow(2,(midi-60)/24); // 半音=1/24oct
+  if(padKeyFollow==='full')  kfRatio=Math.pow(2,(midi-60)/12); // 半音=1/12oct
+  const baseCutoff=Math.min(padCutoff*kfRatio, nyq);
+
+  // ── ENV MOD: アタック時にカットオフを大きく開き、decayで閉じる ──
+  // envModAmt: padEnvMod=0→変化なし、1→baseCutoffの4倍から開始
+  const envModRange=baseCutoff*3.5*padEnvMod; // 最大でbaseCutoffの4.5倍分開く
+  const attackCutoff=Math.min(baseCutoff+envModRange, nyq);
+  const attackTime=0.04;
+  const decayTime=0.8+padEnvMod*1.2; // envModが深いほどdecayも長く
+
+  // OSC
   const osc1=actx.createOscillator();
   osc1.type='sawtooth'; osc1.frequency.value=hz;
 
@@ -8698,27 +8747,46 @@ function padVoiceStart(actx, midi, out){
   const oscSub=actx.createOscillator();
   oscSub.type='square'; oscSub.frequency.value=hz/2;
 
-  // LPF
+  // LPF（RES + ENV MOD + KEY FOLLOW適用）
   const lpf=actx.createBiquadFilter();
-  lpf.type='lowpass'; lpf.Q.value=1.2;
-  lpf.frequency.setValueAtTime(300, t);
-  lpf.frequency.exponentialRampToValueAtTime(cutoffHz, t+0.06);
+  lpf.type='lowpass';
+  lpf.Q.value=padRes;
+  lpf.frequency.setValueAtTime(attackCutoff, t);
+  lpf.frequency.exponentialRampToValueAtTime(
+    Math.max(baseCutoff, 150), t+attackTime+decayTime
+  );
 
-  // コーラス風LFO
-  let lfo=null;
+  // ── Filter LFO（カットオフを周期的に揺らす）──
+  // DepthからRateを自動計算: 浅いとゆっくり、深いと速く
+  let filterLfo=null;
+  if(padLfoDepth>0.01){
+    const lfoRate=0.3+padLfoDepth*3.5;      // 0.3Hz〜3.8Hz
+    const lfoDepthHz=baseCutoff*padLfoDepth*0.6;  // 最大でカットオフの60%揺らす
+    filterLfo=actx.createOscillator();
+    filterLfo.type='sine';
+    filterLfo.frequency.value=lfoRate;
+    const lfoGain=actx.createGain();
+    lfoGain.gain.value=lfoDepthHz;
+    filterLfo.connect(lfoGain);
+    lfoGain.connect(lpf.frequency);
+    filterLfo.start(t);
+  }
+
+  // コーラス風LFO（オシレーター2のpitchを揺らす）
+  let chorusLfo=null;
   if(padChorus!=='off'){
     const rate=padChorus==='i'?0.9:1.8;
     const depth=(padChorus==='i'?0.0015:0.003)*hz;
-    lfo=actx.createOscillator(); lfo.frequency.value=rate;
+    chorusLfo=actx.createOscillator(); chorusLfo.frequency.value=rate;
     const lg=actx.createGain(); lg.gain.value=depth;
-    lfo.connect(lg); lg.connect(osc2.frequency);
-    lfo.start(t);
+    chorusLfo.connect(lg); lg.connect(osc2.frequency);
+    chorusLfo.start(t);
   }
 
-  // Voice個別Gain（ATTACK/RELEASE制御）
+  // Voice Gain（ATTACK制御）
   const env=actx.createGain();
   env.gain.setValueAtTime(0.001, t);
-  env.gain.linearRampToValueAtTime(padVol*0.70, t+0.04); // ATTACK 40ms
+  env.gain.linearRampToValueAtTime(padVol*0.70, t+attackTime);
 
   const subGain=actx.createGain(); subGain.gain.value=0.14;
 
@@ -8728,7 +8796,8 @@ function padVoiceStart(actx, midi, out){
 
   osc1.start(t); osc2.start(t); oscSub.start(t);
 
-  return {midi, osc1, osc2, oscSub, lpf, env, lfo, out,
+  return {midi, osc1, osc2, oscSub, lpf, env,
+          lfo:chorusLfo, filterLfo, out,
           active:true, releasing:false};
 }
 
@@ -8742,12 +8811,12 @@ function padVoiceRelease(voice, actx, releaseSec){
   voice.env.gain.cancelScheduledValues(t);
   voice.env.gain.setValueAtTime(voice.env.gain.value, t);
   voice.env.gain.linearRampToValueAtTime(0.0001, t+rs);
-  // rs後にOSCを停止
   setTimeout(()=>{
     try{ voice.osc1.stop(); }catch(e){}
     try{ voice.osc2.stop(); }catch(e){}
     try{ voice.oscSub.stop(); }catch(e){}
     try{ if(voice.lfo) voice.lfo.stop(); }catch(e){}
+    try{ if(voice.filterLfo) voice.filterLfo.stop(); }catch(e){}
     try{ voice.env.disconnect(); }catch(e){}
   }, Math.round(rs*1000)+50);
 }
@@ -8927,6 +8996,7 @@ function synthSliderUpdate(el, valId, min, max, unit){
   // 表示値フォーマット
   let display;
   if(unit==='Hz' && v>=1000) display=(v/1000).toFixed(1)+'k';
+  else if(unit==='' && id==='pad-res') display=v.toFixed(1);
   else display=Math.round(v)+unit;
   if(valEl) valEl.textContent=display;
 
@@ -8934,6 +9004,9 @@ function synthSliderUpdate(el, valId, min, max, unit){
   const id=el.id;
   if(id==='pad-detune') padDetune=v;
   else if(id==='pad-cutoff') padCutoff=v;
+  else if(id==='pad-res') padRes=v;
+  else if(id==='pad-envmod') padEnvMod=v/100;
+  else if(id==='pad-lfo-depth') padLfoDepth=v/100;
   else if(id==='pad-vol') padVol=v/100;
   else if(id==='arp-free-ms') arpFreeMs=v;
   else if(id==='arp-vol') arpVol=v/100;
@@ -8971,6 +9044,15 @@ function initSynthUI(){
     p.onclick=()=>{
       padChorus=p.dataset.c;
       document.querySelectorAll('#pad-chorus-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+    };
+  });
+
+  // KEY FOLLOW pills
+  document.querySelectorAll('#pad-keyfollow-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.kf===padKeyFollow);
+    p.onclick=()=>{
+      padKeyFollow=p.dataset.kf;
+      document.querySelectorAll('#pad-keyfollow-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
     };
   });
 
@@ -9040,7 +9122,8 @@ function initSynthUI(){
   });
 
   // スライダーのグラデーション初期化
-  [['pad-detune',0,20],['pad-cutoff',200,8000],['pad-vol',0,100],
+  [['pad-detune',0,20],['pad-cutoff',200,8000],['pad-res',0.5,18],
+   ['pad-envmod',0,100],['pad-lfo-depth',0,100],['pad-vol',0,100],
    ['arp-free-ms',50,1000],['arp-vol',0,100],
    ['dly-free-ms',20,800],['dly-fb',0,85],['dly-mix',0,100]
   ].forEach(([id,min,max])=>{
