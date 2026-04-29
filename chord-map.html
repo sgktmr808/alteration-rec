@@ -32,7 +32,11 @@
   --diag-node-r:5px;   /* ノード半径 */
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
-html,body{height:100%;overflow:hidden;}
+/* K4-H3: iOS SafariのURLバー表示/非表示による高さ変動対策
+   height:100% → 100svh(safe)をフォールバック付きで指定
+   dvh非対応ブラウザは100%にフォールバック */
+html{height:100%;height:100svh;}
+body{height:100%;height:100svh;overflow:hidden;}
 body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
 .hdr{flex-shrink:0;background:var(--surf);border-bottom:1px solid var(--bdr);
   padding:calc(var(--safe-t)+10px) 14px 10px;display:flex;align-items:center;gap:10px;}
@@ -1151,6 +1155,19 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           </div>
         </div>
         <canvas id="pr-canvas" height="88"></canvas>
+        <!-- R1: 4声ボイシング表示（S/A/T/B） -->
+        <div id="voice-bar" style="
+          font-family:var(--fm);
+          font-size:8px;
+          letter-spacing:.06em;
+          display:flex;
+          justify-content:center;
+          align-items:center;
+          gap:6px;
+          padding:4px 8px 5px;
+          min-height:18px;
+          color:var(--dim);
+        "></div>
       </div>
 
       <div class="csv-btn" id="csv-export">↓ Export votes CSV</div>
@@ -1181,6 +1198,22 @@ window.addEventListener('unhandledrejection',function(e){
 });
 </script>
 <script>
+// K4-H1: iOS Safari対応 — getCtx()存在チェック付きラッパー
+// chord-map-audio.jsのロード失敗・タイミングずれに対して安全に動作する
+function safeGetCtx(){
+  if(typeof getCtx!=='function') return null;
+  try{ return getCtx(); }catch(e){ return null; }
+}
+// K4-H2: resume()を.then()チェーンで安全に処理するヘルパー
+// コールバックなしの場合はresumeのみ実行
+function safeResume(ctx, callback){
+  if(!ctx) return;
+  if(ctx.state==='suspended'){
+    ctx.resume().then(()=>{ if(callback) callback(); }).catch(()=>{});
+  } else {
+    if(callback) callback();
+  }
+}
 // ═══════════════════════════════════════════════════════════════
 // GUITAR DB — インラインスタブ (guitar-db-filtered.js 非依存)
 // 外部ファイルがロードされる場合はそちらが上書きします
@@ -2352,12 +2385,10 @@ function initCanvas(){
   const canvas=document.getElementById('map-canvas');
 
   // iOS Safari: 最初のタッチでAudioContextをユーザー操作文脈内で初期化
-  // pointerdown / touchstart の両方に登録してSafariの制限に対応
+  // K4-H1/H2: safeGetCtx/safeResumeで外部ファイル未ロード時も安全に動作
   const iosAudioUnlock=()=>{
-    try{
-      const ctx=getCtx();
-      if(ctx.state==='suspended')ctx.resume().catch(()=>{});
-    }catch(e){}
+    const ctx=safeGetCtx();
+    if(ctx) safeResume(ctx);
   };
   canvas.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
   canvas.addEventListener('pointerdown',iosAudioUnlock,{once:true});
@@ -2889,9 +2920,9 @@ function updateS2Result(){
 }
 
 function playS2Chord(){
-  const ctx=getCtx();
+  const ctx=safeGetCtx();
   if(!ctx) return;
-  if(ctx.state==='suspended') ctx.resume();
+  safeResume(ctx,()=>{
   const bri=ni(s2BaseRoot);
   const uri=ni(s2UpperRoot);
   const bIvs=CT[s2BaseType]?.iv??[0,4,7];
@@ -2911,6 +2942,7 @@ function playS2Chord(){
     const midi=60+pc; // oct4
     pluck(ctx,midi2hz(midi),t+0.12+i*0.04,0.45);
   });
+  }); // safeResume callback end
 }
 
 // S2パネルのアコーディオン
@@ -4396,8 +4428,9 @@ function stopPhraseNow(){
 // ── MELODY モード (v4) ──
 function playMelodyPhrase(root, type, durationMs){
   if(phraseMode!=='melody')return;
-  const ctx=getCtx();
-  if(ctx.state==='suspended')ctx.resume();
+  const ctx=safeGetCtx();
+  if(!ctx) return;
+  safeResume(ctx);
 
   phraseCurrentChord={root,type};
   phraseIsPlaying=true;
@@ -4769,8 +4802,9 @@ function getBebopRun(fromNote, toNote, scaleTones, addChromatic){
 
 function playAdlibPhrase(root,type,durationMs){
   if(phraseMode!=='adlib')return;
-  const ctx=getCtx();
-  if(ctx.state==='suspended')ctx.resume();
+  const ctx=safeGetCtx();
+  if(!ctx) return;
+  safeResume(ctx);
 
   phraseCurrentChord={root,type};
   phraseIsPlaying=true;
@@ -5115,8 +5149,9 @@ function grooveTick_step(){
   if(!grooveMode){grooveTimer=null;return;}
   const preset=GROOVE_PRESETS[grooveMode];
   const step=grooveTick%16;
-  const audioCtx=getCtx();
-  if(audioCtx.state==='suspended') audioCtx.resume();
+  const audioCtx=safeGetCtx();
+  if(!audioCtx){grooveTimer=setTimeout(grooveTick_step,grooveStepMs());return;}
+  safeResume(audioCtx);
   const t=audioCtx.currentTime+0.01;
 
   // スウィング: 奇数ステップを少し遅らせる
@@ -8379,13 +8414,14 @@ document.getElementById('fb-canvas').addEventListener('pointerdown',e=>{
   });
   if(!best)return;
   try{
-    const actx=getCtx();
+    const actx=safeGetCtx();
+    if(!actx) return;
     const hz=440*Math.pow(2,(best.midi-69)/12);
     const go=()=>{
       const saved=TIMBRE;TIMBRE=TIMBRE; // そのままの音色で
       pluck(actx,hz,actx.currentTime+0.03,0.15);
     };
-    actx.state==='suspended'?actx.resume().then(go):go();
+    safeResume(actx,go);
   }catch(_){}
   // タップ光エフェクト
   const dpr=window.devicePixelRatio||1;
@@ -8473,6 +8509,79 @@ const WK_SEMI=[0,2,4,5,7,9,11];
 // 黒鍵の半音オフセット（白鍵インデックスの右上に位置 C#=1,D#=3, (なし), F#=6,G#=8,A#=10, (なし)）
 const BK_AFTER=[0,1,2,4,5,6]; // 黒鍵が存在する白鍵インデックス（0=C右, 1=D右, ...）
 const BK_SEMI  =[1,3,6,8,10]; // 上記の半音値
+
+// R1: 4声ボイシング表示（S/A/T/B）
+// S.voicingのフレット配列からMIDIノートを取得し、低→高順にB/T/A/Sへ割り当てる
+function drawVoiceBar(){
+  const bar=document.getElementById('voice-bar');
+  if(!bar) return;
+
+  // ノート名テーブル（MIDI番号→音名）
+  const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+  // 現在のボイシングからMIDIノートを収集
+  const vArr=getVoicings(S.root,S.type);
+  const curPos=vArr.length>0?vArr[Math.min(fbPosIdx,vArr.length-1)]:null;
+
+  if(!curPos){
+    bar.textContent='';
+    return;
+  }
+
+  const midis=[];
+  curPos.f.forEach((f,s)=>{
+    if(f<0) return; // ミュート弦はスキップ
+    midis.push(MIDI_OPEN[s]+f);
+  });
+
+  if(midis.length<2){
+    bar.textContent='';
+    return;
+  }
+
+  // 低→高でソート
+  midis.sort((a,b)=>a-b);
+
+  // 重複排除（同じMIDI番号は1つに）
+  const unique=[...new Set(midis)];
+
+  // 声部ラベルの割り当て: 音数に応じてB/T/A/S
+  const VOICE_LABELS=['B','T','A','S'];
+  const voices=[];
+  if(unique.length>=4){
+    // 4音以上: 最低→B、次→T、次→A、最高→S（複数ある場合は最高音をS）
+    voices.push({label:'B', midi:unique[0]});
+    voices.push({label:'T', midi:unique[1]});
+    voices.push({label:'A', midi:unique[unique.length-2]});
+    voices.push({label:'S', midi:unique[unique.length-1]});
+  } else if(unique.length===3){
+    voices.push({label:'B', midi:unique[0]});
+    voices.push({label:'T', midi:unique[1]});
+    voices.push({label:'S', midi:unique[2]});
+  } else {
+    voices.push({label:'B', midi:unique[0]});
+    voices.push({label:'S', midi:unique[unique.length-1]});
+  }
+
+  // 音名+オクターブ番号を生成（C4=MIDI60）
+  const midiToName=m=>{
+    const oct=Math.floor(m/12)-1;
+    return NOTE_NAMES[m%12]+oct;
+  };
+
+  // 色はivColor準拠（ルート音との音程で色づけ）
+  const ri=ni(S.root);
+
+  bar.innerHTML=voices.map(v=>{
+    const iv=((v.midi%12)-ri+12)%12;
+    const col=ivColor(iv);
+    const name=midiToName(v.midi);
+    return `<span style="color:${col};opacity:0.85;">` +
+      `<span style="color:rgba(160,155,180,0.6);font-size:7px;">${v.label} </span>` +
+      `<span style="font-weight:bold;">${name}</span>` +
+      `</span>`;
+  }).join('<span style="color:rgba(120,115,140,0.4);margin:0 1px;">·</span>');
+}
 
 function drawPianoRoll(){
   const canvas=document.getElementById('pr-canvas');
@@ -8624,6 +8733,8 @@ function drawPianoRoll(){
 
   canvas._wkHits=wkHits;
   canvas._bkHits=bkHits;
+  // R1: 4声ボイシング表示を更新
+  drawVoiceBar();
 }
 
 // ピアノロールタップ → 単音発音
@@ -8641,10 +8752,11 @@ document.getElementById('pr-canvas').addEventListener('pointerdown',e=>{
   if(!hit)return;
 
   try{
-    const actx=getCtx();
+    const actx=safeGetCtx();
+    if(!actx) return;
     const hz=440*Math.pow(2,(hit.midi-69)/12);
     const go=()=>pluck(actx,hz,actx.currentTime+0.03,0.14);
-    actx.state==='suspended'?actx.resume().then(go):go();
+    safeResume(actx,go);
   }catch(_){}
 
   // タップフラッシュ
