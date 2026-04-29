@@ -701,6 +701,24 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <div id="map-screen">
         <div id="map-wrap">
           <canvas id="map-canvas"></canvas>
+          <!-- EXPAND: BACKボタン -->
+          <div id="expand-back-btn" onclick="expandBack()" style="
+            display:none;
+            position:absolute;
+            top:28px;
+            left:10px;
+            font-family:var(--fm);
+            font-size:10px;
+            color:#e8c547;
+            background:rgba(13,13,16,0.85);
+            border:1px solid rgba(232,197,71,0.4);
+            border-radius:4px;
+            padding:4px 8px;
+            cursor:pointer;
+            letter-spacing:.08em;
+            z-index:10;
+            user-select:none;
+          ">← BACK</div>
           <!-- S9 PIVOT: 目標キー選択オーバーレイ（左上） -->
           <div id="pivot-overlay">
             <div class="pivot-row">
@@ -5869,6 +5887,9 @@ const RETURN_TYPES={
 
 let expandReturnPulse=0;
 let expandReturnNode=null;
+let expandOriginRoot='';
+let expandOriginType='';
+let expandNodeHistory=[];  // [{key, node}] 展開順スタック（BACKで1段戻す用）
 
 function getReturnType(node, treeRoot, treeType){
   if(!node||node.depth===0) return null;
@@ -5891,12 +5912,57 @@ function getReturnType(node, treeRoot, treeType){
   return null;
 }
 
-function initExpand(){
+function initExpand(originRoot, originType){
   expandReturnPulse=0; expandReturnNode=null;
+  expandNodeHistory=[];
+  // 最初のルートを記録（引数がなければ現在のS.root/typeを使用）
+  expandOriginRoot = originRoot !== undefined ? originRoot : S.root;
+  expandOriginType = originType !== undefined ? originType : S.type;
   expandTree={root:S.root,type:S.type,key:cs(S.root,S.type),depth:0,
     x:L.cx,y:L.cy,children:[]};
   expandNodes=[expandTree];
+  // BACKボタンをグレーアウト状態にリセット
+  const backBtn=document.getElementById('expand-back-btn');
+  if(backBtn){backBtn.style.opacity='0.35';backBtn.style.pointerEvents='none';}
   invalidate();
+}
+
+// EXPANDモード「戻る」処理
+function expandBack(){
+  // 戻れる状態がなければ何もしない
+  if(!expandTree) return;
+
+  const backBtn=document.getElementById('expand-back-btn');
+  const updateBackState=()=>{
+    if(!backBtn) return;
+    const canBack=expandNodeHistory.length>0;
+    backBtn.style.opacity=canBack?'1':'0.35';
+    backBtn.style.pointerEvents=canBack?'auto':'none';
+  };
+
+  // 通常ノードが展開されている → 最後に展開したノードを1段折りたたむ
+  if(expandNodeHistory.length>0){
+    const last=expandNodeHistory[expandNodeHistory.length-1];
+    const node=expandNodes.find(n=>n.key===last.key);
+    if(node && node.children.length>0){
+      const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n); n.children.forEach(remove);};
+      node.children.forEach(remove);
+      node.children=[];
+      expandNodeHistory.pop();
+      updateBackState();
+      invalidate();
+      return;
+    } else {
+      // ノードが見つからない・既に折りたたまれている場合はhistoryを掃除して再試行
+      expandNodeHistory.pop();
+      updateBackState();
+      expandBack();
+      return;
+    }
+  }
+
+  // historyが空 = 最初の状態 → 何もしない
+  updateBackState();
 }
 
 function expandNode(root,type,key){
@@ -5911,8 +5977,9 @@ function expandNode(root,type,key){
     expandReturnNode={x:found.x, y:found.y, retType};
     dirty=true;
     setTimeout(()=>{
-      moveToChord(root,type);
-      initExpand();
+      // 最初のルートに戻す
+      moveToChord(expandOriginRoot, expandOriginType);
+      initExpand(expandOriginRoot, expandOriginType);
     },600);
     return;
   }
@@ -5924,8 +5991,18 @@ function expandNode(root,type,key){
     const remove=n=>{expandNodes=expandNodes.filter(x=>x!==n); n.children.forEach(remove);};
     found.children.forEach(remove);
     found.children=[];
+    // historyからこのノードを除去
+    const hi=expandNodeHistory.findIndex(h=>h.key===found.key);
+    if(hi>=0) expandNodeHistory.splice(hi,1);
   } else {
     // P1優先・P2補完で展開
+    // historyにpush（depthが0のルートノード除く）
+    if(found.depth>0){
+      expandNodeHistory.push({key:found.key, node:found});
+      // BACKボタンを有効化
+      const backBtn=document.getElementById('expand-back-btn');
+      if(backBtn){backBtn.style.opacity='1';backBtn.style.pointerEvents='auto';}
+    }
     const rels=buildRelations(root,type);
     const notInTree=rels.filter(r=>!expandNodes.find(n=>n.key===cs(r.root,r.type)));
     const p1=notInTree.filter(r=>EXPAND_P1.includes(r.rtype)).slice(0,6);
@@ -7850,6 +7927,9 @@ function setMode(mode){
   document.querySelectorAll('.mode-btn').forEach(b=>{
     b.classList.toggle('on',b.dataset.mode===mode);
   });
+  // EXPANDモード時のみBACKボタンを表示
+  const backBtn=document.getElementById('expand-back-btn');
+  if(backBtn) backBtn.style.display=mode==='expand'?'block':'none';
   if(mode==='expand')initExpand();
   else if(mode==='link')linkSelected.clear();
   else if(mode==='graph'){graphInited=false;graphTick=0;initGraph();}
