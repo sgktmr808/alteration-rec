@@ -5856,6 +5856,9 @@ function showDimMenu(anchor, afterIdx, cands){
 // ④ 同ルート音帰還: depth>=3でルートと同じルート音（type問わず）
 // ⑤ トリトン帰還: ルートから6半音上のルート音
 
+const EXPAND_P1=['diatonic','fifth'];
+const EXPAND_P2=['modal','parallel'];
+
 const RETURN_TYPES={
   parallel: {col:'#e8c547', sym:'↩', label:'同主調'},
   dominant: {col:'#5bb5e8', sym:'⑤', label:'5度圏'},
