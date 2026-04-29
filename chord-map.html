@@ -5755,15 +5755,7 @@ function playSavedProg(id){
   // CHAINモードに切り替えてビジュアルも連動
   if(MAP_MODE!=='chain')setMode('chain');
 
-  // phraseMode が off なら melody に一時切り替え（再生後に元に戻す）
-  const prevPhraseMode=phraseMode;
-  const forcedPhrase=(phraseMode==='off');
-  if(forcedPhrase){
-    phraseMode='melody';
-    const pms=document.getElementById('phrase-mode-sel');
-    if(pms) pms.value='melody';
-  }
-
+  // フレーズモードはユーザー設定を尊重（強制切り替えしない）
   const interval=Math.round(60000/autoBpm*2);
   const chords=entry.chords;
 
@@ -5779,13 +5771,6 @@ function playSavedProg(id){
       savedProgTimer=null;
       // Q2: 再生終了でハイライト解除
       { const c=_tlCvs(); if(c) drawSavedTimeline(c,chords,-1); }
-      if(forcedPhrase){
-        setTimeout(()=>{
-          phraseMode=prevPhraseMode;
-          const pms=document.getElementById('phrase-mode-sel');
-          if(pms) pms.value=prevPhraseMode;
-        }, interval);
-      }
       return;
     }
     const c=chords[idx];
@@ -5860,14 +5845,7 @@ function playSusProg(id){
 
   if(MAP_MODE!=='chain') setMode('chain');
 
-  // フレーズモード一時切り替え（playSavedProgと同じロジック）
-  const prevPhraseMode=phraseMode;
-  const forcedPhrase=(phraseMode==='off');
-  if(forcedPhrase){
-    phraseMode='melody';
-    const pms=document.getElementById('phrase-mode-sel');
-    if(pms) pms.value='melody';
-  }
+  // フレーズモードはユーザー設定を尊重（強制切り替えしない）
 
   // SUSボタンをplaying状態に
   const susBtn=document.querySelector(`.saved-sus[data-id="${id}"]`);
@@ -5881,13 +5859,6 @@ function playSusProg(id){
     if(idx>=susChords.length){
       savedProgTimer=null;
       if(susBtn) susBtn.classList.remove('playing');
-      if(forcedPhrase){
-        setTimeout(()=>{
-          phraseMode=prevPhraseMode;
-          const pms=document.getElementById('phrase-mode-sel');
-          if(pms) pms.value=prevPhraseMode;
-        }, interval);
-      }
       return;
     }
     const c=susChords[idx++];
@@ -6213,14 +6184,7 @@ function playAiProgression(){
   }
   if(MAP_MODE!=='chain') setMode('chain');
 
-  const prevPhraseMode=phraseMode;
-  const forcedPhrase=(phraseMode==='off');
-  if(forcedPhrase){
-    phraseMode='melody';
-    const pms=document.getElementById('phrase-mode-sel');
-    if(pms) pms.value='melody';
-  }
-
+  // フレーズモードはユーザー設定を尊重（強制切り替えしない）
   const interval=Math.round(60000/autoBpm*2);
   const chords=aiLastChords;
   moveToChord(chords[0].root,chords[0].type);
@@ -6233,13 +6197,6 @@ function playAiProgression(){
       savedProgTimer=null;
       // O3: 再生終了でハイライト解除
       drawTensionTimeline(chords, -1);
-      if(forcedPhrase){
-        setTimeout(()=>{
-          phraseMode=prevPhraseMode;
-          const pms=document.getElementById('phrase-mode-sel');
-          if(pms) pms.value=prevPhraseMode;
-        },interval);
-      }
       return;
     }
     const c=chords[idx];
@@ -6277,14 +6234,7 @@ function playAiSusProgression(){
   aiSusPlaying=true;
   if(susBtn){susBtn.textContent='■ STOP';susBtn.classList.add('playing');}
 
-  const prevPhraseMode=phraseMode;
-  const forcedPhrase=(phraseMode==='off');
-  if(forcedPhrase){
-    phraseMode='melody';
-    const pms=document.getElementById('phrase-mode-sel');
-    if(pms) pms.value='melody';
-  }
-
+  // フレーズモードはユーザー設定を尊重（強制切り替えしない）
   const interval=Math.round(60000/autoBpm*2);
   moveToChord(susChords[0].root,susChords[0].type);
   // タイムラインはオリジナル進行のインデックスで連動
@@ -6297,13 +6247,6 @@ function playAiSusProgression(){
       aiSusPlaying=false;
       if(susBtn){susBtn.textContent='→ SUS';susBtn.classList.remove('playing');}
       drawTensionTimeline(aiLastChords,-1);
-      if(forcedPhrase){
-        setTimeout(()=>{
-          phraseMode=prevPhraseMode;
-          const pms=document.getElementById('phrase-mode-sel');
-          if(pms) pms.value=prevPhraseMode;
-        },interval);
-      }
       return;
     }
     const c=susChords[idx];
