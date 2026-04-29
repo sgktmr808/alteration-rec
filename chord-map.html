@@ -8799,6 +8799,30 @@ function stopAllPadVoices(){
   setTimeout(()=>{ padVoices=[]; }, 300);
 }
 
+// ── SH-101風ARPノート合成 ──
+function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
+  const hz=midi2hz(Math.max(24,Math.min(108,midi)));
+  const gateSec=gateMs/1000*0.7;
+  const target=dest||actx.destination;
+
+  const osc=actx.createOscillator();
+  osc.type='sawtooth'; osc.frequency.value=hz;
+
+  const lpf=actx.createBiquadFilter();
+  lpf.type='lowpass'; lpf.Q.value=2.5;
+  lpf.frequency.setValueAtTime(4000, startTime);
+  lpf.frequency.exponentialRampToValueAtTime(1200, startTime+gateSec*0.6);
+
+  const env=actx.createGain();
+  env.gain.setValueAtTime(0.001, startTime);
+  env.gain.linearRampToValueAtTime(vol, startTime+0.005);
+  env.gain.setValueAtTime(vol*0.75, startTime+0.02);
+  env.gain.exponentialRampToValueAtTime(0.001, startTime+gateSec);
+
+  osc.connect(lpf); lpf.connect(env); env.connect(target);
+  osc.start(startTime); osc.stop(startTime+gateSec+0.05);
+}
+
 // ── ARPスケジューラー ──
 let arpLookAheadMs=80;
 let arpScheduleMs=25; // より短いポーリング間隔
