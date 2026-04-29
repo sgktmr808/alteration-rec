@@ -5864,7 +5864,8 @@ function moveToChord(root,type){
       if(curEl){curEl.classList.remove('pulse');void curEl.offsetWidth;curEl.classList.add('pulse');}
     });
   }
-  playChord(root,type);
+  // PAD ONのときはplayChordをスキップ（SYNTHが代わりに発音）
+  if(!padOn) playChord(root,type);
   triggerPhrase(root,type); // ← フレーズ追従
   notifySynth(root,type);   // ← SYNTH PAD/ARP追従
   // CHAINモード: 進行パターンを検出してラベル更新
@@ -8392,57 +8393,67 @@ const ARP_PATTERNS=[
 ];
 
 // ── ボイシング生成 ──
-// コードのMIDIノート列をボイシングタイプに応じて展開
 function buildPadVoicing(root, type, voicingType){
   const ri=ni(root);
   const ivs=CT[type]?.iv??[0,4,7];
-  const baseOct=4; // C4 基準
-  let notes=ivs.map(iv=>12*(baseOct+1)+(ri+iv)%12);
-  // オクターブ内に収める（close）
-  notes=notes.sort((a,b)=>a-b);
+
+  // C4(=MIDI60)基準でクローズポジション構築
+  // ルート音をオクターブ3に、残りを上に積む
+  const rootMidi=48+(ri%12); // C3=48 + root
+  let notes=ivs.map(iv=>{
+    let m=rootMidi+(iv%12);
+    // ルートより下になったら1オクターブ上げる
+    if(m<rootMidi) m+=12;
+    return m;
+  }).sort((a,b)=>a-b);
 
   if(voicingType==='close'){
-    // そのまま（最小音域）
     return notes;
   }
   if(voicingType==='spread'){
-    // 1音ずつ1オクターブ上に広げる
+    // 各音を1音ずつ上に広げる
     return notes.map((n,i)=>n+i*12);
   }
   if(voicingType==='drop2'){
-    // 上から2番目の音を1オクターブ下げる
     if(notes.length>=3){
-      const sorted=[...notes].sort((a,b)=>b-a);
-      sorted[1]-=12;
-      return sorted.sort((a,b)=>a-b);
+      const arr=[...notes].sort((a,b)=>b-a);
+      arr[1]-=12;
+      return arr.sort((a,b)=>a-b);
     }
     return notes;
   }
   if(voicingType==='open'){
-    // ルートをオクターブ下、残りを上に広げる
-    const open=[notes[0]-12,...notes.slice(1).map((n,i)=>n+i*12)];
+    // ルート1oct下 + 中間音そのまま + 上声部1oct上
+    const open=[notes[0]-12,...notes.slice(1)];
+    if(open.length>=2) open[open.length-1]+=12;
     return open.sort((a,b)=>a-b);
   }
   return notes;
 }
 
 // ── ARPシーケンス生成 ──
-// arpOctCenter / arpOctRange に基づきMIDIノート列を生成
 function buildArpSeq(root, type){
   const ri=ni(root);
   const ivs=CT[type]?.iv??[0,4,7];
-  const center=arpOctCenter;
-  const range=arpOctRange-1; // 0=±0, 1=±1, 2=±2
+  const center=arpOctCenter;  // 基準オクターブ（デフォルト3）
+  const range=arpOctRange-1;  // 0=±0oct, 1=±1oct, 2=±2oct
 
-  // 基準オクターブ範囲内のノートを収集
+  // 基準オクターブのルート音
+  const rootMidi=12*(center+1)+ri; // C3=48, C4=60 ...
+
+  // 基準±rangeオクターブ内の全コードトーンを収集
   let notes=[];
-  for(let oct=center-range; oct<=center+range; oct++){
+  for(let oct=-range; oct<=range; oct++){
     ivs.forEach(iv=>{
-      notes.push(12*(oct+1)+(ri+iv)%12);
+      let m=rootMidi+oct*12+(iv%12);
+      // そのオクターブのルートより下なら+12
+      const octRoot=rootMidi+oct*12;
+      if(m<octRoot) m+=12;
+      notes.push(m);
     });
   }
-  notes=notes.sort((a,b)=>a-b);
-  if(notes.length===0) return [12*(center+1)+ri];
+  notes=[...new Set(notes)].sort((a,b)=>a-b);
+  if(notes.length===0) return [rootMidi];
 
   const n=notes;
   const lo=n[0], hi=n[n.length-1];
@@ -8731,71 +8742,42 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
   osc.stop(startTime+gateSec+0.05);
 }
 
-// ── PAD発音（コード変更時にクオンタイズして発音）──
+// ── PAD発音（コード変更時に即発音）──
 let padQuantTimer=null;
-let padNextChord=null; // {root, type, triggerTime}
 
 function triggerPad(root, type){
   if(!padOn) return;
   const actx=safeGetCtx();
   if(!actx) return;
   safeResume(actx, ()=>{
-    // BPMグリッドに合わせてクオンタイズ
-    const stepMs=60000/autoBpm; // 1拍
-    const now=performance.now();
-    const waitMs=msToNextPadGrid(now, stepMs);
-
-    if(padQuantTimer) clearTimeout(padQuantTimer);
-    padNextChord={root,type};
-
-    padQuantTimer=setTimeout(()=>{
-      if(!padOn||!padNextChord) return;
-      const {root:r, type:t}=padNextChord;
-      padNextChord=null;
-      const a2=safeGetCtx();
-      if(!a2) return;
-      safeResume(a2,()=>{
-        const notes=buildPadVoicing(r, t, padVoicing);
-        const startTime=a2.currentTime+0.02;
-        const duration=stepMs*2/1000; // 2拍のゲート
-        notes.forEach((midi,i)=>{
-          synthJunoPad(a2, midi, startTime+i*0.008, duration, padVol);
-        });
-      });
-    }, waitMs);
+    const notes=buildPadVoicing(root, type, padVoicing);
+    const startTime=actx.currentTime+0.015;
+    const beatSec=60/autoBpm;
+    const duration=beatSec*4; // 4拍ゲート
+    notes.forEach((midi, i)=>{
+      synthJunoPad(actx, midi, startTime+i*0.007, duration, padVol);
+    });
   });
 }
 
-// 次の拍頭までのms（PAD用）
-let padLastGrid=performance.now();
-function msToNextPadGrid(now, stepMs){
-  // 直近の拍頭から次の拍頭を計算
-  const elapsed=(now-padLastGrid)%stepMs;
-  const wait=stepMs-elapsed;
-  return wait<20?0:wait; // 20ms以内なら即発音
-}
-
 // ── ARPスケジューラー ──
-// Web Audio の look-ahead scheduling で精密なタイミングを実現
-let arpLookAheadMs=80;   // 先行スケジュール量
-let arpScheduleMs=40;    // スケジューラー呼び出し間隔
+let arpLookAheadMs=80;
+let arpScheduleMs=25; // より短いポーリング間隔
 
 function startArpScheduler(){
-  if(arpScheduleTimer) clearInterval(arpScheduleTimer);
+  stopArpScheduler();
   // ARPシーケンスを現在コードで初期化
   arpSeq=buildArpSeq(S.root, S.type);
   arpStep=0;
 
   const actx=safeGetCtx();
   if(!actx) return;
-  safeResume(actx);
-  buildDelayNodes(actx);
-
-  // 最初の発音時刻を次の拍グリッドに合わせる
-  const stepSec=arpStepMs()/1000;
-  arpNextBeat=actx.currentTime+0.05;
-
-  arpScheduleTimer=setInterval(()=>scheduleArpNotes(), arpScheduleMs);
+  safeResume(actx, ()=>{
+    buildDelayNodes(actx);
+    // 次の発音を少し先から開始
+    arpNextBeat=actx.currentTime+0.05;
+    arpScheduleTimer=setInterval(()=>scheduleArpNotes(), arpScheduleMs);
+  });
 }
 
 function stopArpScheduler(){
@@ -8994,12 +8976,9 @@ function initSynthUI(){
 }
 
 // ── moveToChordからSYNTHに通知するフック ──
-// （moveToChord内の最後に呼び出す）
 function notifySynth(root, type){
   if(padOn) triggerPad(root, type);
   if(arpOn) updateArpChord(root, type);
-  // PADグリッドのタイムスタンプ更新
-  padLastGrid=performance.now();
 }
 
 function toggleScaleRing(){
