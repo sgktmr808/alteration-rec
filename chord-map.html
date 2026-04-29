@@ -1980,6 +1980,12 @@ function drawFrame(){
   if(relCache&&relCache.some(n=>n.dx!==undefined&&Math.abs(n.dop-n.opacity)>0.005))dirty=true;
   // Keep graph physics running while unsettled
   if(MAP_MODE==='graph'&&graphInited&&graphTick<300)dirty=true;
+  // Q6: モーダルオーバーレイのフェードイン更新
+  if(modalMapMode && modalOverlayAlpha<0.999){
+    modalOverlayAlpha+=(1-modalOverlayAlpha)*0.12;
+    if(modalOverlayAlpha>0.999) modalOverlayAlpha=1;
+    dirty=true;
+  }
   if(!dirty)return;
   dirty=false;
 
@@ -5276,6 +5282,8 @@ function moveToChord(root,type){
   S.root=root;S.type=type;
   S.history=S.history.slice(0,S.histIdx+1);S.history.push({root,type});S.histIdx=S.history.length-1;
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
+  // Q6: モーダルオーバーレイをコード変更時にフェードイン再開
+  if(modalMapMode) modalOverlayAlpha=0;
   relCache=null; sncCache=null; invalidate();
   document.getElementById('hdr-chord').textContent=cs(root,type);
   renderPath();
@@ -7048,6 +7056,12 @@ function computeModalInterchange(root, type){
 }
 
 function drawModalOverlay(ctx){
+  // Q6: フェードイン（modalOverlayAlphaで全体の不透明度を制御）
+  const alpha=Math.min(1,modalOverlayAlpha);
+  if(alpha<=0) return;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+
   const neighbors=computeModalNeighbors(S.root, S.type);
   const W=L.W, H=L.H;
   const cx=L.cx, cy=L.cy;
@@ -7201,14 +7215,18 @@ function drawModalOverlay(ctx){
 
     ctx.restore();
   });
+  // Q6: 関数全体のsave/restore（フェードイン用）
+  ctx.restore();
 }
 
 // MODALモードフラグ
 let modalMapMode=false;
+let modalOverlayAlpha=0;  // Q6: フェードイン用 0.0〜1.0
 function toggleModalMap(){
   modalMapMode=!modalMapMode;
   const btn=document.getElementById('modal-map-btn');
   if(btn) btn.classList.toggle('on',modalMapMode);
+  if(modalMapMode) modalOverlayAlpha=0;  // ON時はゼロからフェードイン
   invalidate();
 }
 
