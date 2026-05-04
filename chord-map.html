@@ -11185,58 +11185,146 @@ function padVoiceRelease(voice, actx, releaseSec){
   }, Math.round(rs*1000)+50);
 }
 
-// コードチェンジ: 全音をリリース→新コードを発音（継続音なし・重複なし）
+// ── PAD発音: コードタップのたびに全停止→新規発音 ──
+// シンプルかつ確実: 重複・継続音なし
+let _padGateTimer=null; // Gate自動リリース用タイマー
+
 function triggerPad(root, type){
   if(!synthPanelOpen) return;
   const actx=safeGetCtx();
   if(!actx) return;
 
   function _fire(){
-    // 既存の全Voiceを即リリース（継続音・重複を根絶）
-    const all=padVoices.filter(v=>!v.releasing);
-    all.forEach(v=>padVoiceRelease(v, actx, 0.25));
+    // 既存Gateタイマーをキャンセル
+    if(_padGateTimer){ clearTimeout(_padGateTimer); _padGateTimer=null; }
+
+    // 全オシレーターを即停止してからリスト初期化
+    padVoices.forEach(v=>{
+      try{ v.osc1.stop(); }catch(e){}
+      try{ v.osc2.stop(); }catch(e){}
+      try{ v.oscSub.stop(); }catch(e){}
+      try{ if(v.lfo) v.lfo.stop(); }catch(e){}
+      try{ if(v.filterLfo) v.filterLfo.stop(); }catch(e){}
+      try{ v.env.disconnect(); }catch(e){}
+    });
     padVoices=[];
 
     const out=getPadMasterOut(actx);
     const strumSec=(padStrumMs>0)?padStrumMs/1000:0.008;
 
-    // MODIFYを適用したボイシング
+    // ボイシング取得（MODIFY適用）
     let newMidis=buildPadVoicingWithModify(root, type, padVoicing);
     if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
 
+    // 発音（strumSec間隔でオフセット）
     newMidis.forEach((midi,i)=>{
-      // Strum: 各音をAudioContext時刻にオフセット加算
-      // padVoiceStartはactx.currentTimeを内部で使うので
-      // 複数音を連続でpushするだけでOK（0.008秒≒8msずつ自然にずれる）
-      const voice=padVoiceStart(actx, midi, out);
+      const t=actx.currentTime + i*strumSec;
+      const voice=_padStartVoiceAt(actx, midi, out, t);
       padVoices.push(voice);
-      // Felt Attack
-      if(typeof synthFeltAttack==='function') synthFeltAttack(actx, midi, actx.currentTime+i*strumSec, out);
     });
 
-    // Gate: 4拍後に自動リリース（鳴りっぱなし防止）
-    const gateSec=Math.round(60/autoBpm*4*10)/10;
-    setTimeout(()=>{
-      const cur=safeGetCtx(); if(!cur) return;
-      padVoices.forEach(v=>{ if(!v.releasing) padVoiceRelease(v, cur, 0.5); });
-      setTimeout(()=>{ padVoices=padVoices.filter(v=>v.releasing); },600);
+    // Gate: BPM連動で自動リリース（鳴りっぱなし防止）
+    const gateSec=Math.max(1.0, (60/autoBpm)*4);
+    _padGateTimer=setTimeout(()=>{
+      _padGateTimer=null;
+      padVoices.forEach(v=>_padStopVoiceAt(actx, v, 0.4));
+      padVoices=[];
     }, Math.round(gateSec*1000));
   }
 
-  // 初回タップ: suspended→resume後に発音
+  // suspended: resume後60ms待って発音（iOS/初回対応）
   if(actx.state==='suspended'){
-    actx.resume().then(()=>{ setTimeout(_fire, 60); }).catch(()=>{});
+    actx.resume().then(()=>setTimeout(_fire,60)).catch(()=>{});
   } else {
     _fire();
   }
 }
 
-// PAD全停止
+// 指定時刻tに発音開始するVoice生成（strumオフセット対応）
+function _padStartVoiceAt(actx, midi, out, t){
+  const hz=midi2hz(Math.max(24,Math.min(108,midi)));
+  const nyq=actx.sampleRate/2-100;
+
+  let kfRatio=1.0;
+  if(padKeyFollow==='half') kfRatio=Math.pow(2,(midi-60)/24);
+  if(padKeyFollow==='full') kfRatio=Math.pow(2,(midi-60)/12);
+  const baseCutoff=Math.min(padCutoff*kfRatio,nyq);
+  const envModRange=baseCutoff*3.5*padEnvMod;
+  const attackCutoff=Math.min(baseCutoff+envModRange,nyq);
+  const attackTime=0.04;
+  const decayTime=0.8+padEnvMod*1.2;
+
+  const osc1=actx.createOscillator(); osc1.type='sawtooth'; osc1.frequency.value=hz;
+  const osc2=actx.createOscillator(); osc2.type='sawtooth';
+  osc2.frequency.value=hz*Math.pow(2,padDetune/1200);
+  const oscSub=actx.createOscillator(); oscSub.type='square'; oscSub.frequency.value=hz/2;
+
+  const lpf=actx.createBiquadFilter(); lpf.type='lowpass'; lpf.Q.value=padRes;
+  lpf.frequency.setValueAtTime(attackCutoff,t);
+  lpf.frequency.exponentialRampToValueAtTime(Math.max(baseCutoff,150),t+attackTime+decayTime);
+
+  let filterLfo=null;
+  if(padLfoDepth>0.01){
+    const lfoRate=0.3+padLfoDepth*3.5;
+    const lfoDepthHz=baseCutoff*padLfoDepth*0.6;
+    filterLfo=actx.createOscillator(); filterLfo.type='sine'; filterLfo.frequency.value=lfoRate;
+    const lg=actx.createGain(); lg.gain.value=lfoDepthHz;
+    filterLfo.connect(lg); lg.connect(lpf.frequency); filterLfo.start(t);
+  }
+  let chorusLfo=null;
+  if(padChorus!=='off'){
+    const rate=padChorus==='i'?0.9:1.8;
+    const depth=(padChorus==='i'?0.0015:0.003)*hz;
+    chorusLfo=actx.createOscillator(); chorusLfo.frequency.value=rate;
+    const lg=actx.createGain(); lg.gain.value=depth;
+    chorusLfo.connect(lg); lg.connect(osc2.frequency); chorusLfo.start(t);
+  }
+
+  const env=actx.createGain();
+  env.gain.setValueAtTime(0.001,t);
+  env.gain.linearRampToValueAtTime(padVol*0.70,t+attackTime);
+  const subGain=actx.createGain(); subGain.gain.value=0.14;
+
+  osc1.connect(lpf); osc2.connect(lpf);
+  oscSub.connect(subGain); subGain.connect(lpf);
+  lpf.connect(env); env.connect(out);
+
+  osc1.start(t); osc2.start(t); oscSub.start(t);
+
+  return {midi,osc1,osc2,oscSub,lpf,env,lfo:chorusLfo,filterLfo,out,active:true,releasing:false};
+}
+
+// Voice即停止（stop()で確実にオシレーターを終了）
+function _padStopVoiceAt(actx, v, fadeSec){
+  if(!v) return;
+  fadeSec=fadeSec||0.3;
+  const t=actx.currentTime;
+  try{ v.env.gain.cancelScheduledValues(t); v.env.gain.setValueAtTime(v.env.gain.value,t); v.env.gain.linearRampToValueAtTime(0.0001,t+fadeSec); }catch(e){}
+  setTimeout(()=>{
+    try{ v.osc1.stop(); }catch(e){}
+    try{ v.osc2.stop(); }catch(e){}
+    try{ v.oscSub.stop(); }catch(e){}
+    try{ if(v.lfo) v.lfo.stop(); }catch(e){}
+    try{ if(v.filterLfo) v.filterLfo.stop(); }catch(e){}
+    try{ v.env.disconnect(); }catch(e){}
+  }, Math.round(fadeSec*1000)+50);
+}
+
+// PAD全停止（確実版）
 function stopAllPadVoices(){
+  if(_padGateTimer){ clearTimeout(_padGateTimer); _padGateTimer=null; }
   const actx=safeGetCtx();
-  if(!actx) return;
-  padVoices.forEach(v=>padVoiceRelease(v, actx, 0.15));
-  setTimeout(()=>{ padVoices=[]; }, 300);
+  padVoices.forEach(v=>{
+    if(actx) _padStopVoiceAt(actx, v, 0.1);
+    else {
+      try{ v.osc1.stop(); }catch(e){}
+      try{ v.osc2.stop(); }catch(e){}
+      try{ v.oscSub.stop(); }catch(e){}
+      try{ if(v.lfo) v.lfo.stop(); }catch(e){}
+      try{ if(v.filterLfo) v.filterLfo.stop(); }catch(e){}
+    }
+  });
+  padVoices=[];
 }
 
 // ── SH-101風ARPノート合成 ──
