@@ -10196,53 +10196,6 @@ function synthFeltAttack(actx, midi, startTime, dest){
 }
 
 // ────────────────────────────────────────
-// Trail対応: triggerPadのxfade時間をlbTrailSecで上書き
-// ────────────────────────────────────────
-// 既存triggerPadのxfadeSec=0.12 固定を上書きするフック
-// triggerPad内のxfadeSecをlbTrailに応じて可変にする
-let _lbTrailHookEnabled = false;
-function enableLbTrailHook(){ _lbTrailHookEnabled = true; }
-
-// ── triggerPad Trail Hook: 既存triggerPadをラップ ──
-// 既存コードは触らず、moveToChordの呼び出し経路でHookを差し込む
-// 実装: triggerPadがnewGainを作るXFADE部分をHookしてfadeout時間を延長
-// → 既存のpadCurrentGainのfadeout時間を上書きするポストフック
-
-const _origTriggerPadImm = triggerPad; // 既存triggerPadを保持
-function triggerPad(root, type){
-  if(!synthPanelOpen) return;
-  const actx = safeGetCtx();
-  if(!actx) return;
-  safeResume(actx, () => {
-    const now       = actx.currentTime;
-    const trailSec  = getLbTrailSec(); // 4-1: Trail時間
-    const xfadeSec  = Math.max(0.12, trailSec * 0.4); // xfadeはtrailの40%
-
-    if(padCurrentGain){
-      const old = padCurrentGain;
-      old.gain.cancelScheduledValues(now);
-      old.gain.setValueAtTime(old.gain.value, now);
-      old.gain.linearRampToValueAtTime(0.001, now + trailSec); // Trail長さ適用
-      setTimeout(() => { try{ old.disconnect(); }catch(e){} },
-        Math.round(trailSec * 1000) + 100);
-    }
-
-    const newGain = actx.createGain();
-    newGain.gain.setValueAtTime(0.001, now);
-    newGain.gain.linearRampToValueAtTime(1.0, now + xfadeSec);
-    newGain.connect(actx.destination);
-    padCurrentGain = newGain;
-
-    // MODIFYを適用したボイシング（Trail + Felt Attack）
-    const strumSec = (padStrumMs > 0) ? padStrumMs / 1000 : 0.007;
-    buildPadVoicingWithModify(root, type, padVoicing).forEach((midi, i) => {
-      const t = now + i * strumSec;
-      synthJunoPad(actx, midi, t, 60/autoBpm*6, padVol, newGain);
-      synthFeltAttack(actx, midi, t, newGain); // 4-3: Felt Attack
-    });
-  });
-}
-
 // ────────────────────────────────────────
 // 3-1: Scene → Emitterデフォルトパラメータ
 // ────────────────────────────────────────
@@ -12888,7 +12841,7 @@ function getPadMasterOut(actx){
 }
 
 // ─ MODIFY対応版triggerPad（moveToChordから呼ばれる）─
-// 既存のtriggerPadをオーバーライドして拡張
+// Trail(4-1) / Felt Attack(4-3) / Strum(1-B) 統合版
 const _origTriggerPad=triggerPad;
 function triggerPad(root, type){
   if(!synthPanelOpen) return;
@@ -12896,14 +12849,16 @@ function triggerPad(root, type){
   if(!actx) return;
   safeResume(actx, ()=>{
     const now=actx.currentTime;
-    const xfadeSec=0.12;
+    // 4-1: Trail — lbTrailに応じてfadeout時間を可変に
+    const trailSec = (typeof getLbTrailSec==='function') ? getLbTrailSec() : 0.12;
+    const xfadeSec = Math.max(0.12, trailSec * 0.4);
 
     if(padCurrentGain){
       const old=padCurrentGain;
       old.gain.cancelScheduledValues(now);
       old.gain.setValueAtTime(old.gain.value, now);
-      old.gain.linearRampToValueAtTime(0.001, now+xfadeSec);
-      setTimeout(()=>{ try{old.disconnect();}catch(e){} }, Math.round(xfadeSec*1000)+100);
+      old.gain.linearRampToValueAtTime(0.001, now+trailSec);
+      setTimeout(()=>{ try{old.disconnect();}catch(e){} }, Math.round(trailSec*1000)+100);
     }
 
     const newGain=actx.createGain();
@@ -12912,10 +12867,13 @@ function triggerPad(root, type){
     newGain.connect(actx.destination);
     padCurrentGain=newGain;
 
-    // MODIFYを適用したボイシング（STRUMディレイ対応）
+    // MODIFYを適用したボイシング（STRUM + Felt Attack）
     const strumSec = (padStrumMs > 0) ? padStrumMs / 1000 : 0.007;
     buildPadVoicingWithModify(root, type, padVoicing).forEach((midi,i)=>{
-      synthJunoPad(actx, midi, now+i*strumSec, 60/autoBpm*6, padVol, newGain);
+      const t = now + i * strumSec;
+      synthJunoPad(actx, midi, t, 60/autoBpm*6, padVol, newGain);
+      // 4-3: Felt Attack
+      if(typeof synthFeltAttack==='function') synthFeltAttack(actx, midi, t, newGain);
     });
   });
 }
