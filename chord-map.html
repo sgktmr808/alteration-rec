@@ -104,9 +104,11 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   flex:0 0 50%;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain; /* 上位へのスクロール伝播を遮断 */
   display:flex;
   flex-direction:column;
   background:var(--bg);
+  touch-action:pan-y; /* 縦スクロールのみ許可、横スワイプでページ移動しない */
 }
 /* スワイプヒント */
 .swipe-pip{
@@ -1019,6 +1021,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.5.0</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -3299,12 +3302,30 @@ function initCanvas(){
 
   // iOS Safari: 最初のタッチでAudioContextをユーザー操作文脈内で初期化
   // K4-H1/H2: safeGetCtx/safeResumeで外部ファイル未ロード時も安全に動作
-  const iosAudioUnlock=()=>{
-    const ctx=safeGetCtx();
-    if(ctx) safeResume(ctx);
+  // canvas・document両方にリスナーを設定し、コントロール画面初回タップも対応
+  let _audioUnlocked = false;
+  const iosAudioUnlock = () => {
+    if(_audioUnlocked) return;
+    _audioUnlocked = true;
+    const ctx = safeGetCtx();
+    if(ctx){
+      safeResume(ctx, () => {
+        // unlock後に一瞬無音を発音してAudioContextをアクティブ化
+        try{
+          const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.connect(ctx.destination);
+          src.start(0);
+        }catch(e){}
+      });
+    }
   };
-  canvas.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
-  canvas.addEventListener('pointerdown',iosAudioUnlock,{once:true});
+  // canvas・document・ctrl-screen の両方をカバー
+  canvas.addEventListener('touchstart', iosAudioUnlock, {once:true, passive:true});
+  canvas.addEventListener('pointerdown', iosAudioUnlock, {once:true});
+  document.addEventListener('touchstart', iosAudioUnlock, {once:true, passive:true});
+  document.addEventListener('pointerdown', iosAudioUnlock, {once:true});
 
   canvas.addEventListener('pointerdown',e=>{
     const{x,y}=canvasXY(e);
@@ -12842,8 +12863,8 @@ function getPadMasterOut(actx){
 }
 
 // ─ MODIFY対応版triggerPad（moveToChordから呼ばれる）─
-// Trail(4-1) / Felt Attack(4-3) / Strum(1-B) / MODIFY 統合版
-// padVoiceStart（インライン）ベースで動作 — synthJunoPad(audio.js)に非依存
+// Voice Pool方式を維持しつつ Trail(4-1) / Felt Attack(4-3) / Strum(1-B) を統合
+// 継続音は保持、不要音のみリリース（重複発音しない）
 const _origTriggerPad=triggerPad;
 function triggerPad(root, type){
   if(!synthPanelOpen) return;
@@ -12852,44 +12873,38 @@ function triggerPad(root, type){
   safeResume(actx, ()=>{
     const now=actx.currentTime;
 
-    // 4-1: Trail — lbTrailに応じてfadeout時間を可変に
-    const trailSec = (typeof getLbTrailSec==='function') ? getLbTrailSec() : 0.12;
-
-    // Trail: 既存VoiceをtrailSecかけてリリース
-    const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
+    // 4-1: Trail時間（lbTrail設定に応じてfadeout長さを可変）
+    const trailSec=(typeof getLbTrailSec==='function') ? getLbTrailSec() : 0.12;
 
     // MODIFYを適用したボイシング
     let newMidis=buildPadVoicingWithModify(root, type, padVoicing);
     if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
     const newSet=new Set(newMidis);
+
+    // 現在アクティブなVoiceを取得
+    const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
     const activeSet=new Set(activeVoices.map(v=>v.midi));
 
-    // 不要音をTrail時間でリリース
+    // 不要音をTrail時間でリリース（新コードにない音のみ）
     activeVoices.forEach(v=>{
       if(!newSet.has(v.midi)) padVoiceRelease(v, actx, Math.max(0.15, trailSec));
     });
 
-    // 出力先
+    // 出力先（共有Gainノード）
     const out=getPadMasterOut(actx);
     out.gain.value=1.0;
     padCurrentGain=out;
 
-    // Strum: 新音を時間差で発音
-    const strumSec=(padStrumMs>0)?padStrumMs/1000:0.007;
+    // Strum: AudioContext時刻にオフセットを加算して時間差発音
+    // setTimeout不使用 → 重複チェックが正確に機能する
+    const strumSec=(padStrumMs>0) ? padStrumMs/1000 : 0.007;
     newMidis.forEach((midi,i)=>{
-      if(!activeSet.has(midi)){
-        // scheduleAtTimeのため少し遅延させてpadVoiceStartを呼ぶ
-        const delayMs=Math.round(i*strumSec*1000);
-        setTimeout(()=>{
-          const actx2=safeGetCtx(); if(!actx2)return;
-          const voice=padVoiceStart(actx2, midi, out);
-          padVoices.push(voice);
-          // 4-3: Felt Attack
-          if(typeof synthFeltAttack==='function'){
-            synthFeltAttack(actx2, midi, actx2.currentTime, out);
-          }
-        }, delayMs);
-      }
+      if(activeSet.has(midi)) return; // 継続音はそのまま保持（重複発音しない）
+      const t=now+i*strumSec;
+      const voice=padVoiceStart(actx, midi, out);
+      padVoices.push(voice);
+      // 4-3: Felt Attack（Strumタイミングに合わせてスケジュール）
+      if(typeof synthFeltAttack==='function') synthFeltAttack(actx, midi, t, out);
     });
 
     // 解放済みVoice掃除
@@ -12917,6 +12932,17 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 document.addEventListener('DOMContentLoaded',()=>{
   initLoopBeach();
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  // ctrl-screen内のタッチがmap-slideのスワイプドラッグに干渉しないよう伝播を遮断
+  const ctrl = document.getElementById('ctrl-screen');
+  if(ctrl){
+    ctrl.addEventListener('touchmove', e => {
+      // ctrl-screen内でのtouchmoveはここで止める（map-slideに届かない）
+      e.stopPropagation();
+    }, {passive:true});
+  }
 });
 
 // MIDIノート番号 (E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)
