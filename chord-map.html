@@ -3317,14 +3317,7 @@ function initCanvas(){
   // iOS Safari: 最初のタッチでAudioContextをユーザー操作文脈内で初期化
   // _ensureActxをユーザー操作内で呼び出してrunning状態にする
   const iosAudioUnlock = () => {
-    // pointerdown/touchstart の同期コンテキスト内でresume()を呼ぶ
-    // これがiOSで初回タップから音を出す唯一の確実な方法
-    try{
-      const ctx = (typeof _getOrCreateActx==='function')
-        ? _getOrCreateActx()
-        : (typeof getCtx==='function' ? getCtx() : null);
-      if(ctx && ctx.state==='suspended') ctx.resume().catch(()=>{});
-    }catch(e){}
+    if(typeof _initActx==='function') _initActx();
   };
   canvas.addEventListener('touchstart', iosAudioUnlock, {once:true, passive:true});
   canvas.addEventListener('pointerdown', iosAudioUnlock, {once:true});
@@ -3332,13 +3325,9 @@ function initCanvas(){
   document.addEventListener('pointerdown', iosAudioUnlock, {once:true});
 
   canvas.addEventListener('pointerdown',e=>{
-    // ユーザー操作の同期コンテキスト内でAudioContextをresume
-    // これをmoveToChordより前に呼ぶことでiOS初回タップ問題を解決
-    try{
-      const _c=(typeof _getOrCreateActx==='function')?_getOrCreateActx()
-               :(typeof getCtx==='function'?getCtx():null);
-      if(_c&&_c.state==='suspended') _c.resume().catch(()=>{});
-    }catch(e){}
+    // ユーザー操作の同期コンテキスト内でAudioContextを初期化・resume
+    // moveToChordより前に呼ぶことでiOS初回タップ問題を解決
+    if(typeof _initActx==='function') _initActx();
 
     const{x,y}=canvasXY(e);
     fxAddTrail(x,y);
@@ -11216,66 +11205,129 @@ let _padGateTimer=null;
 let _padActx=null;
 
 // AudioContextを取得（getCtx優先、なければ自前）
-function _getOrCreateActx(){
-  try{ if(typeof getCtx==='function'){ const c=getCtx(); if(c) return c; } }catch(e){}
-  if(!window._padFallbackCtx||window._padFallbackCtx.state==='closed'){
-    window._padFallbackCtx=new(window.AudioContext||window.webkitAudioContext)();
+// ── AudioContext管理 ──
+// PADとARPで共通の1つのAudioContextを使う
+// _padActxは pointerdown の同期コンテキストで初期化される
+
+function _initActx(){
+  // すでにrunningなら何もしない
+  if(_padActx && _padActx.state==='running') return _padActx;
+  // audio.jsのgetCtxを優先（リバーブ・masterGainが使えるため）
+  let ctx=null;
+  try{ if(typeof getCtx==='function') ctx=getCtx(); }catch(e){}
+  if(!ctx){
+    if(!window._padFallbackCtx||window._padFallbackCtx.state==='closed'){
+      window._padFallbackCtx=new(window.AudioContext||window.webkitAudioContext)();
+    }
+    ctx=window._padFallbackCtx;
   }
-  return window._padFallbackCtx;
+  _padActx=ctx;
+  // ユーザー操作の同期コンテキストでresume（iOSはここが重要）
+  if(ctx.state==='suspended') ctx.resume().catch(()=>{});
+  return ctx;
 }
 
-// PAD発音本体（actxがrunning状態であることが前提）
-function _firePad(actx, root, type){
+// PAD発音本体
+function _firePad(root, type){
+  const actx=_padActx;
+  if(!actx||actx.state!=='running') return false;
+
   if(_padGateTimer){ clearTimeout(_padGateTimer); _padGateTimer=null; }
 
-  // 前音をfadeout
-  const rel=Math.max(0.1, padReleaseSec||0.5);
-  const prev=padVoices.splice(0);
-  prev.forEach(v=>_padStopVoiceAt(actx,v,rel));
+  // 前音をRELEASEでフェードアウト
+  const rel=Math.max(0.1,padReleaseSec||0.5);
+  padVoices.splice(0).forEach(v=>_padStopVoiceAt(actx,v,rel));
 
-  // 出力先
+  // 出力先: masterGain経由でリバーブあり
   const dest=(typeof masterGain!=='undefined'&&masterGain)?masterGain:actx.destination;
 
   // ボイシング
-  let newMidis=buildPadVoicingWithModify(root,type,padVoicing);
-  if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
+  let midis=buildPadVoicingWithModify(root,type,padVoicing);
+  if(midis.length>padMaxVoices) midis=midis.slice(0,padMaxVoices);
 
-  // 発音（クロスフェード: 前音と少し重ねる）
+  // Strum発音
   const strumSec=(padStrumMs>0)?padStrumMs/1000:0.008;
   const offset=Math.min(rel*0.3,0.05);
-  newMidis.forEach((midi,i)=>{
-    const t=actx.currentTime+offset+i*strumSec;
-    padVoices.push(_padStartVoiceAt(actx,midi,dest,t));
+  midis.forEach((midi,i)=>{
+    padVoices.push(_padStartVoiceAt(actx,midi,dest,actx.currentTime+offset+i*strumSec));
   });
 
-  // Gate（SUSTAIN秒後に自動リリース、0=次タップまで持続）
+  // ARPを同じコードで再スタート（PADと必ず同期）
+  if(arpOn){
+    _restartArp(root,type);
+  }
+
+  // SUSTAIN Gateタイマー
   const sus=padSustainSec;
   if(sus>0){
     _padGateTimer=setTimeout(()=>{
       _padGateTimer=null;
       padVoices.splice(0).forEach(v=>_padStopVoiceAt(actx,v,padReleaseSec));
-    }, Math.round(sus*1000));
+      // PADが止まったらARPも止める
+      stopArpScheduler();
+    },Math.round(sus*1000));
+  }
+  return true;
+}
+
+// ARPをPADと同じタイミングで再スタート
+function _restartArp(root,type){
+  stopArpScheduler();
+  if(!_padActx||_padActx.state!=='running') return;
+  arpSeq=(typeof buildArpSeqWithModify==='function'&&typeof modifyTensions!=='undefined'&&modifyTensions.size>0)
+    ? buildArpSeqWithModify(root,type)
+    : buildArpSeq(root,type);
+  arpStep=0;
+  buildDelayNodes(_padActx);
+  arpNextBeat=_padActx.currentTime+0.05;
+  arpScheduleTimer=setInterval(()=>_scheduleArp(),arpScheduleMs);
+}
+
+// ARPノートスケジューリング（_padActx使用）
+function _scheduleArp(){
+  if(!arpOn||!_padActx) return;
+  const actx=_padActx;
+  const stepSec=arpStepMs()/1000;
+  const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
+  while(arpNextBeat<lookAhead){
+    const t=arpNextBeat;
+    const stepMs_=arpStepMs();
+    if(arpSeq.length>0){
+      const item=arpSeq[arpStep%arpSeq.length];
+      const dest=dlyDestination||actx.destination;
+      if(Array.isArray(item)){
+        item.forEach((midi,i)=>synthSH101Note(actx,midi,t+i*0.012,stepMs_*0.8,arpVol,dest));
+      } else {
+        synthSH101Note(actx,item,t,stepMs_*0.8,arpVol,dest);
+      }
+      arpStep++;
+    }
+    arpNextBeat+=stepSec;
   }
 }
 
 function triggerPad(root, type){
   if(!synthPanelOpen) return;
-  let actx;
-  try{ actx=_getOrCreateActx(); }catch(e){ return; }
-  _padActx=actx;
 
-  if(actx.state==='running'){
-    _firePad(actx,root,type);
-  } else {
-    // suspended: resume()を呼んでからrunningになるまでポーリング
-    actx.resume().catch(()=>{});
-    let n=0;
-    const wait=()=>{
-      if(actx.state==='running'){ _firePad(actx,root,type); }
-      else if(n++<30){ setTimeout(wait,20); }
-    };
-    wait();
+  // _padActxがrunningなら即発音
+  if(_padActx&&_padActx.state==='running'){
+    _firePad(root,type);
+    return;
   }
+
+  // まだrunningでない: 初回または suspended
+  // _initActxはpointerdownの同期コンテキストで呼ばれているはずなので
+  // ここではrunningになるまで短くポーリングして発音
+  const actx=_padActx||_initActx();
+  if(!actx) return;
+  if(actx.state==='running'){ _firePad(root,type); return; }
+  // ポーリング（最大600ms）
+  let n=0;
+  const poll=()=>{
+    if(actx.state==='running'){ _padActx=actx; _firePad(root,type); }
+    else if(n++<30){ setTimeout(poll,20); }
+  };
+  poll();
 }
 
 // 指定時刻tに発音開始するVoice生成（strumオフセット対応）
@@ -11351,9 +11403,10 @@ function _padStopVoiceAt(actx, v, fadeSec){
 // PAD全停止
 function stopAllPadVoices(){
   if(_padGateTimer){ clearTimeout(_padGateTimer); _padGateTimer=null; }
+  stopArpScheduler();
   const actx=_padActx||window._padFallbackCtx||null;
   padVoices.splice(0).forEach(v=>{
-    if(actx){ _padStopVoiceAt(actx,v,0.2); }
+    if(actx) _padStopVoiceAt(actx,v,0.2);
     else{
       try{v.osc1.stop();}catch(e){}
       try{v.osc2.stop();}catch(e){}
@@ -11393,25 +11446,19 @@ let arpLookAheadMs=80;
 let arpScheduleMs=25; // より短いポーリング間隔
 
 function startArpScheduler(){
-  stopArpScheduler();
-  arpSeq=buildArpSeq(S.root, S.type);
-  arpStep=0;
-
-  const _start=(actx)=>{
-    buildDelayNodes(actx);
-    arpNextBeat=actx.currentTime+0.05;
-    arpScheduleTimer=setInterval(()=>scheduleArpNotes(), arpScheduleMs);
-  };
-
-  // _padActxが既にrunningなら即使用（PADと同じコンテキストを共有）
+  // PADが鳴っていれば_restartArpで連動スタート
+  // PADが鳴っていない場合もAudioContextを使って起動
   if(_padActx&&_padActx.state==='running'){
-    _start(_padActx);
+    _restartArp(S.root,S.type);
   } else {
-    try{
-      const actx=_getOrCreateActx();
-      if(actx.state==='running'){ _start(actx); }
-      else{ actx.resume().catch(()=>{}); let n=0; const w=()=>{ if(actx.state==='running')_start(actx); else if(n++<20)setTimeout(w,25); }; w(); }
-    }catch(e){}
+    // AudioContextを起動してからARPスタート
+    if(typeof _initActx==='function') _initActx();
+    let n=0;
+    const w=()=>{
+      if(_padActx&&_padActx.state==='running'){ _restartArp(S.root,S.type); }
+      else if(n++<20){ setTimeout(w,25); }
+    };
+    w();
   }
 }
 
@@ -11419,44 +11466,19 @@ function stopArpScheduler(){
   if(arpScheduleTimer){ clearInterval(arpScheduleTimer); arpScheduleTimer=null; }
 }
 
-function scheduleArpNotes(){
-  if(!arpOn) return;
-  const actx=safeGetCtx();
-  if(!actx) return;
-  const stepSec=arpStepMs()/1000;
-  const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
+function scheduleArpNotes(){ _scheduleArp(); }
 
-  while(arpNextBeat<lookAhead){
-    const t=arpNextBeat;
-    const stepMs_=arpStepMs();
-
-    if(arpSeq.length>0){
-      const item=arpSeq[arpStep%arpSeq.length];
-      const dest=dlyDestination||actx.destination;
-
-      if(Array.isArray(item)){
-        // CHORDパターン: 同時発音（ストラム）
-        item.forEach((midi,i)=>{
-          synthSH101Note(actx, midi, t+i*0.012, stepMs_*0.8, arpVol, dest);
-          synthGhostNote(actx, midi, t+i*0.012, stepMs_*0.8, dest); // 4-2: Ghost
-        });
-      } else {
-        synthSH101Note(actx, item, t, stepMs_*0.8, arpVol, dest);
-        synthGhostNote(actx, item, t, stepMs_*0.8, dest); // 4-2: Ghost
-      }
-      arpStep++;
-    }
-    arpNextBeat+=stepSec;
-  }
-}
-
-// コード変更でARPシーケンスを更新（スケジューラーが動いていれば必ず更新）
+// コード変更でARPシーケンスを更新
 function updateArpChord(root, type){
-  if(!arpOn && !arpScheduleTimer) return;
-  arpSeq=(typeof buildArpSeqWithModify==='function'&&(typeof modifyTensions!=='undefined')&&modifyTensions.size>0)
-    ? buildArpSeqWithModify(root,type)
-    : buildArpSeq(root,type);
-  arpStep=0;
+  if(!arpOn) return;
+  // _firePad内で_restartArpを呼ぶのでここでは二重更新を避ける
+  // ARPがONかつPADが鳴っていない場合（単独ARP）のみここで更新
+  if(!padVoices.length){
+    arpSeq=(typeof buildArpSeqWithModify==='function'&&typeof modifyTensions!=='undefined'&&modifyTensions.size>0)
+      ? buildArpSeqWithModify(root,type)
+      : buildArpSeq(root,type);
+    arpStep=0;
+  }
 }
 
 // ── UI制御 ──
