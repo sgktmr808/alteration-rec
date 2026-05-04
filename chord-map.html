@@ -453,6 +453,43 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   transition:border-color .1s,color .1s,background .1s;white-space:nowrap;}
 .synth-pill.on{border-color:#e0a0ff;color:#e0a0ff;background:rgba(224,160,255,0.10);}
 .synth-pill.on.arp{border-color:#80d4ff;color:#80d4ff;background:rgba(128,212,255,0.10);}
+.synth-pill.lb-scene{border-color:rgba(255,180,80,0.35);color:rgba(255,180,80,0.7);}
+.synth-pill.lb-scene.on{border-color:#ffb450;color:#ffb450;background:rgba(255,180,80,0.13);}
+
+/* ── LOOP BEACH パネル ── */
+.lb-zone{flex-shrink:0;background:var(--surf2);border-top:1px solid var(--bdr);}
+.lb-hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 10px;cursor:pointer;user-select:none;}
+.lb-hdr-l{font-family:var(--fm);font-size:9px;letter-spacing:.15em;color:#ffb450;}
+.lb-tog{font-size:9px;color:var(--dim);}
+.lb-wrap{display:none;padding:8px 10px 10px;}
+.lb-wrap.open{display:block;}
+.lb-sec{margin-bottom:8px;}
+.lb-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.lb-lbl{font-family:var(--fm);font-size:8px;color:var(--dim);letter-spacing:.08em;
+  width:52px;flex-shrink:0;text-transform:uppercase;}
+.lb-pills{display:flex;flex-wrap:wrap;gap:3px;flex:1;}
+.lb-pill{font-family:var(--fm);font-size:8px;padding:2px 7px;
+  border:1px solid rgba(255,180,80,0.25);border-radius:3px;
+  color:rgba(255,180,80,0.5);cursor:pointer;user-select:none;transition:all .12s;}
+.lb-pill.on{border-color:#ffb450;color:#ffb450;background:rgba(255,180,80,0.13);}
+.lb-pill:active{opacity:.7;}
+.lb-slider-wrap{flex:1;display:flex;align-items:center;gap:6px;}
+.lb-slider{-webkit-appearance:none;appearance:none;flex:1;height:3px;
+  background:linear-gradient(to right,#ffb450 var(--pct,50%),rgba(255,255,255,0.1) var(--pct,50%));
+  border-radius:2px;outline:none;}
+.lb-slider::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
+  border-radius:50%;background:#ffb450;cursor:pointer;}
+.lb-val{font-family:var(--fm);font-size:8px;color:var(--dim);width:30px;text-align:right;flex-shrink:0;}
+.lb-actions{display:flex;gap:6px;margin-top:8px;}
+.lb-btn{font-family:var(--fm);font-size:8px;letter-spacing:.1em;padding:5px 10px;
+  border:1px solid rgba(255,180,80,0.4);border-radius:3px;
+  color:#ffb450;background:transparent;cursor:pointer;flex:1;text-align:center;
+  transition:background .12s;user-select:none;}
+.lb-btn:active{background:rgba(255,180,80,0.15);}
+.lb-btn.primary{background:rgba(255,180,80,0.12);border-color:#ffb450;}
+.lb-status{font-family:var(--fm);font-size:8px;color:var(--dim);
+  margin-top:6px;min-height:14px;text-align:center;letter-spacing:.06em;}
 .synth-slider{-webkit-appearance:none;appearance:none;
   width:100%;height:3px;border-radius:2px;outline:none;cursor:pointer;
   background:linear-gradient(to right,#e0a0ff var(--pct,40%),rgba(255,255,255,0.12) var(--pct,40%));}
@@ -1221,6 +1258,12 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                     <div class="synth-pill" data-preset="dark">DARK</div>
                     <div class="synth-pill" data-preset="glass">GLASS</div>
                     <div class="synth-pill" data-preset="lead">LEAD</div>
+                    <div class="synth-pill lb-scene" data-preset="plain">PLAIN</div>
+                    <div class="synth-pill lb-scene" data-preset="velvet">VELVET</div>
+                    <div class="synth-pill lb-scene" data-preset="glass2">GLASS2</div>
+                    <div class="synth-pill lb-scene" data-preset="lovestab">LOVE</div>
+                    <div class="synth-pill lb-scene" data-preset="pluck2">PLUCK</div>
+                    <div class="synth-pill lb-scene" data-preset="bstrings">BSTR</div>
                   </div>
                 </div>
                 <!-- VOICES -->
@@ -1301,6 +1344,13 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   <input class="synth-slider" id="pad-vol" type="range" min="0" max="100" value="55"
                     oninput="synthSliderUpdate(this,'pad-vol-val',0,100,'%')">
                   <span class="synth-val" id="pad-vol-val">55%</span>
+                </div>
+                <!-- STRUM -->
+                <div class="synth-row">
+                  <span class="synth-lbl">STRUM</span>
+                  <input class="synth-slider" id="pad-strum" type="range" min="0" max="25" step="1" value="0"
+                    oninput="padStrumMs=parseInt(this.value);document.getElementById('pad-strum-val').textContent=this.value+'ms';">
+                  <span class="synth-val" id="pad-strum-val">0ms</span>
                 </div>
               </div>
 
@@ -1397,6 +1447,77 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               </div>
 
             </div>
+          </div>
+        </div>
+
+        <!-- ── LOOP BEACH パネル ── -->
+        <div class="lb-zone" id="lb-zone">
+          <div class="lb-hdr" id="lb-hdr" onclick="toggleLoopBeach()">
+            <span class="lb-hdr-l">〜 LOOP BEACH</span>
+            <span class="lb-tog" id="lb-tog">▼</span>
+          </div>
+          <div class="lb-wrap" id="lb-wrap">
+
+            <!-- SOURCE -->
+            <div class="lb-row">
+              <span class="lb-lbl">SOURCE</span>
+              <div class="lb-pills" id="lb-source-pills">
+                <div class="lb-pill on" data-src="CHORD">CHORD</div>
+                <div class="lb-pill" data-src="ARP">ARP</div>
+                <div class="lb-pill" data-src="CHORD+ARP">CHORD+ARP</div>
+              </div>
+            </div>
+
+            <!-- PATTERN -->
+            <div class="lb-row">
+              <span class="lb-lbl">PATTERN</span>
+              <div class="lb-pills" id="lb-pattern-pills">
+                <div class="lb-pill on" data-pat="HOLD">HOLD</div>
+                <div class="lb-pill" data-pat="STAB">STAB</div>
+                <div class="lb-pill" data-pat="BROKEN">BROKEN</div>
+                <div class="lb-pill" data-pat="PLUCK">PLUCK</div>
+              </div>
+            </div>
+
+            <!-- BARS -->
+            <div class="lb-row">
+              <span class="lb-lbl">BARS</span>
+              <div class="lb-pills" id="lb-bars-pills">
+                <div class="lb-pill on" data-bars="2">2</div>
+                <div class="lb-pill" data-bars="4">4</div>
+              </div>
+            </div>
+
+            <!-- DENSITY -->
+            <div class="lb-row">
+              <span class="lb-lbl">DENSITY</span>
+              <div class="lb-slider-wrap">
+                <input class="lb-slider" id="lb-density" type="range" min="10" max="90" step="5" value="50"
+                  oninput="lbParams.density=parseInt(this.value)/100;this.style.setProperty('--pct',(parseInt(this.value)-10)/80*100+'%');document.getElementById('lb-density-val').textContent=this.value+'%';">
+                <span class="lb-val" id="lb-density-val">50%</span>
+              </div>
+            </div>
+
+            <!-- RANDOM -->
+            <div class="lb-row">
+              <span class="lb-lbl">RANDOM</span>
+              <div class="lb-slider-wrap">
+                <input class="lb-slider" id="lb-random" type="range" min="0" max="80" step="5" value="20"
+                  oninput="lbParams.randomness=parseInt(this.value)/100;this.style.setProperty('--pct',parseInt(this.value)/80*100+'%');document.getElementById('lb-random-val').textContent=this.value+'%';">
+                <span class="lb-val" id="lb-random-val">20%</span>
+              </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="lb-actions">
+              <div class="lb-btn" onclick="lbAnotherWave()">ANOTHER WAVE</div>
+              <div class="lb-btn primary" onclick="lbCollect()">COLLECT</div>
+              <div class="lb-btn" onclick="lbExportMidi()">MIDI</div>
+            </div>
+
+            <!-- ステータス表示 -->
+            <div class="lb-status" id="lb-status">— select a chord path and generate —</div>
+
           </div>
         </div>
 
@@ -9452,21 +9573,38 @@ let padLfoDepth=0;     // LFO Depth（0〜1）
 let padKeyFollow='half'; // off / half / full
 let padChorus='i';
 let padVol=0.55;
+let padStrumMs=0;   // Strumディレイ(ms) 0=同時発音
 
 // ── PADプリセット ──
 const PAD_PRESETS={
-  juno:   {voicing:'close',  detune:8,  cutoff:2400, res:1.2, envMod:0.35, lfoDepth:0.00, keyFollow:'half', chorus:'i',   vol:0.55},
-  strings:{voicing:'spread', detune:12, cutoff:3200, res:0.8, envMod:0.55, lfoDepth:0.08, keyFollow:'half', chorus:'ii',  vol:0.50},
-  brass:  {voicing:'close',  detune:4,  cutoff:1800, res:4.5, envMod:0.75, lfoDepth:0.00, keyFollow:'full', chorus:'off', vol:0.60},
-  dark:   {voicing:'drop2',  detune:10, cutoff:800,  res:3.0, envMod:0.20, lfoDepth:0.30, keyFollow:'off',  chorus:'i',   vol:0.55},
-  glass:  {voicing:'open',   detune:3,  cutoff:6000, res:2.5, envMod:0.15, lfoDepth:0.05, keyFollow:'full', chorus:'off', vol:0.48},
-  lead:   {voicing:'drop2',  detune:6,  cutoff:3600, res:6.0, envMod:0.60, lfoDepth:0.12, keyFollow:'half', chorus:'i',   vol:0.62},
+  juno:   {voicing:'close',  detune:8,  cutoff:2400, res:1.2, envMod:0.35, lfoDepth:0.00, keyFollow:'half', chorus:'i',   vol:0.55, strum:7},
+  strings:{voicing:'spread', detune:12, cutoff:3200, res:0.8, envMod:0.55, lfoDepth:0.08, keyFollow:'half', chorus:'ii',  vol:0.50, strum:10},
+  brass:  {voicing:'close',  detune:4,  cutoff:1800, res:4.5, envMod:0.75, lfoDepth:0.00, keyFollow:'full', chorus:'off', vol:0.60, strum:0},
+  dark:   {voicing:'drop2',  detune:10, cutoff:800,  res:3.0, envMod:0.20, lfoDepth:0.30, keyFollow:'off',  chorus:'i',   vol:0.55, strum:5},
+  glass:  {voicing:'open',   detune:3,  cutoff:6000, res:2.5, envMod:0.15, lfoDepth:0.05, keyFollow:'full', chorus:'off', vol:0.48, strum:4},
+  lead:   {voicing:'drop2',  detune:6,  cutoff:3600, res:6.0, envMod:0.60, lfoDepth:0.12, keyFollow:'half', chorus:'i',   vol:0.62, strum:0},
+  // ── Loop Beach Sound Scenes ──
+  plain:   {voicing:'open',   detune:2,  cutoff:900,  res:0.8, envMod:0.10, lfoDepth:0.03, keyFollow:'off',  chorus:'off', vol:0.42, strum:12},
+  velvet:  {voicing:'drop2',  detune:9,  cutoff:2200, res:1.5, envMod:0.28, lfoDepth:0.06, keyFollow:'half', chorus:'ii',  vol:0.50, strum:10},
+  glass2:  {voicing:'open',   detune:2,  cutoff:6500, res:2.0, envMod:0.12, lfoDepth:0.04, keyFollow:'full', chorus:'off', vol:0.44, strum:4},
+  lovestab:{voicing:'close',  detune:6,  cutoff:2800, res:2.2, envMod:0.55, lfoDepth:0.00, keyFollow:'half', chorus:'i',   vol:0.58, strum:0},
+  pluck2:  {voicing:'drop2',  detune:5,  cutoff:3800, res:7.0, envMod:0.80, lfoDepth:0.00, keyFollow:'full', chorus:'off', vol:0.52, strum:0},
+  bstrings:{voicing:'spread', detune:14, cutoff:2600, res:1.0, envMod:0.40, lfoDepth:0.10, keyFollow:'half', chorus:'ii',  vol:0.56, strum:15},
 };
 let padCurrentPreset='juno';
+
+// Loop Beach Sceneの表示名マップ
+const LB_SCENE_LABELS={
+  plain:'PLAIN ROOM', velvet:'VELVET ROOTLESS', glass2:'GLASS PIANO',
+  lovestab:'LOVE STAB', pluck2:'METALLIC PLUCK', bstrings:'BLACK STRINGS',
+};
+const LB_SCENE_KEYS=new Set(Object.keys(LB_SCENE_LABELS));
+let lbCurrentScene=null; // 現在のLoop Beach Scene名（null=通常プリセット）
 
 function applyPadPreset(name){
   const p=PAD_PRESETS[name]; if(!p) return;
   padCurrentPreset=name;
+  lbCurrentScene = LB_SCENE_KEYS.has(name) ? name : null;
   padVoicing=p.voicing; padDetune=p.detune; padCutoff=p.cutoff;
   padRes=p.res; padEnvMod=p.envMod; padLfoDepth=p.lfoDepth;
   padKeyFollow=p.keyFollow; padChorus=p.chorus; padVol=p.vol;
@@ -9487,15 +9625,258 @@ function applyPadPreset(name){
   setSlider('pad-lfo-depth',p.lfoDepth*100,0,  100,  '%', 'pad-lfo-depth-val');
   setSlider('pad-vol',      p.vol*100,     0,   100,  '%', 'pad-vol-val');
 
+  // STRUMスライダー更新
+  const strumVal = p.strum !== undefined ? p.strum : 0;
+  padStrumMs = strumVal;
+  const strumEl = document.getElementById('pad-strum');
+  if(strumEl){ strumEl.value = strumVal; strumEl.style.setProperty('--pct', (strumVal/25*100).toFixed(1)+'%'); }
+  const strumValEl = document.getElementById('pad-strum-val');
+  if(strumValEl) strumValEl.textContent = strumVal + 'ms';
+
   document.querySelectorAll('#pad-voicing-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.v===p.voicing));
   document.querySelectorAll('#pad-chorus-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.c===p.chorus));
   document.querySelectorAll('#pad-keyfollow-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.kf===p.keyFollow));
   document.querySelectorAll('#pad-preset-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.preset===name));
 
+  // セクションタイトル更新
+  const titleEl=document.querySelector('#pad-preset-pills')?.closest('.synth-sec')?.querySelector('.synth-sec-title');
+  if(titleEl){
+    const label=LB_SCENE_LABELS[name] || ('PAD · '+name.toUpperCase());
+    titleEl.textContent=label;
+  }
+
   if(synthPanelOpen){
     stopAllPadVoices();
     setTimeout(()=>triggerPad(S.root,S.type),150);
   }
+}
+
+// ── Loop Beach: サウンド状態スナップショット（Phase 1-C） ──
+function captureCurrentSoundState(){
+  return {
+    source: arpOn ? 'ARP' : 'CHORD',
+    scene: lbCurrentScene,
+    padPreset: padCurrentPreset,
+    voicing: padVoicing,
+    detune: padDetune,
+    cutoff: padCutoff,
+    res: padRes,
+    chorus: padChorus,
+    vol: padVol,
+    arpOn: typeof arpOn !== 'undefined' ? arpOn : false,
+    arpPattern: typeof arpPattern !== 'undefined' ? arpPattern : 'up',
+    arpRate: typeof arpRate !== 'undefined' ? arpRate : '1/8',
+    dlyTime: typeof dlyTime !== 'undefined' ? dlyTime : '1/8',
+    dlyFb: typeof dlyFeedback !== 'undefined' ? dlyFeedback : 0.3,
+    dlyMix: typeof dlyMix !== 'undefined' ? dlyMix : 0.2,
+    strumMs: padStrumMs,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOOP BEACH — Sound Memory / Clip Collection Layer  (Phase 2-1)
+// ═══════════════════════════════════════════════════════════════
+
+// ── ストレージキー ──
+const COLLECTED_CLIPS_KEY = 'chord_collected_clips_v1';
+const CLIP_HISTORY_KEY    = 'chord_clip_history_v1';
+const LB_CLIP_HISTORY_MAX = 50;
+
+// ── パネル状態 ──
+let lbPanelOpen = false;
+
+// ── 現在のClip候補（ANOTHER WAVE / COLLECT の対象） ──
+let lbCurrentClip = null;
+
+// ── パラメータ状態 ──
+const lbParams = {
+  source:    'CHORD',   // 'CHORD' | 'ARP' | 'CHORD+ARP'
+  pattern:   'HOLD',    // 'HOLD' | 'STAB' | 'BROKEN' | 'PLUCK'
+  bars:      2,
+  density:   0.50,
+  randomness:0.20,
+};
+
+// ── Seed付き軽量乱数（Clip再現性のため必須）──
+function makeRng(seed){
+  let s = seed >>> 0;
+  return () => { s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+}
+
+// ── 現在のChord Pathを取得 ──
+function getCurrentChordPath(){
+  if(!S || !S.history) return [];
+  return S.history.slice(0, S.histIdx + 1).map(h => ({
+    root: h.root,
+    type: h.type,
+  }));
+}
+
+// ── SLスライダーからmood配列を推定 ──
+function inferMoodFromSliders(){
+  const mood = [];
+  if(typeof sv === 'function'){
+    if(sv('bright') >  0.3) mood.push('明るい');
+    if(sv('bright') < -0.3) mood.push('暗い');
+    if(sv('tense')  >  0.3) mood.push('緊張');
+    if(sv('warm')   >  0.3) mood.push('温かい');
+    if(sv('complex')>  0.3) mood.push('複雑');
+    if(sv('strange')>  0.3) mood.push('不思議');
+    if(sv('moving') >  0.3) mood.push('動的');
+  }
+  if(mood.length === 0) mood.push('neutral');
+  return mood;
+}
+
+// ── Clipオブジェクトを生成（notesは後でEmitterが埋める）──
+function createClip(params = {}){
+  const seed = params.seed || (Date.now() & 0xffffffff);
+  const path = params.chordPath || getCurrentChordPath();
+  const id   = 'clip_' + Date.now() + '_' + (Math.random()*0xffff|0).toString(16);
+  return {
+    id,
+    name:      params.name || ('Clip #' + ((loadCollectedClips().length) + 1)),
+    createdAt: new Date().toISOString(),
+    project: {
+      bpm:        autoBpm,
+      bars:       lbParams.bars,
+      stepsPerBar:16,
+      key:        S ? S.root : 'C',
+    },
+    harmony: {
+      chordPath:    path,
+      startChord:   path.length ? (path[0].root + path[0].type) : '—',
+      endChord:     path.length ? (path[path.length-1].root + path[path.length-1].type) : '—',
+      voicingFlavor: padVoicing || 'close',
+    },
+    sound: captureCurrentSoundState(),
+    pattern: {
+      mode:        lbParams.pattern,
+      source:      lbParams.source,
+      density:     lbParams.density,
+      randomness:  lbParams.randomness,
+      densityCurve:'endLift',
+      seed,
+    },
+    notes: params.notes || [],
+    metadata: {
+      mood:     inferMoodFromSliders(),
+      energy:   Math.round((lbParams.density + 0.5) * 3),
+      rating:   0,
+      favorite: false,
+      memo:     '',
+    },
+    lineage: {
+      parentId: params.parentId || null,
+      action:   params.action   || null,
+    },
+    seed,
+  };
+}
+
+// ── ストレージ読み書き ──
+function loadCollectedClips(){
+  try {
+    const raw = localStorage.getItem(COLLECTED_CLIPS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e){ return []; }
+}
+
+function storeCollectedClips(clips){
+  try { localStorage.setItem(COLLECTED_CLIPS_KEY, JSON.stringify(clips)); } catch(e){}
+}
+
+function addClipToHistory(clip){
+  try {
+    const raw = localStorage.getItem(CLIP_HISTORY_KEY);
+    const hist = raw ? JSON.parse(raw) : [];
+    hist.unshift(clip);
+    if(hist.length > LB_CLIP_HISTORY_MAX) hist.length = LB_CLIP_HISTORY_MAX;
+    localStorage.setItem(CLIP_HISTORY_KEY, JSON.stringify(hist));
+  } catch(e){}
+}
+
+// ── パネル開閉 ──
+function toggleLoopBeach(){
+  lbPanelOpen = !lbPanelOpen;
+  const wrap = document.getElementById('lb-wrap');
+  const tog  = document.getElementById('lb-tog');
+  if(wrap) wrap.classList.toggle('open', lbPanelOpen);
+  if(tog)  tog.textContent = lbPanelOpen ? '▲' : '▼';
+}
+
+// ── ステータス表示 ──
+function lbSetStatus(msg){
+  const el = document.getElementById('lb-status');
+  if(el) el.textContent = msg;
+}
+
+// ── ANOTHER WAVE（再生成）──
+function lbAnotherWave(){
+  const path = getCurrentChordPath();
+  if(!path.length){
+    lbSetStatus('⚠ chord path is empty — tap some chords first');
+    return;
+  }
+  lbSetStatus('generating…');
+  setTimeout(() => {
+    const clip = createClip({ chordPath: path, seed: Date.now() & 0xffffffff });
+    lbCurrentClip = clip;
+    addClipToHistory(clip);
+    lbSetStatus('✓ ' + clip.harmony.startChord + ' → ' + clip.harmony.endChord
+      + '  [' + lbParams.pattern + ' · ' + lbParams.bars + 'bars · BPM' + autoBpm + ']');
+  }, 50);
+}
+
+// ── COLLECT（保存）──
+function lbCollect(){
+  if(!lbCurrentClip){
+    lbSetStatus('⚠ generate a wave first');
+    return;
+  }
+  const clips = loadCollectedClips();
+  clips.unshift(lbCurrentClip);
+  storeCollectedClips(clips);
+  lbSetStatus('★ collected: ' + lbCurrentClip.name + '  (total: ' + clips.length + ')');
+}
+
+// ── MIDI書き出し（Phase 2-3 で実装予定のスタブ）──
+function lbExportMidi(){
+  if(!lbCurrentClip){
+    lbSetStatus('⚠ no clip to export');
+    return;
+  }
+  lbSetStatus('MIDI export: coming in Phase 2-3');
+}
+
+// ── UI初期化 ──
+function initLoopBeach(){
+  // SOURCE pills
+  document.querySelectorAll('#lb-source-pills .lb-pill').forEach(el => {
+    el.onclick = () => {
+      lbParams.source = el.dataset.src;
+      document.querySelectorAll('#lb-source-pills .lb-pill').forEach(p => p.classList.toggle('on', p === el));
+    };
+  });
+  // PATTERN pills
+  document.querySelectorAll('#lb-pattern-pills .lb-pill').forEach(el => {
+    el.onclick = () => {
+      lbParams.pattern = el.dataset.pat;
+      document.querySelectorAll('#lb-pattern-pills .lb-pill').forEach(p => p.classList.toggle('on', p === el));
+    };
+  });
+  // BARS pills
+  document.querySelectorAll('#lb-bars-pills .lb-pill').forEach(el => {
+    el.onclick = () => {
+      lbParams.bars = parseInt(el.dataset.bars);
+      document.querySelectorAll('#lb-bars-pills .lb-pill').forEach(p => p.classList.toggle('on', p === el));
+    };
+  });
+  // スライダーの--pct初期化
+  const densityEl = document.getElementById('lb-density');
+  if(densityEl) densityEl.style.setProperty('--pct', '50%');
+  const randomEl  = document.getElementById('lb-random');
+  if(randomEl)  randomEl.style.setProperty('--pct', '25%');
 }
 
 // ARPパラメーター
@@ -11643,9 +12024,10 @@ function triggerPad(root, type){
     newGain.connect(actx.destination);
     padCurrentGain=newGain;
 
-    // MODIFYを適用したボイシング
+    // MODIFYを適用したボイシング（STRUMディレイ対応）
+    const strumSec = (padStrumMs > 0) ? padStrumMs / 1000 : 0.007;
     buildPadVoicingWithModify(root, type, padVoicing).forEach((midi,i)=>{
-      synthJunoPad(actx, midi, now+i*0.007, 60/autoBpm*6, padVol, newGain);
+      synthJunoPad(actx, midi, now+i*strumSec, 60/autoBpm*6, padVol, newGain);
     });
   });
 }
@@ -11665,6 +12047,10 @@ const _origRenderRoots=renderRoots;
 // ─ ページ読み込み時にMODIFY初期化 ─
 document.addEventListener('DOMContentLoaded',()=>{
   renderModify();
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  initLoopBeach();
 });
 
 // MIDIノート番号 (E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)
