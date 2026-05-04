@@ -490,6 +490,29 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .lb-btn.primary{background:rgba(255,180,80,0.12);border-color:#ffb450;}
 .lb-status{font-family:var(--fm);font-size:8px;color:var(--dim);
   margin-top:6px;min-height:14px;text-align:center;letter-spacing:.06em;}
+.lb-collection{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
+.lb-clip-card{background:var(--surf3);border:1px solid var(--bdr2);border-radius:4px;
+  padding:5px 7px;display:flex;flex-direction:column;gap:3px;}
+.lb-clip-card.favorite{border-color:rgba(255,180,80,0.5);}
+.lb-clip-top{display:flex;align-items:center;gap:5px;}
+.lb-clip-name{font-family:var(--fm);font-size:8px;color:#ffb450;flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lb-clip-star{font-size:9px;color:var(--dim);cursor:pointer;flex-shrink:0;padding:0 2px;}
+.lb-clip-star.on{color:#ffb450;}
+.lb-clip-info{font-family:var(--fm);font-size:7px;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lb-clip-btns{display:flex;gap:4px;margin-top:2px;}
+.lb-clip-btn{font-family:var(--fm);font-size:7px;padding:2px 6px;
+  border:1px solid rgba(255,255,255,0.12);border-radius:2px;
+  color:var(--dim);cursor:pointer;transition:color .1s,border-color .1s;}
+.lb-clip-btn:active{color:#ffb450;border-color:#ffb450;}
+.lb-clip-btn.danger{border-color:rgba(212,74,106,0.3);color:rgba(212,74,106,0.6);}
+.lb-clip-btn.danger:active{color:#d44a6a;border-color:#d44a6a;}
+.lb-collection-hdr{font-family:var(--fm);font-size:7px;color:var(--dim);
+  letter-spacing:.1em;padding:4px 0 2px;border-top:1px solid var(--bdr);
+  display:flex;justify-content:space-between;align-items:center;}
+.lb-collection-hdr span{cursor:pointer;}
+.lb-collection-hdr span:active{color:#ffb450;}
 .synth-slider{-webkit-appearance:none;appearance:none;
   width:100%;height:3px;border-radius:2px;outline:none;cursor:pointer;
   background:linear-gradient(to right,#e0a0ff var(--pct,40%),rgba(255,255,255,0.12) var(--pct,40%));}
@@ -1508,6 +1531,49 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               </div>
             </div>
 
+            <!-- SPACE -->
+            <div class="lb-row">
+              <span class="lb-lbl">SPACE</span>
+              <div class="lb-pills" id="lb-space-pills">
+                <div class="lb-pill on"  data-sp="dry"  >DRY</div>
+                <div class="lb-pill"     data-sp="room" >ROOM</div>
+                <div class="lb-pill"     data-sp="plate">PLATE</div>
+                <div class="lb-pill"     data-sp="fog"  >FOG</div>
+                <div class="lb-pill"     data-sp="tide" >TIDE</div>
+              </div>
+            </div>
+
+            <!-- TRAIL -->
+            <div class="lb-row">
+              <span class="lb-lbl">TRAIL</span>
+              <div class="lb-pills" id="lb-trail-pills">
+                <div class="lb-pill on"  data-tr="off"     >OFF</div>
+                <div class="lb-pill"     data-tr="short"   >SHORT</div>
+                <div class="lb-pill"     data-tr="long"    >LONG</div>
+                <div class="lb-pill"     data-tr="infinite">∞</div>
+              </div>
+            </div>
+
+            <!-- IMMERSION トグル行 -->
+            <div class="lb-row">
+              <span class="lb-lbl">IMMERSO</span>
+              <div class="lb-pills">
+                <div class="lb-pill" id="lb-drift-btn"  onclick="lbToggleDrift()">DRIFT</div>
+                <div class="lb-pill" id="lb-ghost-btn"  onclick="lbToggleGhost()">GHOST</div>
+                <div class="lb-pill" id="lb-felt-btn"   onclick="lbToggleFelt()">FELT</div>
+              </div>
+            </div>
+
+            <!-- WIDTH -->
+            <div class="lb-row">
+              <span class="lb-lbl">WIDTH</span>
+              <div class="lb-slider-wrap">
+                <input class="lb-slider" id="lb-width" type="range" min="0" max="100" step="5" value="0"
+                  oninput="lbWidth=parseInt(this.value)/100;this.style.setProperty('--pct',this.value+'%');document.getElementById('lb-width-val').textContent=this.value+'%';">
+                <span class="lb-val" id="lb-width-val">0%</span>
+              </div>
+            </div>
+
             <!-- アクションボタン -->
             <div class="lb-actions">
               <div class="lb-btn" onclick="lbAnotherWave()">ANOTHER WAVE</div>
@@ -1517,6 +1583,9 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 
             <!-- ステータス表示 -->
             <div class="lb-status" id="lb-status">— select a chord path and generate —</div>
+
+            <!-- Collection一覧 -->
+            <div class="lb-collection" id="lb-collection"></div>
 
           </div>
         </div>
@@ -9820,11 +9889,41 @@ function lbAnotherWave(){
   }
   lbSetStatus('generating…');
   setTimeout(() => {
-    const clip = createClip({ chordPath: path, seed: Date.now() & 0xffffffff });
+    const seed = Date.now() & 0xffffffff;
+
+    // 3-1: Scene連動パラメータブレンド
+    // UIスライダー値を優先しつつ、Scene推奨値をデフォルトとして使う
+    const scDef = getLbSceneDefaults();
+    const resolvedParams = {
+      seed,
+      bars:       lbParams.bars,
+      density:    lbParams.density,    // UIスライダーが50%中央以外なら優先
+      randomness: lbParams.randomness,
+      source:     lbParams.source,
+      mode:       lbParams.pattern,
+      gate:       scDef.gate !== undefined ? scDef.gate : 0.5,
+      swing:      scDef.swing !== undefined ? scDef.swing : 0,
+    };
+
+    const clip = createClip({ chordPath: path, seed });
+    clip.notes = generateClipNotes(path, resolvedParams);
+
+    // Grooveモード情報をpatternに記録
+    if(grooveMode) clip.pattern.grooveMode = grooveMode;
+    if(lbCurrentScene) clip.pattern.scene  = lbCurrentScene;
+
     lbCurrentClip = clip;
     addClipToHistory(clip);
-    lbSetStatus('✓ ' + clip.harmony.startChord + ' → ' + clip.harmony.endChord
-      + '  [' + lbParams.pattern + ' · ' + lbParams.bars + 'bars · BPM' + autoBpm + ']');
+
+    const noteCount  = clip.notes.length;
+    const grooveTxt  = grooveMode ? ` · ${GROOVE_PRESETS[grooveMode].label}` : '';
+    const sceneTxt   = lbCurrentScene ? ` · ${LB_SCENE_LABELS[lbCurrentScene] || lbCurrentScene}` : '';
+    lbSetStatus(
+      '✓ ' + clip.harmony.startChord + ' → ' + clip.harmony.endChord
+      + '  [' + resolvedParams.mode + ' · ' + resolvedParams.source
+      + ' · ' + lbParams.bars + 'bars · ' + noteCount + 'notes'
+      + grooveTxt + sceneTxt + ']'
+    );
   }, 50);
 }
 
@@ -9837,16 +9936,766 @@ function lbCollect(){
   const clips = loadCollectedClips();
   clips.unshift(lbCurrentClip);
   storeCollectedClips(clips);
+  renderClipCollection();
   lbSetStatus('★ collected: ' + lbCurrentClip.name + '  (total: ' + clips.length + ')');
 }
 
-// ── MIDI書き出し（Phase 2-3 で実装予定のスタブ）──
-function lbExportMidi(){
-  if(!lbCurrentClip){
-    lbSetStatus('⚠ no clip to export');
+// ══════════════════════════════════════════════
+// LOOP BEACH — MIDI / Collection (Phase 2-3)
+// ══════════════════════════════════════════════
+
+// ── Clip.notes[] → MIDI events 変換 ──
+function clipToMidiEvents(clip){
+  const TPQ = MIDI_TPQ;           // 480
+  const ticksPerStep = TPQ / 4;   // 16分音符 = 120 tick
+  const evs = [];
+
+  (clip.notes || []).forEach(n => {
+    const noteList = Array.isArray(n.notes) ? n.notes : [n.note];
+    // 小数stepをtickに変換（BROKENのstagger / PLUCKのhumanize対応）
+    const tick    = Math.max(0, Math.round(n.step * ticksPerStep));
+    const durTick = Math.max(1, Math.round((n.length || 1) * ticksPerStep) - 5);
+    const ch      = (n.source === 'arp') ? 1 : 0;
+
+    noteList.forEach(note => {
+      const safe = Math.max(0, Math.min(127, Math.round(note)));
+      evs.push({ tick,            type:'on',  note:safe, vel:Math.min(127,n.velocity||80), ch });
+      evs.push({ tick:tick+durTick, type:'off', note:safe, vel:0, ch });
+    });
+  });
+
+  return evs;
+}
+
+// ── Clipを単体でMIDI書き出し ──
+function exportClipMidi(clip){
+  if(!clip || !clip.notes || !clip.notes.length){
+    lbSetStatus('⚠ no notes in clip');
     return;
   }
-  lbSetStatus('MIDI export: coming in Phase 2-3');
+  const evs   = clipToMidiEvents(clip);
+  const bpm   = clip.project?.bpm || autoBpm || 120;
+  const bytes = buildMidiFile(evs, bpm);
+  const name  = (clip.name || 'clip').replace(/[^a-zA-Z0-9_\-]/g,'_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], {type:'audio/midi'}));
+  a.download = name + '.mid';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  lbSetStatus('↓ MIDI: ' + name + '.mid  (' + clip.notes.length + ' notes)');
+}
+
+// ── 現在Clipをエクスポート ──
+function lbExportMidi(){
+  if(!lbCurrentClip){
+    lbSetStatus('⚠ generate a wave first');
+    return;
+  }
+  exportClipMidi(lbCurrentClip);
+}
+
+// ══════════════════════════════════════════════
+// LOOP BEACH — Emitter 4種 (Phase 2-2)
+// ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════
+// LOOP BEACH — Phase 3 : Techno-House Grammar
+//   3-1  Scene連動パターンチューニング
+//   3-2  Groove Timing → Emitter連携
+//   3-3  Euclidean Rhythm → PLUCK統合
+// ══════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════
+// LOOP BEACH — Phase 4 : Immersion Layer
+//   4-1  Chord Trail + Filter Drift
+//   4-2  Arp Ghost + Stereo Width
+//   4-3  Space Preset + Felt Attack
+// ══════════════════════════════════════════════════════════════
+
+// ────────────────────────────────────────
+// 4-3: Space Preset
+// DRY / ROOM / PLATE / FOG / TIDE
+// 既存 dlyTime/dlyMix/dlyFeedback を組み合わせて設定
+// ────────────────────────────────────────
+const LB_SPACE_PRESETS = {
+  dry:  { dlyTime:'off',   dlyMix:0.00, dlyFb:0.00, label:'DRY'  },
+  room: { dlyTime:'1/8',   dlyMix:0.25, dlyFb:0.20, label:'ROOM' },
+  plate:{ dlyTime:'1/4',   dlyMix:0.35, dlyFb:0.30, label:'PLATE'},
+  fog:  { dlyTime:'1/2',   dlyMix:0.50, dlyFb:0.45, label:'FOG'  },
+  tide: { dlyTime:'ping',  dlyMix:0.55, dlyFb:0.40, label:'TIDE' },
+};
+let lbSpacePreset = 'room'; // 現在のSpace Preset
+
+function applyLbSpacePreset(name){
+  const p = LB_SPACE_PRESETS[name];
+  if(!p) return;
+  lbSpacePreset = name;
+
+  // 既存ディレイパラメータに書き込む
+  dlyTime     = p.dlyTime;
+  dlyFeedback = p.dlyFb;
+  dlyMix      = p.dlyMix;
+
+  // UIスライダーも更新
+  const fbEl  = document.getElementById('dly-fb');
+  const mixEl = document.getElementById('dly-mix');
+  const setSlPct = (el, val, min, max, valId, unit) => {
+    if(!el) return;
+    el.value = val;
+    el.style.setProperty('--pct', ((val-min)/(max-min)*100).toFixed(1)+'%');
+    const vEl = document.getElementById(valId);
+    if(vEl) vEl.textContent = Math.round(val) + unit;
+  };
+  setSlPct(fbEl,  p.dlyFb*100,  0, 85,  'dly-fb-val',  '%');
+  setSlPct(mixEl, p.dlyMix*100, 0, 100, 'dly-mix-val', '%');
+
+  // dlyTime pillの更新
+  document.querySelectorAll('#dly-time-pills .synth-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.t === p.dlyTime));
+
+  // ディレイグラフを再構築（既存関数があれば）
+  if(typeof rebuildDelay === 'function'){
+    const actx = safeGetCtx();
+    if(actx) rebuildDelay(actx);
+  }
+
+  // Space pill UI更新
+  document.querySelectorAll('#lb-space-pills .lb-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.sp === name));
+}
+
+// ────────────────────────────────────────
+// 4-1: Chord Trail
+// 前コードの尾を残す: padCurrentGainをゆっくりfadeoutし
+// 次のコードをfadein（triggerPad内のxfadeを延長するかたち）
+// trail: 'off'|'short'|'long'|'infinite'
+// ────────────────────────────────────────
+let lbTrail = 'off'; // 'off'|'short'|'long'|'infinite'
+const LB_TRAIL_SEC = { off:0.12, short:0.6, long:1.8, infinite:4.0 };
+
+function getLbTrailSec(){
+  return LB_TRAIL_SEC[lbTrail] || 0.12;
+}
+
+// ────────────────────────────────────────
+// 4-1: Filter Drift
+// パッドのカットオフをゆっくり揺らす独立LFO
+// ────────────────────────────────────────
+let lbDriftOn    = false;
+let lbDriftDepth = 0.25;  // 0〜1
+let lbDriftRate  = 0.08;  // Hz
+let _driftOsc    = null;
+let _driftGain   = null;
+
+function startFilterDrift(actx, lpfNode){
+  stopFilterDrift();
+  if(!lbDriftOn || !lpfNode) return;
+  const depthHz = padCutoff * lbDriftDepth * 0.5;
+  _driftOsc  = actx.createOscillator();
+  _driftOsc.type = 'sine';
+  _driftOsc.frequency.value = lbDriftRate;
+  _driftGain = actx.createGain();
+  _driftGain.gain.value = depthHz;
+  _driftOsc.connect(_driftGain);
+  _driftGain.connect(lpfNode.frequency);
+  _driftOsc.start(actx.currentTime);
+}
+
+function stopFilterDrift(){
+  try { if(_driftOsc){ _driftOsc.stop(); _driftOsc.disconnect(); } } catch(e){}
+  try { if(_driftGain) _driftGain.disconnect(); } catch(e){}
+  _driftOsc = null; _driftGain = null;
+}
+
+// ────────────────────────────────────────
+// 4-2: Stereo Width
+// StereoPannerでLとRを±widthだけずらして疑似ステレオ化
+// PADボイシングの奇数音=Left、偶数音=Right
+// ────────────────────────────────────────
+let lbWidth = 0.0; // 0〜1
+
+function createWidthPanner(actx, voiceIdx, totalVoices){
+  if(!actx.createStereoPanner) return null;
+  const pan = actx.createStereoPanner();
+  // 交互にL/Rへパンニング（widthが0なら中央）
+  const spread = lbWidth * 0.8; // 最大±0.8
+  const pos = (voiceIdx % 2 === 0 ? -1 : 1) * spread;
+  pan.pan.value = pos;
+  return pan;
+}
+
+// ────────────────────────────────────────
+// 4-2: Arp Ghost
+// ARPノートの直後に1オクターブ上・低velocity・遅延・暗いフィルターの幽霊音
+// ────────────────────────────────────────
+let lbGhostOn  = false;
+let lbGhostVol = 0.22; // 幽霊音の音量比率
+
+function synthGhostNote(actx, midi, startTime, gateMs, dest){
+  if(!lbGhostOn) return;
+  const ghostMidi = Math.min(127, midi + 12); // 1オクターブ上
+  const hz = typeof midi2hz === 'function' ? midi2hz(ghostMidi) : 440 * Math.pow(2, (ghostMidi-69)/12);
+  const delayTime = 0.02 + Math.random() * 0.04; // 20〜60ms遅延
+  const gateSec   = Math.max(0.05, gateMs / 1000 * 0.5);
+
+  const osc = actx.createOscillator();
+  osc.type = 'sine'; osc.frequency.value = hz;
+
+  const lpf = actx.createBiquadFilter();
+  lpf.type = 'lowpass'; lpf.frequency.value = 2000; lpf.Q.value = 1.5;
+
+  const env = actx.createGain();
+  const t0  = startTime + delayTime;
+  env.gain.setValueAtTime(0.001, t0);
+  env.gain.linearRampToValueAtTime(lbGhostVol * 0.5, t0 + 0.008);
+  env.gain.exponentialRampToValueAtTime(0.001, t0 + gateSec);
+
+  osc.connect(lpf); lpf.connect(env); env.connect(dest || actx.destination);
+  osc.start(t0); osc.stop(t0 + gateSec + 0.05);
+}
+
+// ────────────────────────────────────────
+// 4-3: Felt Attack
+// PADの発音時に短いsineバーストを重ね、ピアノ的な触感を付与
+// ────────────────────────────────────────
+let lbFeltOn  = false;
+let lbFeltVol = 0.18;
+
+function synthFeltAttack(actx, midi, startTime, dest){
+  if(!lbFeltOn) return;
+  const hz = typeof midi2hz === 'function' ? midi2hz(midi) : 440 * Math.pow(2, (midi-69)/12);
+
+  // 短いsine + 小さなnoise burst
+  const osc  = actx.createOscillator();
+  osc.type = 'sine'; osc.frequency.value = hz * 2; // 1オクターブ上のsine
+
+  const env  = actx.createGain();
+  env.gain.setValueAtTime(lbFeltVol, startTime);
+  env.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08 + Math.random() * 0.10);
+
+  // 小さなノイズ成分（フェルト感）
+  const noiseLen  = Math.ceil(actx.sampleRate * 0.05);
+  const noiseBuf  = actx.createBuffer(1, noiseLen, actx.sampleRate);
+  const noiseDat  = noiseBuf.getChannelData(0);
+  for(let i = 0; i < noiseLen; i++) noiseDat[i] = (Math.random() * 2 - 1) * 0.3;
+  const noiseSrc  = actx.createBufferSource();
+  noiseSrc.buffer = noiseBuf;
+
+  const nEnv = actx.createGain();
+  nEnv.gain.setValueAtTime(lbFeltVol * 0.4, startTime);
+  nEnv.gain.exponentialRampToValueAtTime(0.001, startTime + 0.04);
+
+  const noiseFilter = actx.createBiquadFilter();
+  noiseFilter.type = 'highpass'; noiseFilter.frequency.value = 2000;
+
+  osc.connect(env);       env.connect(dest || actx.destination);
+  noiseSrc.connect(noiseFilter); noiseFilter.connect(nEnv); nEnv.connect(dest || actx.destination);
+
+  osc.start(startTime);  osc.stop(startTime + 0.18);
+  noiseSrc.start(startTime); noiseSrc.stop(startTime + 0.06);
+}
+
+// ────────────────────────────────────────
+// Trail対応: triggerPadのxfade時間をlbTrailSecで上書き
+// ────────────────────────────────────────
+// 既存triggerPadのxfadeSec=0.12 固定を上書きするフック
+// triggerPad内のxfadeSecをlbTrailに応じて可変にする
+let _lbTrailHookEnabled = false;
+function enableLbTrailHook(){ _lbTrailHookEnabled = true; }
+
+// ── triggerPad Trail Hook: 既存triggerPadをラップ ──
+// 既存コードは触らず、moveToChordの呼び出し経路でHookを差し込む
+// 実装: triggerPadがnewGainを作るXFADE部分をHookしてfadeout時間を延長
+// → 既存のpadCurrentGainのfadeout時間を上書きするポストフック
+
+const _origTriggerPadImm = triggerPad; // 既存triggerPadを保持
+function triggerPad(root, type){
+  if(!synthPanelOpen) return;
+  const actx = safeGetCtx();
+  if(!actx) return;
+  safeResume(actx, () => {
+    const now       = actx.currentTime;
+    const trailSec  = getLbTrailSec(); // 4-1: Trail時間
+    const xfadeSec  = Math.max(0.12, trailSec * 0.4); // xfadeはtrailの40%
+
+    if(padCurrentGain){
+      const old = padCurrentGain;
+      old.gain.cancelScheduledValues(now);
+      old.gain.setValueAtTime(old.gain.value, now);
+      old.gain.linearRampToValueAtTime(0.001, now + trailSec); // Trail長さ適用
+      setTimeout(() => { try{ old.disconnect(); }catch(e){} },
+        Math.round(trailSec * 1000) + 100);
+    }
+
+    const newGain = actx.createGain();
+    newGain.gain.setValueAtTime(0.001, now);
+    newGain.gain.linearRampToValueAtTime(1.0, now + xfadeSec);
+    newGain.connect(actx.destination);
+    padCurrentGain = newGain;
+
+    // MODIFYを適用したボイシング（Trail + Felt Attack）
+    const strumSec = (padStrumMs > 0) ? padStrumMs / 1000 : 0.007;
+    buildPadVoicingWithModify(root, type, padVoicing).forEach((midi, i) => {
+      const t = now + i * strumSec;
+      synthJunoPad(actx, midi, t, 60/autoBpm*6, padVol, newGain);
+      synthFeltAttack(actx, midi, t, newGain); // 4-3: Felt Attack
+    });
+  });
+}
+
+// ────────────────────────────────────────
+// 3-1: Scene → Emitterデフォルトパラメータ
+// ────────────────────────────────────────
+// Sceneキー → 推奨パターン調整値
+// lbAnotherWave 呼び出し時に自動でパラメータをブレンドする
+const LB_SCENE_DEFAULTS = {
+  plain:    { pattern:'HOLD',   source:'CHORD',     density:0.35, randomness:0.10, swing:0.00, gate:0.90 },
+  velvet:   { pattern:'BROKEN', source:'CHORD',     density:0.50, randomness:0.15, swing:0.05, gate:0.80 },
+  glass2:   { pattern:'BROKEN', source:'CHORD+ARP', density:0.45, randomness:0.20, swing:0.03, gate:0.70 },
+  lovestab: { pattern:'STAB',   source:'CHORD',     density:0.65, randomness:0.18, swing:0.08, gate:0.25 },
+  pluck2:   { pattern:'PLUCK',  source:'ARP',       density:0.55, randomness:0.25, swing:0.00, gate:0.15 },
+  bstrings: { pattern:'HOLD',   source:'CHORD+ARP', density:0.40, randomness:0.12, swing:0.04, gate:0.95 },
+};
+
+// 現在Sceneのデフォルト値を取得（Sceneが未選択なら空オブジェクト）
+function getLbSceneDefaults(){
+  return LB_SCENE_DEFAULTS[lbCurrentScene] || {};
+}
+
+// ────────────────────────────────────────
+// 3-2: Groove Timing ソース取得
+// GROOVE_PRESETSのkick/snare/hihatパターンをEmitterのリズムソースとして使う
+// ────────────────────────────────────────
+
+// grooveModeのkickパターン（16step配列）を取得
+// grooveModeがnullなら null を返す
+function getLbGroovePattern(){
+  if(!grooveMode || typeof GROOVE_PRESETS === 'undefined') return null;
+  return GROOVE_PRESETS[grooveMode] || null;
+}
+
+// Groove kick/hihat ステップからSTABの発音位置を生成
+// kickOn: kickが鳴るステップ、hihatOn: hihatが鳴るステップ
+// returns: Set<number> 発音ステップ（小節内0〜15）
+function buildGrooveStabSteps(gp, src){
+  if(!gp) return null;
+  const steps = new Set();
+  for(let i = 0; i < 16; i++){
+    if(src === 'kick'  && gp.kick[i])  steps.add(i);
+    if(src === 'snare' && gp.snare[i]) steps.add(i);
+    if(src === 'hihat' && gp.hihat[i]) steps.add(i);
+    if(src === 'off')                  {}  // grooveを使わない
+  }
+  return steps;
+}
+
+// Grooveのswingをtimingずれ（秒）に変換 → step単位でのmicrotiming
+// swing: 0.5=straight, 0.6=heavy swing
+// returns: 各偶数ステップへの遅延（step単位）
+function grooveSwingOffset(gp, stepIdx){
+  if(!gp) return 0;
+  const swing = gp.swing || 0.50;
+  // 8分グリッド偶数ステップ（0,2,4,6,8,10,12,14）を遅らせる
+  if(stepIdx % 2 === 1) return (swing - 0.5) * 2; // 0〜0.2 step
+  return 0;
+}
+
+// ────────────────────────────────────────
+// 3-3: Euclidean Rhythm 生成
+// n個のパルスをk個のスロットに均等配置（Bjorklund algorithm）
+// ────────────────────────────────────────
+function euclidean(pulses, steps){
+  if(pulses <= 0) return new Array(steps).fill(0);
+  if(pulses >= steps) return new Array(steps).fill(1);
+  let pattern = [];
+  let counts = [];
+  let remainders = [];
+  let divisor = steps - pulses;
+  remainders.push(pulses);
+  let level = 0;
+  while(true){
+    counts.push(Math.floor(divisor / remainders[level]));
+    remainders.push(divisor % remainders[level]);
+    divisor = remainders[level];
+    level++;
+    if(remainders[level] <= 1) break;
+  }
+  counts.push(divisor);
+  function build(lv){
+    if(lv === -1){ pattern.push(0); }
+    else if(lv === -2){ pattern.push(1); }
+    else{
+      for(let i = 0; i < counts[lv]; i++) build(lv - 1);
+      if(remainders[lv] !== 0) build(lv - 2);
+    }
+  }
+  build(level);
+  // ローテーション：最初の1を先頭に
+  const first = pattern.indexOf(1);
+  return [...pattern.slice(first), ...pattern.slice(0, first)];
+}
+
+// Sceneに応じたEuclidean設定
+// returns: { pulses, steps } or null（Euclidean不使用）
+function getLbEuclideanConfig(){
+  if(!lbCurrentScene) return null;
+  const map = {
+    pluck2:   { pulses:5, steps:16 },  // 5/16: Rej的テクノプラック
+    lovestab: { pulses:6, steps:16 },  // 6/16: ガラージ裏拍
+    bstrings: { pulses:3, steps:16 },  // 3/16: 疎なストリングスパルス
+    glass2:   { pulses:7, steps:16 },  // 7/16: 透明ARP
+  };
+  return map[lbCurrentScene] || null;
+}
+
+// ── MIDIピールプール生成（コードトーン、指定オクターブ範囲）──
+function getChordMidiPool(root, type, octLow, octHigh){
+  const ri = (typeof ni === 'function') ? ni(root) : ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].indexOf(root);
+  const ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
+  const pool = [];
+  for(let oct = octLow; oct <= octHigh; oct++){
+    ivs.forEach(iv => pool.push(12*(oct+1) + ((ri+iv)%12)));
+  }
+  return [...new Set(pool)].sort((a,b) => a-b);
+}
+
+// ── Density Curve: 小節ごとの密度倍率 ──
+function densityAtBar(barIdx, bars, base, curve){
+  if(curve === 'endLift' && barIdx === bars-1) return Math.min(1, base * 1.35);
+  if(curve === 'rise') return base * (0.7 + 0.6 * (barIdx / Math.max(1, bars-1)));
+  return base;
+}
+
+// ── ボイシングMIDIノート取得（buildPadVoicing流用）──
+function lbGetVoicingMidi(root, type){
+  if(typeof buildPadVoicing === 'function'){
+    return buildPadVoicing(root, type, padVoicing);
+  }
+  // フォールバック: close position
+  const ri = (typeof ni === 'function') ? ni(root) : 0;
+  const ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
+  const rootMidi = 48 + ri;
+  return ivs.map(iv => { let m = rootMidi + (iv%12); if(m < rootMidi) m += 12; return m; }).sort((a,b)=>a-b);
+}
+
+// ────────────────────────────────────────
+// EMITTER: HOLD
+// 各コードを小節頭で発音、長いsustain
+// ────────────────────────────────────────
+function emitHold(chordPath, bars, rng, gate = 0.90){
+  const notes = [];
+  const stepsPerBar = 16;
+  const totalSteps = bars * stepsPerBar;
+  const stepsPerChord = Math.max(stepsPerBar, Math.floor(totalSteps / Math.max(1, chordPath.length)));
+
+  chordPath.forEach((ch, ci) => {
+    const startStep = ci * stepsPerChord;
+    if(startStep >= totalSteps) return;
+    const midi = lbGetVoicingMidi(ch.root, ch.type);
+    // gate: 0.9=ほぼ全長, 0.25=スタブ的
+    const maxLen = Math.min(stepsPerChord - 1, stepsPerBar * 2 - 1);
+    const length = Math.max(1, Math.round(maxLen * gate));
+    const vel = 72 + Math.round(rng() * 14);
+    notes.push({ step: startStep, notes: midi, velocity: vel, length, source: 'chord', locked: false });
+  });
+  return notes;
+}
+
+// ────────────────────────────────────────
+// EMITTER: STAB (Phase 3-2: Groove Timing連携)
+// Groove kick/hihatパターンを発音タイミングとして使用
+// grooveModeがnullの場合は従来の裏拍固定
+// ────────────────────────────────────────
+function emitStab(chordPath, bars, density, rng){
+  const notes = [];
+  const stepsPerBar = 16;
+  const totalSteps  = bars * stepsPerBar;
+  const stepsPerChord = Math.max(stepsPerBar, Math.floor(totalSteps / Math.max(1, chordPath.length)));
+
+  // Scene: LOVE STAB はガラージ的にoff-beat強調
+  const isLoveStab = (lbCurrentScene === 'lovestab');
+
+  // Groove Timing ソース決定
+  const gp = getLbGroovePattern();
+  // LOVE STABはhihat+snare、それ以外はkick+snare
+  const grooveSteps = gp
+    ? (() => {
+        const s = new Set();
+        gp.kick.forEach((v,i)  => { if(v) s.add(i); });
+        gp.snare.forEach((v,i) => { if(v) s.add(i); });
+        if(isLoveStab) gp.hihat.forEach((v,i) => { if(v) s.add(i); });
+        return s;
+      })()
+    : new Set([4, 8, 12, 0]); // フォールバック: 裏拍固定
+
+  chordPath.forEach((ch, ci) => {
+    const chordStart = ci * stepsPerChord;
+    if(chordStart >= totalSteps) return;
+    const midi   = lbGetVoicingMidi(ch.root, ch.type);
+    const barIdx = Math.floor(chordStart / stepsPerBar);
+    const d      = densityAtBar(barIdx, bars, density, 'endLift');
+
+    grooveSteps.forEach(off => {
+      const rawStep = chordStart + off;
+      if(rawStep >= totalSteps) return;
+      if(rng() > d) return; // Probability Gate
+
+      // Swing microtiming
+      const swing  = grooveSwingOffset(gp, off);
+      const step   = rawStep + swing;
+
+      // velocity humanize + snare accent
+      const isSnare = gp ? gp.snare[off] : (off === 4 || off === 12);
+      const baseVel = isLoveStab ? 65 : 62;
+      const vel     = Math.min(100, baseVel + Math.round(rng() * 22) + (isSnare ? 8 : 0));
+
+      // LOVE STAB: gate短め(1step), 通常: 2step
+      const gate = isLoveStab ? 1 : 2;
+      notes.push({ step, notes: midi, velocity: vel, length: gate, source: 'chord', locked: false });
+    });
+  });
+  return notes;
+}
+
+// ────────────────────────────────────────
+// EMITTER: BROKEN
+// 和音の各音を低→高の順にずらして発音
+// MIDIではstepを微細にずらす（1step = 120tick → 10tick単位でstagger）
+// ────────────────────────────────────────
+function emitBroken(chordPath, bars, rng, gate = 0.80){
+  const notes = [];
+  const stepsPerBar = 16;
+  const totalSteps = bars * stepsPerBar;
+  const stepsPerChord = Math.max(stepsPerBar, Math.floor(totalSteps / Math.max(1, chordPath.length)));
+
+  chordPath.forEach((ch, ci) => {
+    const startStep = ci * stepsPerChord;
+    if(startStep >= totalSteps) return;
+    const midi = lbGetVoicingMidi(ch.root, ch.type);
+    const maxLen = Math.max(4, stepsPerChord - 2);
+    const baseLen = Math.max(2, Math.round(maxLen * gate));
+
+    // 各音を0.08〜0.18stepずつずらして発音（低→高）
+    const staggerStep = 0.08 + rng() * 0.10;
+    midi.forEach((m, i) => {
+      const vel = 68 + Math.round(rng() * 16) - i * 2;
+      notes.push({
+        step:     startStep + i * staggerStep,
+        note:     m,
+        velocity: Math.max(50, vel),
+        length:   Math.max(1, baseLen - i),
+        source:   'chord',
+        locked:   false,
+      });
+    });
+  });
+  return notes;
+}
+
+// ────────────────────────────────────────
+// EMITTER: PLUCK (Phase 3-3: Euclidean Rhythm統合)
+// SceneによってEuclideanグリッドかProbability Gateを切り替え
+// METALLIC PLUCK: 5/16 Euclidean + 金属的な短いgate
+// その他: Probability Gate（従来）
+// ────────────────────────────────────────
+function emitPluck(chordPath, bars, density, randomness, rng){
+  const notes = [];
+  const stepsPerBar = 16;
+  const totalSteps  = bars * stepsPerBar;
+  const stepsPerChord = Math.max(stepsPerBar, Math.floor(totalSteps / Math.max(1, chordPath.length)));
+
+  // Euclidean設定取得（Scene連動）
+  const euclCfg  = getLbEuclideanConfig();
+  // Euclideanグリッド（1小節分）
+  const euclGrid = euclCfg ? euclidean(euclCfg.pulses, euclCfg.steps) : null;
+
+  // Groove timingのswing取得
+  const gp = getLbGroovePattern();
+
+  // METALLIC PLUCKは高域・短いgate
+  const isMetallic = (lbCurrentScene === 'pluck2');
+  const octLow  = isMetallic ? 4 : 3;
+  const octHigh = isMetallic ? 6 : 5;
+  const gateLen = isMetallic ? 1 : 2;
+
+  chordPath.forEach((ch, ci) => {
+    const chordStart = ci * stepsPerChord;
+    if(chordStart >= totalSteps) return;
+    const pool   = getChordMidiPool(ch.root, ch.type, octLow, octHigh);
+    const barIdx = Math.floor(chordStart / stepsPerBar);
+
+    // 小節単位でEuclideanグリッドを繰り返す
+    const chordBars = Math.ceil(stepsPerChord / stepsPerBar);
+    for(let b = 0; b < chordBars; b++){
+      for(let s = 0; s < stepsPerBar; s++){
+        const absStep = chordStart + b * stepsPerBar + s;
+        if(absStep >= totalSteps) break;
+
+        // 発音判定: Euclidean or Probability Gate
+        let shouldFire = false;
+        if(euclGrid){
+          shouldFire = euclGrid[s % euclGrid.length] === 1;
+          // Euclideanヒット時もさらにdensityでProbability Gate
+          if(shouldFire){
+            const d = densityAtBar(barIdx + b, bars, density, 'endLift');
+            shouldFire = rng() < d;
+          }
+        } else {
+          const d = densityAtBar(barIdx + b, bars, density, 'endLift');
+          shouldFire = rng() < d;
+        }
+        if(!shouldFire) continue;
+
+        // Swing microtiming
+        const swing = grooveSwingOffset(gp, s);
+        // Humanize（±0.05step）
+        const humanize = (rng() - 0.5) * 0.10;
+
+        // 音高選択: randomnessが高いほど上方バイアス
+        const bias = 0.5 + randomness * 0.3;
+        const idx  = Math.min(pool.length - 1,
+                       Math.floor(Math.pow(rng(), 1 - bias) * pool.length));
+        const midi = pool[idx];
+
+        // METALLIC PLUCK: velocity強め・ばらつき大
+        const baseVel = isMetallic ? 60 : 55;
+        const vel = baseVel + Math.round(rng() * 32);
+
+        notes.push({
+          step:     absStep + swing + humanize,
+          note:     midi,
+          velocity: Math.min(110, vel),
+          length:   gateLen + Math.round(rng() * (isMetallic ? 0 : 1)),
+          source:   'arp',
+          locked:   false,
+        });
+      }
+    }
+  });
+  return notes;
+}
+
+// ── Emitterディスパッチャ ──
+function generateClipNotes(chordPath, params){
+  const bars = params.bars || lbParams.bars;
+  const dens = params.density    !== undefined ? params.density    : lbParams.density;
+  const rand = params.randomness !== undefined ? params.randomness : lbParams.randomness;
+  const src  = params.source  || lbParams.source;
+  const pat  = params.mode    || lbParams.pattern;
+  // gate: HOLDのsustain比率 / BROKENのlength調整（0〜1）
+  const gate = params.gate !== undefined ? params.gate : 0.75;
+
+  let notes = [];
+
+  if(src === 'CHORD' || src === 'CHORD+ARP'){
+    if(pat === 'HOLD')   notes = notes.concat(emitHold(chordPath, bars, makeRng(params.seed), gate));
+    if(pat === 'STAB')   notes = notes.concat(emitStab(chordPath, bars, dens, makeRng(params.seed)));
+    if(pat === 'BROKEN') notes = notes.concat(emitBroken(chordPath, bars, makeRng(params.seed), gate));
+  }
+  if(src === 'ARP' || src === 'CHORD+ARP'){
+    notes = notes.concat(emitPluck(chordPath, bars, dens, rand, makeRng(params.seed + 1)));
+  }
+  if(pat === 'PLUCK' && src === 'CHORD'){
+    notes = emitPluck(chordPath, bars, dens, rand, makeRng(params.seed));
+  }
+
+  // step昇順ソート
+  return notes.sort((a, b) => a.step - b.step);
+}
+
+// ── Collection一覧を描画 ──
+function renderClipCollection(){
+  const el = document.getElementById('lb-collection');
+  if(!el) return;
+  const clips = loadCollectedClips();
+
+  if(!clips.length){
+    el.innerHTML = '';
+    return;
+  }
+
+  // ヘッダー行
+  let html = '<div class="lb-collection-hdr">'
+    + '<span>★ COLLECTION (' + clips.length + ')</span>'
+    + '<span onclick="lbClearAll()" style="color:rgba(212,74,106,0.6)">CLEAR ALL</span>'
+    + '</div>';
+
+  clips.forEach((clip, idx) => {
+    const path    = (clip.harmony?.chordPath || []).map(c => c.root + c.type).join(' → ');
+    const pat     = clip.pattern?.mode   || '—';
+    const src     = clip.pattern?.source || '—';
+    const bars    = clip.project?.bars   || '—';
+    const bpm     = clip.project?.bpm    || '—';
+    const notes   = (clip.notes || []).length;
+    const date    = clip.createdAt ? new Date(clip.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+    const isFav   = clip.metadata?.favorite;
+    const starOn  = isFav ? ' on' : '';
+    const cardOn  = isFav ? ' favorite' : '';
+
+    html += '<div class="lb-clip-card' + cardOn + '" id="lb-card-' + idx + '">'
+      + '<div class="lb-clip-top">'
+      +   '<span class="lb-clip-name">' + (clip.name || 'Clip') + '</span>'
+      +   '<span class="lb-clip-star' + starOn + '" onclick="lbToggleFav(' + idx + ')">★</span>'
+      + '</div>'
+      + '<div class="lb-clip-info">'
+      +   pat + ' · ' + src + ' · ' + bars + 'bars · BPM' + bpm + ' · ' + notes + 'notes  ' + date
+      + '</div>'
+      + (path ? '<div class="lb-clip-info">' + path + '</div>' : '')
+      + '<div class="lb-clip-btns">'
+      +   '<span class="lb-clip-btn" onclick="lbPlayClip(' + idx + ')">▶ LOAD</span>'
+      +   '<span class="lb-clip-btn" onclick="lbDownloadClip(' + idx + ')">↓ MIDI</span>'
+      +   '<span class="lb-clip-btn danger" onclick="lbDeleteClip(' + idx + ')">✕</span>'
+      + '</div>'
+      + '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// ── ★ お気に入りトグル ──
+function lbToggleFav(idx){
+  const clips = loadCollectedClips();
+  if(!clips[idx]) return;
+  clips[idx].metadata = clips[idx].metadata || {};
+  clips[idx].metadata.favorite = !clips[idx].metadata.favorite;
+  storeCollectedClips(clips);
+  renderClipCollection();
+}
+
+// ── ▶ Clipをカレントにロード（sound stateは今後 restoreClipSoundState で対応）──
+function lbPlayClip(idx){
+  const clips = loadCollectedClips();
+  if(!clips[idx]) return;
+  lbCurrentClip = clips[idx];
+  const c = clips[idx];
+  const pat = c.pattern?.mode   || lbParams.pattern;
+  const src = c.pattern?.source || lbParams.source;
+  lbSetStatus('↺ loaded: ' + (c.name||'Clip') + '  [' + pat + ' · ' + src + ']');
+}
+
+// ── ↓ 個別MIDI書き出し ──
+function lbDownloadClip(idx){
+  const clips = loadCollectedClips();
+  if(!clips[idx]) return;
+  exportClipMidi(clips[idx]);
+}
+
+// ── ✕ 個別削除 ──
+function lbDeleteClip(idx){
+  const clips = loadCollectedClips();
+  clips.splice(idx, 1);
+  storeCollectedClips(clips);
+  if(lbCurrentClip && lbCurrentClip.id === (clips[idx]?.id)) lbCurrentClip = null;
+  renderClipCollection();
+  lbSetStatus('deleted  (remaining: ' + clips.length + ')');
+}
+
+// ── CLEAR ALL ──
+function lbClearAll(){
+  if(!confirm('すべてのClipを削除しますか？')) return;
+  storeCollectedClips([]);
+  renderClipCollection();
+  lbSetStatus('collection cleared');
 }
 
 // ── UI初期化 ──
@@ -9877,6 +10726,43 @@ function initLoopBeach(){
   if(densityEl) densityEl.style.setProperty('--pct', '50%');
   const randomEl  = document.getElementById('lb-random');
   if(randomEl)  randomEl.style.setProperty('--pct', '25%');
+  const widthEl   = document.getElementById('lb-width');
+  if(widthEl)   widthEl.style.setProperty('--pct', '0%');
+
+  // SPACE pills
+  document.querySelectorAll('#lb-space-pills .lb-pill').forEach(el => {
+    el.onclick = () => applyLbSpacePreset(el.dataset.sp);
+  });
+
+  // TRAIL pills
+  document.querySelectorAll('#lb-trail-pills .lb-pill').forEach(el => {
+    el.onclick = () => {
+      lbTrail = el.dataset.tr;
+      document.querySelectorAll('#lb-trail-pills .lb-pill').forEach(p =>
+        p.classList.toggle('on', p === el));
+    };
+  });
+
+  // 既存Collectionを初期描画
+  renderClipCollection();
+}
+
+// ── Immersionトグルボタン ──
+function lbToggleDrift(){
+  lbDriftOn = !lbDriftOn;
+  const btn = document.getElementById('lb-drift-btn');
+  if(btn) btn.classList.toggle('on', lbDriftOn);
+  if(!lbDriftOn) stopFilterDrift();
+}
+function lbToggleGhost(){
+  lbGhostOn = !lbGhostOn;
+  const btn = document.getElementById('lb-ghost-btn');
+  if(btn) btn.classList.toggle('on', lbGhostOn);
+}
+function lbToggleFelt(){
+  lbFeltOn = !lbFeltOn;
+  const btn = document.getElementById('lb-felt-btn');
+  if(btn) btn.classList.toggle('on', lbFeltOn);
 }
 
 // ARPパラメーター
@@ -10438,9 +11324,11 @@ function scheduleArpNotes(){
         // CHORDパターン: 同時発音（ストラム）
         item.forEach((midi,i)=>{
           synthSH101Note(actx, midi, t+i*0.012, stepMs_*0.8, arpVol, dest);
+          synthGhostNote(actx, midi, t+i*0.012, stepMs_*0.8, dest); // 4-2: Ghost
         });
       } else {
         synthSH101Note(actx, item, t, stepMs_*0.8, arpVol, dest);
+        synthGhostNote(actx, item, t, stepMs_*0.8, dest); // 4-2: Ghost
       }
       arpStep++;
     }
