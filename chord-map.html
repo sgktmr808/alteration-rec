@@ -44,6 +44,17 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .hdr-back:hover{color:var(--text);}
 .hdr-title{font-family:var(--fm);font-size:11px;font-weight:500;color:var(--acc);letter-spacing:.15em;flex:1;}
 .hdr-chord{font-family:var(--fm);font-size:18px;font-weight:500;color:var(--text);}
+.hdr-arp-btn{
+  font-family:var(--fm);font-size:9px;padding:4px 10px;
+  border:1px solid rgba(128,212,255,0.4);border-radius:var(--r);
+  color:rgba(128,212,255,0.6);background:transparent;cursor:pointer;
+  letter-spacing:.1em;transition:border-color .15s,color .15s,background .15s;
+  white-space:nowrap;user-select:none;-webkit-user-select:none;
+}
+.hdr-arp-btn.on{
+  border-color:#80d4ff;color:#80d4ff;
+  background:rgba(128,212,255,0.12);
+}
 .legend{flex-shrink:0;background:var(--surf2);border-bottom:1px solid var(--bdr);
   padding:4px 12px;display:flex;gap:10px;overflow-x:auto;align-items:center;-webkit-overflow-scrolling:touch;}
 .legend::-webkit-scrollbar{display:none;}
@@ -191,7 +202,37 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:var(--surf2);color:var(--dim);border-radius:var(--r);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
 .tp.on{background:var(--acc-a);border-color:var(--acc);color:var(--acc);}
 
-/* ── CHAIN SAVE BUTTON ── */
+/* ── MODIFY ZONE（オンコード + テンション）── */
+.modify-zone{
+  padding:8px 12px 6px;
+  border-top:1px solid var(--bdr);
+  display:flex;flex-direction:column;gap:5px;
+}
+.modify-row{display:flex;align-items:flex-start;gap:6px;}
+.modify-lbl{
+  font-family:var(--fm);font-size:7.5px;letter-spacing:.08em;
+  color:var(--dim);width:30px;flex-shrink:0;padding-top:4px;
+}
+.modify-pills{display:flex;flex-wrap:wrap;gap:3px;flex:1;}
+.modify-pill{
+  font-family:var(--fm);font-size:9px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:var(--surf);cursor:pointer;
+  transition:border-color .1s,color .1s,background .1s;
+  white-space:nowrap;user-select:none;-webkit-user-select:none;
+}
+.modify-pill.on{
+  border-color:#e8c547;color:#e8c547;
+  background:rgba(232,197,71,0.12);
+}
+.modify-pill.on-chord{
+  border-color:#4a90d4;color:#4a90d4;
+  background:rgba(74,144,212,0.12);
+}
+.modify-result{
+  font-family:var(--fm);font-size:10px;color:var(--text);
+  letter-spacing:.06em;padding:2px 0;min-height:16px;
+}
 #chain-save-btn{
   position:absolute;bottom:44px;right:10px;z-index:15;
   font-family:var(--fm);font-size:8px;letter-spacing:.1em;
@@ -532,6 +573,31 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   border-color:#d4823a;color:#d4823a;
   background:rgba(212,130,58,0.1);
 }
+#bartok-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#bartok-btn.on{
+  border-color:#4a90d4;color:#4a90d4;
+  background:rgba(74,144,212,0.1);
+}
+/* S5: ディミニッシュサークル */
+#dim-circle-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#dim-circle-btn.on{
+  border-color:#9b59b6;color:#9b59b6;
+  background:rgba(155,89,182,0.12);
+}
 #tone-wheel-overlay{
   position:absolute;bottom:12px;left:12px;z-index:10;
   display:none;
@@ -543,6 +609,31 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 #tone-wheel-overlay.on{ display:flex; }
 #tone-wheel-canvas{ display:block; cursor:grab; touch-action:none; }
+
+/* ── S7 モーダルグラフパネル（右下） ── */
+#modal-graph-overlay{
+  position:absolute;bottom:12px;right:12px;z-index:10;
+  display:none;
+  background:rgba(13,13,16,0.88);
+  border:1px solid rgba(154,106,212,0.35);
+  border-radius:8px;
+  padding:6px;
+  flex-direction:column;gap:4px;align-items:center;
+}
+#modal-graph-overlay.on{ display:flex; }
+#modal-graph-canvas{ display:block; touch-action:none; cursor:pointer; }
+#modal-graph-header{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;padding:0 2px;
+}
+#modal-graph-title{
+  font-family:var(--fm);font-size:7px;color:rgba(154,106,212,0.7);
+  letter-spacing:.1em;
+}
+#modal-graph-cur{
+  font-family:var(--fm);font-size:7.5px;color:#9a6ad4;
+  letter-spacing:.05em;font-weight:bold;
+}
 
 /* ── S9 PIVOT: 目標キー選択オーバーレイ ── */
 #pivot-overlay{
@@ -869,6 +960,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
+  <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
 <div class="legend">
   <div class="li"><div class="ldot" style="background:#4aaa72"></div><span class="ltxt">Diatonic</span></div>
@@ -948,6 +1040,15 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <canvas id="tone-wheel-canvas" width="200" height="200"></canvas>
             <div style="font-family:var(--fm);font-size:6px;color:rgba(74,144,212,0.6);letter-spacing:.1em;text-align:center;">TAP TO SET KEY · DRAG TO ROTATE</div>
           </div>
+          <!-- S7: モーダル地図グラフ（右下） -->
+          <div id="modal-graph-overlay">
+            <div id="modal-graph-header">
+              <span id="modal-graph-title">MODE MAP</span>
+              <span id="modal-graph-cur"></span>
+            </div>
+            <canvas id="modal-graph-canvas" width="220" height="200"></canvas>
+            <div style="font-family:var(--fm);font-size:6px;color:rgba(154,106,212,0.6);letter-spacing:.1em;text-align:center;">TAP NODE TO MOVE</div>
+          </div>
           <div class="mode-bar">
             <div class="mode-row">
               <div class="mode-btn on" data-mode="radial">RADIAL</div>
@@ -969,6 +1070,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div id="augmod-btn" onclick="toggleAugMod()">AUGM</div>
               <div id="scale-ring-btn" onclick="toggleScaleRing()">SCRG</div>
               <div id="triad-space-btn" onclick="toggleTriadSpace()">TRVS</div>
+              <div id="bartok-btn" onclick="toggleBartok()">BRTK</div>
+              <div id="dim-circle-btn" onclick="toggleDimCircle()">DIMI</div>
             </div>
           </div>
         </div>
@@ -1107,7 +1210,18 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="synth-sec">
                 <div class="synth-sec-hdr">
                   <span class="synth-sec-title">PAD · JUNO</span>
-                  <div class="synth-on-btn" id="pad-on-btn" onclick="togglePad()">OFF</div>
+                </div>
+                <!-- PRESET -->
+                <div class="synth-row">
+                  <span class="synth-lbl">PRESET</span>
+                  <div class="synth-pills" id="pad-preset-pills">
+                    <div class="synth-pill on" data-preset="juno">JUNO</div>
+                    <div class="synth-pill" data-preset="strings">STR</div>
+                    <div class="synth-pill" data-preset="brass">BRASS</div>
+                    <div class="synth-pill" data-preset="dark">DARK</div>
+                    <div class="synth-pill" data-preset="glass">GLASS</div>
+                    <div class="synth-pill" data-preset="lead">LEAD</div>
+                  </div>
                 </div>
                 <!-- VOICES -->
                 <div class="synth-row">
@@ -1304,7 +1418,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <div class="icon-lbl">REC</div>
             <div class="icon-sub" id="ic-rec-sub">MIDI off</div>
           </div>
-          <div class="icon-btn ic-phrase" id="ic-phrase-btn">
+          <div class="icon-btn ic-phrase feature-phrase" id="ic-phrase-btn">
             <div class="icon-sym">♪</div>
             <div class="icon-lbl">PHRASE</div>
             <div class="icon-sub" id="ic-phrase-sub">— off</div>
@@ -1373,14 +1487,26 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           </div>
           <!-- F4: Grooveプリセット -->
           <div class="groove-preset-row" id="groove-preset-row">
-            <div class="groove-btn" data-groove="house">HOUSE<br><span style="font-size:6px;opacity:.6;">124</span></div>
-            <div class="groove-btn" data-groove="techno">TECHNO<br><span style="font-size:6px;opacity:.6;">132</span></div>
+            <div style="font-family:var(--fm);font-size:7px;color:var(--dim);width:100%;margin-bottom:2px;letter-spacing:.08em;">HOUSE</div>
+            <div class="groove-btn" data-groove="house">JUNO<br><span style="font-size:6px;opacity:.6;">124</span></div>
+            <div class="groove-btn" data-groove="house_deep">DEEP<br><span style="font-size:6px;opacity:.6;">120</span></div>
+            <div class="groove-btn" data-groove="house_shuffle">SHFL<br><span style="font-size:6px;opacity:.6;">122</span></div>
+            <div class="groove-btn" data-groove="house_garage">GARG<br><span style="font-size:6px;opacity:.6;">126</span></div>
+            <div style="font-family:var(--fm);font-size:7px;color:var(--dim);width:100%;margin-bottom:2px;margin-top:4px;letter-spacing:.08em;">TECHNO</div>
+            <div class="groove-btn" data-groove="techno">TCNO<br><span style="font-size:6px;opacity:.6;">132</span></div>
+            <div class="groove-btn" data-groove="techno_industrial">INDS<br><span style="font-size:6px;opacity:.6;">136</span></div>
+            <div class="groove-btn" data-groove="techno_tribal">TRBL<br><span style="font-size:6px;opacity:.6;">128</span></div>
+            <div class="groove-btn" data-groove="techno_hard">HARD<br><span style="font-size:6px;opacity:.6;">140</span></div>
+            <div style="font-family:var(--fm);font-size:7px;color:var(--dim);width:100%;margin-bottom:2px;margin-top:4px;letter-spacing:.08em;">DRUM & BASS</div>
             <div class="groove-btn" data-groove="dnb">DnB<br><span style="font-size:6px;opacity:.6;">174</span></div>
+            <div class="groove-btn" data-groove="dnb_jungle">JNGL<br><span style="font-size:6px;opacity:.6;">168</span></div>
+            <div class="groove-btn" data-groove="dnb_liquid">LQID<br><span style="font-size:6px;opacity:.6;">172</span></div>
+            <div class="groove-btn" data-groove="dnb_step">STEP<br><span style="font-size:6px;opacity:.6;">178</span></div>
           </div>
         </div>
 
         <!-- PHRASEパネル (ic-phrase-btnでトグル) -->
-        <div class="phrase-panel" id="phrase-panel">
+        <div class="phrase-panel feature-phrase" id="phrase-panel">
           <div class="phrase-panel-t">♪ PHRASE</div>
           <div class="phrase-sels">
             <select class="phrase-sel" id="phrase-mode-sel">
@@ -1522,6 +1648,32 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
       <div class="rpills" id="root-pills"></div>
       <span class="slbl">Type</span>
       <div class="tgs" id="type-groups"></div>
+
+      <!-- ── MODIFY: オンコード + テンション ── -->
+      <div class="modify-zone" id="modify-zone">
+        <!-- ON CHORD -->
+        <div class="modify-row">
+          <span class="modify-lbl">ON</span>
+          <div class="modify-pills" id="on-chord-pills">
+            <!-- JSで動的生成 -->
+          </div>
+        </div>
+        <!-- TENSIONS -->
+        <div class="modify-row">
+          <span class="modify-lbl">TENS</span>
+          <div class="modify-pills" id="tension-pills">
+            <div class="modify-pill" data-tension="9">9</div>
+            <div class="modify-pill" data-tension="b9">♭9</div>
+            <div class="modify-pill" data-tension="s9">♯9</div>
+            <div class="modify-pill" data-tension="11">11</div>
+            <div class="modify-pill" data-tension="s11">♯11</div>
+            <div class="modify-pill" data-tension="13">13</div>
+            <div class="modify-pill" data-tension="b13">♭13</div>
+          </div>
+        </div>
+        <!-- 現在のコード名表示 -->
+        <div class="modify-result" id="modify-result"></div>
+      </div>
 
       <!-- ── FRETBOARD ── -->
       <div class="fb-wrap">
@@ -2132,6 +2284,51 @@ function buildRelations(root,type){
   return res.slice(0,24);
 }
 
+// ── RADIALモード用ノード絞り込み（最大4件）──
+// カテゴリ別優先度でスコア上位のノードを選出
+// 優先度: fifth(2) > diatonic(1) > modal/parallel(1) > それ以外(0→合計1)
+function filterRadialNodes(rels){
+  if(!rels||rels.length<=4) return rels;
+
+  const picked=[];
+  const used=new Set();
+
+  function pickTop(rtypes, max){
+    let count=0;
+    for(const node of rels){
+      if(count>=max) break;
+      if(used.has(node.root+'__'+node.type)) continue;
+      if(rtypes.includes(node.rtype)){
+        picked.push(node);
+        used.add(node.root+'__'+node.type);
+        count++;
+      }
+    }
+  }
+
+  // 1. fifth: 最大2件（V7・IV・ii等 — 最も音楽的に重要）
+  pickTop(['fifth'], 2);
+
+  // 2. diatonic: 最大1件
+  pickTop(['diatonic'], 1);
+
+  // 3. modal / parallel: 最大1件（どちらか上位）
+  pickTop(['modal','parallel'], 1);
+
+  // 4. まだ4件に満たない場合、残りカテゴリから補充
+  if(picked.length < 4){
+    pickTop(['chromatic','subst',
+             'ethnic_spanish','ethnic_arabic','ethnic_japanese',
+             'ethnic_blues','ethnic_african','ethnic_indian',
+             'ethnic_hungarian','ethnic_byzantine','ethnic_jewish',
+             'ethnic_balinese','ethnic_celtic','ethnic_persian',
+             'ethnic_brazilian'], 4-picked.length);
+  }
+
+  // スコア順で返す（描画の角度計算のため元の順序は保持）
+  return picked.sort((a,b)=>b.score-a.score);
+}
+
 // [chord-map-audio.js で定義]
 
 const VOTE_KEY='chord_votes';
@@ -2209,6 +2406,14 @@ document.getElementById('csv-export').addEventListener('click',exportCSV);
 // STATE & LAYOUT
 // ═══════════════════════
 const S={root:'A',type:'m9',history:[{root:'A',type:'m9'}],histIdx:0,voicing:null};
+
+// ── FEATURE FLAGS ──
+// false にするとUIから非表示・処理スキップ（コードは保持）
+// true に戻すだけで即復活
+const FEATURES={
+  phraseEngine: false,  // アドリブ/メロディフレーズエンジン
+};
+
 // MAP MODE: 'radial' | 'expand' | 'link' | 'chain' | 'graph' | 'wave' | 'bridge'
 let MAP_MODE='radial';
 
@@ -2226,33 +2431,104 @@ let grooveLastKickTime=0;   // 最後のkick発音時刻（AudioContext）
 
 // Grooveプリセット定義（v12 Hybrid準拠）
 const GROOVE_PRESETS={
+  // ── HOUSE ──
   house:{
-    bpm:124,
-    // 16ステップ: kick=1, snare=2, hihat=3
-    kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], // 4-on-the-floor
-    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0], // 2拍4拍
-    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1], // offbeat+
-    swing:0.55,   // スウィング比（0.5=直線）
-    pulseCol:'#4aaa72',
-    label:'HOUSE',
-  },
-  techno:{
-    bpm:132,
+    bpm:124, swing:0.54, pulseCol:'#4aaa72', label:'HOUSE',
     kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
-    hihat:[1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1], // 16ビート
-    swing:0.50,   // 直線（硬質）
-    pulseCol:'#d4823a',
-    label:'TECHNO',
+    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    ohhat:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
   },
+  house_deep:{
+    bpm:120, swing:0.56, pulseCol:'#4aaa72', label:'DEEP',
+    kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+    hihat:[0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+    ohhat:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    clap: [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+  },
+  house_shuffle:{
+    bpm:122, swing:0.60, pulseCol:'#4aaa72', label:'SHFL',
+    kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,1,0],
+    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+    hihat:[1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1],
+    ohhat:[0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  house_garage:{
+    bpm:126, swing:0.52, pulseCol:'#4aaa72', label:'GARG',
+    kick: [1,0,0,1, 0,0,1,0, 1,0,0,0, 1,0,0,0],
+    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    ohhat:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
+    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  },
+  // ── TECHNO ──
+  techno:{
+    bpm:132, swing:0.50, pulseCol:'#d4823a', label:'TCNO',
+    kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hihat:[1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+  },
+  techno_industrial:{
+    bpm:136, swing:0.50, pulseCol:'#d4823a', label:'INDS',
+    kick: [1,0,1,0, 0,0,1,0, 1,0,0,0, 1,0,1,0],
+    snare:[0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+    clap: [0,0,0,0, 0,1,0,0, 0,0,0,0, 0,1,0,0],
+  },
+  techno_tribal:{
+    bpm:128, swing:0.51, pulseCol:'#d4823a', label:'TRBL',
+    kick: [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,0,1,0],
+    snare:[0,0,1,0, 0,0,1,0, 0,1,0,0, 1,0,0,0],
+    hihat:[1,1,0,1, 1,0,1,1, 1,1,0,1, 1,0,1,0],
+    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  techno_hard:{
+    bpm:140, swing:0.50, pulseCol:'#d4823a', label:'HARD',
+    kick: [1,0,0,0, 1,0,0,0, 1,0,1,0, 1,0,0,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hihat:[1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  // ── DRUM & BASS ──
   dnb:{
-    bpm:174,
-    kick: [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0], // ブレイクビート風
+    bpm:174, swing:0.52, pulseCol:'#9a6ad4', label:'DnB',
+    kick: [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
     snare:[0,0,0,0, 1,0,0,0, 0,1,0,0, 0,0,1,0],
-    hihat:[1,0,1,1, 0,1,1,0, 1,0,1,1, 0,1,0,1], // シンコペーション
-    swing:0.52,
-    pulseCol:'#9a6ad4',
-    label:'DnB',
+    hihat:[1,0,1,1, 0,1,1,0, 1,0,1,1, 0,1,0,1],
+    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  },
+  dnb_jungle:{
+    bpm:168, swing:0.54, pulseCol:'#9a6ad4', label:'JNGL',
+    kick: [1,0,0,1, 0,0,0,0, 1,0,0,0, 0,1,0,0],
+    snare:[0,0,1,0, 0,1,0,0, 1,0,0,1, 0,0,1,0],
+    hihat:[1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1],
+    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  },
+  dnb_liquid:{
+    bpm:172, swing:0.53, pulseCol:'#9a6ad4', label:'LQID',
+    kick: [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    ohhat:[0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1],
+    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  },
+  dnb_step:{
+    bpm:178, swing:0.50, pulseCol:'#9a6ad4', label:'STEP',
+    kick: [1,0,1,0, 0,0,0,1, 1,0,0,0, 0,1,0,0],
+    snare:[0,0,0,0, 1,0,0,1, 0,0,1,0, 1,0,0,0],
+    hihat:[1,1,1,1, 0,1,1,0, 1,1,1,0, 1,0,1,1],
+    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
   },
 };
 let autoPhase=0;      // 0..1 animation phase between chords
@@ -2434,6 +2710,18 @@ function drawFrame(){
     if(triadSpaceAlpha>0.999) triadSpaceAlpha=1;
     dirty=true;
   }
+  // BRTK: バルトーク軸オーバーレイのフェードイン更新
+  if(bartokMode && bartokAlpha<0.999){
+    bartokAlpha+=(1-bartokAlpha)*0.12;
+    if(bartokAlpha>0.999) bartokAlpha=1;
+    dirty=true;
+  }
+  // DIMI: ディミニッシュサークルオーバーレイのフェードイン更新
+  if(dimCircleMode && dimCircleAlpha<0.999){
+    dimCircleAlpha+=(1-dimCircleAlpha)*0.12;
+    if(dimCircleAlpha>0.999) dimCircleAlpha=1;
+    dirty=true;
+  }
   if(!dirty)return;
   dirty=false;
 
@@ -2465,7 +2753,8 @@ function drawFrame(){
 
   // ── Get/cache relations ──
   if(!relCache)relCache=buildRelations(S.root,S.type);
-  const rels=relCache;
+  // RADIALはスクリーンが狭いため最大4件に絞る
+  const rels=(MAP_MODE==='radial')?filterRadialNodes(relCache):relCache;
   const dynRHEX=getRHEX();
   const dynRTYPES=getRTYPES();
   const perType={};dynRTYPES.forEach(t=>{perType[t]=[];});
@@ -2766,6 +3055,14 @@ function drawFrame(){
   if(trvsModes.includes(MAP_MODE)&&triadSpaceMode){
     drawTriadSpaceOverlay(ctx);
   }
+  // ── BRTK: バルトーク軸オーバーレイ（RADIAL/EXPAND/CHAIN）──
+  if(trvsModes.includes(MAP_MODE)&&bartokMode){
+    drawBartokOverlay(ctx);
+  }
+  // ── DIMI: ディミニッシュサークルオーバーレイ（RADIAL/EXPAND/CHAIN）──
+  if(trvsModes.includes(MAP_MODE)&&dimCircleMode){
+    drawDimCircleOverlay(ctx);
+  }
   // ── F2: ガイドトーンライン可視化（PHRASE ON時 + RADIAL/EXPAND/CHAINモード）──
   // K3: EXPANDとCHAINもnodeHitsが有効なのでガイドトーンを表示可能
   const gtModes=['radial','expand','chain'];
@@ -2843,8 +3140,8 @@ function initCanvas(){
     if(dist<32&&MAP_MODE!=='expand'){
       if(autoPlay){stopAuto();}
       else{
-        if(!padOn) playChord(S.root,S.type);
-        triggerPhrase(S.root,S.type);
+        if(!synthPanelOpen) playChord(S.root,S.type);
+        if(FEATURES.phraseEngine) triggerPhrase(S.root,S.type);
         notifySynth(S.root,S.type);
       }
       return;
@@ -2859,6 +3156,14 @@ function initCanvas(){
         updateCompassChainBtn();
       }
       return;
+    }
+    // BRTK: バルトーク軸ノードのヒットテスト
+    if(bartokMode && ['radial','expand','chain'].includes(MAP_MODE)){
+      if(hitTestBartok(x,y)) return;
+    }
+    // DIMI: ディミニッシュサークルノードのヒットテスト
+    if(dimCircleMode && ['radial','expand','chain'].includes(MAP_MODE)){
+      if(hitTestDimCircle(x,y)) return;
     }
     const hit=hitNode(x,y);
     if(hit){
@@ -3403,6 +3708,18 @@ document.addEventListener('DOMContentLoaded',()=>{
       renderS2Panel();
     }
   });
+});
+
+// ── FEATURESフラグ適用（DOM生成後に一括で非表示化）──
+document.addEventListener('DOMContentLoaded',()=>{
+  if(!FEATURES.phraseEngine){
+    // PHRASEボタン・パネルを非表示
+    document.querySelectorAll('.feature-phrase').forEach(el=>{
+      el.style.display='none';
+    });
+    // phraseMode を強制 off に固定
+    phraseMode='off';
+  }
 });
 
 // R4: ベース / 上部を入れ替え（双方向解釈ボタン）
@@ -5616,106 +5933,110 @@ function grooveStepMs(){
 // K2: Groove専用打楽器合成（pluck()非依存）
 // ─ Kick: ピッチエンベロープ付きサイン波 ─
 function synthKick(ctx, t, vol){
-  const osc=ctx.createOscillator();
-  const gain=ctx.createGain();
-  const distortion=ctx.createWaveShaper();
+  // ── サブキック: 深いボディ ──
+  const sub=ctx.createOscillator();
+  const subGain=ctx.createGain();
+  sub.type='sine';
+  sub.frequency.setValueAtTime(80, t);
+  sub.frequency.exponentialRampToValueAtTime(32, t+0.12);
+  subGain.gain.setValueAtTime(vol*1.6, t);
+  subGain.gain.exponentialRampToValueAtTime(0.001, t+0.45);
+  sub.connect(subGain); subGain.connect(ctx.destination);
+  sub.start(t); sub.stop(t+0.5);
 
-  // 軽いウェーブシェーパーで太さを出す
-  const curve=new Float32Array(256);
-  for(let i=0;i<256;i++){const x=i/128-1; curve[i]=x<0?-Math.pow(-x,0.7):Math.pow(x,0.7);}
-  distortion.curve=curve;
-
-  osc.type='sine';
-  // ピッチエンベロープ: 150Hz→45Hz に急降下
-  osc.frequency.setValueAtTime(150,t);
-  osc.frequency.exponentialRampToValueAtTime(45,t+0.08);
-  osc.frequency.exponentialRampToValueAtTime(30,t+0.25);
-
-  // ボリュームエンベロープ
-  gain.gain.setValueAtTime(vol*1.4,t);
-  gain.gain.exponentialRampToValueAtTime(0.001,t+0.35);
-
-  osc.connect(distortion);
-  distortion.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(t);
-  osc.stop(t+0.4);
+  // ── クリック: アタック感 ──
+  const click=ctx.createOscillator();
+  const clickGain=ctx.createGain();
+  click.type='sine';
+  click.frequency.setValueAtTime(500, t);
+  click.frequency.exponentialRampToValueAtTime(60, t+0.015);
+  clickGain.gain.setValueAtTime(vol*1.2, t);
+  clickGain.gain.exponentialRampToValueAtTime(0.001, t+0.04);
+  // 軽い歪み
+  const dist=ctx.createWaveShaper();
+  const c=new Float32Array(256);
+  for(let i=0;i<256;i++){const x=i/128-1; c[i]=x<0?-Math.pow(-x,0.5):Math.pow(x,0.5);}
+  dist.curve=c;
+  click.connect(dist); dist.connect(clickGain); clickGain.connect(ctx.destination);
+  click.start(t); click.stop(t+0.06);
 }
 
-// ─ Snare: ノイズ + トーン ─
+// ─ Snare ─
 function synthSnare(ctx, t, vol){
-  // ノイズ成分
-  const bufLen=ctx.sampleRate*0.2;
-  const buf=ctx.createBuffer(1,bufLen,ctx.sampleRate);
+  const sr=ctx.sampleRate;
+  // ── ノイズ（スナッピー成分）──
+  const bufLen=Math.ceil(sr*0.22);
+  const buf=ctx.createBuffer(1,bufLen,sr);
   const data=buf.getChannelData(0);
   for(let i=0;i<bufLen;i++) data[i]=(Math.random()*2-1);
-  const noise=ctx.createBufferSource();
-  noise.buffer=buf;
-
+  const noise=ctx.createBufferSource(); noise.buffer=buf;
   const bpf=ctx.createBiquadFilter();
-  bpf.type='bandpass';
-  bpf.frequency.value=3000;
-  bpf.Q.value=0.6;
-
+  bpf.type='bandpass'; bpf.frequency.value=4200; bpf.Q.value=0.7;
   const noiseGain=ctx.createGain();
-  noiseGain.gain.setValueAtTime(vol*0.8,t);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+  noiseGain.gain.setValueAtTime(vol*1.0, t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, t+0.18);
+  noise.connect(bpf); bpf.connect(noiseGain); noiseGain.connect(ctx.destination);
+  noise.start(t); noise.stop(t+0.22);
 
-  noise.connect(bpf);
-  bpf.connect(noiseGain);
-  noiseGain.connect(ctx.destination);
-  noise.start(t);
-  noise.stop(t+0.22);
-
-  // トーン成分（ボディ感）
+  // ── ボディトーン ──
   const osc=ctx.createOscillator();
   const oscGain=ctx.createGain();
   osc.type='triangle';
-  osc.frequency.setValueAtTime(220,t);
-  osc.frequency.exponentialRampToValueAtTime(120,t+0.05);
-  oscGain.gain.setValueAtTime(vol*0.4,t);
-  oscGain.gain.exponentialRampToValueAtTime(0.001,t+0.12);
-  osc.connect(oscGain);
-  oscGain.connect(ctx.destination);
-  osc.start(t);
-  osc.stop(t+0.15);
+  osc.frequency.setValueAtTime(240, t);
+  osc.frequency.exponentialRampToValueAtTime(100, t+0.06);
+  oscGain.gain.setValueAtTime(vol*0.65, t);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, t+0.10);
+  osc.connect(oscGain); oscGain.connect(ctx.destination);
+  osc.start(t); osc.stop(t+0.12);
 }
 
-// ─ Hi-hat: ハイパスフィルター済みノイズ ─
+// ─ Hi-hat（金属的倍音構造）─
 function synthHihat(ctx, t, vol, open){
-  const decay=open?0.28:0.055;
-  const bufLen=Math.ceil(ctx.sampleRate*decay*1.2);
-  const buf=ctx.createBuffer(1,bufLen,ctx.sampleRate);
-  const data=buf.getChannelData(0);
-  for(let i=0;i<bufLen;i++) data[i]=(Math.random()*2-1);
-  const noise=ctx.createBufferSource();
-  noise.buffer=buf;
-
+  const decay=open?0.32:0.06;
+  // 6つの正弦波を混合して金属的なサウンドに
+  const freqs=[205.7, 313.1, 370.2, 458.3, 686.5, 861.2];
+  const gainNode=ctx.createGain();
+  gainNode.gain.setValueAtTime(vol*(open?0.30:0.22), t);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, t+decay);
+  // HPF
   const hpf=ctx.createBiquadFilter();
-  hpf.type='highpass';
-  hpf.frequency.value=8000;
-  hpf.Q.value=0.8;
+  hpf.type='highpass'; hpf.frequency.value=7000; hpf.Q.value=1.0;
+  gainNode.connect(hpf); hpf.connect(ctx.destination);
+  freqs.forEach(f=>{
+    const o=ctx.createOscillator();
+    o.type='square'; o.frequency.value=f;
+    o.connect(gainNode);
+    o.start(t); o.stop(t+decay+0.02);
+  });
+}
 
-  const gain=ctx.createGain();
-  gain.gain.setValueAtTime(vol*(open?0.35:0.28),t);
-  gain.gain.exponentialRampToValueAtTime(0.001,t+decay);
-
-  noise.connect(hpf);
-  hpf.connect(gain);
-  gain.connect(ctx.destination);
-  noise.start(t);
-  noise.stop(t+decay+0.01);
+// ─ Clap（複数ノイズバースト）─
+function synthClap(ctx, t, vol){
+  const sr=ctx.sampleRate;
+  // 3つの短いバーストを重ねてリアルなクラップ感に
+  [0, 0.008, 0.018].forEach((offset, i)=>{
+    const bufLen=Math.ceil(sr*0.12);
+    const buf=ctx.createBuffer(1,bufLen,sr);
+    const data=buf.getChannelData(0);
+    for(let j=0;j<bufLen;j++) data[j]=(Math.random()*2-1);
+    const noise=ctx.createBufferSource(); noise.buffer=buf;
+    const bpf=ctx.createBiquadFilter();
+    bpf.type='bandpass'; bpf.frequency.value=1800+i*400; bpf.Q.value=0.9;
+    const g=ctx.createGain();
+    const at=t+offset;
+    g.gain.setValueAtTime(vol*(0.9-i*0.15), at);
+    g.gain.exponentialRampToValueAtTime(0.001, at+0.10);
+    noise.connect(bpf); bpf.connect(g); g.connect(ctx.destination);
+    noise.start(at); noise.stop(at+0.14);
+  });
 }
 
 function playGrooveBeat(ctx, type, hz, t, vol){
-  if(type==='kick'){
-    synthKick(ctx,t,vol);
-  } else if(type==='snare'){
-    synthSnare(ctx,t,vol);
-  } else {
-    // hihat: GROOVE_PRESTSのパターン末尾(open判定は将来拡張)
-    synthHihat(ctx,t,vol,false);
-  }
+  if(type==='kick')       synthKick(ctx,t,vol);
+  else if(type==='snare') synthSnare(ctx,t,vol);
+  else if(type==='hihat') synthHihat(ctx,t,vol,false);
+  else if(type==='ohhat') synthHihat(ctx,t,vol,true);
+  else if(type==='clap')  synthClap(ctx,t,vol);
 }
 
 function grooveTick_step(){
@@ -5735,21 +6056,27 @@ function grooveTick_step(){
   const rootHz=midi2hz(36+ri); // C2基準
 
   if(preset.kick[step]){
-    groovePulse=1.0; // Canvas pulse trigger
-    playGrooveBeat(audioCtx,'kick',rootHz,t+swingDelay,0.85);
+    groovePulse=1.0;
+    playGrooveBeat(audioCtx,'kick',rootHz,t+swingDelay,0.88);
     dirty=true;
   }
   if(preset.snare[step]){
-    playGrooveBeat(audioCtx,'snare',rootHz,t+swingDelay,0.65);
+    playGrooveBeat(audioCtx,'snare',rootHz,t+swingDelay,0.70);
     dirty=true;
   }
   if(preset.hihat[step]){
-    playGrooveBeat(audioCtx,'hihat',rootHz,t+swingDelay,0.45);
+    playGrooveBeat(audioCtx,'hihat',rootHz,t+swingDelay,0.42);
+  }
+  if(preset.ohhat&&preset.ohhat[step]){
+    playGrooveBeat(audioCtx,'ohhat',rootHz,t+swingDelay,0.38);
+  }
+  if(preset.clap&&preset.clap[step]){
+    playGrooveBeat(audioCtx,'clap',rootHz,t+swingDelay,0.55);
   }
 
   // PHRASEがGROOVEスタイルのとき、4ステップごとにリズムノートをトリガー
   if(phraseMode!=='off'&&phraseStyle==='groove'&&step%4===0&&!phraseIsPlaying){
-    triggerPhrase(S.root,S.type);
+    if(FEATURES.phraseEngine) triggerPhrase(S.root,S.type);
   }
 
   grooveTick++;
@@ -5771,6 +6098,7 @@ function startGroove(mode){
   // BPMを自動設定
   autoBpm=preset.bpm;
   updateBpmDisplay(autoBpm);
+  updateDelayTime(); // ディレイタイムをGROOVE BPMに追従
 
   // PHRASEをGROOVEスタイルに自動切り替え
   if(phraseMode!=='off'){
@@ -5892,8 +6220,14 @@ function moveToChord(root,type){
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
   // Q6: モーダルオーバーレイをコード変更時にフェードイン再開
   if(modalMapMode) modalOverlayAlpha=0;
+  // S7グラフ: コード変更時に現在モードをハイライト更新
+  if(modalMapMode) updateModalGraphHighlight();
   // R2: トライアッドスペースオーバーレイもコード変更時にフェードイン再開
   if(triadSpaceMode) triadSpaceAlpha=0;
+  // BRTK: バルトーク軸オーバーレイもコード変更時にフェードイン再開
+  if(bartokMode) bartokAlpha=0;
+  // DIMI: ディミニッシュサークルオーバーレイもコード変更時にフェードイン再開
+  if(dimCircleMode) dimCircleAlpha=0;
   relCache=null; sncCache=null; invalidate();
   document.getElementById('hdr-chord').textContent=cs(root,type);
   renderPath();
@@ -5905,8 +6239,8 @@ function moveToChord(root,type){
     });
   }
   // PAD ONのときはplayChordをスキップ（SYNTHが代わりに発音）
-  if(!padOn) playChord(root,type);
-  triggerPhrase(root,type); // ← フレーズ追従
+  if(!synthPanelOpen) playChord(root,type);
+  if(FEATURES.phraseEngine) triggerPhrase(root,type);
   notifySynth(root,type);   // ← SYNTH PAD/ARP追従
   // CHAINモード: 進行パターンを検出してラベル更新
   if(MAP_MODE==='chain'){
@@ -6728,7 +7062,7 @@ function renderPath(){
       const a=document.createElement('span');a.className='ph-arr';a.textContent='›';bar.appendChild(a);
     }
     const n=document.createElement('div');n.className='ph'+(i===S.histIdx?' cur':'');n.textContent=cs(c.root,c.type);
-    n.addEventListener('click',()=>{S.histIdx=i;S.root=c.root;S.type=c.type;relCache=null;invalidate();document.getElementById('hdr-chord').textContent=cs(c.root,c.type);renderPath();renderPosZone();if(!padOn)playChord(c.root,c.type);notifySynth(c.root,c.type);});
+    n.addEventListener('click',()=>{S.histIdx=i;S.root=c.root;S.type=c.type;relCache=null;invalidate();document.getElementById('hdr-chord').textContent=cs(c.root,c.type);renderPath();renderPosZone();if(!synthPanelOpen)playChord(c.root,c.type);notifySynth(c.root,c.type);});
     bar.appendChild(n);
   });
   bar.scrollLeft=bar.scrollWidth;
@@ -6911,12 +7245,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 function expandNode(root,type,key){
   const found=expandNodes.find(n=>n.key===key);
-  if(!found){ if(!padOn)playChord(root,type); triggerPhrase(root,type); notifySynth(root,type); return; }
+  if(!found){ if(!synthPanelOpen)playChord(root,type); if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type); return; }
 
   // 帰還判定
   const retType=getReturnType(found, expandTree.root, expandTree.type);
   if(retType){
-    if(!padOn)playChord(root,type); triggerPhrase(root,type); notifySynth(root,type);
+    if(!synthPanelOpen)playChord(root,type); if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type);
     expandReturnPulse=1.0;
     expandReturnNode={x:found.x, y:found.y, retType};
     dirty=true;
@@ -6928,7 +7262,7 @@ function expandNode(root,type,key){
     return;
   }
 
-  if(!padOn)playChord(root,type); triggerPhrase(root,type); notifySynth(root,type);
+  if(!synthPanelOpen)playChord(root,type); if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type);
 
   if(found.children.length>0){
     // 折りたたむ
@@ -7111,7 +7445,7 @@ function toggleLinkSelect(root,type){
   const k=cs(root,type);
   if(linkSelected.has(k))linkSelected.delete(k);
   else linkSelected.add(k);
-  if(!padOn)playChord(root,type);
+  if(!synthPanelOpen)playChord(root,type);
   notifySynth(root,type);
   invalidate();
 }
@@ -8183,6 +8517,12 @@ function toggleModalMap(){
   const btn=document.getElementById('modal-map-btn');
   if(btn) btn.classList.toggle('on',modalMapMode);
   if(modalMapMode) modalOverlayAlpha=0;  // ON時はゼロからフェードイン
+  // S7グラフパネルも連動
+  const mgOv=document.getElementById('modal-graph-overlay');
+  if(mgOv){
+    mgOv.classList.toggle('on',modalMapMode);
+    if(modalMapMode) initModalGraph();
+  }
   invalidate();
 }
 
@@ -8212,6 +8552,15 @@ function toggleAugMod(){
 let triadSpaceMode=false;
 let triadSpaceAlpha=0;  // フェードイン用 0.0〜1.0
 let scaleRingMode=false; // R2挿入時に消えた宣言を復元
+
+// ── BARTOK AXIS (BRTK) ──
+let bartokMode=false;
+let bartokAlpha=0; // フェードイン用 0.0〜1.0
+
+// ── DIMINISHED CIRCLE (DIMI) S5 ──
+let dimCircleMode=false;
+let dimCircleAlpha=0; // フェードイン用 0.0〜1.0
+let dimCircleHits=[]; // タップ判定用
 
 function toggleTriadSpace(){
   triadSpaceMode=!triadSpaceMode;
@@ -8368,12 +8717,728 @@ function drawTriadSpaceOverlay(ctx){
 
 
 
+
+// ═══════════════════════════════════════════════════════════════
+// S7 MODAL GRAPH — フルUIパネル (右下キャンバス)
+// 13モードをブライトネス軸で縦配置、1音差エッジを接続線で描画
+// 現在コードのモードをハイライト、タップで moveToChord()
+// ═══════════════════════════════════════════════════════════════
+
+let mgCanvas=null, mgCtx=null;
+let mgHits=[]; // [{mode, x, y, r}] — タップ判定用
+
+// ブライトネス値でモードを縦ソート（明るい=上、暗い=下）
+const MG_MODES_SORTED=Object.entries(MODAL_DATA)
+  .sort((a,b)=>b[1].brightness-a[1].brightness)
+  .map(([k])=>k);
+
+// 親スケール別の横オフセット
+const MG_PARENT_COL={
+  'Maj': 0,
+  'Me':  1,
+  'Ar':  2,
+};
+
+function initModalGraph(){
+  mgCanvas=document.getElementById('modal-graph-canvas');
+  if(!mgCanvas)return;
+  mgCtx=mgCanvas.getContext('2d');
+  drawModalGraph();
+
+  // イベント登録（重複防止のためcloneAndReplace）
+  const nc=mgCanvas.cloneNode(true);
+  mgCanvas.parentNode.replaceChild(nc,mgCanvas);
+  mgCanvas=nc; mgCtx=mgCanvas.getContext('2d');
+
+  mgCanvas.addEventListener('pointerdown',e=>{
+    e.stopPropagation();
+    const rect=mgCanvas.getBoundingClientRect();
+    const scaleX=mgCanvas.width/rect.width;
+    const scaleY=mgCanvas.height/rect.height;
+    const tx=(e.clientX-rect.left)*scaleX;
+    const ty=(e.clientY-rect.top)*scaleY;
+    const hit=mgHits.find(h=>{
+      const dx=tx-h.x,dy=ty-h.y;
+      return dx*dx+dy*dy<=(h.r+6)*(h.r+6);
+    });
+    if(hit){
+      // そのモードの代表コードタイプでmoveToChord
+      const mdata=MODAL_DATA[hit.mode];
+      if(mdata&&mdata.types.length>0){
+        moveToChord(S.root, mdata.types[0]);
+      }
+    }
+  });
+}
+
+function drawModalGraph(){
+  if(!mgCanvas||!mgCtx)return;
+  const W=mgCanvas.width, H=mgCanvas.height;
+  const ctx=mgCtx;
+  ctx.clearRect(0,0,W,H);
+
+  mgHits=[];
+
+  // レイアウト定数
+  const PAD_T=16, PAD_B=12, PAD_L=28, PAD_R=16;
+  const colW=(W-PAD_L-PAD_R)/3; // 3列（Maj/Me/Ar）
+  const rowH=(H-PAD_T-PAD_B)/(MG_MODES_SORTED.length-1||1);
+  const NODE_R=14;
+
+  // 現在モード
+  const curMode=guessMode(S.type)||'Ionian';
+
+  // 各モードの座標を計算
+  const modePos={};
+  MG_MODES_SORTED.forEach((mode,i)=>{
+    const md=MODAL_DATA[mode];
+    const col=MG_PARENT_COL[md.parent]??0;
+    const x=PAD_L+col*colW+colW/2;
+    const y=PAD_T+i*rowH;
+    modePos[mode]={x,y};
+    mgHits.push({mode,x,y,r:NODE_R});
+  });
+
+  // ── エッジ描画（1音差接続） ──
+  Object.entries(MODAL_GRAPH_S7).forEach(([modeA,edges])=>{
+    const posA=modePos[modeA];
+    if(!posA)return;
+    edges.forEach(e=>{
+      const posB=modePos[e.mode];
+      if(!posB)return;
+      const colA=MG_PARENT_COL[MODAL_DATA[modeA]?.parent]??0;
+      const colB=MG_PARENT_COL[MODAL_DATA[e.mode]?.parent]??0;
+      const isCross=(colA!==colB);
+      ctx.beginPath();
+      ctx.moveTo(posA.x,posA.y);
+      ctx.lineTo(posB.x,posB.y);
+      ctx.strokeStyle=isCross?'rgba(255,255,255,0.12)':'rgba(255,255,255,0.18)';
+      ctx.lineWidth=isCross?0.8:1.2;
+      ctx.setLineDash(isCross?[3,4]:[]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // 方向矢印ラベル（変化音）
+      const mx=(posA.x+posB.x)/2;
+      const my=(posA.y+posB.y)/2;
+      ctx.font='5px var(--fm,monospace)';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle='rgba(255,255,255,0.25)';
+      ctx.fillText(e.change, mx, my);
+    });
+  });
+
+  // ── 親スケール列ヘッダー ──
+  const parentLabels=[
+    {col:0,label:'Maj',col_hex:'rgba(212,74,106,0.55)'},
+    {col:1,label:'Me', col_hex:'rgba(74,144,212,0.55)'},
+    {col:2,label:'Ar', col_hex:'rgba(74,170,114,0.55)'},
+  ];
+  parentLabels.forEach(p=>{
+    const x=PAD_L+p.col*colW+colW/2;
+    ctx.font='bold 6px var(--fm,monospace)';
+    ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillStyle=p.col_hex;
+    ctx.fillText(p.label,x,1);
+  });
+
+  // ── ノード描画 ──
+  MG_MODES_SORTED.forEach(mode=>{
+    const md=MODAL_DATA[mode];
+    const {x,y}=modePos[mode];
+    const isCur=(mode===curMode);
+    const col=md.color||'#9a6ad4';
+
+    // ブライトネスインジケーター（左端の細い縦バー）
+    const bv=(md.brightness+1)/2; // 0〜1
+    ctx.beginPath();
+    ctx.arc(PAD_L-10,y,3,0,Math.PI*2);
+    const bCol=bv>0.5?`rgba(232,197,71,${0.3+bv*0.5})`:`rgba(74,144,212,${0.3+(1-bv)*0.5})`;
+    ctx.fillStyle=bCol;
+    ctx.fill();
+
+    // ノード外リング
+    ctx.beginPath();
+    ctx.arc(x,y,NODE_R+(isCur?3:0),0,Math.PI*2);
+    ctx.strokeStyle=isCur?col:'rgba(255,255,255,0.15)';
+    ctx.lineWidth=isCur?2:0.8;
+    ctx.stroke();
+
+    // ノード塗り
+    ctx.beginPath();
+    ctx.arc(x,y,NODE_R,0,Math.PI*2);
+    const fillAlpha=isCur?0.35:0.08;
+    ctx.fillStyle=isCur
+      ?col.replace('#',`rgba(`)+',' // ダミー、下で正しく設定
+      :'rgba(255,255,255,0.05)';
+    if(isCur){
+      const [r,g,b]=hexToRgb(col).split(',');
+      ctx.fillStyle=`rgba(${r},${g},${b},0.30)`;
+    }
+    ctx.fill();
+
+    // モード名
+    ctx.font=`${isCur?'bold ':''} ${isCur?7:6}px var(--fm,monospace)`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=isCur?col:'rgba(255,255,255,0.55)';
+    const displayName=MODAL_DISPLAY[mode]||mode;
+    ctx.fillText(displayName.length>10?displayName.slice(0,9)+'…':displayName,x,y);
+
+    // テンション表示（現在モードのみ）
+    if(isCur && md.tension!==undefined){
+      ctx.font='5px var(--fm,monospace)';
+      ctx.fillStyle='rgba(255,255,255,0.40)';
+      ctx.fillText(`♯${Math.round(md.tension*10)}`, x, y+NODE_R+6);
+    }
+  });
+
+  // 現在モード名をヘッダーに更新
+  const curEl=document.getElementById('modal-graph-cur');
+  if(curEl) curEl.textContent=MODAL_DISPLAY[curMode]||curMode;
+}
+
+function updateModalGraphHighlight(){
+  // コード変更時に再描画
+  drawModalGraph();
+}
+
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// S5: ディミニッシュサークルマップ (DIMI) — Callipari §8準拠
+//
+// 3等価グループの可視化:
+//   G1: B°=D°=F°=Ab°  → 代理dom7: G7/Bb7/Db7/E7
+//   G2: C°=Eb°=Gb°=A° → 代理dom7: Ab7/B7/D7/F7
+//   G3: C#°=E°=G°=Bb° → 代理dom7: A7/C7/Eb7/F#7
+//
+// 表示内容:
+//   レイヤー1: 現在コードの属するグループをハイライト弧
+//   レイヤー2: 同グループの等価dim7ノードを紫リングで強調
+//   レイヤー3: 対応するdom7代理コードを金色破線で接続
+//   レイヤー4: 解決先（現在コードへのアプローチ）を矢印表示
+//   タップ: 等価dim7 or 代理dom7へmoveToChord()
+// ═══════════════════════════════════════════════════════════════
+
+// 3等価グループ定義（chordmap_master_dev §8準拠）
+// 各グループのdim7と、それが代理するdom7のルート
+const DIM_EQUIV_GROUPS=[
+  {
+    id:1,
+    dims:['B','D','F','Ab'],
+    // dom7ルート: G7/Bb7/Db7/E7（各dimの半音下）
+    dom7s:['G','Bb','Db','E'],
+    col:'#b57bde',  // 薄紫
+  },
+  {
+    id:2,
+    dims:['C','Eb','Gb','A'],
+    dom7s:['Ab','B','D','F'],
+    col:'#9b59b6',  // 中紫
+  },
+  {
+    id:3,
+    dims:['C#','E','G','Bb'],
+    dom7s:['A','C','Eb','F#'],
+    col:'#7d3c98',  // 濃紫
+  },
+];
+
+// 現在コードが属するdim等価グループを返す
+function getDimGroup(root, type){
+  const ri=ni(root);
+  // dim/dim7コードの場合: そのルートがどのグループか
+  if(type==='dim'||type==='dim7'){
+    return DIM_EQUIV_GROUPS.find(g=>g.dims.some(d=>ni(d)===ri))||null;
+  }
+  // dom7コードの場合: そのdom7が代理されるグループ（半音上のdimグループ）
+  if(type==='dom7'||type==='7'||type==='9'||type==='7b9'||type==='13'){
+    const b9Ri=(ri+1)%12;
+    return DIM_EQUIV_GROUPS.find(g=>g.dims.some(d=>ni(d)===b9Ri))||null;
+  }
+  // その他のコード: そのルートの短9度上のdimグループ（最も自然なアプローチdim）
+  const b9Ri=(ri+1)%12;
+  return DIM_EQUIV_GROUPS.find(g=>g.dims.some(d=>ni(d)===b9Ri))||null;
+}
+
+// ディミニッシュサークルオーバーレイ描画
+function drawDimCircleOverlay(ctx){
+  const {cx,cy,SR,MR}=L;
+  const alpha=Math.min(1,dimCircleAlpha);
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  dimCircleHits=[];
+
+  const isDimChord=(S.type==='dim'||S.type==='dim7');
+  const curGroup=getDimGroup(S.root, S.type);
+
+  // ── レイヤー1: 全3グループの外周弧表示 ──
+  DIM_EQUIV_GROUPS.forEach((g,gi)=>{
+    const isActive=(curGroup&&curGroup.id===g.id);
+    const arcR=SR*0.88 - gi*8; // 3グループを同心状にずらす
+    const startAngle=-Math.PI/2 + gi*(Math.PI*2/3);
+    const endAngle=startAngle+(Math.PI*2/3);
+    ctx.beginPath();
+    ctx.arc(cx,cy,arcR,startAngle,endAngle);
+    ctx.strokeStyle=g.col;
+    ctx.lineWidth=isActive?4:1.5;
+    ctx.globalAlpha=alpha*(isActive?0.80:0.22);
+    ctx.stroke();
+    // グループラベル
+    const midA=startAngle+Math.PI/3;
+    ctx.globalAlpha=alpha*(isActive?0.85:0.30);
+    ctx.fillStyle=g.col;
+    ctx.font=`${isActive?'bold ':''} ${isActive?8:7}px var(--fm,monospace)`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(`G${g.id}`,
+      cx+Math.cos(midA)*(arcR+14),
+      cy+Math.sin(midA)*(arcR+14));
+  });
+  ctx.globalAlpha=alpha;
+
+  // ── レイヤー2 & 3: アクティブグループのノード強調 ──
+  if(curGroup){
+    const g=curGroup;
+
+    // 等価dim7ノードを紫リングで強調
+    g.dims.forEach(dimRoot=>{
+      const dimRi=ni(dimRoot);
+      if(isDimChord && dimRi===ni(S.root)) return; // 現在コード自身はスキップ
+
+      const pos=nodeHits.find(h=>ni(h.root)===dimRi&&(h.type==='dim7'||h.type==='dim'));
+      if(!pos) return;
+
+      // 二重紫リング
+      [18,12].forEach((extra,ei)=>{
+        ctx.beginPath();
+        ctx.arc(pos.x,pos.y,pos.r+extra,0,Math.PI*2);
+        ctx.strokeStyle=g.col;
+        ctx.lineWidth=ei===0?1.2:2;
+        ctx.setLineDash(ei===0?[4,3]:[]);
+        ctx.globalAlpha=alpha*(ei===0?0.45:0.75);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
+      // 「=」ラベル（等価）
+      ctx.globalAlpha=alpha*0.85;
+      ctx.fillStyle=g.col;
+      ctx.font='bold 7px var(--fm,monospace)';
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText('= '+dimRoot+'°', pos.x, pos.y-pos.r-6);
+
+      // タップ登録
+      dimCircleHits.push({x:pos.x,y:pos.y,r:pos.r+18,root:pos.root,type:pos.type||'dim7'});
+    });
+
+    // 代理dom7ノードを金色破線で表示
+    g.dom7s.forEach(domRoot=>{
+      const domRi=ni(domRoot);
+      const pos=nodeHits.find(h=>ni(h.root)===domRi&&(h.type==='dom7'||h.type==='7'||h.type==='9'));
+      if(!pos) return;
+
+      // 金色破線リング
+      ctx.beginPath();
+      ctx.arc(pos.x,pos.y,pos.r+14,0,Math.PI*2);
+      ctx.strokeStyle='#e8c547';
+      ctx.lineWidth=1.5;
+      ctx.setLineDash([5,4]);
+      ctx.globalAlpha=alpha*0.60;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // dom7ラベル
+      ctx.globalAlpha=alpha*0.80;
+      ctx.fillStyle='#e8c547';
+      ctx.font='6.5px var(--fm,monospace)';
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText('sub7', pos.x, pos.y-pos.r-6);
+
+      // タップ登録
+      dimCircleHits.push({x:pos.x,y:pos.y,r:pos.r+14,root:pos.root,type:pos.type||'dom7'});
+    });
+
+    // ── レイヤー4: 解決先への矢印（現コードがdom7またはnon-dim時）──
+    if(!isDimChord){
+      // 現在コードへアプローチするdim7（b9上）を矢印で指示
+      const b9Ri=(ni(S.root)+1)%12;
+      const bestDim=g.dims.find(d=>ni(d)===b9Ri);
+      if(bestDim){
+        const dimPos=nodeHits.find(h=>ni(h.root)===b9Ri&&(h.type==='dim7'||h.type==='dim'));
+        if(dimPos){
+          // dim→現在コードへの破線矢印
+          ctx.globalAlpha=alpha*0.70;
+          ctx.strokeStyle='#cc88ff';
+          ctx.lineWidth=1.5;
+          ctx.setLineDash([4,3]);
+          ctx.beginPath();
+          ctx.moveTo(dimPos.x,dimPos.y);
+          ctx.lineTo(cx,cy);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // 矢印先端（中央方向）
+          const ang=Math.atan2(cy-dimPos.y,cx-dimPos.x);
+          const aLen=9;
+          const tipX=cx-Math.cos(ang)*36, tipY=cy-Math.sin(ang)*36;
+          ctx.beginPath();
+          ctx.moveTo(tipX,tipY);
+          ctx.lineTo(tipX-Math.cos(ang-0.4)*aLen,tipY-Math.sin(ang-0.4)*aLen);
+          ctx.lineTo(tipX-Math.cos(ang+0.4)*aLen,tipY-Math.sin(ang+0.4)*aLen);
+          ctx.closePath();
+          ctx.fillStyle='#cc88ff';
+          ctx.fill();
+          // 「→ resolve」ラベル
+          const mx=(dimPos.x+cx)/2, my=(dimPos.y+cy)/2;
+          ctx.globalAlpha=alpha*0.65;
+          ctx.fillStyle='#cc88ff';
+          ctx.font='6px var(--fm,monospace)';
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText('→ resolve', mx, my-8);
+        }
+      }
+    }
+
+    // ── グループ情報テキスト ──
+    ctx.globalAlpha=alpha*0.75;
+    ctx.fillStyle=g.col;
+    ctx.font='bold 7px var(--fm,monospace)';
+    ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillText(`S5 G${g.id}: ${g.dims.join('=')}°`, 10, L.H-36);
+    ctx.globalAlpha=alpha*0.55;
+    ctx.fillStyle='#e8c547';
+    ctx.font='6.5px var(--fm,monospace)';
+    ctx.fillText(`sub: ${g.dom7s.join(' ')}`, 10, L.H-24);
+  } else {
+    // グループ未検出時
+    ctx.globalAlpha=alpha*0.45;
+    ctx.fillStyle='#666';
+    ctx.font='6.5px var(--fm,monospace)';
+    ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillText('S5 DIMI: no group', 10, L.H-36);
+  }
+
+  // ── 凡例 ──
+  ctx.globalAlpha=alpha*0.60;
+  ctx.fillStyle='#9b59b6';
+  ctx.font='6.5px var(--fm,monospace)';
+  ctx.textAlign='right';ctx.textBaseline='bottom';
+  ctx.fillText('DIMI S5', L.W-10, L.H-10);
+
+  ctx.restore();
+}
+
+// DIMI ヒットテスト
+function hitTestDimCircle(tx,ty){
+  if(!dimCircleMode) return false;
+  for(const h of dimCircleHits){
+    const dx=tx-h.x, dy=ty-h.y;
+    if(dx*dx+dy*dy<=(h.r+6)*(h.r+6)){
+      moveToChord(h.root,h.type);
+      return true;
+    }
+  }
+  return false;
+}
+
+// DIMI トグル
+function toggleDimCircle(){
+  dimCircleMode=!dimCircleMode;
+  const btn=document.getElementById('dim-circle-btn');
+  if(btn) btn.classList.toggle('on',dimCircleMode);
+  dimCircleAlpha=0;
+  invalidate();
+}
+
+// BRTK: バルトーク軸ビジュアライザー (S10)
+// currentKey = S.root をPIVOT_KEYSに照合してキー決定
+// T軸(青)/S軸(緑)/D軸(金) + トリトン代理ノード
+// ═══════════════════════════════════════════════════════════════
+
+// キー正規化マップ（異名同音）
+const BRTK_ENHARMONIC={'Gb':'F#','C#':'Db','D#':'Eb','G#':'Ab','A#':'Bb'};
+
+// currentKeyを取得（S.rootをPIVOT_KEYSに照合、ALT経由）
+function getBrtokKey(){
+  const r=S.root;
+  if(PIVOT_KEYS.includes(r)) return r;
+  return BRTK_ENHARMONIC[r]||r;
+}
+
+// Bartok軸データを生成する
+// Cキー基準:
+//   T軸: I(C), VIm(Am), #IV(F#), #IIm(Ebm) → 半音6度ずつ
+//   S軸: IV(F), IIm(Dm), #VII(B), #Vm(Abm)
+//   D軸: V(G), IIIm(Em), bII(Db), bVIIm(Bbm)
+// 各軸のルートは keyRoot から以下の半音数で計算:
+//   T軸メンバーのルート(半音): 0(I/major), 9(VIm/minor), 6(#IV/major), 3(#IIm/minor)
+//   S軸: 5(IV/major), 2(IIm/minor), 11(VII/major→実際はdom7), 8(VIm相当/minor)
+//   D軸: 7(V/major), 4(IIIm/minor), 1(bII=トリトン代理/major), 10(bVII/minor)
+function getBartokAxes(keyRoot){
+  const ri=ni(keyRoot);
+  if(ri<0) return null;
+  const N=NOTES;
+  // T軸 (Tonic function)
+  const T=[
+    {root:N[ri],           type:'major', func:'I'},
+    {root:N[(ri+9)%12],   type:'minor', func:'VIm'},
+    {root:N[(ri+6)%12],   type:'major', func:'#IVm'}, // 遠隔T代理
+    {root:N[(ri+3)%12],   type:'minor', func:'bIIIm'}, // 遠隔T代理
+  ];
+  // S軸 (Subdominant function)
+  const Sv=[
+    {root:N[(ri+5)%12],   type:'major', func:'IV'},
+    {root:N[(ri+2)%12],   type:'minor', func:'IIm'},
+    {root:N[(ri+11)%12],  type:'major', func:'VIIb'}, // 遠隔S代理
+    {root:N[(ri+8)%12],   type:'minor', func:'bVIm'}, // 遠隔S代理
+  ];
+  // D軸 (Dominant function)
+  const D=[
+    {root:N[(ri+7)%12],   type:'dom7',  func:'V7'},
+    {root:N[(ri+4)%12],   type:'minor', func:'IIIm'},
+    {root:N[(ri+1)%12],   type:'dom7',  func:'bII7'}, // トリトン代理
+    {root:N[(ri+10)%12],  type:'minor', func:'bVIIm'}, // 遠隔D代理
+  ];
+  return {T, S:Sv, D};
+}
+
+// 軸スタイル定義
+const BRTK_AXIS_STYLE={
+  T:{col:'#4a90d4', arcCol:'rgba(74,144,212,0.25)', label:'T', name:'Tonic'},
+  S:{col:'#4aaa72', arcCol:'rgba(74,170,114,0.25)', label:'S', name:'Sub-Dom'},
+  D:{col:'#e8c547', arcCol:'rgba(232,197,71,0.25)',  label:'D', name:'Dominant'},
+};
+
+// 現在コードがどの軸に属するか判定
+function getBrtokAxisOf(axes, root, type){
+  // typeはmajor/minor/dom7等 — 軸判定はrootのみで行う（typeは参考）
+  const ri=ni(root);
+  for(const axName of ['T','S','D']){
+    for(const m of axes[axName]){
+      if(ni(m.root)===ri) return axName;
+    }
+  }
+  return null; // ダイアトニック外
+}
+
+// トリトン代理コードを取得（D軸のbII7）
+function getBrtokTritoneSub(axes){
+  return axes.D.find(m=>m.func==='bII7')||null;
+}
+
+// ノードの画面座標をRADIALのnodeHitsから検索
+function findNodePos(root, type){
+  if(!nodeHits||nodeHits.length===0) return null;
+  // typeは緩く照合（dom7 ↔ major等の揺らぎを許容）
+  const ri=ni(root);
+  // 完全一致優先
+  let hit=nodeHits.find(h=>ni(h.root)===ri && h.type===type);
+  // ルートのみ一致でフォールバック
+  if(!hit) hit=nodeHits.find(h=>ni(h.root)===ri);
+  return hit?{x:h.x,y:h.y,r:h.r||18}:null;
+}
+
+// BRTKオーバーレイ描画
+function drawBartokOverlay(ctx){
+  const {cx,cy,SR,MR}=L;
+  const alpha=Math.min(1,bartokAlpha);
+  ctx.save();
+  ctx.globalAlpha=alpha;
+
+  const keyRoot=getBrtokKey();
+  const axes=getBartokAxes(keyRoot);
+  if(!axes){ctx.restore();return;}
+
+  // 現在コードの軸を判定
+  const curAxis=getBrtokAxisOf(axes,S.root,S.type);
+
+  // ── レイヤー1: 外周弧（T/S/D）──
+  // 円の外周に3色の弧を描く（軸ごとに120度ずつ）
+  const arcR=SR*0.92;
+  const axisNames=['T','S','D'];
+  axisNames.forEach((ax,i)=>{
+    const st=BRTK_AXIS_STYLE[ax];
+    const startAngle=-Math.PI/2 + i*(Math.PI*2/3);
+    const endAngle=startAngle+(Math.PI*2/3);
+    const isActive=(ax===curAxis);
+    ctx.beginPath();
+    ctx.arc(cx,cy,arcR,startAngle,endAngle);
+    ctx.strokeStyle=st.col;
+    ctx.lineWidth=isActive?5:2;
+    ctx.globalAlpha=alpha*(isActive?0.9:0.35);
+    ctx.stroke();
+    // 軸ラベル
+    const midA=startAngle+(Math.PI/3);
+    const lx=cx+Math.cos(midA)*(arcR+14);
+    const ly=cy+Math.sin(midA)*(arcR+14);
+    ctx.globalAlpha=alpha*(isActive?1.0:0.45);
+    ctx.fillStyle=st.col;
+    ctx.font=`bold ${isActive?11:9}px var(--fm,monospace)`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(st.label+'-axis',lx,ly);
+  });
+  ctx.globalAlpha=alpha;
+
+  // ── レイヤー2: 代理ノード描画 ──
+  const keyRi=ni(keyRoot);
+  axisNames.forEach(ax=>{
+    const st=BRTK_AXIS_STYLE[ax];
+    const members=axes[ax];
+    const isActiveAxis=(ax===curAxis);
+    members.forEach(m=>{
+      const mRi=ni(m.root);
+      // 現在コードはスキップ（中央で強調）
+      if(mRi===ni(S.root)) return;
+
+      // RADIALのnodeHitsから座標を探す
+      const pos=findNodePos(m.root,m.type);
+
+      // nodeHitsに無い場合は計算で配置
+      let nx,ny,nr;
+      if(pos){
+        nx=pos.x;ny=pos.y;nr=Math.max(pos.r,16);
+      } else {
+        // 軸メンバーインデックスから角度を計算して配置
+        const idx=members.indexOf(m);
+        const baseAngle=(axisNames.indexOf(ax))*(Math.PI*2/3)-Math.PI/2;
+        const spread=Math.PI/5;
+        const angle=baseAngle + (idx-1.5)*spread*0.7;
+        const dist=MR*0.72;
+        nx=cx+Math.cos(angle)*dist;
+        ny=cy+Math.sin(angle)*dist;
+        nr=18;
+      }
+
+      // トリトン代理は特別スタイル
+      const isTritone=(m.func==='bII7');
+      const nodeAlpha=isActiveAxis?0.85:0.40;
+      ctx.globalAlpha=alpha*nodeAlpha;
+
+      // 外リング（軸色）
+      ctx.beginPath();
+      ctx.arc(nx,ny,nr+4,0,Math.PI*2);
+      ctx.strokeStyle=st.col;
+      ctx.lineWidth=isTritone?2.5:1.5;
+      if(isTritone){
+        ctx.setLineDash([4,3]);
+      } else {
+        ctx.setLineDash([]);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // ノード塗り
+      ctx.beginPath();
+      ctx.arc(nx,ny,nr,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${hexToRgb(st.col)},${isTritone?0.18:0.12})`;
+      ctx.fill();
+
+      // コード名
+      ctx.globalAlpha=alpha*(isActiveAxis?0.95:0.5);
+      ctx.fillStyle=isTritone?'#e8c547':st.col;
+      ctx.font=`${isTritone?'bold ':''} ${nr>20?10:8}px var(--fm,monospace)`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(cs(m.root,m.type),nx,ny-2);
+      // 機能表示
+      ctx.font=`7px var(--fm,monospace)`;
+      ctx.globalAlpha=alpha*(isActiveAxis?0.6:0.3);
+      ctx.fillText(m.func,nx,ny+8);
+    });
+  });
+
+  // ── トリトン代理矢印: V7 → bII7 ──
+  const triSub=getBrtokTritoneSub(axes);
+  const v7=axes.D.find(m=>m.func==='V7');
+  if(triSub&&v7){
+    const posV=findNodePos(v7.root,v7.type);
+    const posT=findNodePos(triSub.root,triSub.type);
+    if(posV&&posT){
+      ctx.globalAlpha=alpha*0.65;
+      ctx.strokeStyle='#e8c547';
+      ctx.lineWidth=1.5;
+      ctx.setLineDash([5,4]);
+      ctx.beginPath();
+      ctx.moveTo(posV.x,posV.y);
+      ctx.lineTo(posT.x,posT.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // 矢印先端
+      const ang=Math.atan2(posT.y-posV.y,posT.x-posV.x);
+      const aLen=8;
+      ctx.beginPath();
+      ctx.moveTo(posT.x,posT.y);
+      ctx.lineTo(posT.x-Math.cos(ang-0.4)*aLen, posT.y-Math.sin(ang-0.4)*aLen);
+      ctx.lineTo(posT.x-Math.cos(ang+0.4)*aLen, posT.y-Math.sin(ang+0.4)*aLen);
+      ctx.closePath();
+      ctx.fillStyle='#e8c547';
+      ctx.fill();
+    }
+  }
+
+  // ── 凡例 ──
+  ctx.globalAlpha=alpha*0.75;
+  ctx.font='7.5px var(--fm,monospace)';
+  ctx.textAlign='left';ctx.textBaseline='top';
+  const legends=[
+    {col:'#4a90d4',label:'T: Tonic'},
+    {col:'#4aaa72',label:'S: Sub-Dom'},
+    {col:'#e8c547',label:'D: Dominant'},
+  ];
+  legends.forEach((lg,i)=>{
+    ctx.fillStyle=lg.col;
+    ctx.fillText(lg.label, 10, L.H-38+i*12);
+  });
+  // 現在キー表示
+  ctx.globalAlpha=alpha*0.55;
+  ctx.fillStyle='#888';
+  ctx.textAlign='right';
+  ctx.fillText('BRTK key: '+keyRoot, L.W-10, L.H-10);
+
+  ctx.restore();
+}
+
+// hex色をRGB文字列に変換（fillStyle用）
+function hexToRgb(hex){
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+// BRTKオーバーレイのON/OFF
+function toggleBartok(){
+  bartokMode=!bartokMode;
+  const btn=document.getElementById('bartok-btn');
+  if(btn) btn.classList.toggle('on',bartokMode);
+  bartokAlpha=0; // 常にフェードインから開始
+  invalidate();
+}
+
+// BRTKノードのヒットテスト（drawBartokOverlay後に呼ばれる）
+function hitTestBartok(tx,ty){
+  if(!bartokMode) return false;
+  const keyRoot=getBrtokKey();
+  const axes=getBartokAxes(keyRoot);
+  if(!axes) return false;
+  const allMembers=[...axes.T,...axes.S,...axes.D];
+  for(const m of allMembers){
+    if(ni(m.root)===ni(S.root)) continue; // 現在コードはスキップ
+    const pos=findNodePos(m.root,m.type);
+    if(!pos) continue;
+    const dx=tx-pos.x, dy=ty-pos.y;
+    const hitR=Math.max(pos.r||18,22)+4;
+    if(dx*dx+dy*dy<hitR*hitR){
+      moveToChord(m.root,m.type);
+      return true;
+    }
+  }
+  return false;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // SYNTH ENGINE — PAD (JUNO-106/60風) + ARP (SH-101風) + DELAY
 // ═══════════════════════════════════════════════════════════════
 
 // ── 状態変数 ──
-let padOn=false;
+let padOn=true; // PADは常時有効（タップで発音）
 let arpOn=false;
 let synthPanelOpen=false;
 
@@ -8387,6 +9452,51 @@ let padLfoDepth=0;     // LFO Depth（0〜1）
 let padKeyFollow='half'; // off / half / full
 let padChorus='i';
 let padVol=0.55;
+
+// ── PADプリセット ──
+const PAD_PRESETS={
+  juno:   {voicing:'close',  detune:8,  cutoff:2400, res:1.2, envMod:0.35, lfoDepth:0.00, keyFollow:'half', chorus:'i',   vol:0.55},
+  strings:{voicing:'spread', detune:12, cutoff:3200, res:0.8, envMod:0.55, lfoDepth:0.08, keyFollow:'half', chorus:'ii',  vol:0.50},
+  brass:  {voicing:'close',  detune:4,  cutoff:1800, res:4.5, envMod:0.75, lfoDepth:0.00, keyFollow:'full', chorus:'off', vol:0.60},
+  dark:   {voicing:'drop2',  detune:10, cutoff:800,  res:3.0, envMod:0.20, lfoDepth:0.30, keyFollow:'off',  chorus:'i',   vol:0.55},
+  glass:  {voicing:'open',   detune:3,  cutoff:6000, res:2.5, envMod:0.15, lfoDepth:0.05, keyFollow:'full', chorus:'off', vol:0.48},
+  lead:   {voicing:'drop2',  detune:6,  cutoff:3600, res:6.0, envMod:0.60, lfoDepth:0.12, keyFollow:'half', chorus:'i',   vol:0.62},
+};
+let padCurrentPreset='juno';
+
+function applyPadPreset(name){
+  const p=PAD_PRESETS[name]; if(!p) return;
+  padCurrentPreset=name;
+  padVoicing=p.voicing; padDetune=p.detune; padCutoff=p.cutoff;
+  padRes=p.res; padEnvMod=p.envMod; padLfoDepth=p.lfoDepth;
+  padKeyFollow=p.keyFollow; padChorus=p.chorus; padVol=p.vol;
+
+  const setSlider=(id,val,min,max,unit,valId)=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.value=val;
+    el.style.setProperty('--pct',((val-min)/(max-min)*100).toFixed(1)+'%');
+    const vEl=document.getElementById(valId); if(!vEl) return;
+    if(unit==='Hz'&&val>=1000) vEl.textContent=(val/1000).toFixed(1)+'k';
+    else if(unit===''&&id==='pad-res') vEl.textContent=val.toFixed(1);
+    else vEl.textContent=Math.round(val)+unit;
+  };
+  setSlider('pad-detune',   p.detune,      0,   20,   '¢', 'pad-detune-val');
+  setSlider('pad-cutoff',   p.cutoff,      200, 8000, 'Hz','pad-cutoff-val');
+  setSlider('pad-res',      p.res,         0.5, 18,   '',  'pad-res-val');
+  setSlider('pad-envmod',   p.envMod*100,  0,   100,  '%', 'pad-envmod-val');
+  setSlider('pad-lfo-depth',p.lfoDepth*100,0,  100,  '%', 'pad-lfo-depth-val');
+  setSlider('pad-vol',      p.vol*100,     0,   100,  '%', 'pad-vol-val');
+
+  document.querySelectorAll('#pad-voicing-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.v===p.voicing));
+  document.querySelectorAll('#pad-chorus-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.c===p.chorus));
+  document.querySelectorAll('#pad-keyfollow-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.kf===p.keyFollow));
+  document.querySelectorAll('#pad-preset-pills .synth-pill').forEach(el=>el.classList.toggle('on',el.dataset.preset===name));
+
+  if(synthPanelOpen){
+    stopAllPadVoices();
+    setTimeout(()=>triggerPad(S.root,S.type),150);
+  }
+}
 
 // ARPパラメーター
 let arpPattern='up';
@@ -8614,8 +9724,20 @@ function msToNextGrid(){
 }
 
 // ── ディレイノードの構築 ──
+// ── DELAY ENGINE（BPMライブ追従）──
+// ノードを一度構築したらdelayTime.valueのみ更新してBPMに追従
+let dlyInputGain=null;    // ARPノートの入力点
+
+function calcDelayTimeSec(){
+  if(dlyTime==='off') return 0;
+  if(dlyTime==='free') return dlyFreeMs/1000;
+  const beat=60/autoBpm;
+  const map={'1/4':beat,'1/8':beat/2,'1/8D':beat*0.75,'1/16':beat/4,'ping':beat/2};
+  return map[dlyTime]??(beat/2);
+}
+
 function buildDelayNodes(actx){
-  // 既存ノードがあれば切断
+  // 既存ノードを切断
   try{
     if(dlyNodeL) dlyNodeL.disconnect();
     if(dlyNodeR) dlyNodeR.disconnect();
@@ -8624,65 +9746,65 @@ function buildDelayNodes(actx){
     if(dlyWetGainL) dlyWetGainL.disconnect();
     if(dlyWetGainR) dlyWetGainR.disconnect();
     if(dlyDryGain) dlyDryGain.disconnect();
+    if(dlyInputGain) dlyInputGain.disconnect();
   }catch(e){}
 
+  dlyInputGain=actx.createGain();
+  dlyInputGain.gain.value=1;
+
   if(dlyTime==='off'){
-    dlyDestination=actx.destination;
+    dlyInputGain.connect(actx.destination);
+    dlyDestination=dlyInputGain;
     return;
   }
 
-  const beatSec=60/autoBpm;
-  const map={'1/8':beatSec/2,'1/4':beatSec,'1/8D':beatSec*0.75,
-             '1/16':beatSec/4,'free':dlyFreeMs/1000};
-  const delayTimeSec=map[dlyTime]??(beatSec/2);
-
-  // ステレオ分離（PING-PONGはL/Rを互い違い）
-  const splitter=actx.createChannelSplitter(2);
-  const merger=actx.createChannelMerger(2);
+  const timeSec=calcDelayTimeSec();
 
   dlyNodeL=actx.createDelay(4.0);
   dlyNodeR=actx.createDelay(4.0);
-  dlyNodeL.delayTime.value=delayTimeSec;
-  dlyNodeR.delayTime.value=dlyTime==='ping'?delayTimeSec*2:delayTimeSec;
+  dlyNodeL.delayTime.value=timeSec;
+  dlyNodeR.delayTime.value=dlyTime==='ping'?timeSec*2:timeSec;
 
-  dlyFbGainL=actx.createGain();
-  dlyFbGainR=actx.createGain();
-  dlyFbGainL.gain.value=dlyFeedback;
-  dlyFbGainR.gain.value=dlyFeedback;
+  dlyFbGainL=actx.createGain(); dlyFbGainL.gain.value=dlyFeedback;
+  dlyFbGainR=actx.createGain(); dlyFbGainR.gain.value=dlyFeedback;
+  dlyWetGainL=actx.createGain(); dlyWetGainL.gain.value=dlyMix;
+  dlyWetGainR=actx.createGain(); dlyWetGainR.gain.value=dlyMix;
+  dlyDryGain=actx.createGain(); dlyDryGain.gain.value=1-dlyMix*0.5;
 
-  dlyWetGainL=actx.createGain();
-  dlyWetGainR=actx.createGain();
-  dlyWetGainL.gain.value=dlyMix;
-  dlyWetGainR.gain.value=dlyMix;
-
-  dlyDryGain=actx.createGain();
-  dlyDryGain.gain.value=1-dlyMix*0.5;
-
-  // 入力→dry→dest
-  const inputGain=actx.createGain();
-  inputGain.gain.value=1;
-  inputGain.connect(dlyDryGain);
+  // dry path
+  dlyInputGain.connect(dlyDryGain);
   dlyDryGain.connect(actx.destination);
 
-  // 入力→delayL→fbL→delayL（ループ）
-  inputGain.connect(dlyNodeL);
+  // delay L path
+  dlyInputGain.connect(dlyNodeL);
   dlyNodeL.connect(dlyFbGainL);
-  dlyFbGainL.connect(dlyNodeL);
-  // delayL→wet→dest
+  dlyFbGainL.connect(dlyNodeL); // feedback loop
   dlyNodeL.connect(dlyWetGainL);
   dlyWetGainL.connect(actx.destination);
 
-  // PING: L→R→L クロスフィードバック
+  // PING: cross-feedback L↔R
   if(dlyTime==='ping'){
-    inputGain.connect(dlyNodeR);
+    dlyInputGain.connect(dlyNodeR);
     dlyNodeR.connect(dlyFbGainR);
-    dlyFbGainR.connect(dlyNodeL); // クロス
-    dlyFbGainL.connect(dlyNodeR); // クロス
+    dlyFbGainR.connect(dlyNodeL);
+    dlyFbGainL.connect(dlyNodeR);
     dlyNodeR.connect(dlyWetGainR);
     dlyWetGainR.connect(actx.destination);
   }
 
-  dlyDestination=inputGain;
+  dlyDestination=dlyInputGain;
+}
+
+// BPM変更時にディレイタイムをライブ更新（ノード再構築不要）
+function updateDelayTime(){
+  if(!dlyNodeL) return;
+  const timeSec=calcDelayTimeSec();
+  const t=safeGetCtx()?.currentTime??0;
+  // AudioParamをスムーズに更新（クリックノイズ防止）
+  dlyNodeL.delayTime.setTargetAtTime(timeSec, t, 0.05);
+  dlyNodeR.delayTime.setTargetAtTime(
+    dlyTime==='ping'?timeSec*2:timeSec, t, 0.05
+  );
 }
 
 // ════════════════════════════════════════════════════════
@@ -8823,7 +9945,7 @@ function padVoiceRelease(voice, actx, releaseSec){
 
 // コードチェンジ: 継続音は保持、不要音はリリース、新音はアタック
 function triggerPad(root, type){
-  if(!padOn) return;
+  if(!synthPanelOpen) return;
   const actx=safeGetCtx();
   if(!actx) return;
   safeResume(actx, ()=>{
@@ -8963,20 +10085,18 @@ function toggleSynthPanel(){
 }
 
 function togglePad(){
-  padOn=!padOn;
-  const btn=document.getElementById('pad-on-btn');
-  if(btn){btn.textContent=padOn?'ON':'OFF'; btn.classList.toggle('on',padOn);}
-  if(padOn){
-    triggerPad(S.root, S.type);
-  } else {
-    stopAllPadVoices();
-  }
+  // PADは廃止（synthPanelOpenで制御）
 }
 
 function toggleArp(){
   arpOn=!arpOn;
-  const btn=document.getElementById('arp-on-btn');
-  if(btn){btn.textContent=arpOn?'ON':'OFF'; btn.classList.toggle('on',arpOn);}
+  // SYNTHパネル内のボタンとヘッダーボタンを同期
+  document.querySelectorAll('#arp-on-btn, #hdr-arp-btn').forEach(btn=>{
+    if(!btn) return;
+    btn.textContent=arpOn?(btn.id==='hdr-arp-btn'?'ARP ▶':'ON'):(btn.id==='hdr-arp-btn'?'ARP':'OFF');
+    btn.classList.toggle('on', arpOn);
+    btn.classList.toggle('arp', btn.id==='arp-on-btn');
+  });
   if(arpOn){
     startArpScheduler();
   } else {
@@ -9017,6 +10137,12 @@ function synthSliderUpdate(el, valId, min, max, unit){
 }
 
 function initSynthUI(){
+  // PAD PRESET pills
+  document.querySelectorAll('#pad-preset-pills .synth-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.preset===padCurrentPreset);
+    p.onclick=()=>applyPadPreset(p.dataset.preset);
+  });
+
   // PAD VOICES pills
   document.querySelectorAll('#pad-voices-pills .synth-pill').forEach(p=>{
     p.classList.toggle('on', parseInt(p.dataset.voices)===padMaxVoices);
@@ -9024,7 +10150,7 @@ function initSynthUI(){
       padMaxVoices=parseInt(p.dataset.voices);
       document.querySelectorAll('#pad-voices-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
       // 変更後すぐに現在コードを再発音
-      if(padOn) triggerPad(S.root, S.type);
+      if(synthPanelOpen) triggerPad(S.root, S.type);
     };
   });
 
@@ -9035,7 +10161,7 @@ function initSynthUI(){
       padVoicing=p.dataset.v;
       document.querySelectorAll('#pad-voicing-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
       // ボイシング変更後に再発音
-      if(padOn){ stopAllPadVoices(); setTimeout(()=>triggerPad(S.root,S.type),200); }
+      if(synthPanelOpen){ stopAllPadVoices(); setTimeout(()=>triggerPad(S.root,S.type),200); }
     };
   });
 
@@ -9138,7 +10264,7 @@ function initSynthUI(){
 
 // ── moveToChordからSYNTHに通知するフック ──
 function notifySynth(root, type){
-  if(padOn) triggerPad(root, type);
+  if(synthPanelOpen) triggerPad(root, type);
   if(arpOn) updateArpChord(root, type);
 }
 
@@ -10293,7 +11419,6 @@ function renderRoots(){
 }
 function renderTypes(){
   const el=document.getElementById('type-groups');
-  // ネストテンプレートリテラルを避ける（iOS Safari互換）
   el.innerHTML=Object.entries(GROUPS).map(function(entry){
     var g=entry[0],ts=entry[1];
     var pills=ts.map(function(t){
@@ -10310,12 +11435,237 @@ function renderTypes(){
     Object.keys(VCACHE).forEach(k=>delete VCACHE[k]);
     renderTypes();renderPosZone();
     refreshChordVisuals();
+    // コードタイプ変更時にMODIFYを更新
+    renderModify();
   }));
 }
 
 // ═══════════════════════════════════════════════════
-// FRETBOARD & PIANO ROLL
+// MODIFY — オンコード（スラッシュコード）& テンションノート
 // ═══════════════════════════════════════════════════
+
+// 状態
+let modifyOnChordNote=null;   // null or note string e.g. "E"
+let modifyTensions=new Set(); // Set of tension strings e.g. {"9","#11"}
+
+// テンション→半音インターバルのマップ
+const TENSION_SEMITONES={
+  '9':14, 'b9':13, 's9':15,
+  '11':17, 's11':18,
+  '13':21, 'b13':20,
+};
+
+// ON CHORD pillsを現在のルートに基づいて動的生成
+function renderModify(){
+  // ON CHORD pills（ルート以外の全音名）
+  const onEl=document.getElementById('on-chord-pills');
+  if(onEl){
+    onEl.innerHTML='';
+    NOTES.forEach(n=>{
+      const pill=document.createElement('div');
+      pill.className='modify-pill on-chord'+(modifyOnChordNote===n?' on':'');
+      pill.textContent=n;
+      pill.onclick=()=>{
+        modifyOnChordNote=(modifyOnChordNote===n)?null:n;
+        renderModify();
+        applyModifyToSynth();
+      };
+      onEl.appendChild(pill);
+    });
+  }
+
+  // TENSION pills
+  document.querySelectorAll('#tension-pills .modify-pill').forEach(p=>{
+    const t=p.dataset.tension;
+    p.classList.toggle('on', modifyTensions.has(t));
+    p.onclick=()=>{
+      if(modifyTensions.has(t)) modifyTensions.delete(t);
+      else modifyTensions.add(t);
+      p.classList.toggle('on', modifyTensions.has(t));
+      applyModifyToSynth();
+      updateModifyResult();
+    };
+  });
+
+  updateModifyResult();
+}
+
+// 現在のコード名+修飾を表示
+function updateModifyResult(){
+  const el=document.getElementById('modify-result');
+  if(!el) return;
+  let name=cs(S.root, S.type);
+  if(modifyTensions.size>0){
+    const tLabels={'9':'9','b9':'♭9','s9':'♯9','11':'11','s11':'♯11','13':'13','b13':'♭13'};
+    const ts=[...modifyTensions].map(t=>tLabels[t]||t).join(',');
+    name+=`(${ts})`;
+  }
+  if(modifyOnChordNote) name+=`/${modifyOnChordNote}`;
+  el.textContent=name;
+}
+
+// MODIFYの内容をVoice Pool / ARPシーケンスに反映
+function applyModifyToSynth(){
+  updateModifyResult();
+  // SYNTHパネルが開いていれば即再発音
+  if(synthPanelOpen){
+    stopAllPadVoices();
+    setTimeout(()=>triggerPadWithModify(S.root, S.type), 100);
+  }
+  // ARPが動いていればシーケンス更新
+  if(arpOn){
+    arpSeq=buildArpSeqWithModify(S.root, S.type);
+    arpStep=0;
+  }
+}
+
+// MODIFYを適用したMIDIノート列を生成（PAD用）
+function buildPadVoicingWithModify(root, type, voicingType){
+  let notes=buildPadVoicing(root, type, voicingType);
+
+  // テンションノートを追加
+  if(modifyTensions.size>0){
+    const ri=ni(root);
+    const baseOct=Math.floor(notes[0]/12); // 最低音のオクターブ
+    modifyTensions.forEach(t=>{
+      const semi=TENSION_SEMITONES[t];
+      if(semi===undefined) return;
+      let midi=12*(baseOct+1)+(ri+semi)%12;
+      // 既存音より上に配置
+      while(midi<=notes[notes.length-1]) midi+=12;
+      notes.push(midi);
+    });
+    notes.sort((a,b)=>a-b);
+    // VOICESの上限に合わせる
+    if(notes.length>padMaxVoices) notes=notes.slice(0,padMaxVoices);
+  }
+
+  // オンコード: 最低音をベース音に差し替え
+  if(modifyOnChordNote){
+    const bi=ni(modifyOnChordNote);
+    const lowestOct=Math.floor(notes[0]/12)-1;
+    const bassNote=12*(lowestOct+1)+bi;
+    // ルートと同音なら置き換えない
+    if(bi!==ni(root)){
+      notes=[bassNote, ...notes.slice(0,padMaxVoices-1)];
+      notes.sort((a,b)=>a-b);
+    }
+  }
+
+  return notes;
+}
+
+// MODIFYを適用したARPシーケンス生成
+function buildArpSeqWithModify(root, type){
+  let seq=buildArpSeq(root, type);
+
+  // テンションMIDIを追加
+  if(modifyTensions.size>0){
+    const ri=ni(root);
+    const baseNote=12*(arpOctCenter+1)+ri;
+    const extra=[];
+    modifyTensions.forEach(t=>{
+      const semi=TENSION_SEMITONES[t];
+      if(semi!==undefined) extra.push(baseNote+(semi%12));
+    });
+    if(Array.isArray(seq[0])){
+      // CHORDパターン
+      seq=[[ ...(Array.isArray(seq[0])?seq[0]:[seq[0]]), ...extra ]];
+    } else {
+      seq=[...seq, ...extra].sort((a,b)=>a-b);
+    }
+  }
+
+  // オンコード: シーケンスの先頭にベース音を追加
+  if(modifyOnChordNote){
+    const bi=ni(modifyOnChordNote);
+    const bassNote=12*(arpOctCenter)+bi; // 1oct低い位置
+    if(!Array.isArray(seq[0])){
+      seq=[bassNote, ...seq];
+    }
+  }
+
+  return seq;
+}
+
+// triggerPadのMODIFY対応版
+function triggerPadWithModify(root, type){
+  if(!synthPanelOpen) return;
+  const actx=safeGetCtx();
+  if(!actx) return;
+  safeResume(actx, ()=>{
+    const out=getPadMasterOut(actx);
+    out.gain.value=1.0;
+    const newSet=new Set();
+    let notes=buildPadVoicingWithModify(root, type, padVoicing);
+    notes.forEach(midi=>{
+      const voice=padVoiceStart(actx, midi, out);
+      padVoices.push(voice);
+      newSet.add(midi);
+    });
+    setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },600);
+  });
+}
+
+// getPadMasterOut（triggerPadWithModify用）
+let _padMasterOut=null;
+function getPadMasterOut(actx){
+  if(!_padMasterOut||_padMasterOut.context!==actx){
+    _padMasterOut=actx.createGain();
+    _padMasterOut.gain.value=1;
+    _padMasterOut.connect(actx.destination);
+  }
+  return _padMasterOut;
+}
+
+// ─ MODIFY対応版triggerPad（moveToChordから呼ばれる）─
+// 既存のtriggerPadをオーバーライドして拡張
+const _origTriggerPad=triggerPad;
+function triggerPad(root, type){
+  if(!synthPanelOpen) return;
+  const actx=safeGetCtx();
+  if(!actx) return;
+  safeResume(actx, ()=>{
+    const now=actx.currentTime;
+    const xfadeSec=0.12;
+
+    if(padCurrentGain){
+      const old=padCurrentGain;
+      old.gain.cancelScheduledValues(now);
+      old.gain.setValueAtTime(old.gain.value, now);
+      old.gain.linearRampToValueAtTime(0.001, now+xfadeSec);
+      setTimeout(()=>{ try{old.disconnect();}catch(e){} }, Math.round(xfadeSec*1000)+100);
+    }
+
+    const newGain=actx.createGain();
+    newGain.gain.setValueAtTime(0.001, now);
+    newGain.gain.linearRampToValueAtTime(1.0, now+xfadeSec);
+    newGain.connect(actx.destination);
+    padCurrentGain=newGain;
+
+    // MODIFYを適用したボイシング
+    buildPadVoicingWithModify(root, type, padVoicing).forEach((midi,i)=>{
+      synthJunoPad(actx, midi, now+i*0.007, 60/autoBpm*6, padVol, newGain);
+    });
+  });
+}
+
+// updateArpChordのMODIFY対応
+function updateArpChord(root, type){
+  if(!arpOn) return;
+  arpSeq=(modifyTensions.size>0||modifyOnChordNote)
+    ? buildArpSeqWithModify(root, type)
+    : buildArpSeq(root, type);
+  arpStep=0;
+}
+
+// renderRoots/renderTypesの後にrenderModifyを呼ぶ
+const _origRenderRoots=renderRoots;
+
+// ─ ページ読み込み時にMODIFY初期化 ─
+document.addEventListener('DOMContentLoaded',()=>{
+  renderModify();
+});
 
 // MIDIノート番号 (E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)
 const MIDI_OPEN=[40,45,50,55,59,64];
@@ -11124,6 +12474,13 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
     v=Math.max(40,Math.min(180,Math.round(v/4)*4));
     autoBpm=v;
     updateDial(v);
+    // ディレイタイムをBPMに追従（ノード再構築不要）
+    updateDelayTime();
+    // ARPが動いていれば次ビートタイムを更新
+    if(arpOn && arpScheduleTimer){
+      const actx=safeGetCtx();
+      if(actx) arpNextBeat=actx.currentTime+0.05;
+    }
   }
   // F4: グローバル公開（grooveから呼び出せるように）
   window.updateBpmDisplay=function(bpm){ setBpm(bpm); };
