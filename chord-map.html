@@ -11075,7 +11075,9 @@ function getPadMasterOut(actx){
   if(!padMasterOut||padMasterOut.context!==actx){
     padMasterOut=actx.createGain();
     padMasterOut.gain.value=1.0;
-    padMasterOut.connect(actx.destination);
+    // masterGain(audio.js)があればそこへ接続、なければdestinationへ
+    const dest=(typeof masterGain!=='undefined'&&masterGain)?masterGain:actx.destination;
+    padMasterOut.connect(dest);
   }
   return padMasterOut;
 }
@@ -11185,56 +11187,68 @@ function padVoiceRelease(voice, actx, releaseSec){
   }, Math.round(rs*1000)+50);
 }
 
-// ── PAD発音: コードタップのたびに全停止→新規発音 ──
-// シンプルかつ確実: 重複・継続音なし
-let _padGateTimer=null; // Gate自動リリース用タイマー
+// ── PAD発音エンジン ──
+let _padGateTimer=null;
 
 function triggerPad(root, type){
   if(!synthPanelOpen) return;
-  const actx=safeGetCtx();
-  if(!actx) return;
+
+  // AudioContextをactx変数に確保（audio.js getCtx 経由）
+  // getCtxがない環境では自前で作成
+  let actx;
+  try{
+    actx = (typeof getCtx==='function') ? getCtx() : null;
+  }catch(e){ actx=null; }
+  if(!actx){
+    try{
+      if(!window._fallbackActx){
+        window._fallbackActx = new(window.AudioContext||window.webkitAudioContext)();
+      }
+      actx = window._fallbackActx;
+    }catch(e){ return; }
+  }
+
+  // masterGainがあればそこへ、なければdestinationへ
+  const dest = (typeof masterGain!=='undefined' && masterGain)
+    ? masterGain : actx.destination;
 
   function _fire(){
-    // 既存Gateタイマーをキャンセル
+    // Gateタイマーキャンセル
     if(_padGateTimer){ clearTimeout(_padGateTimer); _padGateTimer=null; }
 
-    // 全オシレーターを即停止してからリスト初期化
-    padVoices.forEach(v=>{
-      try{ v.osc1.stop(); }catch(e){}
-      try{ v.osc2.stop(); }catch(e){}
-      try{ v.oscSub.stop(); }catch(e){}
-      try{ if(v.lfo) v.lfo.stop(); }catch(e){}
-      try{ if(v.filterLfo) v.filterLfo.stop(); }catch(e){}
-      try{ v.env.disconnect(); }catch(e){}
-    });
+    // 前音をフェードアウト（ぶつ切り防止: 0.15秒で消す）
+    const old=[...padVoices];
+    old.forEach(v=>_padStopVoiceAt(actx,v,0.15));
     padVoices=[];
 
-    const out=getPadMasterOut(actx);
-    const strumSec=(padStrumMs>0)?padStrumMs/1000:0.008;
-
-    // ボイシング取得（MODIFY適用）
+    // ボイシング取得
     let newMidis=buildPadVoicingWithModify(root, type, padVoicing);
     if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
 
-    // 発音（strumSec間隔でオフセット）
+    // Strum間隔で発音
+    const strumSec=(padStrumMs>0)?padStrumMs/1000:0.008;
     newMidis.forEach((midi,i)=>{
-      const t=actx.currentTime + i*strumSec;
-      const voice=_padStartVoiceAt(actx, midi, out, t);
+      const t=actx.currentTime+0.02+i*strumSec; // 20ms先から開始（クリック防止）
+      const voice=_padStartVoiceAt(actx,midi,dest,t);
       padVoices.push(voice);
     });
 
-    // Gate: BPM連動で自動リリース（鳴りっぱなし防止）
-    const gateSec=Math.max(1.0, (60/autoBpm)*4);
+    // Gate: 4拍後に自動リリース
+    const gateSec=Math.max(1.5,(60/autoBpm)*4);
     _padGateTimer=setTimeout(()=>{
       _padGateTimer=null;
-      padVoices.forEach(v=>_padStopVoiceAt(actx, v, 0.4));
-      padVoices=[];
-    }, Math.round(gateSec*1000));
+      const cur=padVoices.splice(0);
+      cur.forEach(v=>_padStopVoiceAt(actx,v,0.5));
+    },Math.round(gateSec*1000));
   }
 
-  // suspended: resume後60ms待って発音（iOS/初回対応）
+  // AudioContext起動を確実に待ってから発音
   if(actx.state==='suspended'){
-    actx.resume().then(()=>setTimeout(_fire,60)).catch(()=>{});
+    actx.resume().then(()=>{
+      // resumeのPromise解決後もrunningになるまで少し待つ
+      const _wait=()=>{ if(actx.state==='running'){ _fire(); } else { setTimeout(_wait,20); } };
+      setTimeout(_wait,20);
+    }).catch(()=>{});
   } else {
     _fire();
   }
@@ -11310,21 +11324,21 @@ function _padStopVoiceAt(actx, v, fadeSec){
   }, Math.round(fadeSec*1000)+50);
 }
 
-// PAD全停止（確実版）
+// PAD全停止
 function stopAllPadVoices(){
   if(_padGateTimer){ clearTimeout(_padGateTimer); _padGateTimer=null; }
-  const actx=safeGetCtx();
-  padVoices.forEach(v=>{
-    if(actx) _padStopVoiceAt(actx, v, 0.1);
+  const actx=safeGetCtx()||window._fallbackActx||null;
+  const cur=padVoices.splice(0);
+  cur.forEach(v=>{
+    if(actx){ _padStopVoiceAt(actx,v,0.1); }
     else {
-      try{ v.osc1.stop(); }catch(e){}
-      try{ v.osc2.stop(); }catch(e){}
-      try{ v.oscSub.stop(); }catch(e){}
-      try{ if(v.lfo) v.lfo.stop(); }catch(e){}
-      try{ if(v.filterLfo) v.filterLfo.stop(); }catch(e){}
+      try{v.osc1.stop();}catch(e){}
+      try{v.osc2.stop();}catch(e){}
+      try{v.oscSub.stop();}catch(e){}
+      try{if(v.lfo)v.lfo.stop();}catch(e){}
+      try{if(v.filterLfo)v.filterLfo.stop();}catch(e){}
     }
   });
-  padVoices=[];
 }
 
 // ── SH-101風ARPノート合成 ──
@@ -11603,7 +11617,10 @@ function initSynthUI(){
 
 // ── moveToChordからSYNTHに通知するフック ──
 function notifySynth(root, type){
-  if(synthPanelOpen) triggerPad(root, type);
+  if(synthPanelOpen){
+    // ARPがONのときはPADも発音（ARPと同コードで連動）
+    triggerPad(root, type);
+  }
   if(arpOn) updateArpChord(root, type);
 }
 
