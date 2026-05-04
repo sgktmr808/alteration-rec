@@ -12842,7 +12842,8 @@ function getPadMasterOut(actx){
 }
 
 // ─ MODIFY対応版triggerPad（moveToChordから呼ばれる）─
-// Trail(4-1) / Felt Attack(4-3) / Strum(1-B) 統合版
+// Trail(4-1) / Felt Attack(4-3) / Strum(1-B) / MODIFY 統合版
+// padVoiceStart（インライン）ベースで動作 — synthJunoPad(audio.js)に非依存
 const _origTriggerPad=triggerPad;
 function triggerPad(root, type){
   if(!synthPanelOpen) return;
@@ -12850,32 +12851,50 @@ function triggerPad(root, type){
   if(!actx) return;
   safeResume(actx, ()=>{
     const now=actx.currentTime;
+
     // 4-1: Trail — lbTrailに応じてfadeout時間を可変に
     const trailSec = (typeof getLbTrailSec==='function') ? getLbTrailSec() : 0.12;
-    const xfadeSec = Math.max(0.12, trailSec * 0.4);
 
-    if(padCurrentGain){
-      const old=padCurrentGain;
-      old.gain.cancelScheduledValues(now);
-      old.gain.setValueAtTime(old.gain.value, now);
-      old.gain.linearRampToValueAtTime(0.001, now+trailSec);
-      setTimeout(()=>{ try{old.disconnect();}catch(e){} }, Math.round(trailSec*1000)+100);
-    }
+    // Trail: 既存VoiceをtrailSecかけてリリース
+    const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
 
-    const newGain=actx.createGain();
-    newGain.gain.setValueAtTime(0.001, now);
-    newGain.gain.linearRampToValueAtTime(1.0, now+xfadeSec);
-    newGain.connect(actx.destination);
-    padCurrentGain=newGain;
+    // MODIFYを適用したボイシング
+    let newMidis=buildPadVoicingWithModify(root, type, padVoicing);
+    if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
+    const newSet=new Set(newMidis);
+    const activeSet=new Set(activeVoices.map(v=>v.midi));
 
-    // MODIFYを適用したボイシング（STRUM + Felt Attack）
-    const strumSec = (padStrumMs > 0) ? padStrumMs / 1000 : 0.007;
-    buildPadVoicingWithModify(root, type, padVoicing).forEach((midi,i)=>{
-      const t = now + i * strumSec;
-      synthJunoPad(actx, midi, t, 60/autoBpm*6, padVol, newGain);
-      // 4-3: Felt Attack
-      if(typeof synthFeltAttack==='function') synthFeltAttack(actx, midi, t, newGain);
+    // 不要音をTrail時間でリリース
+    activeVoices.forEach(v=>{
+      if(!newSet.has(v.midi)) padVoiceRelease(v, actx, Math.max(0.15, trailSec));
     });
+
+    // 出力先
+    const out=getPadMasterOut(actx);
+    out.gain.value=1.0;
+    padCurrentGain=out;
+
+    // Strum: 新音を時間差で発音
+    const strumSec=(padStrumMs>0)?padStrumMs/1000:0.007;
+    newMidis.forEach((midi,i)=>{
+      if(!activeSet.has(midi)){
+        // scheduleAtTimeのため少し遅延させてpadVoiceStartを呼ぶ
+        const delayMs=Math.round(i*strumSec*1000);
+        setTimeout(()=>{
+          const actx2=safeGetCtx(); if(!actx2)return;
+          const voice=padVoiceStart(actx2, midi, out);
+          padVoices.push(voice);
+          // 4-3: Felt Attack
+          if(typeof synthFeltAttack==='function'){
+            synthFeltAttack(actx2, midi, actx2.currentTime, out);
+          }
+        }, delayMs);
+      }
+    });
+
+    // 解放済みVoice掃除
+    setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },
+      Math.round(trailSec*1000)+600);
   });
 }
 
