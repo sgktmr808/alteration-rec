@@ -11041,6 +11041,7 @@ function updateDelayTime(){
 // ════════════════════════════════════════════════════════
 
 let padMaxVoices=4;  // UI選択: 4 / 6 / 8
+let padCurrentGain=null; // 現在のPAD出力Gainノード（xfade制御用）
 
 // Voice構造体
 // { midi, osc1, osc2, oscSub, lpf, env, lfo, gainNode, active, releasing }
