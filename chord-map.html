@@ -12840,12 +12840,17 @@ function triggerPadWithModify(root, type){
   safeResume(actx, ()=>{
     const out=getPadMasterOut(actx);
     out.gain.value=1.0;
-    const newSet=new Set();
-    let notes=buildPadVoicingWithModify(root, type, padVoicing);
-    notes.forEach(midi=>{
+    let newMidis=buildPadVoicingWithModify(root, type, padVoicing);
+    if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
+    const newSet=new Set(newMidis);
+    // 重複チェック: MODIFY呼び出し時も同様にVoice Pool管理
+    const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
+    const activeSet=new Set(activeVoices.map(v=>v.midi));
+    activeVoices.forEach(v=>{ if(!newSet.has(v.midi)) padVoiceRelease(v,actx,0.15); });
+    newMidis.forEach(midi=>{
+      if(activeSet.has(midi)) return;
       const voice=padVoiceStart(actx, midi, out);
       padVoices.push(voice);
-      newSet.add(midi);
     });
     setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },600);
   });
@@ -12870,10 +12875,12 @@ function triggerPad(root, type){
   if(!synthPanelOpen) return;
   const actx=safeGetCtx();
   if(!actx) return;
-  safeResume(actx, ()=>{
+
+  // 内部発音処理（resume完了後に呼ばれる）
+  function _doPad(){
     const now=actx.currentTime;
 
-    // 4-1: Trail時間（lbTrail設定に応じてfadeout長さを可変）
+    // 4-1: Trail時間
     const trailSec=(typeof getLbTrailSec==='function') ? getLbTrailSec() : 0.12;
 
     // MODIFYを適用したボイシング
@@ -12895,22 +12902,26 @@ function triggerPad(root, type){
     out.gain.value=1.0;
     padCurrentGain=out;
 
-    // Strum: AudioContext時刻にオフセットを加算して時間差発音
-    // setTimeout不使用 → 重複チェックが正確に機能する
+    // Strum: AudioContext時刻にオフセット加算（setTimeout不使用）
     const strumSec=(padStrumMs>0) ? padStrumMs/1000 : 0.007;
     newMidis.forEach((midi,i)=>{
-      if(activeSet.has(midi)) return; // 継続音はそのまま保持（重複発音しない）
-      const t=now+i*strumSec;
+      if(activeSet.has(midi)) return; // 継続音は保持、重複発音しない
       const voice=padVoiceStart(actx, midi, out);
       padVoices.push(voice);
-      // 4-3: Felt Attack（Strumタイミングに合わせてスケジュール）
-      if(typeof synthFeltAttack==='function') synthFeltAttack(actx, midi, t, out);
+      if(typeof synthFeltAttack==='function') synthFeltAttack(actx, midi, actx.currentTime+i*strumSec, out);
     });
 
     // 解放済みVoice掃除
     setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },
       Math.round(trailSec*1000)+600);
-  });
+  }
+
+  // AudioContextがsuspendedの場合はresume後に発音（初回タップ対応）
+  if(actx.state==='suspended'){
+    actx.resume().then(()=>{ setTimeout(_doPad, 80); }).catch(()=>{});
+  } else {
+    _doPad();
+  }
 }
 
 // updateArpChordのMODIFY対応
