@@ -3117,7 +3117,9 @@ function initCanvas(){
         e.preventDefault();canvas.setPointerCapture(e.pointerId);
         const now=Date.now();
         if(lastTap.idx===idx&&now-lastTap.t<380){
-          SL[idx].val=0;SL[idx].disp=0;relCache=null;invalidate();lastTap={idx:-1,t:0};return;
+          SL[idx].val=0;SL[idx].disp=0;relCache=null;invalidate();lastTap={idx:-1,t:0};
+          if(typeof applySLToArp==='function') applySLToArp();
+          return;
         }
         lastTap={idx,t:now};
         drag={idx,startAngle:angle,startVal:SL[idx].val};return;
@@ -3197,7 +3199,11 @@ function initCanvas(){
     const nv=Math.max(-1,Math.min(1,drag.startVal+delta/ARC_HALF));
     SL[drag.idx].val=Math.abs(nv)<0.04?0:nv;
     const now=Date.now();
-    if(!drag.lastRel||now-drag.lastRel>80){relCache=null;drag.lastRel=now;}
+    if(!drag.lastRel||now-drag.lastRel>80){
+      relCache=null;drag.lastRel=now;
+      // SL変更をARPにリアルタイム反映
+      if(typeof applySLToArp==='function') applySLToArp();
+    }
     invalidate();
   });
 
@@ -3207,6 +3213,8 @@ function initCanvas(){
       const sl=SL[drag.idx];
       sl.val=Math.abs(sl.val)<0.04?0:Math.round(sl.val*20)/20;
       relCache=null;invalidate();
+      // スライダー確定時にもARP反映
+      if(typeof applySLToArp==='function') applySLToArp();
     }
     drag=null;
   });
@@ -9578,7 +9586,9 @@ function buildArpSeq(root, type){
   const ri=ni(root);
   const ivs=CT[type]?.iv??[0,4,7];
   const center=arpOctCenter;  // 基準オクターブ（デフォルト3）
-  const range=arpOctRange-1;  // 0=±0oct, 1=±1oct, 2=±2oct
+  // SLのcomplex値でoctaveRangeを動的調整
+  const effectiveOctRange = _slArpOctRange !== null ? _slArpOctRange : arpOctRange;
+  const range=effectiveOctRange-1;  // 0=±0oct, 1=±1oct, 2=±2oct
 
   // 基準オクターブのルート音
   const rootMidi=12*(center+1)+ri; // C3=48, C4=60 ...
@@ -10000,16 +10010,18 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 function _playSceneArpNote(actx, midi, startTime, dest){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
-  const gateSec = (sc.arpGate / 1000) * 0.78;
+  const arpGateMs = _slArpGate !== null ? _slArpGate : (sc.arpGate || 280);
+  const gateSec = (arpGateMs / 1000) * 0.78;
   const nyq = actx.sampleRate / 2 - 100;
 
   const vol    = sc.arpVol    || 0.26;
   const atk    = sc.arpAttack || 0.006;
   const decay  = sc.arpDecay  || 0.22;
-  const res    = sc.arpRes    || 1.2;
   const envMod = sc.arpEnvMod || 0.5;
-  const cutoff = sc.arpCutoff || 1800;
   const oscType = sc.arpOsc   || 'sawtooth';
+  // SLスライダー反映（nullなら各Sceneのデフォルト値を使用）
+  const res    = _slArpRes    !== null ? _slArpRes    : (sc.arpRes    || 1.2);
+  const cutoff = _slArpCutoff !== null ? _slArpCutoff : (sc.arpCutoff || 1800);
 
   // ARP出力: delay経由（共有ノード）+ reverb経由（共有ノード）
   // getOut()を毎音呼ばない → 音量膨れを防ぐ
@@ -10063,9 +10075,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   env.gain.linearRampToValueAtTime(vol, startTime + atk);
   env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
 
-  // ── OSC2 mix（triangleは倍音少ないので音量UP）──
+  // ── OSC2 mix（warm→triangle多め / cold→osc1寄り）──
   const osc2g = actx.createGain();
-  osc2g.gain.value = 0.75;
+  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : 0.75;
 
   // ── ルーティング ──
   osc1.connect(lpf);
@@ -10140,18 +10152,20 @@ function scheduleArpNotes(){
   const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const rhythm = sc.arpRhythm; // Scene別リズムパターン
-  const restProb = sc.arpRestProb || 0;
+  // SLスライダー反映（nullならSceneデフォルト）
+  const restProb = _slArpRestProb !== null ? _slArpRestProb : (sc.arpRestProb || 0);
+  const densityMul = _slRhythmDensity !== null ? _slRhythmDensity : 1.0;
 
   while(arpNextBeat<lookAhead){
     const t=arpNextBeat;
 
-    // リズムパターンがあれば使用、なければ均等
+    // リズムパターン × densityMul（complex→短く / simple→長く）
     let stepRatio = 1.0;
     if(rhythm && rhythm.length > 0){
-      stepRatio = rhythm[_arpRhythmStep % rhythm.length];
+      stepRatio = rhythm[_arpRhythmStep % rhythm.length] * densityMul;
       _arpRhythmStep++;
     }
-    const stepSec = baseSec * stepRatio;
+    const stepSec = Math.max(baseSec * 0.25, baseSec * stepRatio);
 
     if(arpSeq.length > 0){
       // 休符確率チェック
@@ -10674,6 +10688,81 @@ function playScene(root, type){
     }, 20);
   }
 }
+
+// ── SLスライダー → ARP/CHORDリアルタイム反映 ──
+// 各スライダー値（-1〜+1）をSCENE_PRESETSのベース値に重ねて適用する
+function applySLToArp(){
+  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+
+  const bright  = sv('bright');   // Dark(-1) ↔ Bright(+1)
+  const tense   = sv('tense');    // Calm(-1) ↔ Tense(+1)
+  const warm    = sv('warm');     // Cold(-1) ↔ Warm(+1)
+  const complex = sv('complex');  // Simple(-1) ↔ Complex(+1)
+  const moving  = sv('moving');   // Static(-1) ↔ Moving(+1)
+  const strange = sv('strange');  // Familiar(-1) ↔ Strange(+1)
+
+  // ── bright: ARP cutoffを上下 ──
+  // Bright→高域明るく / Dark→暗く閉じる
+  const cutoffMul = 1.0 + bright * 0.7; // 0.3〜1.7倍
+  _slArpCutoff = Math.max(200, (sc.arpCutoff || 1200) * cutoffMul);
+
+  // ── tense: resonance + 休符確率（緊張→密に鳴る）──
+  const resMul = 1.0 + tense * 0.6; // 0.4〜1.6倍
+  _slArpRes = Math.max(0.3, (sc.arpRes || 1.2) * resMul);
+  _slArpRestProb = Math.max(0, (sc.arpRestProb || 0.1) - tense * 0.15);
+
+  // ── warm: OSC2のmix比率（暖→triangle多め / 冷→sawtooth寄り）──
+  // 実装: osc2gのgain値を動的に変える（0.4〜0.9）
+  _slOsc2Mix = 0.65 + warm * 0.25; // 0.4〜0.9
+
+  // ── complex: octaveRange + リズム密度 ──
+  // Complex→音域広く/リズム細かく / Simple→音域狭く/ゆったり
+  _slArpOctRange = Math.max(1, Math.min(3, Math.round(
+    (sc.arpOctRange || 1) + complex * 1.2
+  )));
+  // リズムの基本stepを短縮（complex→16分寄り）
+  _slRhythmDensity = 1.0 - complex * 0.35; // 0.65〜1.35倍のstep長さ
+
+  // ── moving: arpGate長さ（Moving→短く歯切れよく / Static→長く残響）──
+  const gateMul = 1.0 - moving * 0.4; // 0.6〜1.4倍
+  _slArpGate = Math.max(60, (sc.arpGate || 280) * gateMul);
+
+  // ── strange: arpPatternを自動切替 ──
+  // Familiar(-1)→up / 中立(0)→Scene設定維持 / Strange(+1)→random/insideout
+  if(Math.abs(strange) > 0.3){
+    if(strange > 0.6){
+      _slArpPattern = 'insideout';
+    } else if(strange > 0.3){
+      _slArpPattern = 'random';
+    } else if(strange < -0.6){
+      _slArpPattern = 'up';
+    } else if(strange < -0.3){
+      _slArpPattern = 'updown';
+    } else {
+      _slArpPattern = null; // Scene設定維持
+    }
+  } else {
+    _slArpPattern = null;
+  }
+
+  // ARPシーケンスを再構築（パターン変更の場合）
+  if(arpOn && S && S.root){
+    const prevPat = arpPattern;
+    if(_slArpPattern) arpPattern = _slArpPattern;
+    arpSeq = buildArpSeq(S.root, S.type);
+    arpPattern = prevPat; // arpPattern変数自体は変えない（UIとの整合性）
+  }
+}
+
+// SLスライダー → ARP動的パラメーター（applySLToArp()が更新）
+let _slArpCutoff   = null;
+let _slArpRes      = null;
+let _slArpRestProb = null;
+let _slOsc2Mix     = null;
+let _slArpOctRange = null;
+let _slRhythmDensity = null;
+let _slArpGate     = null;
+let _slArpPattern  = null;
 
 // ── Scene切替 ──
 function applyScene(name){
