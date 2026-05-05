@@ -10279,9 +10279,11 @@ function playSceneChord(actx, root, type){
   if(!midis.length) return;
 
   // Strum: 低→高の順に少しずつ遅らせて発音
+  // iOS PWA: suspended直後はcurrentTime=0のため最低0.3秒のオフセットを確保
   const strumSec = sc.strum / 1000;
+  const tBase = Math.max(actx.currentTime, 0.1) + 0.3;
   midis.forEach((midi, i) => {
-    const t = actx.currentTime + 0.015 + i * strumSec;
+    const t = tBase + i * strumSec;
     const hz = midi2hz(Math.max(24, Math.min(108, midi)));
     const voice = _playSceneNote(actx, hz, sc, t, out);
     _sceneVoices.push(voice);
@@ -10320,14 +10322,10 @@ function playScene(root, type){
   };
 
   _dbg('playScene state='+actx.state+' t='+actx.currentTime.toFixed(3));
-  if(actx.state === 'suspended'){
-    actx.resume().then(() => {
-      _dbg('resumed! state='+actx.state+' t='+actx.currentTime.toFixed(3));
-      _doPlay();
-    }).catch((e)=>{ _dbg('resume ERR:'+e); });
-  } else {
-    _doPlay();
-  }
+  // iOS PWAではresume()のPromiseがジェスチャー外でresolveされないため
+  // suspendedでも即座に_doPlayを呼び、resume()は並行して発火するだけにする
+  actx.resume().catch(()=>{});
+  _doPlay();
 }
 
 // ── Scene切替 ──
