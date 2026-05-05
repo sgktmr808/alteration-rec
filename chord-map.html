@@ -35,7 +35,7 @@
 /* K4-H3: iOS SafariのURLバー表示/非表示による高さ変動対策
    height:100% → 100svh(safe)をフォールバック付きで指定
    dvh非対応ブラウザは100%にフォールバック */
-html{height:100%;height:100svh;}
+html{height:100%;height:100svh;overflow:hidden;}
 body{height:100%;height:100svh;overflow:hidden;}
 body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
 .hdr{flex-shrink:0;background:var(--surf);border-bottom:1px solid var(--bdr);
@@ -103,7 +103,10 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 #ctrl-screen{
   flex:0 0 50%;
   overflow-y:auto;
+  overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
   display:flex;
   flex-direction:column;
   background:var(--bg);
@@ -959,7 +962,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.2</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.3</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -10250,18 +10253,25 @@ function initSynthUI(){
     };
   });
 
-  // スライダーのグラデーション初期化
-  [['pad-detune',0,20],['pad-cutoff',200,8000],['pad-res',0.5,18],
-   ['pad-envmod',0,100],['pad-lfo-depth',0,100],['pad-vol',0,100],
-   ['arp-free-ms',50,1000],['arp-vol',0,100],
-   ['dly-free-ms',20,800],['dly-fb',0,85],['dly-mix',0,100]
-  ].forEach(([id,min,max])=>{
-    const el=document.getElementById(id);
-    if(el){
-      const pct=((parseFloat(el.value)-min)/(max-min)*100).toFixed(1);
-      el.style.setProperty('--pct', pct+'%');
-    }
-  });
+  // スライダーを現在の変数値で初期化（HTML defaultではなく変数値を使う）
+  const _sv=(id,val,min,max,unit,valId)=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.value=val;
+    el.style.setProperty('--pct',((val-min)/(max-min)*100).toFixed(1)+'%');
+    const vEl=document.getElementById(valId); if(!vEl) return;
+    if(unit==='Hz'&&val>=1000) vEl.textContent=(val/1000).toFixed(1)+'k';
+    else if(unit===''&&id==='pad-res') vEl.textContent=val.toFixed(1);
+    else vEl.textContent=Math.round(val)+unit;
+  };
+  _sv('pad-detune',  padDetune,     0,    20,   '¢',  'pad-detune-val');
+  _sv('pad-cutoff',  padCutoff,     200,  8000, 'Hz', 'pad-cutoff-val');
+  _sv('pad-res',     padRes,        0.5,  18,   '',   'pad-res-val');
+  _sv('pad-envmod',  padEnvMod*100, 0,    100,  '%',  'pad-envmod-val');
+  _sv('pad-lfo-depth',padLfoDepth*100,0, 100,  '%',  'pad-lfo-val');
+  _sv('pad-vol',     padVol*100,    0,    100,  '%',  'pad-vol-val');
+  _sv('arp-vol',     arpVol*100,    0,    100,  '%',  'arp-vol-val');
+  _sv('dly-fb',      dlyFeedback*100,0,  85,   '%',  'dly-fb-val');
+  _sv('dly-mix',     dlyMix*100,    0,    100,  '%',  'dly-mix-val');
 }
 
 // ── moveToChordからSYNTHに通知するフック ──
@@ -11642,6 +11652,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(wrap) wrap.classList.add('open');
   if(tog) tog.textContent='▲';
   initSynthUI();
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const ctrl=document.getElementById('ctrl-screen');
+  if(ctrl){
+    ctrl.addEventListener('touchmove',e=>e.stopPropagation(),{passive:true});
+    ctrl.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+  }
 });
 
 // MIDIノート番号 (E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)
