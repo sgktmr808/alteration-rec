@@ -9996,35 +9996,51 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
   osc.start(startTime); osc.stop(startTime+gateSec+0.05);
 }
 
-// ── Scene別ARPノート発音 ──
+// ── Scene別ARPノート発音（Arp Ghost対応）──
 function _playSceneArpNote(actx, midi, startTime, dest){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
   const gateSec = (sc.arpGate / 1000) * 0.75;
   const nyq = actx.sampleRate / 2 - 100;
-
-  const osc = actx.createOscillator();
-  osc.type = sc.arpOsc || 'sawtooth';
-  osc.frequency.value = hz;
-
-  const lpf = actx.createBiquadFilter();
-  lpf.type = 'lowpass';
-  lpf.Q.value = sc.arpRes || 1.5;
-  const peakCutoff = Math.min(sc.arpCutoff * (1 + (sc.arpEnvMod || 0.5) * 4.0), nyq);
-  lpf.frequency.setValueAtTime(peakCutoff, startTime);
-  lpf.frequency.exponentialRampToValueAtTime(
-    Math.max(sc.arpCutoff * 0.4, 80), startTime + (sc.arpAttack || 0.005) + (sc.arpDecay || 0.2)
-  );
-
-  const env = actx.createGain();
-  const vol = sc.arpVol || 0.28;
-  env.gain.setValueAtTime(0.001, startTime);
-  env.gain.linearRampToValueAtTime(vol, startTime + (sc.arpAttack || 0.005));
-  env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
-
   const target = dest || actx.destination;
-  osc.connect(lpf); lpf.connect(env); env.connect(target);
-  osc.start(startTime); osc.stop(startTime + gateSec + 0.05);
+
+  const _makeArpVoice = (hzVal, volMul, delayMs, cutoffMul) => {
+    const osc = actx.createOscillator();
+    osc.type = sc.arpOsc || 'sawtooth';
+    osc.frequency.value = hzVal;
+
+    const lpf = actx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.Q.value = sc.arpRes || 1.5;
+    const peakCutoff = Math.min(
+      sc.arpCutoff * cutoffMul * (1 + (sc.arpEnvMod || 0.5) * 4.0), nyq
+    );
+    const t0 = startTime + delayMs / 1000;
+    lpf.frequency.setValueAtTime(peakCutoff, t0);
+    lpf.frequency.exponentialRampToValueAtTime(
+      Math.max(sc.arpCutoff * cutoffMul * 0.4, 80),
+      t0 + (sc.arpAttack || 0.005) + (sc.arpDecay || 0.2)
+    );
+
+    const env = actx.createGain();
+    const vol = (sc.arpVol || 0.28) * volMul;
+    env.gain.setValueAtTime(0.001, t0);
+    env.gain.linearRampToValueAtTime(vol, t0 + (sc.arpAttack || 0.005));
+    env.gain.exponentialRampToValueAtTime(0.001, t0 + gateSec);
+
+    osc.connect(lpf); lpf.connect(env); env.connect(target);
+    osc.start(t0); osc.stop(t0 + gateSec + 0.05);
+  };
+
+  // メインARP音
+  _makeArpVoice(hz, 1.0, 0, 1.0);
+
+  // Arp Ghost: 1オクターブ上、velocity低め、遅延20〜40ms、filter暗め
+  const ghostVol = sc.arpGhost || 0;
+  if(ghostVol > 0.02){
+    const ghostDelayMs = 20 + Math.random() * 20;
+    _makeArpVoice(hz * 2, ghostVol * 0.5, ghostDelayMs, 0.45);
+  }
 }
 
 // ── ARPスケジューラー ──
@@ -10205,78 +10221,90 @@ const SCENE_PRESETS = {
   plain: {
     label:'PLAIN ROOM',
     osc1:'sine', osc2:'triangle', detune:4,
-    cutoff:1200, res:0.6, envMod:0.45,
-    attack:0.12, decay:0.8, sustain:0.55, release:2.8,
-    vol:0.42, chorus:0.08, wet:0.45, strum:10,
-    // ARP: 控えめ、sineで柔らかく、delay少なめ
-    arpOsc:'sine', arpCutoff:900, arpRes:0.5, arpEnvMod:0.3,
-    arpAttack:0.015, arpDecay:0.4, arpSustain:0.0,
-    arpGate:320, arpVol:0.22, arpWet:0.35,
+    cutoff:1100, res:0.5, envMod:0.40,
+    attack:0.15, decay:0.7, sustain:0.50, release:3.0,
+    vol:0.40, chorus:0.06, wet:0.48, strum:12,
+    trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0,
+    voicingFlavor:'plain',
+    // ARP: sineで柔らかく、音数少なめ、delay控えめ
+    arpOsc:'sine', arpCutoff:850, arpRes:0.4, arpEnvMod:0.28,
+    arpAttack:0.018, arpDecay:0.45, arpSustain:0.0,
+    arpGate:340, arpVol:0.20, arpWet:0.30, arpGhost:0.12,
   },
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
   velvet: {
     label:'VELVET ROOTLESS',
-    osc1:'sawtooth', osc2:'triangle', detune:9,
-    cutoff:1900, res:0.8, envMod:0.52,
-    attack:0.08, decay:0.7, sustain:0.65, release:2.2,
-    vol:0.46, chorus:0.18, wet:0.42, strum:8,
-    // ARP: 中域、triangle、柔らかいfilter env
-    arpOsc:'triangle', arpCutoff:1400, arpRes:0.8, arpEnvMod:0.45,
-    arpAttack:0.008, arpDecay:0.35, arpSustain:0.0,
-    arpGate:280, arpVol:0.26, arpWet:0.38,
+    osc1:'sawtooth', osc2:'triangle', detune:8,
+    cutoff:1800, res:0.7, envMod:0.50,
+    attack:0.09, decay:0.65, sustain:0.62, release:2.4,
+    vol:0.44, chorus:0.16, wet:0.44, strum:7,
+    trailSec:1.4, width:0.65, feltAttack:0.14, ghost:0.0,
+    voicingFlavor:'rootless',
+    // ARP: triangle、中域、柔らかいfilter env
+    arpOsc:'triangle', arpCutoff:1300, arpRes:0.7, arpEnvMod:0.42,
+    arpAttack:0.010, arpDecay:0.38, arpSustain:0.0,
+    arpGate:300, arpVol:0.24, arpWet:0.36, arpGhost:0.18,
   },
 
   // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
   glass: {
     label:'GLASS PIANO',
     osc1:'sine', osc2:'sine', detune:2,
-    cutoff:3200, res:1.2, envMod:0.35,
-    attack:0.025, decay:0.5, sustain:0.42, release:1.8,
-    vol:0.40, chorus:0.05, wet:0.55, strum:5,
-    // ARP: 細い、高域、sine、短いgate、冷たい
-    arpOsc:'sine', arpCutoff:3500, arpRes:1.5, arpEnvMod:0.6,
-    arpAttack:0.003, arpDecay:0.18, arpSustain:0.0,
-    arpGate:160, arpVol:0.20, arpWet:0.55,
+    cutoff:3000, res:1.1, envMod:0.32,
+    attack:0.020, decay:0.45, sustain:0.38, release:2.0,
+    vol:0.38, chorus:0.04, wet:0.58, strum:4,
+    trailSec:1.2, width:0.45, feltAttack:0.18, ghost:0.0,
+    voicingFlavor:'glass',
+    // ARP: sine、高域、細い、短いgate、冷たい
+    arpOsc:'sine', arpCutoff:3200, arpRes:1.4, arpEnvMod:0.58,
+    arpAttack:0.004, arpDecay:0.16, arpSustain:0.0,
+    arpGate:150, arpVol:0.18, arpWet:0.52, arpGhost:0.22,
   },
 
   // 4. LOVE STAB — ガラージ/ハウス的。暖かいコードスタブ、跳ねる
   love: {
     label:'LOVE STAB',
     osc1:'sawtooth', osc2:'triangle', detune:6,
-    cutoff:2600, res:1.4, envMod:0.62,
-    attack:0.012, decay:0.35, sustain:0.35, release:0.55,
-    vol:0.52, chorus:0.12, wet:0.28, strum:3,
-    // ARP: 暖かいsaw、短gate、中域、ハウス的なアタック
-    arpOsc:'sawtooth', arpCutoff:2200, arpRes:1.2, arpEnvMod:0.7,
-    arpAttack:0.003, arpDecay:0.20, arpSustain:0.0,
-    arpGate:150, arpVol:0.32, arpWet:0.28,
+    cutoff:2400, res:1.3, envMod:0.60,
+    attack:0.008, decay:0.30, sustain:0.30, release:0.50,
+    vol:0.50, chorus:0.10, wet:0.26, strum:2,
+    trailSec:0.4, width:0.60, feltAttack:0.08, ghost:0.0,
+    voicingFlavor:'garage',
+    // ARP: sawtooth、暖かい中域、ハウス的アタック
+    arpOsc:'sawtooth', arpCutoff:2000, arpRes:1.1, arpEnvMod:0.68,
+    arpAttack:0.004, arpDecay:0.18, arpSustain:0.0,
+    arpGate:140, arpVol:0.30, arpWet:0.25, arpGhost:0.08,
   },
 
   // 5. METALLIC PLUCK — Âme的。金属的、催眠的、短い反復
   pluck: {
     label:'METALLIC PLUCK',
     osc1:'sawtooth', osc2:'square', detune:3,
-    cutoff:3800, res:3.5, envMod:0.80,
-    attack:0.004, decay:0.22, sustain:0.08, release:0.28,
-    vol:0.48, chorus:0.00, wet:0.22, strum:0,
-    // ARP: 金属的、square、高resonance、強いfilter env、delay多め
-    arpOsc:'square', arpCutoff:4500, arpRes:4.0, arpEnvMod:0.95,
-    arpAttack:0.001, arpDecay:0.12, arpSustain:0.0,
-    arpGate:110, arpVol:0.36, arpWet:0.52,
+    cutoff:3600, res:3.2, envMod:0.78,
+    attack:0.003, decay:0.20, sustain:0.06, release:0.25,
+    vol:0.46, chorus:0.00, wet:0.20, strum:0,
+    trailSec:0.2, width:0.35, feltAttack:0.0, ghost:0.0,
+    voicingFlavor:'plain',
+    // ARP: square、高resonance、強いfilter env、催眠的
+    arpOsc:'square', arpCutoff:4200, arpRes:3.8, arpEnvMod:0.92,
+    arpAttack:0.001, arpDecay:0.10, arpSustain:0.0,
+    arpGate:100, arpVol:0.34, arpWet:0.50, arpGhost:0.05,
   },
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
   strings: {
     label:'BLACK STRINGS',
     osc1:'sawtooth', osc2:'sawtooth', detune:14,
-    cutoff:2200, res:0.7, envMod:0.40,
-    attack:0.25, decay:1.2, sustain:0.78, release:4.2,
-    vol:0.50, chorus:0.28, wet:0.52, strum:18,
-    // ARP: sawtooth、広め、ゆっくりアタック、Detroit的な推進力
-    arpOsc:'sawtooth', arpCutoff:1800, arpRes:0.6, arpEnvMod:0.35,
-    arpAttack:0.012, arpDecay:0.5, arpSustain:0.15,
-    arpGate:350, arpVol:0.28, arpWet:0.45,
+    cutoff:2000, res:0.65, envMod:0.38,
+    attack:0.28, decay:1.1, sustain:0.75, release:4.5,
+    vol:0.48, chorus:0.25, wet:0.54, strum:20,
+    trailSec:2.5, width:0.80, feltAttack:0.0, ghost:0.0,
+    voicingFlavor:'detroit',
+    // ARP: sawtooth、Detroit的推進力、広め
+    arpOsc:'sawtooth', arpCutoff:1700, arpRes:0.55, arpEnvMod:0.32,
+    arpAttack:0.015, arpDecay:0.48, arpSustain:0.12,
+    arpGate:360, arpVol:0.26, arpWet:0.42, arpGhost:0.15,
   },
 };
 
@@ -10284,9 +10312,65 @@ const SCENE_PRESETS = {
 let _sceneVoices = [];   // 現在鳴っているCHORDボイス
 let _sceneTrailTimer = null;
 
-// ── 1音のCHORDボイスを発音 ──
-function _playSceneNote(actx, hz, sc, t, out){
+// ── Scene別ボイシング取得 ──
+function buildSceneVoicing(root, type, flavor){
+  if(!flavor) flavor = 'plain';
+  const ri = (typeof ni === 'function') ? ni(root) : 0;
+  const ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
+  const rootMidi = 48 + (ri % 12);
+
+  let notes = ivs.map(iv => {
+    let m = rootMidi + (iv % 12);
+    if(m < rootMidi) m += 12;
+    return m;
+  }).sort((a,b) => a-b);
+
+  if(flavor === 'rootless'){
+    // ルートを抜き3rd/7thを優先、中域中心
+    if(notes.length >= 3) notes = notes.slice(1); // ルート除去
+    notes = notes.map((n,i) => n + (i===0?12:0)); // 3rdを1oct上げて中域へ
+    // 9thを追加（ivs内で9=14のものを探す）
+    const has9 = ivs.some(iv => (iv%12)===2);
+    if(!has9 && notes.length <= 4){
+      notes.push(rootMidi + 14); // 9th追加
+    }
+    return notes.sort((a,b)=>a-b).slice(0,5);
+  }
+
+  if(flavor === 'glass'){
+    // 音数少なめ、高域の透明な上声、sus2風
+    const glassNotes = [notes[0]]; // root
+    if(notes.length >= 3) glassNotes.push(notes[1]); // 3rd
+    if(notes.length >= 3) glassNotes.push(notes[notes.length-1] + 12); // 5th or 7th 1oct上
+    glassNotes.push(rootMidi + 14); // 9th（透明感）
+    return glassNotes.sort((a,b)=>a-b).slice(0,4);
+  }
+
+  if(flavor === 'garage'){
+    // 暖かい中域、3rd/7thを強調、閉じたvoicing
+    return notes.slice(0, Math.min(4, notes.length));
+  }
+
+  if(flavor === 'detroit'){
+    // 広いvoicing、5th/9thで広げる
+    const det = [notes[0]-12, ...notes]; // ルートを1oct下にも
+    if(det.length <= 4) det.push(rootMidi + 14); // 9th
+    return det.sort((a,b)=>a-b).slice(0,5);
+  }
+
+  // plain / default: open voicing
+  const open = [notes[0]-12, ...notes.slice(1)];
+  if(open.length >= 2) open[open.length-1] += 12;
+  return open.sort((a,b)=>a-b).slice(0,5);
+}
+
+// ── 1音のCHORDボイスを発音（Felt Attack / Stereo Width 対応）──
+function _playSceneNote(actx, hz, sc, t, out, panValue){
   const nyq = actx.sampleRate / 2 - 100;
+
+  // Stereo Panner
+  const panner = actx.createStereoPanner();
+  panner.pan.value = (panValue || 0) * (sc.width || 0.5);
 
   // OSC1（メイン）
   const osc1 = actx.createOscillator();
@@ -10326,18 +10410,35 @@ function _playSceneNote(actx, hz, sc, t, out){
   vca.gain.linearRampToValueAtTime(sc.vol * 0.68, t + sc.attack);
   vca.gain.setValueAtTime(sc.vol * 0.68 * sc.sustain, t + sc.attack + sc.decay);
 
-  // OSC2 mix (少し抑える)
+  // OSC2 mix
   const osc2g = actx.createGain();
   osc2g.gain.value = 0.55;
 
   osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
-  lpf.connect(vca); vca.connect(out);
+  lpf.connect(vca); vca.connect(panner); panner.connect(out);
 
   osc1.start(t); osc2.start(t);
   osc1.stop(t + 30); osc2.stop(t + 30);
 
-  return { osc1, osc2, lpf, vca, releasing: false };
+  // ── Felt Attack: ピアノ的な短い粒を発音頭に加える ──
+  if(sc.feltAttack > 0.02){
+    const felt = actx.createOscillator();
+    const feltEnv = actx.createGain();
+    const feltLpf = actx.createBiquadFilter();
+    felt.type = 'sine';
+    felt.frequency.value = hz * 2.0; // 倍音
+    feltLpf.type = 'lowpass';
+    feltLpf.frequency.value = hz * 8;
+    const feltDur = 0.06 + sc.feltAttack * 0.12; // 60〜180ms
+    const feltVol = sc.vol * sc.feltAttack * 0.5;
+    feltEnv.gain.setValueAtTime(feltVol, t);
+    feltEnv.gain.exponentialRampToValueAtTime(0.001, t + feltDur);
+    felt.connect(feltLpf); feltLpf.connect(feltEnv); feltEnv.connect(panner);
+    felt.start(t); felt.stop(t + feltDur + 0.01);
+  }
+
+  return { osc1, osc2, lpf, vca, panner, releasing: false };
 }
 
 // ── CHORDボイスのリリース ──
@@ -10360,8 +10461,8 @@ function _releaseSceneVoice(v, actx, relSec){
 function playSceneChord(actx, root, type){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
 
-  // 既存ボイスをリリース（Trail: 長めにフェードアウト）
-  const trailSec = Math.max(0.3, sc.release * 0.6);
+  // 既存ボイスをChord Trailでフェードアウト
+  const trailSec = sc.trailSec || Math.max(0.4, sc.release * 0.5);
   _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, trailSec));
   _sceneVoices = [];
 
@@ -10370,26 +10471,31 @@ function playSceneChord(actx, root, type){
     ? getOut(actx, sc.wet)
     : actx.destination;
 
-  // ボイシング取得
-  const midis = (typeof buildPadVoicing === 'function')
-    ? buildPadVoicing(root, type, 'open').slice(0, 5)
-    : [];
+  // Scene別voicingFlavorでボイシング取得
+  const midis = buildSceneVoicing(root, type, sc.voicingFlavor);
   if(!midis.length) return;
 
-  // Strum: 低→高の順に少しずつ遅らせて発音
+  // Strum: 低→高の順にずらして発音
   // iOS PWA: suspended直後はcurrentTime=0のため最低0.3秒のオフセットを確保
   const strumSec = sc.strum / 1000;
   const tBase = Math.max(actx.currentTime, 0.1) + 0.3;
+
+  // Stereo Width: 音数に応じてパン位置を分散
+  const panPositions = midis.map((_, i) => {
+    if(midis.length === 1) return 0;
+    return (i / (midis.length - 1) * 2 - 1) * 0.9; // -0.9〜+0.9
+  });
+
   midis.forEach((midi, i) => {
     const t = tBase + i * strumSec;
     const hz = midi2hz(Math.max(24, Math.min(108, midi)));
-    const voice = _playSceneNote(actx, hz, sc, t, out);
+    const voice = _playSceneNote(actx, hz, sc, t, out, panPositions[i]);
     _sceneVoices.push(voice);
   });
 
   // 自動リリース（sustainに基づく）
   if(_sceneTrailTimer) clearTimeout(_sceneTrailTimer);
-  const holdSec = sc.attack + sc.decay + 4.0;
+  const holdSec = sc.attack + sc.decay + 4.5;
   _sceneTrailTimer = setTimeout(()=>{
     const a2 = safeGetCtx(); if(!a2) return;
     _sceneVoices.forEach(v => _releaseSceneVoice(v, a2, sc.release));
