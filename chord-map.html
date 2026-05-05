@@ -959,38 +959,87 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 </style>
 </head>
 <body>
-<div id="_dbg_panel" style="
-  position:fixed;bottom:0;left:0;right:0;
-  background:rgba(0,0,0,0.85);color:#0f0;
-  font:11px monospace;padding:4px 8px;
-  max-height:120px;overflow-y:auto;
-  z-index:99999;pointer-events:none;
-  display:none;
-" id="_dbg_panel"></div>
-<script>
-var _dbgLines=[];
-function _dbg(msg){
-  var p=document.getElementById('_dbg_panel');
-  if(!p) return;
-  p.style.display='block';
-  _dbgLines.push(msg);
-  if(_dbgLines.length>10) _dbgLines.shift();
-  p.innerHTML=_dbgLines.map(function(l){return '<div>'+l+'</div>';}).join('');
-  p.scrollTop=p.scrollHeight;
+<script>function _dbg(){}</script>
+<div id="audio-loading" style="
+  position:fixed;inset:0;
+  background:#0a0a0f;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  z-index:99999;
+  transition:opacity 0.6s ease;
+">
+  <div style="
+    font-family:'Courier New',monospace;
+    color:rgba(255,180,80,0.9);
+    font-size:13px;
+    letter-spacing:0.15em;
+    margin-bottom:24px;
+  ">CHORD MAP</div>
+  <div id="audio-loading-dot" style="
+    width:8px;height:8px;
+    border-radius:50%;
+    background:rgba(255,180,80,0.8);
+    animation:_ldpulse 1.2s ease-in-out infinite;
+  "></div>
+  <div style="
+    font-family:'Courier New',monospace;
+    color:rgba(255,255,255,0.3);
+    font-size:10px;
+    letter-spacing:0.1em;
+    margin-top:20px;
+  ">tap to begin</div>
+</div>
+<style>
+@keyframes _ldpulse{
+  0%,100%{opacity:0.3;transform:scale(0.8);}
+  50%{opacity:1;transform:scale(1.2);}
 }
-// 3秒後に自動非表示
-var _dbgHideTimer=null;
-var _origDbg=_dbg;
-window._dbg=function(msg){
-  _origDbg(msg);
-  clearTimeout(_dbgHideTimer);
-  _dbgHideTimer=setTimeout(function(){
-    var p=document.getElementById('_dbg_panel');
-    if(p) p.style.display='none';
-    _dbgLines=[];
-  }, 6000);
-};
+</style>
+<script>
+(function(){
+  var _overlay = null;
+
+  function _removeOverlay(){
+    if(!_overlay) return;
+    _overlay.style.opacity = '0';
+    setTimeout(function(){ 
+      if(_overlay && _overlay.parentNode) _overlay.parentNode.removeChild(_overlay);
+      _overlay = null;
+    }, 650);
+  }
+
+  // AudioContextをunlockしてからオーバーレイを消す
+  function _initAudio(){
+    if(!_overlay) return; // すでに解除済み
+    var actx;
+    try{ actx = (typeof getCtx === 'function') ? getCtx() : null; }catch(e){}
+    if(!actx){ _removeOverlay(); return; }
+
+    actx.resume().then(function(){
+      _removeOverlay();
+    }).catch(function(){
+      _removeOverlay();
+    });
+
+    // resume Promiseが来なくても500ms後に強制解除
+    setTimeout(_removeOverlay, 500);
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    _overlay = document.getElementById('audio-loading');
+    if(!_overlay) return;
+    // タップでunlock開始
+    _overlay.addEventListener('touchstart', function(e){
+      e.preventDefault();
+      _initAudio();
+    }, {once:true, passive:false});
+    _overlay.addEventListener('click', function(){
+      _initAudio();
+    }, {once:true});
+  });
+})();
 </script>
+
 
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
@@ -10307,9 +10356,6 @@ function playScene(root, type){
   if(!actx) return;
 
   const _doPlay = () => {
-    _dbg('doPlay state='+actx.state+' t='+actx.currentTime.toFixed(3)+' '+root+' '+type);
-    const midis = (typeof buildPadVoicing === 'function') ? buildPadVoicing(root, type, 'open') : [];
-    _dbg('midis='+JSON.stringify(midis));
     // CHORD系を発音
     if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
       playSceneChord(actx, root, type);
@@ -10321,11 +10367,22 @@ function playScene(root, type){
     if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
   };
 
-  _dbg('playScene state='+actx.state+' t='+actx.currentTime.toFixed(3));
-  // iOS PWAではresume()のPromiseがジェスチャー外でresolveされないため
-  // suspendedでも即座に_doPlayを呼び、resume()は並行して発火するだけにする
-  actx.resume().catch(()=>{});
-  _doPlay();
+  if(actx.state === 'running'){
+    _doPlay();
+  } else {
+    actx.resume().catch(()=>{});
+    let _waited = 0;
+    const _poll = setInterval(()=>{
+      _waited += 20;
+      if(actx.state === 'running'){
+        clearInterval(_poll);
+        _doPlay();
+      } else if(_waited >= 500){
+        clearInterval(_poll);
+        _doPlay();
+      }
+    }, 20);
+  }
 }
 
 // ── Scene切替 ──
