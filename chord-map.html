@@ -10032,7 +10032,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   sub.type = 'sine';
   sub.frequency.value = hz * 0.5;
   const subG = actx.createGain();
-  subG.gain.value = 0.18;
+  // DEEP TECHはサブを強化して低域の重みを出す
+  subG.gain.value = (sceneCurrentName === 'pluck') ? 0.38 : 0.18;
 
   // ── LPF with filter envelope ──
   const lpf = actx.createBiquadFilter();
@@ -10355,21 +10356,23 @@ const SCENE_PRESETS = {
     arpRhythm:[0.5, 0.5, 1.0, 0.5, 1.5, 0.5, 0.5, 0.5, 1.5], arpRestProb:0.10,
   },
 
-  // 5. METALLIC PLUCK — Âme的。金属的、催眠的、短い反復
+  // 5. DEEP TECH — ディープテクノ/ハウス的シンセシーケンス
   pluck: {
-    label:'METALLIC PLUCK',
-    osc1:'sawtooth', osc2:'square', detune:3,
-    cutoff:3600, res:3.2, envMod:0.78,
-    attack:0.003, decay:0.20, sustain:0.06, release:0.25,
-    vol:0.46, chorus:0.00, wet:0.20, strum:0,
-    trailSec:0.2, width:0.35, feltAttack:0.0, ghost:0.0,
+    label:'DEEP TECH',
+    // CHORD: 暗いsawtooth、filterがゆっくり開くswell感
+    osc1:'sawtooth', osc2:'sawtooth', detune:8,
+    cutoff:600, res:1.4, envMod:0.72,
+    attack:0.06, decay:1.2, sustain:0.30, release:1.8,
+    vol:0.44, chorus:0.08, wet:0.38, strum:6,
+    trailSec:0.6, width:0.55, feltAttack:0.0, ghost:0.0,
     voicingFlavor:'plain',
-    // ARP: square、高resonance、催眠的プラック
-    arpOsc:'square', arpCutoff:4200, arpRes:3.8, arpEnvMod:0.92,
-    arpAttack:0.001, arpDecay:0.10, arpSustain:0.0,
-    arpGate:100, arpVol:0.34, arpWet:0.50, arpGhost:0.05,
-    // リズム: Euclidean 5/8的、催眠的、一部省略
-    arpRhythm:[1.0, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5], arpRestProb:0.12,
+    // ARP: sawtooth、暗め、filterが鋭く開いてゆっくり閉じる
+    // サブが効いた低域の重み、長めのdecayで余韻が残る
+    arpOsc:'sawtooth', arpCutoff:800, arpRes:2.2, arpEnvMod:0.85,
+    arpAttack:0.003, arpDecay:0.55, arpSustain:0.0,
+    arpGate:320, arpVol:0.32, arpWet:0.44, arpGhost:0.08,
+    // リズム: 16分ベース、シンコペーション、催眠的反復
+    arpRhythm:[0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.5, 1.0, 0.5], arpRestProb:0.10,
   },
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
