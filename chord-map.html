@@ -10350,7 +10350,7 @@ const SCENE_PRESETS = {
     cutoff:2000, res:0.65, envMod:0.38,
     attack:0.28, decay:1.1, sustain:0.75, release:4.5,
     vol:0.48, chorus:0.25, wet:0.54, strum:20,
-    trailSec:2.5, width:0.80, feltAttack:0.0, ghost:0.0,
+    trailSec:0.8, width:0.80, feltAttack:0.0, ghost:0.0,
     voicingFlavor:'detroit',
     // ARP: sawtooth、Detroit的推進力、広め
     arpOsc:'sawtooth', arpCutoff:1700, arpRes:0.55, arpEnvMod:0.32,
@@ -10360,7 +10360,8 @@ const SCENE_PRESETS = {
 };
 
 // ── アクティブなCHORDボイスを管理 ──
-let _sceneVoices = [];   // 現在鳴っているCHORDボイス
+let _sceneVoices = [];          // 現在鳴っているCHORDボイス
+let _sceneReleasingVoices = []; // リリース中のボイス（重なり防止用）
 let _sceneTrailTimer = null;
 
 // ── Scene別ボイシング取得 ──
@@ -10496,21 +10497,46 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
 function _releaseSceneVoice(v, actx, relSec){
   if(!v || v.releasing) return;
   v.releasing = true;
+  _sceneReleasingVoices.push(v);
   const t = actx.currentTime;
   try{
     v.vca.gain.cancelScheduledValues(t);
     v.vca.gain.setValueAtTime(v.vca.gain.value, t);
     v.vca.gain.linearRampToValueAtTime(0.0001, t + relSec);
   }catch(e){}
+  const stopMs = Math.round(relSec * 1000) + 50;
   setTimeout(()=>{
     try{ v.osc1.stop(); }catch(e){}
     try{ v.osc2.stop(); }catch(e){}
-  }, Math.round(relSec * 1000) + 50);
+    // リリース完了後に管理配列から除去
+    const idx = _sceneReleasingVoices.indexOf(v);
+    if(idx >= 0) _sceneReleasingVoices.splice(idx, 1);
+  }, stopMs);
+}
+
+// ── リリース中のボイスを即座に停止（コードチェンジ時の濁り防止）──
+function _killReleasingVoices(actx){
+  const t = actx.currentTime;
+  _sceneReleasingVoices.forEach(v => {
+    try{
+      v.vca.gain.cancelScheduledValues(t);
+      v.vca.gain.setValueAtTime(v.vca.gain.value, t);
+      v.vca.gain.linearRampToValueAtTime(0.0001, t + 0.08);
+    }catch(e){}
+    setTimeout(()=>{
+      try{ v.osc1.stop(); }catch(e){}
+      try{ v.osc2.stop(); }catch(e){}
+    }, 120);
+  });
+  _sceneReleasingVoices = [];
 }
 
 // ── CHORDサウンドを発音 ──
 function playSceneChord(actx, root, type){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+
+  // 前回リリース中のボイスを即座に消音（濁り防止）
+  _killReleasingVoices(actx);
 
   // 既存ボイスをChord Trailでフェードアウト
   const trailSec = sc.trailSec || Math.max(0.4, sc.release * 0.5);
