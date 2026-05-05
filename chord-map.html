@@ -2272,30 +2272,26 @@ function buildRelations(root,type){
 // ── RADIALモード用ノード絞り込み（最大4件）──
 // カテゴリ別優先度でスコア上位のノードを選出
 // 優先度: fifth(2) > diatonic(1) > modal/parallel(1) > それ以外(0→合計1)
-function filterRadialNodes(rels){
+// セクター（rtype）ごとに最大maxPerSector件に絞る汎用フィルター
+function filterNodesBySector(rels, maxPerSector){
   if(!rels||rels.length===0) return rels;
-
-  // セクター（rtype）ごとに最大4件に絞る
-  // → 合計は最大24件だが、実際のコード数は限られるので過剰にならない
-  const MAX_PER_SECTOR = 4;
-
-  // rtypeごとにスコア順でグループ化
   const byType = {};
   rels.forEach(node => {
     if(!byType[node.rtype]) byType[node.rtype] = [];
     byType[node.rtype].push(node);
   });
-
-  // 各セクター上位4件を取得（スコア順）
   const picked = [];
   Object.values(byType).forEach(group => {
     group
       .sort((a,b) => b.score - a.score)
-      .slice(0, MAX_PER_SECTOR)
+      .slice(0, maxPerSector)
       .forEach(n => picked.push(n));
   });
-
   return picked.sort((a,b) => b.score - a.score);
+}
+
+function filterRadialNodes(rels){
+  return filterNodesBySector(rels, 4); // radial: セクター別最大4件
 }
 
 // [chord-map-audio.js で定義]
@@ -2724,7 +2720,9 @@ function drawFrame(){
   // ── Get/cache relations ──
   if(!relCache)relCache=buildRelations(S.root,S.type);
   // RADIALはスクリーンが狭いため最大4件に絞る
-  const rels=(MAP_MODE==='radial')?filterRadialNodes(relCache):relCache;
+  const rels=(MAP_MODE==='radial') ? filterRadialNodes(relCache)
+           :(MAP_MODE==='link'||MAP_MODE==='chain') ? filterNodesBySector(relCache, 3)
+           : relCache;
   const dynRHEX=getRHEX();
   const dynRTYPES=getRTYPES();
   const perType={};dynRTYPES.forEach(t=>{perType[t]=[];});
