@@ -959,7 +959,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.1</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.2</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -9443,20 +9443,20 @@ let padOn=true; // PADは常時有効（タップで発音）
 let arpOn=false;
 let synthPanelOpen=true;
 
-// PADパラメーター
-let padVoicing='close';
-let padDetune=6;
-let padCutoff=2400;
-let padRes=1.2;        // フィルターQ値
-let padEnvMod=0.40;    // ENV MOD量（0〜1）
-let padLfoDepth=0;     // LFO Depth（0〜1）
-let padKeyFollow='half'; // off / half / full
-let padChorus='i';
-let padVol=0.55;
+// PADパラメーター（幻想的・広がりのあるデフォルト）
+let padVoicing='open';
+let padDetune=10;
+let padCutoff=900;      // 低めのカットオフ → ゆっくりスウィープで開く
+let padRes=0.8;
+let padEnvMod=0.65;     // 深めのENV MOD → フィルタースウィープ感
+let padLfoDepth=0.18;   // LFOでゆっくり揺れる
+let padKeyFollow='half';
+let padChorus='ii';     // 深いコーラスで広がり
+let padVol=0.52;
 
 // ── PADプリセット ──
 const PAD_PRESETS={
-  juno:   {voicing:'close',  detune:8,  cutoff:2400, res:1.2, envMod:0.35, lfoDepth:0.00, keyFollow:'half', chorus:'i',   vol:0.55},
+  juno:   {voicing:'open',   detune:10, cutoff:900,  res:0.8, envMod:0.65, lfoDepth:0.18, keyFollow:'half', chorus:'ii',  vol:0.52},
   strings:{voicing:'spread', detune:12, cutoff:3200, res:0.8, envMod:0.55, lfoDepth:0.08, keyFollow:'half', chorus:'ii',  vol:0.50},
   brass:  {voicing:'close',  detune:4,  cutoff:1800, res:4.5, envMod:0.75, lfoDepth:0.00, keyFollow:'full', chorus:'off', vol:0.60},
   dark:   {voicing:'drop2',  detune:10, cutoff:800,  res:3.0, envMod:0.20, lfoDepth:0.30, keyFollow:'off',  chorus:'i',   vol:0.55},
@@ -9501,17 +9501,17 @@ function applyPadPreset(name){
 
 // ARPパラメーター
 let arpPattern='up';
-let arpRate='1/8';
+let arpRate='1/4'; // ゆったりしたレート
 let arpFreeMs=200;
 let arpOctCenter=3;
 let arpOctRange=1;         // 1=±0oct, 2=±1oct, 3=±2oct
-let arpVol=0.65;
+let arpVol=0.38; // PADより控えめ（幻想的な重なり）
 
 // DILAYパラメーター
-let dlyTime='1/8';
-let dlyFreeMs=250;
-let dlyFeedback=0.35;
-let dlyMix=0.40;
+let dlyTime='1/2';   // 長めのディレイで空間を作る
+let dlyFreeMs=500;
+let dlyFeedback=0.42; // フィードバック多め
+let dlyMix=0.52;      // ウェット多め
 
 // ARP内部状態
 let arpTimer=null;
@@ -9857,8 +9857,8 @@ function padVoiceStart(actx, midi, out){
   // envModAmt: padEnvMod=0→変化なし、1→baseCutoffの4倍から開始
   const envModRange=baseCutoff*3.5*padEnvMod; // 最大でbaseCutoffの4.5倍分開く
   const attackCutoff=Math.min(baseCutoff+envModRange, nyq);
-  const attackTime=0.04;
-  const decayTime=0.8+padEnvMod*1.2; // envModが深いほどdecayも長く
+  const attackTime=0.12;  // ゆっくり立ち上がり
+  const decayTime=2.0+padEnvMod*2.5; // 長いフィルタースウィープ
 
   // OSC
   const osc1=actx.createOscillator();
@@ -9884,8 +9884,8 @@ function padVoiceStart(actx, midi, out){
   // DepthからRateを自動計算: 浅いとゆっくり、深いと速く
   let filterLfo=null;
   if(padLfoDepth>0.01){
-    const lfoRate=0.3+padLfoDepth*3.5;      // 0.3Hz〜3.8Hz
-    const lfoDepthHz=baseCutoff*padLfoDepth*0.6;  // 最大でカットオフの60%揺らす
+    const lfoRate=0.15+padLfoDepth*1.2;     // 0.15Hz〜1.4Hz（ゆっくり）
+    const lfoDepthHz=baseCutoff*padLfoDepth*0.5;
     filterLfo=actx.createOscillator();
     filterLfo.type='sine';
     filterLfo.frequency.value=lfoRate;
@@ -9910,7 +9910,7 @@ function padVoiceStart(actx, midi, out){
   // Voice Gain（ATTACK制御）
   const env=actx.createGain();
   env.gain.setValueAtTime(0.001, t);
-  env.gain.linearRampToValueAtTime(padVol*0.70, t+attackTime);
+  env.gain.linearRampToValueAtTime(padVol*0.72, t+attackTime);
 
   const subGain=actx.createGain(); subGain.gain.value=0.14;
 
@@ -9931,7 +9931,7 @@ function padVoiceRelease(voice, actx, releaseSec){
   voice.releasing=true;
   voice.active=false;
   const t=actx.currentTime;
-  const rs=releaseSec||0.35;
+  const rs=releaseSec||1.8; // 長めのリリース（幻想的な余韻）
   voice.env.gain.cancelScheduledValues(t);
   voice.env.gain.setValueAtTime(voice.env.gain.value, t);
   voice.env.gain.linearRampToValueAtTime(0.0001, t+rs);
@@ -11620,37 +11620,7 @@ function getPadMasterOut(actx){
   return _padMasterOut;
 }
 
-// ─ MODIFY対応版triggerPad（moveToChordから呼ばれる）─
-// 既存のtriggerPadをオーバーライドして拡張
-const _origTriggerPad=triggerPad;
-function triggerPad(root, type){
-  if(!synthPanelOpen) return;
-  const actx=safeGetCtx();
-  if(!actx) return;
-  safeResume(actx, ()=>{
-    const now=actx.currentTime;
-    const xfadeSec=0.12;
-
-    if(padCurrentGain){
-      const old=padCurrentGain;
-      old.gain.cancelScheduledValues(now);
-      old.gain.setValueAtTime(old.gain.value, now);
-      old.gain.linearRampToValueAtTime(0.001, now+xfadeSec);
-      setTimeout(()=>{ try{old.disconnect();}catch(e){} }, Math.round(xfadeSec*1000)+100);
-    }
-
-    const newGain=actx.createGain();
-    newGain.gain.setValueAtTime(0.001, now);
-    newGain.gain.linearRampToValueAtTime(1.0, now+xfadeSec);
-    newGain.connect(actx.destination);
-    padCurrentGain=newGain;
-
-    // MODIFYを適用したボイシング
-    buildPadVoicingWithModify(root, type, padVoicing).forEach((midi,i)=>{
-      synthJunoPad(actx, midi, now+i*0.007, 60/autoBpm*6, padVol, newGain);
-    });
-  });
-}
+// triggerPad は L.9951 に定義済み（padVoiceStart使用）
 
 // updateArpChordのMODIFY対応
 function updateArpChord(root, type){
