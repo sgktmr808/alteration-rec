@@ -3045,7 +3045,7 @@ function initCanvas(){
     if(dist<32&&MAP_MODE!=='expand'){
       if(autoPlay){stopAuto();}
       else{
-        if(!synthPanelOpen) playChord(S.root,S.type);
+        /* playChord disabled: notifySynth handles audio */
         if(FEATURES.phraseEngine) triggerPhrase(S.root,S.type);
         notifySynth(S.root,S.type);
       }
@@ -6143,8 +6143,7 @@ function moveToChord(root,type){
       if(curEl){curEl.classList.remove('pulse');void curEl.offsetWidth;curEl.classList.add('pulse');}
     });
   }
-  // PAD ONのときはplayChordをスキップ（SYNTHが代わりに発音）
-  if(!synthPanelOpen) playChord(root,type);
+  // playChord disabled: notifySynth(playScene)が一元発音
   if(FEATURES.phraseEngine) triggerPhrase(root,type);
   notifySynth(root,type);   // ← SYNTH PAD/ARP追従
   // CHAINモード: 進行パターンを検出してラベル更新
@@ -6967,7 +6966,7 @@ function renderPath(){
       const a=document.createElement('span');a.className='ph-arr';a.textContent='›';bar.appendChild(a);
     }
     const n=document.createElement('div');n.className='ph'+(i===S.histIdx?' cur':'');n.textContent=cs(c.root,c.type);
-    n.addEventListener('click',()=>{S.histIdx=i;S.root=c.root;S.type=c.type;relCache=null;invalidate();document.getElementById('hdr-chord').textContent=cs(c.root,c.type);renderPath();renderPosZone();if(!synthPanelOpen)playChord(c.root,c.type);notifySynth(c.root,c.type);});
+    n.addEventListener('click',()=>{S.histIdx=i;S.root=c.root;S.type=c.type;relCache=null;invalidate();document.getElementById('hdr-chord').textContent=cs(c.root,c.type);renderPath();renderPosZone();/* playChord disabled */notifySynth(c.root,c.type);});
     bar.appendChild(n);
   });
   bar.scrollLeft=bar.scrollWidth;
@@ -7150,12 +7149,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 function expandNode(root,type,key){
   const found=expandNodes.find(n=>n.key===key);
-  if(!found){ if(!synthPanelOpen)playChord(root,type); if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type); return; }
+  if(!found){ /* playChord disabled */ if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type); return; }
 
   // 帰還判定
   const retType=getReturnType(found, expandTree.root, expandTree.type);
   if(retType){
-    if(!synthPanelOpen)playChord(root,type); if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type);
+    /* playChord disabled */ if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type);
     expandReturnPulse=1.0;
     expandReturnNode={x:found.x, y:found.y, retType};
     dirty=true;
@@ -7167,7 +7166,7 @@ function expandNode(root,type,key){
     return;
   }
 
-  if(!synthPanelOpen)playChord(root,type); if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type);
+  /* playChord disabled */ if(FEATURES.phraseEngine)triggerPhrase(root,type); notifySynth(root,type);
 
   if(found.children.length>0){
     // 折りたたむ
@@ -7350,7 +7349,7 @@ function toggleLinkSelect(root,type){
   const k=cs(root,type);
   if(linkSelected.has(k))linkSelected.delete(k);
   else linkSelected.add(k);
-  if(!synthPanelOpen)playChord(root,type);
+  /* playChord disabled */
   notifySynth(root,type);
   invalidate();
 }
@@ -10267,25 +10266,30 @@ function playSceneChord(actx, root, type){
 
 // ── メインディスパッチャー ──
 function playScene(root, type){
-  // getCtx()をユーザー操作のコールスタック内で呼ぶ（iOS unlock）
+  // getCtx()をユーザー操作のコールスタック内で呼ぶ（iOS unlock必須）
   let actx;
   try{ actx = (typeof getCtx === 'function') ? getCtx() : null; }catch(e){ return; }
   if(!actx) return;
 
-  // CHORD系を発音
-  if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
-    playSceneChord(actx, root, type);
-  } else {
-    // ARPのみのとき前コードを止める
-    _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
-    _sceneVoices = [];
-  }
+  // iOS/Safari: suspended状態ならresumeを待ってから発音
+  // resume()はPromiseを返すが、ユーザーイベントのコールスタック内なので必ず成功する
+  const _doPlay = () => {
+    // CHORD系を発音
+    if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
+      playSceneChord(actx, root, type);
+    } else {
+      // ARPのみのとき前コードを止める
+      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
+      _sceneVoices = [];
+    }
+    // ARP連動
+    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
+  };
 
-  // ARP連動
-  if(sceneCurrentSource === 'ARP' || sceneCurrentSource === 'CHORD+ARP'){
-    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
+  if(actx.state === 'suspended'){
+    actx.resume().then(_doPlay).catch(()=>{});
   } else {
-    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
+    _doPlay();
   }
 }
 
@@ -10302,11 +10306,15 @@ function applyScene(name){
     const sc = SCENE_PRESETS[name];
     titleEl.textContent = sc ? sc.label : name.toUpperCase();
   }
-  // 再発音（パネルが開いていて現在コードがあれば）
-  if(S && S.root){
+  // Scene切替: 再発音しない（次のコードタップで新Sceneが適用される）
+  // 鳴っている前ボイスは自然なリリースでフェードアウト
+  if(_sceneVoices.length > 0){
     const actx = safeGetCtx();
     if(actx && actx.state === 'running'){
-      playSceneChord(actx, S.root, S.type);
+      const sc = SCENE_PRESETS[name] || SCENE_PRESETS.plain;
+      const fadeSec = Math.max(0.8, sc.release * 0.5);
+      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, fadeSec));
+      _sceneVoices = [];
     }
   }
 }
@@ -10325,8 +10333,7 @@ function notifySynth(root, type){
     playScene(root, type);
     return;
   }
-  // フォールバック（playScene未実装時）
-  if(!synthPanelOpen) playChord(root, type);
+  // フォールバック（playScene未実装時）— playChord disabled
   if(arpOn) updateArpChord(root, type);
 }
 
