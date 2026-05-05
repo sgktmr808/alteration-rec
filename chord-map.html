@@ -959,6 +959,39 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 </style>
 </head>
 <body>
+<div id="_dbg_panel" style="
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(0,0,0,0.85);color:#0f0;
+  font:11px monospace;padding:4px 8px;
+  max-height:120px;overflow-y:auto;
+  z-index:99999;pointer-events:none;
+  display:none;
+" id="_dbg_panel"></div>
+<script>
+var _dbgLines=[];
+function _dbg(msg){
+  var p=document.getElementById('_dbg_panel');
+  if(!p) return;
+  p.style.display='block';
+  _dbgLines.push(msg);
+  if(_dbgLines.length>10) _dbgLines.shift();
+  p.innerHTML=_dbgLines.map(function(l){return '<div>'+l+'</div>';}).join('');
+  p.scrollTop=p.scrollHeight;
+}
+// 3秒後に自動非表示
+var _dbgHideTimer=null;
+var _origDbg=_dbg;
+window._dbg=function(msg){
+  _origDbg(msg);
+  clearTimeout(_dbgHideTimer);
+  _dbgHideTimer=setTimeout(function(){
+    var p=document.getElementById('_dbg_panel');
+    if(p) p.style.display='none';
+    _dbgLines=[];
+  }, 6000);
+};
+</script>
+
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
@@ -10271,14 +10304,14 @@ function playScene(root, type){
   try{ actx = (typeof getCtx === 'function') ? getCtx() : null; }catch(e){ return; }
   if(!actx) return;
 
-  // iOS/Safari: suspended状態ならresumeを待ってから発音
-  // resume()はPromiseを返すが、ユーザーイベントのコールスタック内なので必ず成功する
   const _doPlay = () => {
+    _dbg('doPlay state='+actx.state+' t='+actx.currentTime.toFixed(3)+' '+root+' '+type);
+    const midis = (typeof buildPadVoicing === 'function') ? buildPadVoicing(root, type, 'open') : [];
+    _dbg('midis='+JSON.stringify(midis));
     // CHORD系を発音
     if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
       playSceneChord(actx, root, type);
     } else {
-      // ARPのみのとき前コードを止める
       _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
       _sceneVoices = [];
     }
@@ -10286,8 +10319,12 @@ function playScene(root, type){
     if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
   };
 
+  _dbg('playScene state='+actx.state+' t='+actx.currentTime.toFixed(3));
   if(actx.state === 'suspended'){
-    actx.resume().then(_doPlay).catch(()=>{});
+    actx.resume().then(() => {
+      _dbg('resumed! state='+actx.state+' t='+actx.currentTime.toFixed(3));
+      _doPlay();
+    }).catch((e)=>{ _dbg('resume ERR:'+e); });
   } else {
     _doPlay();
   }
