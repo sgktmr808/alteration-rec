@@ -10103,6 +10103,7 @@ function startArpScheduler(){
   // ARPシーケンスを現在コードで初期化
   arpSeq=buildArpSeq(S.root, S.type);
   arpStep=0;
+  _arpRhythmStep=0;
 
   const actx=safeGetCtx();
   if(!actx) return;
@@ -10118,32 +10119,49 @@ function stopArpScheduler(){
   if(arpScheduleTimer){ clearInterval(arpScheduleTimer); arpScheduleTimer=null; }
 }
 
+// ARPリズムステップカウンター
+let _arpRhythmStep = 0;
+
 function scheduleArpNotes(){
   if(!arpOn) return;
   const actx=safeGetCtx();
   if(!actx) return;
-  const stepSec=arpStepMs()/1000;
+  const baseSec=arpStepMs()/1000; // 1拍の長さ
   const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
+  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  const rhythm = sc.arpRhythm; // Scene別リズムパターン
+  const restProb = sc.arpRestProb || 0;
 
   while(arpNextBeat<lookAhead){
     const t=arpNextBeat;
-    const stepMs_=arpStepMs();
 
-    if(arpSeq.length>0){
-      const item=arpSeq[arpStep%arpSeq.length];
-      const dest=dlyDestination||actx.destination;
+    // リズムパターンがあれば使用、なければ均等
+    let stepRatio = 1.0;
+    if(rhythm && rhythm.length > 0){
+      stepRatio = rhythm[_arpRhythmStep % rhythm.length];
+      _arpRhythmStep++;
+    }
+    const stepSec = baseSec * stepRatio;
 
-      if(Array.isArray(item)){
-        // CHORDパターン: 同時発音（ストラム）
-        item.forEach((midi,i)=>{
-          _playSceneArpNote(actx, midi, t+i*0.012, dest);
-        });
-      } else {
-        _playSceneArpNote(actx, item, t, dest);
+    if(arpSeq.length > 0){
+      // 休符確率チェック
+      const isRest = restProb > 0 && Math.random() < restProb;
+
+      if(!isRest){
+        const item=arpSeq[arpStep%arpSeq.length];
+        const dest=dlyDestination||actx.destination;
+
+        if(Array.isArray(item)){
+          item.forEach((midi,i)=>{
+            _playSceneArpNote(actx, midi, t+i*0.012, dest);
+          });
+        } else {
+          _playSceneArpNote(actx, item, t, dest);
+        }
       }
       arpStep++;
     }
-    arpNextBeat+=stepSec;
+    arpNextBeat += stepSec;
   }
 }
 
@@ -10152,6 +10170,7 @@ function updateArpChord(root, type){
   if(!arpOn) return;
   arpSeq=buildArpSeq(root, type);
   arpStep=0;
+  // リズムパターンはリセットしない（コードチェンジをまたいでリズムが継続）
 }
 
 // ── UI制御 ──
@@ -10277,10 +10296,12 @@ const SCENE_PRESETS = {
     vol:0.40, chorus:0.06, wet:0.48, strum:12,
     trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0,
     voicingFlavor:'plain',
-    // ARP: sineで柔らかく、音数少なめ、delay控えめ
+    // ARP: sineで柔らかく、音数少なめ、余白あり
     arpOsc:'sine', arpCutoff:850, arpRes:0.4, arpEnvMod:0.28,
     arpAttack:0.018, arpDecay:0.45, arpSustain:0.0,
     arpGate:340, arpVol:0.20, arpWet:0.30, arpGhost:0.12,
+    // リズム: 長短混合、サティ的な余白（1.0=1拍、2.0=2拍休符的）
+    arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.5, 0.5], arpRestProb:0.25,
   },
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
@@ -10292,10 +10313,12 @@ const SCENE_PRESETS = {
     vol:0.44, chorus:0.16, wet:0.44, strum:7,
     trailSec:1.4, width:0.65, feltAttack:0.14, ghost:0.0,
     voicingFlavor:'rootless',
-    // ARP: triangle、中域、柔らかいfilter env
+    // ARP: triangle、中域、内声的な動き
     arpOsc:'triangle', arpCutoff:1300, arpRes:0.7, arpEnvMod:0.42,
     arpAttack:0.010, arpDecay:0.38, arpSustain:0.0,
     arpGate:300, arpVol:0.24, arpWet:0.36, arpGhost:0.18,
+    // リズム: 付点+短連打、エヴァンス的なブロークンリズム
+    arpRhythm:[1.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 1.5], arpRestProb:0.15,
   },
 
   // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
@@ -10307,10 +10330,12 @@ const SCENE_PRESETS = {
     vol:0.38, chorus:0.04, wet:0.58, strum:4,
     trailSec:1.2, width:0.45, feltAttack:0.18, ghost:0.0,
     voicingFlavor:'glass',
-    // ARP: sine、高域、細い、短いgate、冷たい
+    // ARP: sine、高域、細い、坂本龍一的断片
     arpOsc:'sine', arpCutoff:3200, arpRes:1.4, arpEnvMod:0.58,
     arpAttack:0.004, arpDecay:0.16, arpSustain:0.0,
     arpGate:150, arpVol:0.18, arpWet:0.52, arpGhost:0.22,
+    // リズム: 疎、断片的、長い間隔あり
+    arpRhythm:[1.0, 3.0, 1.0, 1.0, 2.0, 1.0, 4.0], arpRestProb:0.30,
   },
 
   // 4. LOVE STAB — ガラージ/ハウス的。暖かいコードスタブ、跳ねる
@@ -10322,10 +10347,12 @@ const SCENE_PRESETS = {
     vol:0.50, chorus:0.10, wet:0.26, strum:2,
     trailSec:0.4, width:0.60, feltAttack:0.08, ghost:0.0,
     voicingFlavor:'garage',
-    // ARP: sawtooth、暖かい中域、ハウス的アタック
+    // ARP: sawtooth、暖かい、ハウス的シンコペーション
     arpOsc:'sawtooth', arpCutoff:2000, arpRes:1.1, arpEnvMod:0.68,
     arpAttack:0.004, arpDecay:0.18, arpSustain:0.0,
     arpGate:140, arpVol:0.30, arpWet:0.25, arpGhost:0.08,
+    // リズム: 裏拍中心、ハウス的な跳ねるリズム
+    arpRhythm:[0.5, 0.5, 1.0, 0.5, 1.5, 0.5, 0.5, 0.5, 1.5], arpRestProb:0.10,
   },
 
   // 5. METALLIC PLUCK — Âme的。金属的、催眠的、短い反復
@@ -10337,10 +10364,12 @@ const SCENE_PRESETS = {
     vol:0.46, chorus:0.00, wet:0.20, strum:0,
     trailSec:0.2, width:0.35, feltAttack:0.0, ghost:0.0,
     voicingFlavor:'plain',
-    // ARP: square、高resonance、強いfilter env、催眠的
+    // ARP: square、高resonance、催眠的プラック
     arpOsc:'square', arpCutoff:4200, arpRes:3.8, arpEnvMod:0.92,
     arpAttack:0.001, arpDecay:0.10, arpSustain:0.0,
     arpGate:100, arpVol:0.34, arpWet:0.50, arpGhost:0.05,
+    // リズム: Euclidean 5/8的、催眠的、一部省略
+    arpRhythm:[1.0, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5], arpRestProb:0.12,
   },
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
@@ -10356,6 +10385,8 @@ const SCENE_PRESETS = {
     arpOsc:'sawtooth', arpCutoff:1700, arpRes:0.55, arpEnvMod:0.32,
     arpAttack:0.015, arpDecay:0.48, arpSustain:0.12,
     arpGate:360, arpVol:0.26, arpWet:0.42, arpGhost:0.15,
+    // リズム: Detroit的推進感、2拍+細分の組み合わせ
+    arpRhythm:[2.0, 1.0, 1.0, 2.0, 0.5, 0.5, 1.0], arpRestProb:0.08,
   },
 };
 
