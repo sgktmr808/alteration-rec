@@ -2090,6 +2090,8 @@ const SL=[
 ];
 // val = logical target, disp = animated display position (lerped each frame)
 const EASE=0.12;
+// スライダー操作中フラグ（スワイプと競合しないよう管理）
+let _sliderDragging = false;
 function sv(id){return SL.find(s=>s.id===id)?.val??0;}
 function moodOn(){return SL.some(s=>Math.abs(s.val)>0.05);}
 function tickSliders(){
@@ -3090,9 +3092,6 @@ function initCanvas(){
   canvas.addEventListener('pointerdown',iosAudioUnlock,{once:true});
   document.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
   document.addEventListener('pointerdown',iosAudioUnlock,{once:true});
-
-  // スライダー操作中フラグ（スワイプと競合しないよう管理）
-  let _sliderDragging = false;
 
   canvas.addEventListener('pointerdown',e=>{
     const{x,y}=canvasXY(e);
