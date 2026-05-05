@@ -962,7 +962,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.5</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.6</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -9449,17 +9449,17 @@ let synthPanelOpen=true;
 // PADパラメーター（幻想的・広がりのあるデフォルト）
 let padVoicing='open';
 let padDetune=10;
-let padCutoff=900;      // 低めのカットオフ → ゆっくりスウィープで開く
+let padCutoff=2800;     // 十分聞こえる帯域、LFO+ENVMODで動かす
 let padRes=0.8;
-let padEnvMod=0.65;     // 深めのENV MOD → フィルタースウィープ感
+let padEnvMod=0.55;     // フィルタースウィープ感
 let padLfoDepth=0.18;   // LFOでゆっくり揺れる
 let padKeyFollow='half';
 let padChorus='ii';     // 深いコーラスで広がり
-let padVol=0.52;
+let padVol=0.58;
 
 // ── PADプリセット ──
 const PAD_PRESETS={
-  juno:   {voicing:'open',   detune:10, cutoff:900,  res:0.8, envMod:0.65, lfoDepth:0.18, keyFollow:'half', chorus:'ii',  vol:0.52},
+  juno:   {voicing:'open',   detune:10, cutoff:2800, res:0.8, envMod:0.55, lfoDepth:0.18, keyFollow:'half', chorus:'ii',  vol:0.58},
   strings:{voicing:'spread', detune:12, cutoff:3200, res:0.8, envMod:0.55, lfoDepth:0.08, keyFollow:'half', chorus:'ii',  vol:0.50},
   brass:  {voicing:'close',  detune:4,  cutoff:1800, res:4.5, envMod:0.75, lfoDepth:0.00, keyFollow:'full', chorus:'off', vol:0.60},
   dark:   {voicing:'drop2',  detune:10, cutoff:800,  res:3.0, envMod:0.20, lfoDepth:0.30, keyFollow:'off',  chorus:'i',   vol:0.55},
@@ -9834,13 +9834,16 @@ let padVoices=[];
 // マスター出力GainNode（PAD全体のvol制御）
 let padMasterOut=null;
 
-function getPadMasterOut(actx, dest){
-  if(!padMasterOut||padMasterOut.context!==actx){
+function getPadMasterOut(actx){
+  // masterGainが存在するか確認（getCtx()後に作られるため毎回チェック）
+  const mg=(typeof masterGain!=='undefined'&&masterGain)?masterGain:null;
+  // コンテキスト変更またはmasterGain接続先が変わった場合は再作成
+  if(!padMasterOut||padMasterOut.context!==actx||padMasterOut._connectedToMg!==!!mg){
+    try{ padMasterOut.disconnect(); }catch(e){}
     padMasterOut=actx.createGain();
     padMasterOut.gain.value=1.0;
-    // masterGain経由でリバーブ込みの出力
-    const d=dest||(typeof masterGain!=='undefined'&&masterGain?masterGain:actx.destination);
-    padMasterOut.connect(d);
+    padMasterOut.connect(mg||actx.destination);
+    padMasterOut._connectedToMg=!!mg;
   }
   return padMasterOut;
 }
@@ -9862,8 +9865,8 @@ function padVoiceStart(actx, midi, out){
   // envModAmt: padEnvMod=0→変化なし、1→baseCutoffの4倍から開始
   const envModRange=baseCutoff*3.5*padEnvMod; // 最大でbaseCutoffの4.5倍分開く
   const attackCutoff=Math.min(baseCutoff+envModRange, nyq);
-  const attackTime=0.12;  // ゆっくり立ち上がり
-  const decayTime=2.0+padEnvMod*2.5; // 長いフィルタースウィープ
+  const attackTime=0.05;  // 素早く立ち上がり（遅すぎると聞こえない）
+  const decayTime=1.5+padEnvMod*2.0; // フィルタースウィープ
 
   // OSC
   const osc1=actx.createOscillator();
@@ -9936,7 +9939,7 @@ function padVoiceRelease(voice, actx, releaseSec){
   voice.releasing=true;
   voice.active=false;
   const t=actx.currentTime;
-  const rs=releaseSec||1.8; // 長めのリリース（幻想的な余韻）
+  const rs=releaseSec||1.5; // 幻想的な余韻
   voice.env.gain.cancelScheduledValues(t);
   voice.env.gain.setValueAtTime(voice.env.gain.value, t);
   voice.env.gain.linearRampToValueAtTime(0.0001, t+rs);
@@ -9960,9 +9963,7 @@ function triggerPad(root, type){
   if(actx.state==='suspended') actx.resume().catch(()=>{});
 
   function _play(){
-    // masterGainへ接続（リバーブ・音量制御を通す）
-    const dest=(typeof masterGain!=='undefined'&&masterGain)?masterGain:actx.destination;
-    const out=getPadMasterOut(actx, dest);
+    const out=getPadMasterOut(actx);
     out.gain.value=1.0;
 
     // MODIFY対応ボイシング
