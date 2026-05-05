@@ -962,7 +962,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.7.0</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.7.1</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -1210,101 +1210,29 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div class="synth-wrap" id="synth-wrap">
             <div class="synth-inner">
 
-              <!-- ── PAD セクション ── -->
+              <!-- ── SCENE ── -->
               <div class="synth-sec">
                 <div class="synth-sec-hdr">
-                  <span class="synth-sec-title">PAD · JUNO</span>
+                  <span class="synth-sec-title" id="scene-title">PLAIN ROOM</span>
                 </div>
-                <!-- PRESET -->
                 <div class="synth-row">
-                  <span class="synth-lbl">PRESET</span>
-                  <div class="synth-pills" id="pad-preset-pills">
-                    <div class="synth-pill on" data-preset="juno">JUNO</div>
-                    <div class="synth-pill" data-preset="strings">STR</div>
-                    <div class="synth-pill" data-preset="brass">BRASS</div>
-                    <div class="synth-pill" data-preset="dark">DARK</div>
-                    <div class="synth-pill" data-preset="glass">GLASS</div>
-                    <div class="synth-pill" data-preset="lead">LEAD</div>
+                  <span class="synth-lbl">SCENE</span>
+                  <div class="synth-pills">
+                    <div class="synth-pill scene-pill on" data-scene="plain" onclick="applyScene('plain')">PLAIN</div>
+                    <div class="synth-pill scene-pill" data-scene="velvet" onclick="applyScene('velvet')">VELVET</div>
+                    <div class="synth-pill scene-pill" data-scene="glass" onclick="applyScene('glass')">GLASS</div>
+                    <div class="synth-pill scene-pill" data-scene="love" onclick="applyScene('love')">LOVE</div>
+                    <div class="synth-pill scene-pill" data-scene="pluck" onclick="applyScene('pluck')">PLUCK</div>
+                    <div class="synth-pill scene-pill" data-scene="strings" onclick="applyScene('strings')">STRINGS</div>
                   </div>
                 </div>
-                <!-- VOICES -->
                 <div class="synth-row">
-                  <span class="synth-lbl">VOICES</span>
-                  <div class="synth-pills" id="pad-voices-pills">
-                    <div class="synth-pill on" data-voices="4">4</div>
-                    <div class="synth-pill" data-voices="6">6</div>
-                    <div class="synth-pill" data-voices="8">8</div>
+                  <span class="synth-lbl">SOURCE</span>
+                  <div class="synth-pills">
+                    <div class="synth-pill source-pill on" data-source="CHORD" onclick="applySource('CHORD')">CHORD</div>
+                    <div class="synth-pill source-pill" data-source="ARP" onclick="applySource('ARP')">ARP</div>
+                    <div class="synth-pill source-pill" data-source="CHORD+ARP" onclick="applySource('CHORD+ARP')">CHORD+ARP</div>
                   </div>
-                </div>
-                <!-- ボイシング -->
-                <div class="synth-row">
-                  <span class="synth-lbl">VOICING</span>
-                  <div class="synth-pills" id="pad-voicing-pills">
-                    <div class="synth-pill on" data-v="close">CLOSE</div>
-                    <div class="synth-pill" data-v="spread">SPREAD</div>
-                    <div class="synth-pill" data-v="drop2">DROP2</div>
-                    <div class="synth-pill" data-v="open">OPEN</div>
-                  </div>
-                </div>
-                <!-- DETUNE -->
-                <div class="synth-row">
-                  <span class="synth-lbl">DETUNE</span>
-                  <input class="synth-slider" id="pad-detune" type="range" min="0" max="20" value="6"
-                    oninput="synthSliderUpdate(this,'pad-detune-val',0,20,'¢')">
-                  <span class="synth-val" id="pad-detune-val">6¢</span>
-                </div>
-                <!-- CUTOFF -->
-                <div class="synth-row">
-                  <span class="synth-lbl">CUTOFF</span>
-                  <input class="synth-slider" id="pad-cutoff" type="range" min="200" max="8000" value="2400"
-                    oninput="synthSliderUpdate(this,'pad-cutoff-val',200,8000,'Hz')">
-                  <span class="synth-val" id="pad-cutoff-val">2.4k</span>
-                </div>
-                <!-- RESONANCE -->
-                <div class="synth-row">
-                  <span class="synth-lbl">RES</span>
-                  <input class="synth-slider" id="pad-res" type="range" min="0.5" max="18" step="0.1" value="1.2"
-                    oninput="synthSliderUpdate(this,'pad-res-val',0.5,18,'')">
-                  <span class="synth-val" id="pad-res-val">1.2</span>
-                </div>
-                <!-- ENV MOD -->
-                <div class="synth-row">
-                  <span class="synth-lbl">ENV MOD</span>
-                  <input class="synth-slider" id="pad-envmod" type="range" min="0" max="100" value="40"
-                    oninput="synthSliderUpdate(this,'pad-envmod-val',0,100,'%')">
-                  <span class="synth-val" id="pad-envmod-val">40%</span>
-                </div>
-                <!-- LFO DEPTH（RateはDepthに自動連動） -->
-                <div class="synth-row">
-                  <span class="synth-lbl">LFO</span>
-                  <input class="synth-slider" id="pad-lfo-depth" type="range" min="0" max="100" value="0"
-                    oninput="synthSliderUpdate(this,'pad-lfo-depth-val',0,100,'%')">
-                  <span class="synth-val" id="pad-lfo-depth-val">0%</span>
-                </div>
-                <!-- KEY FOLLOW -->
-                <div class="synth-row">
-                  <span class="synth-lbl">KEY FOL</span>
-                  <div class="synth-pills" id="pad-keyfollow-pills">
-                    <div class="synth-pill" data-kf="off">OFF</div>
-                    <div class="synth-pill on" data-kf="half">½</div>
-                    <div class="synth-pill" data-kf="full">FULL</div>
-                  </div>
-                </div>
-                <!-- CHORUS -->
-                <div class="synth-row">
-                  <span class="synth-lbl">CHORUS</span>
-                  <div class="synth-pills" id="pad-chorus-pills">
-                    <div class="synth-pill" data-c="off">OFF</div>
-                    <div class="synth-pill on" data-c="i">I</div>
-                    <div class="synth-pill" data-c="ii">II</div>
-                  </div>
-                </div>
-                <!-- VOLUME -->
-                <div class="synth-row">
-                  <span class="synth-lbl">VOL</span>
-                  <input class="synth-slider" id="pad-vol" type="range" min="0" max="100" value="55"
-                    oninput="synthSliderUpdate(this,'pad-vol-val',0,100,'%')">
-                  <span class="synth-val" id="pad-vol-val">55%</span>
                 </div>
               </div>
 
@@ -1312,14 +1240,19 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div class="synth-sec">
                 <div class="synth-sec-hdr">
                   <span class="synth-sec-title">ARP · SH-101</span>
-                  <div class="synth-on-btn arp" id="arp-on-btn" onclick="toggleArp()">OFF</div>
+                  <div class="synth-pill arp" id="arp-on-btn" onclick="toggleArp()">OFF</div>
                 </div>
-                <!-- パターン -->
                 <div class="synth-row">
                   <span class="synth-lbl">PATTERN</span>
-                  <div class="arp-pattern-grid" id="arp-pattern-pills"></div>
+                  <div class="synth-pills" id="arp-pattern-pills">
+                    <div class="synth-pill arp on" data-pat="up">UP</div>
+                    <div class="synth-pill arp" data-pat="down">DOWN</div>
+                    <div class="synth-pill arp" data-pat="up-dn">UP-DN</div>
+                    <div class="synth-pill arp" data-pat="dn-up">DN-UP</div>
+                    <div class="synth-pill arp" data-pat="rand">RAND</div>
+                    <div class="synth-pill arp" data-pat="chord">CHORD</div>
+                  </div>
                 </div>
-                <!-- レート -->
                 <div class="synth-row">
                   <span class="synth-lbl">RATE</span>
                   <div class="synth-pills" id="arp-rate-pills">
@@ -1327,76 +1260,42 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                     <div class="synth-pill arp on" data-r="1/8">1/8</div>
                     <div class="synth-pill arp" data-r="1/16">1/16</div>
                     <div class="synth-pill arp" data-r="1/32">1/32</div>
-                    <div class="synth-pill arp" data-r="1/8T">1/8T</div>
-                    <div class="synth-pill arp" data-r="1/16T">1/16T</div>
-                    <div class="synth-pill arp" data-r="free">FREE</div>
                   </div>
                 </div>
-                <!-- FREE ms（レートがfreeのとき有効） -->
-                <div class="synth-row" id="arp-free-row" style="display:none;">
-                  <span class="synth-lbl">MS</span>
-                  <input class="synth-slider arp" id="arp-free-ms" type="range" min="50" max="1000" value="200"
-                    oninput="synthSliderUpdate(this,'arp-free-ms-val',50,1000,'ms')">
-                  <span class="synth-val" id="arp-free-ms-val">200ms</span>
-                </div>
-                <!-- オクターブ中心 -->
-                <div class="synth-row">
-                  <span class="synth-lbl">OCT CTR</span>
-                  <div class="synth-pills" id="arp-oct-ctr-pills">
-                    <div class="synth-pill arp" data-oc="2">2</div>
-                    <div class="synth-pill arp on" data-oc="3">3</div>
-                    <div class="synth-pill arp" data-oc="4">4</div>
-                    <div class="synth-pill arp" data-oc="5">5</div>
-                  </div>
-                </div>
-                <!-- オクターブ幅 -->
-                <div class="synth-row">
-                  <span class="synth-lbl">OCT RNG</span>
-                  <div class="synth-pills" id="arp-oct-rng-pills">
-                    <div class="synth-pill arp on" data-or="1">±0</div>
-                    <div class="synth-pill arp" data-or="2">±1</div>
-                    <div class="synth-pill arp" data-or="3">±2</div>
-                  </div>
-                </div>
-                <!-- VOLUME -->
                 <div class="synth-row">
                   <span class="synth-lbl">VOL</span>
-                  <input class="synth-slider arp" id="arp-vol" type="range" min="0" max="100" value="65"
-                    oninput="synthSliderUpdate(this,'arp-vol-val',0,100,'%')">
-                  <span class="synth-val" id="arp-vol-val">65%</span>
+                  <input class="synth-slider arp" id="arp-vol" type="range" min="0" max="100" value="38"
+                    oninput="arpVol=parseInt(this.value)/100;this.style.setProperty('--pct',this.value+'%');document.getElementById('arp-vol-val').textContent=this.value+'%';">
+                  <span class="synth-val" id="arp-vol-val">38%</span>
                 </div>
+              </div>
 
-                <!-- ── DELAY サブセクション ── -->
-                <div style="border-top:1px solid var(--bdr);padding-top:6px;margin-top:2px;">
-                  <div class="synth-row">
-                    <span class="synth-lbl">DLY TIME</span>
-                    <div class="synth-pills" id="dly-time-pills">
-                      <div class="synth-pill arp" data-dt="off">OFF</div>
-                      <div class="synth-pill arp on" data-dt="1/8">1/8</div>
-                      <div class="synth-pill arp" data-dt="1/4">1/4</div>
-                      <div class="synth-pill arp" data-dt="1/8D">1/8D</div>
-                      <div class="synth-pill arp" data-dt="ping">PING</div>
-                      <div class="synth-pill arp" data-dt="free">FREE</div>
-                    </div>
+              <!-- ── DELAY / SPACE ── -->
+              <div class="synth-sec">
+                <div class="synth-sec-hdr">
+                  <span class="synth-sec-title">DELAY · SPACE</span>
+                </div>
+                <div class="synth-row">
+                  <span class="synth-lbl">TIME</span>
+                  <div class="synth-pills" id="dly-time-pills">
+                    <div class="synth-pill arp" data-t="1/8">1/8</div>
+                    <div class="synth-pill arp on" data-t="1/4">1/4</div>
+                    <div class="synth-pill arp" data-t="1/2">1/2</div>
+                    <div class="synth-pill arp" data-t="ping">PING</div>
+                    <div class="synth-pill arp" data-t="off">OFF</div>
                   </div>
-                  <div class="synth-row" id="dly-free-row" style="display:none;">
-                    <span class="synth-lbl">DLY MS</span>
-                    <input class="synth-slider arp" id="dly-free-ms" type="range" min="20" max="800" value="250"
-                      oninput="synthSliderUpdate(this,'dly-free-ms-val',20,800,'ms')">
-                    <span class="synth-val" id="dly-free-ms-val">250ms</span>
-                  </div>
-                  <div class="synth-row">
-                    <span class="synth-lbl">FEEDBACK</span>
-                    <input class="synth-slider arp" id="dly-fb" type="range" min="0" max="85" value="35"
-                      oninput="synthSliderUpdate(this,'dly-fb-val',0,85,'%')">
-                    <span class="synth-val" id="dly-fb-val">35%</span>
-                  </div>
-                  <div class="synth-row">
-                    <span class="synth-lbl">MIX</span>
-                    <input class="synth-slider arp" id="dly-mix" type="range" min="0" max="100" value="40"
-                      oninput="synthSliderUpdate(this,'dly-mix-val',0,100,'%')">
-                    <span class="synth-val" id="dly-mix-val">40%</span>
-                  </div>
+                </div>
+                <div class="synth-row">
+                  <span class="synth-lbl">FEEDBACK</span>
+                  <input class="synth-slider arp" id="dly-fb" type="range" min="0" max="85" value="35"
+                    oninput="dlyFeedback=parseInt(this.value)/100;this.style.setProperty('--pct',(parseInt(this.value)/85*100).toFixed(1)+'%');document.getElementById('dly-fb-val').textContent=this.value+'%';">
+                  <span class="synth-val" id="dly-fb-val">35%</span>
+                </div>
+                <div class="synth-row">
+                  <span class="synth-lbl">MIX</span>
+                  <input class="synth-slider arp" id="dly-mix" type="range" min="0" max="100" value="40"
+                    oninput="dlyMix=parseInt(this.value)/100;this.style.setProperty('--pct',this.value+'%');document.getElementById('dly-mix-val').textContent=this.value+'%';">
+                  <span class="synth-val" id="dly-mix-val">40%</span>
                 </div>
               </div>
 
@@ -10139,6 +10038,36 @@ function synthSliderUpdate(el, valId, min, max, unit){
 }
 
 function initSynthUI(){
+  // ARPパターンpill初期化
+  document.querySelectorAll('#arp-pattern-pills .synth-pill').forEach(p=>{
+    p.onclick=()=>{
+      arpPattern=p.dataset.pat;
+      document.querySelectorAll('#arp-pattern-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      if(arpOn&&S&&S.root) { arpSeq=buildArpSeq(S.root,S.type); arpStep=0; }
+    };
+  });
+  // ARPレートpill初期化
+  document.querySelectorAll('#arp-rate-pills .synth-pill').forEach(p=>{
+    p.onclick=()=>{
+      arpRate=p.dataset.r;
+      document.querySelectorAll('#arp-rate-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+    };
+  });
+  // DELAYタイムpill初期化
+  document.querySelectorAll('#dly-time-pills .synth-pill').forEach(p=>{
+    p.onclick=()=>{
+      dlyTime=p.dataset.t;
+      document.querySelectorAll('#dly-time-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
+      const actx=safeGetCtx();
+      if(actx) safeResume(actx,()=>buildDelayNodes(actx));
+    };
+  });
+  // スライダーのグラデーション初期化
+  [['arp-vol',0,100],['dly-fb',0,85],['dly-mix',0,100]].forEach(([id,min,max])=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.style.setProperty('--pct',((parseFloat(el.value)-min)/(max-min)*100).toFixed(1)+'%');
+  });
+
   // PAD PRESET pills
   document.querySelectorAll('#pad-preset-pills .synth-pill').forEach(p=>{
     p.classList.toggle('on', p.dataset.preset===padCurrentPreset);
@@ -10272,6 +10201,253 @@ function initSynthUI(){
 }
 
 // ── moveToChordからSYNTHに通知するフック ──
+// ═══════════════════════════════════════════════════════════════
+// SCENE SOUND ENGINE v1.0
+// 仕様: chord_map_sound_world_spec_v2_with_taste_profile.md
+// 「ピアノの記憶を持ったシンセが、静かな和声とクラブ的な反復のあいだを漂う」
+// ═══════════════════════════════════════════════════════════════
+
+// ── 現在のScene / Source 状態 ──
+let sceneCurrentName = 'plain';   // 現在のScene名
+let sceneCurrentSource = 'CHORD'; // 'CHORD' | 'ARP' | 'CHORD+ARP'
+
+// ── Scene定義 ──
+// 各Sceneは以下を持つ:
+// osc1/osc2: oscillator type, detune: cents, cutoff: Hz,
+// res: Q, envMod: 0-1, attack: sec, release: sec,
+// vol: 0-1, chorus: 0-1, wet: reverb mix, arpGate: ms
+const SCENE_PRESETS = {
+
+  // 1. PLAIN ROOM — サティ的。余白、淡い和声、静けさ
+  plain: {
+    label:'PLAIN ROOM',
+    osc1:'sine', osc2:'triangle', detune:4,
+    cutoff:1200, res:0.6, envMod:0.45,
+    attack:0.12, decay:0.8, sustain:0.55, release:2.8,
+    vol:0.42, chorus:0.08, wet:0.45, strum:10,
+    arpGate:320, arpVol:0.28, arpWet:0.38,
+  },
+
+  // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
+  velvet: {
+    label:'VELVET ROOTLESS',
+    osc1:'sawtooth', osc2:'triangle', detune:9,
+    cutoff:1900, res:0.8, envMod:0.52,
+    attack:0.08, decay:0.7, sustain:0.65, release:2.2,
+    vol:0.46, chorus:0.18, wet:0.42, strum:8,
+    arpGate:280, arpVol:0.30, arpWet:0.40,
+  },
+
+  // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
+  glass: {
+    label:'GLASS PIANO',
+    osc1:'sine', osc2:'sine', detune:2,
+    cutoff:3200, res:1.2, envMod:0.35,
+    attack:0.025, decay:0.5, sustain:0.42, release:1.8,
+    vol:0.40, chorus:0.05, wet:0.55, strum:5,
+    arpGate:180, arpVol:0.25, arpWet:0.50,
+  },
+
+  // 4. LOVE STAB — ガラージ/ハウス的。暖かいコードスタブ、跳ねる
+  love: {
+    label:'LOVE STAB',
+    osc1:'sawtooth', osc2:'triangle', detune:6,
+    cutoff:2600, res:1.4, envMod:0.62,
+    attack:0.012, decay:0.35, sustain:0.35, release:0.55,
+    vol:0.52, chorus:0.12, wet:0.28, strum:3,
+    arpGate:160, arpVol:0.36, arpWet:0.32,
+  },
+
+  // 5. METALLIC PLUCK — Âme的。金属的、催眠的、短い反復
+  pluck: {
+    label:'METALLIC PLUCK',
+    osc1:'sawtooth', osc2:'square', detune:3,
+    cutoff:3800, res:3.5, envMod:0.80,
+    attack:0.004, decay:0.22, sustain:0.08, release:0.28,
+    vol:0.48, chorus:0.00, wet:0.22, strum:0,
+    arpGate:120, arpVol:0.40, arpWet:0.55,
+  },
+
+  // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
+  strings: {
+    label:'BLACK STRINGS',
+    osc1:'sawtooth', osc2:'sawtooth', detune:14,
+    cutoff:2200, res:0.7, envMod:0.40,
+    attack:0.25, decay:1.2, sustain:0.78, release:4.2,
+    vol:0.50, chorus:0.28, wet:0.52, strum:18,
+    arpGate:380, arpVol:0.32, arpWet:0.48,
+  },
+};
+
+// ── アクティブなCHORDボイスを管理 ──
+let _sceneVoices = [];   // 現在鳴っているCHORDボイス
+let _sceneTrailTimer = null;
+
+// ── 1音のCHORDボイスを発音 ──
+function _playSceneNote(actx, hz, sc, t, out){
+  const nyq = actx.sampleRate / 2 - 100;
+
+  // OSC1（メイン）
+  const osc1 = actx.createOscillator();
+  osc1.type = sc.osc1;
+  osc1.frequency.value = hz;
+
+  // OSC2（デチューン）
+  const osc2 = actx.createOscillator();
+  osc2.type = sc.osc2;
+  osc2.frequency.value = hz * Math.pow(2, sc.detune / 1200);
+
+  // LPF with ENV MOD
+  const lpf = actx.createBiquadFilter();
+  lpf.type = 'lowpass';
+  lpf.Q.value = sc.res;
+  const peakCutoff = Math.min(sc.cutoff * (1 + sc.envMod * 3.0), nyq);
+  lpf.frequency.setValueAtTime(peakCutoff, t);
+  lpf.frequency.exponentialRampToValueAtTime(
+    Math.max(sc.cutoff, 80), t + sc.attack + sc.decay
+  );
+
+  // Chorus LFO（osc2のピッチを揺らす）
+  if(sc.chorus > 0.02){
+    const lfoRate = 0.8 + sc.chorus * 1.2;
+    const lfoDepth = hz * sc.chorus * 0.006;
+    const clfo = actx.createOscillator();
+    const cg = actx.createGain();
+    clfo.frequency.value = lfoRate;
+    cg.gain.value = lfoDepth;
+    clfo.connect(cg); cg.connect(osc2.frequency);
+    clfo.start(t); clfo.stop(t + 30);
+  }
+
+  // VCA Envelope
+  const vca = actx.createGain();
+  vca.gain.setValueAtTime(0.001, t);
+  vca.gain.linearRampToValueAtTime(sc.vol * 0.68, t + sc.attack);
+  vca.gain.setValueAtTime(sc.vol * 0.68 * sc.sustain, t + sc.attack + sc.decay);
+
+  // OSC2 mix (少し抑える)
+  const osc2g = actx.createGain();
+  osc2g.gain.value = 0.55;
+
+  osc1.connect(lpf);
+  osc2.connect(osc2g); osc2g.connect(lpf);
+  lpf.connect(vca); vca.connect(out);
+
+  osc1.start(t); osc2.start(t);
+  osc1.stop(t + 30); osc2.stop(t + 30);
+
+  return { osc1, osc2, lpf, vca, releasing: false };
+}
+
+// ── CHORDボイスのリリース ──
+function _releaseSceneVoice(v, actx, relSec){
+  if(!v || v.releasing) return;
+  v.releasing = true;
+  const t = actx.currentTime;
+  try{
+    v.vca.gain.cancelScheduledValues(t);
+    v.vca.gain.setValueAtTime(v.vca.gain.value, t);
+    v.vca.gain.linearRampToValueAtTime(0.0001, t + relSec);
+  }catch(e){}
+  setTimeout(()=>{
+    try{ v.osc1.stop(); }catch(e){}
+    try{ v.osc2.stop(); }catch(e){}
+  }, Math.round(relSec * 1000) + 50);
+}
+
+// ── CHORDサウンドを発音 ──
+function playSceneChord(actx, root, type){
+  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+
+  // 既存ボイスをリリース（Trail: 長めにフェードアウト）
+  const trailSec = Math.max(0.3, sc.release * 0.6);
+  _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, trailSec));
+  _sceneVoices = [];
+
+  // getOut() = masterGain + reverb（audio.jsの正規ルーティング）
+  const out = (typeof getOut === 'function')
+    ? getOut(actx, sc.wet)
+    : actx.destination;
+
+  // ボイシング取得
+  const midis = (typeof buildPadVoicing === 'function')
+    ? buildPadVoicing(root, type, 'open').slice(0, 5)
+    : [];
+  if(!midis.length) return;
+
+  // Strum: 低→高の順に少しずつ遅らせて発音
+  const strumSec = sc.strum / 1000;
+  midis.forEach((midi, i) => {
+    const t = actx.currentTime + 0.015 + i * strumSec;
+    const hz = midi2hz(Math.max(24, Math.min(108, midi)));
+    const voice = _playSceneNote(actx, hz, sc, t, out);
+    _sceneVoices.push(voice);
+  });
+
+  // 自動リリース（sustainに基づく）
+  if(_sceneTrailTimer) clearTimeout(_sceneTrailTimer);
+  const holdSec = sc.attack + sc.decay + 4.0;
+  _sceneTrailTimer = setTimeout(()=>{
+    const a2 = safeGetCtx(); if(!a2) return;
+    _sceneVoices.forEach(v => _releaseSceneVoice(v, a2, sc.release));
+    setTimeout(()=>{ _sceneVoices = []; }, Math.round(sc.release * 1000) + 200);
+  }, Math.round(holdSec * 1000));
+}
+
+// ── メインディスパッチャー ──
+function playScene(root, type){
+  // getCtx()をユーザー操作のコールスタック内で呼ぶ（iOS unlock）
+  let actx;
+  try{ actx = (typeof getCtx === 'function') ? getCtx() : null; }catch(e){ return; }
+  if(!actx) return;
+
+  // CHORD系を発音
+  if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
+    playSceneChord(actx, root, type);
+  } else {
+    // ARPのみのとき前コードを止める
+    _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
+    _sceneVoices = [];
+  }
+
+  // ARP連動
+  if(sceneCurrentSource === 'ARP' || sceneCurrentSource === 'CHORD+ARP'){
+    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
+  } else {
+    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
+  }
+}
+
+// ── Scene切替 ──
+function applyScene(name){
+  sceneCurrentName = name;
+  // UI更新
+  document.querySelectorAll('.scene-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.scene === name)
+  );
+  // SYNTHパネルのタイトル更新
+  const titleEl = document.getElementById('scene-title');
+  if(titleEl){
+    const sc = SCENE_PRESETS[name];
+    titleEl.textContent = sc ? sc.label : name.toUpperCase();
+  }
+  // 再発音（パネルが開いていて現在コードがあれば）
+  if(S && S.root){
+    const actx = safeGetCtx();
+    if(actx && actx.state === 'running'){
+      playSceneChord(actx, S.root, S.type);
+    }
+  }
+}
+
+// ── Source切替 ──
+function applySource(src){
+  sceneCurrentSource = src;
+  document.querySelectorAll('.source-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.source === src)
+  );
+}
+
 function notifySynth(root, type){
   // 新サウンドエンジン: playScene()が発音とARP連動を一元管理
   if(typeof playScene==='function'){
