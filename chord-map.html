@@ -959,7 +959,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.1</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -3109,15 +3109,13 @@ function initCanvas(){
   const canvas=document.getElementById('map-canvas');
 
   // iOS Safari: 最初のタッチでAudioContextをユーザー操作文脈内で初期化
+  // K4-H1/H2: safeGetCtx/safeResumeで外部ファイル未ロード時も安全に動作
   const iosAudioUnlock=()=>{
     const ctx=safeGetCtx();
     if(ctx) safeResume(ctx);
   };
   canvas.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
   canvas.addEventListener('pointerdown',iosAudioUnlock,{once:true});
-  // ctrl-screen側のタップでも初期化（コントロール画面から最初に触れた場合）
-  document.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
-  document.addEventListener('pointerdown',iosAudioUnlock,{once:true});
 
   canvas.addEventListener('pointerdown',e=>{
     const{x,y}=canvasXY(e);
@@ -9824,7 +9822,6 @@ function updateDelayTime(){
 // ════════════════════════════════════════════════════════
 
 let padMaxVoices=4;  // UI選択: 4 / 6 / 8
-let padCurrentGain=null; // xfade用（互換）
 
 // Voice構造体
 // { midi, osc1, osc2, oscSub, lpf, env, lfo, gainNode, active, releasing }
@@ -9956,10 +9953,8 @@ function triggerPad(root, type){
     const out=getPadMasterOut(actx);
     out.gain.value=1.0;
 
-    // MODIFY対応ボイシング（modifyTensionsがなければ通常ボイシング）
-    let newMidis=(typeof buildPadVoicingWithModify==='function')
-      ? buildPadVoicingWithModify(root, type, padVoicing)
-      : buildPadVoicing(root, type, padVoicing);
+    // 新コードのMIDIノートセット（最大padMaxVoices音に制限）
+    let newMidis=buildPadVoicing(root, type, padVoicing);
     if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
     const newSet=new Set(newMidis);
 
@@ -9967,22 +9962,21 @@ function triggerPad(root, type){
     const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
     const activeSet=new Set(activeVoices.map(v=>v.midi));
 
-    // 不要音をリリース
+    // 1. 不要になった音をリリース（新コードにない音）
     activeVoices.forEach(v=>{
       if(!newSet.has(v.midi)) padVoiceRelease(v, actx, 0.35);
     });
 
-    // 新しい音を発音（重複しない）
+    // 2. 新しく必要な音のうち、まだ鳴っていない音を発音
     newMidis.forEach(midi=>{
       if(!activeSet.has(midi)){
+        // 旧リリース中のVoiceを再利用するか新規作成
         const voice=padVoiceStart(actx, midi, out);
         padVoices.push(voice);
       }
     });
 
-    // ARP連動: コードが変わったらARPシーケンスも更新
-    if(arpOn && typeof updateArpChord==='function') updateArpChord(root, type);
-
+    // 3. 解放済みVoiceをリストから掃除（メモリ管理）
     setTimeout(()=>{
       padVoices=padVoices.filter(v=>v.active||v.releasing);
     }, 600);
@@ -11625,8 +11619,37 @@ function getPadMasterOut(actx){
   return _padMasterOut;
 }
 
-// triggerPad は L.9947 に定義（MODIFYボイシング対応版）
-// ※ synthJunoPadはaudio.js依存のため使用しない
+// ─ MODIFY対応版triggerPad（moveToChordから呼ばれる）─
+// 既存のtriggerPadをオーバーライドして拡張
+const _origTriggerPad=triggerPad;
+function triggerPad(root, type){
+  if(!synthPanelOpen) return;
+  const actx=safeGetCtx();
+  if(!actx) return;
+  safeResume(actx, ()=>{
+    const now=actx.currentTime;
+    const xfadeSec=0.12;
+
+    if(padCurrentGain){
+      const old=padCurrentGain;
+      old.gain.cancelScheduledValues(now);
+      old.gain.setValueAtTime(old.gain.value, now);
+      old.gain.linearRampToValueAtTime(0.001, now+xfadeSec);
+      setTimeout(()=>{ try{old.disconnect();}catch(e){} }, Math.round(xfadeSec*1000)+100);
+    }
+
+    const newGain=actx.createGain();
+    newGain.gain.setValueAtTime(0.001, now);
+    newGain.gain.linearRampToValueAtTime(1.0, now+xfadeSec);
+    newGain.connect(actx.destination);
+    padCurrentGain=newGain;
+
+    // MODIFYを適用したボイシング
+    buildPadVoicingWithModify(root, type, padVoicing).forEach((midi,i)=>{
+      synthJunoPad(actx, midi, now+i*0.007, 60/autoBpm*6, padVol, newGain);
+    });
+  });
+}
 
 // updateArpChordのMODIFY対応
 function updateArpChord(root, type){
@@ -11643,7 +11666,6 @@ const _origRenderRoots=renderRoots;
 // ─ ページ読み込み時にMODIFY初期化 ─
 document.addEventListener('DOMContentLoaded',()=>{
   renderModify();
-  // synthPanelOpen=trueに合わせてUIを開いた状態に
   const wrap=document.getElementById('synth-wrap');
   const tog=document.getElementById('synth-tog');
   if(wrap) wrap.classList.add('open');
