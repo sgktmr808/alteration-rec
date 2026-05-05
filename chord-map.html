@@ -2273,45 +2273,29 @@ function buildRelations(root,type){
 // カテゴリ別優先度でスコア上位のノードを選出
 // 優先度: fifth(2) > diatonic(1) > modal/parallel(1) > それ以外(0→合計1)
 function filterRadialNodes(rels){
-  if(!rels||rels.length<=4) return rels;
+  if(!rels||rels.length===0) return rels;
 
-  const picked=[];
-  const used=new Set();
+  // セクター（rtype）ごとに最大4件に絞る
+  // → 合計は最大24件だが、実際のコード数は限られるので過剰にならない
+  const MAX_PER_SECTOR = 4;
 
-  function pickTop(rtypes, max){
-    let count=0;
-    for(const node of rels){
-      if(count>=max) break;
-      if(used.has(node.root+'__'+node.type)) continue;
-      if(rtypes.includes(node.rtype)){
-        picked.push(node);
-        used.add(node.root+'__'+node.type);
-        count++;
-      }
-    }
-  }
+  // rtypeごとにスコア順でグループ化
+  const byType = {};
+  rels.forEach(node => {
+    if(!byType[node.rtype]) byType[node.rtype] = [];
+    byType[node.rtype].push(node);
+  });
 
-  // 1. fifth: 最大2件（V7・IV・ii等 — 最も音楽的に重要）
-  pickTop(['fifth'], 2);
+  // 各セクター上位4件を取得（スコア順）
+  const picked = [];
+  Object.values(byType).forEach(group => {
+    group
+      .sort((a,b) => b.score - a.score)
+      .slice(0, MAX_PER_SECTOR)
+      .forEach(n => picked.push(n));
+  });
 
-  // 2. diatonic: 最大1件
-  pickTop(['diatonic'], 1);
-
-  // 3. modal / parallel: 最大1件（どちらか上位）
-  pickTop(['modal','parallel'], 1);
-
-  // 4. まだ4件に満たない場合、残りカテゴリから補充
-  if(picked.length < 4){
-    pickTop(['chromatic','subst',
-             'ethnic_spanish','ethnic_arabic','ethnic_japanese',
-             'ethnic_blues','ethnic_african','ethnic_indian',
-             'ethnic_hungarian','ethnic_byzantine','ethnic_jewish',
-             'ethnic_balinese','ethnic_celtic','ethnic_persian',
-             'ethnic_brazilian'], 4-picked.length);
-  }
-
-  // スコア順で返す（描画の角度計算のため元の順序は保持）
-  return picked.sort((a,b)=>b.score-a.score);
+  return picked.sort((a,b) => b.score - a.score);
 }
 
 // [chord-map-audio.js で定義]
@@ -2757,11 +2741,17 @@ function drawFrame(){
     // Sector angle from weighted layout
     const sec=sectorAngles[ri2]||sectorAngles[0];
     const sc=(sec.start+sec.size/2)-Math.PI/2;
-    const spread=Math.min(sec.size*0.72,cnt*0.28);
+    // ノードが重ならない最小角度間隔を確保
+    // タップ領域40px、半径mrで40px = 40/mr rad ≈ 0.22rad
+    const minStep = Math.max(42/((mr+MR)/2), 0.18); // 最小間隔（ラジアン）
+    const spreadNeed = cnt<=1 ? 0 : minStep*(cnt-1);
+    const spread = Math.min(sec.size*0.82, spreadNeed);
     const angle=sc+(idx-(cnt-1)/2)*(spread/Math.max(cnt-1,1));
+    // 件数が多いほど半径方向にも少し分散（奇数/偶数で交互）
     const frac=idx/Math.max(cnt-1,1);
     const pull=node.mb/40;
-    const r=mr+(MR-mr)*(0.15+frac*0.85)*(1-pull*0.25);
+    const rExtra = cnt>=3 ? (idx%2===0?0:6) : 0; // 交互に±6px
+    const r=mr+(MR-mr)*(0.15+frac*0.85)*(1-pull*0.25)+rExtra;
     // Wobble: ±1.5px organic drift per node
     FX.wobbleTick+=0.00015;
     const wSeed=ri2*1.7+idx*0.9;
