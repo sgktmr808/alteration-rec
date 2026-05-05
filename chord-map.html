@@ -962,7 +962,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.4</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.5</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -11611,33 +11611,11 @@ function buildArpSeqWithModify(root, type){
 
 // triggerPadのMODIFY対応版
 function triggerPadWithModify(root, type){
-  if(!synthPanelOpen) return;
-  const actx=safeGetCtx();
-  if(!actx) return;
-  safeResume(actx, ()=>{
-    const out=getPadMasterOut(actx);
-    out.gain.value=1.0;
-    const newSet=new Set();
-    let notes=buildPadVoicingWithModify(root, type, padVoicing);
-    notes.forEach(midi=>{
-      const voice=padVoiceStart(actx, midi, out);
-      padVoices.push(voice);
-      newSet.add(midi);
-    });
-    setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },600);
-  });
+  // triggerPadに統合済み（MODIFY対応・masterGain経由）
+  triggerPad(root, type);
 }
 
-// getPadMasterOut（triggerPadWithModify用）
-let _padMasterOut=null;
-function getPadMasterOut(actx){
-  if(!_padMasterOut||_padMasterOut.context!==actx){
-    _padMasterOut=actx.createGain();
-    _padMasterOut.gain.value=1;
-    _padMasterOut.connect(actx.destination);
-  }
-  return _padMasterOut;
-}
+// getPadMasterOut は L.9837 に定義済み
 
 // triggerPad は L.9951 に定義済み（padVoiceStart使用）
 
