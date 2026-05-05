@@ -962,7 +962,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.3</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.4</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -9834,11 +9834,13 @@ let padVoices=[];
 // マスター出力GainNode（PAD全体のvol制御）
 let padMasterOut=null;
 
-function getPadMasterOut(actx){
+function getPadMasterOut(actx, dest){
   if(!padMasterOut||padMasterOut.context!==actx){
     padMasterOut=actx.createGain();
     padMasterOut.gain.value=1.0;
-    padMasterOut.connect(actx.destination);
+    // masterGain経由でリバーブ込みの出力
+    const d=dest||(typeof masterGain!=='undefined'&&masterGain?masterGain:actx.destination);
+    padMasterOut.connect(d);
   }
   return padMasterOut;
 }
@@ -9953,38 +9955,45 @@ function triggerPad(root, type){
   if(!synthPanelOpen) return;
   const actx=safeGetCtx();
   if(!actx) return;
-  safeResume(actx, ()=>{
-    const out=getPadMasterOut(actx);
+
+  // ユーザー操作のコールスタック内でresume()を同期呼び出し（iOS初回対応）
+  if(actx.state==='suspended') actx.resume().catch(()=>{});
+
+  function _play(){
+    // masterGainへ接続（リバーブ・音量制御を通す）
+    const dest=(typeof masterGain!=='undefined'&&masterGain)?masterGain:actx.destination;
+    const out=getPadMasterOut(actx, dest);
     out.gain.value=1.0;
 
-    // 新コードのMIDIノートセット（最大padMaxVoices音に制限）
-    let newMidis=buildPadVoicing(root, type, padVoicing);
+    // MODIFY対応ボイシング
+    let newMidis=(typeof buildPadVoicingWithModify==='function')
+      ? buildPadVoicingWithModify(root,type,padVoicing)
+      : buildPadVoicing(root,type,padVoicing);
     if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
     const newSet=new Set(newMidis);
 
-    // 現在アクティブなVoiceのMIDIセット
     const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
     const activeSet=new Set(activeVoices.map(v=>v.midi));
 
-    // 1. 不要になった音をリリース（新コードにない音）
+    // 不要音をリリース（長めの1.2秒で滑らか）
     activeVoices.forEach(v=>{
-      if(!newSet.has(v.midi)) padVoiceRelease(v, actx, 0.35);
+      if(!newSet.has(v.midi)) padVoiceRelease(v,actx,1.2);
     });
 
-    // 2. 新しく必要な音のうち、まだ鳴っていない音を発音
+    // 新音を発音
     newMidis.forEach(midi=>{
-      if(!activeSet.has(midi)){
-        // 旧リリース中のVoiceを再利用するか新規作成
-        const voice=padVoiceStart(actx, midi, out);
-        padVoices.push(voice);
-      }
+      if(!activeSet.has(midi)) padVoices.push(padVoiceStart(actx,midi,out));
     });
 
-    // 3. 解放済みVoiceをリストから掃除（メモリ管理）
-    setTimeout(()=>{
-      padVoices=padVoices.filter(v=>v.active||v.releasing);
-    }, 600);
-  });
+    // ARP連動
+    if(arpOn&&typeof updateArpChord==='function') updateArpChord(root,type);
+
+    setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },3000);
+  }
+
+  // running状態なら即発音、suspendedなら20msポーリング（最大300ms待つ）
+  if(actx.state==='running'){ _play(); }
+  else{ let n=0; const p=()=>{ if(actx.state==='running')_play(); else if(n++<15)setTimeout(p,20); }; p(); }
 }
 
 // PAD全停止
@@ -10267,7 +10276,7 @@ function initSynthUI(){
   _sv('pad-cutoff',  padCutoff,     200,  8000, 'Hz', 'pad-cutoff-val');
   _sv('pad-res',     padRes,        0.5,  18,   '',   'pad-res-val');
   _sv('pad-envmod',  padEnvMod*100, 0,    100,  '%',  'pad-envmod-val');
-  _sv('pad-lfo-depth',padLfoDepth*100,0, 100,  '%',  'pad-lfo-val');
+  _sv('pad-lfo-depth',padLfoDepth*100,0, 100,  '%',  'pad-lfo-depth-val');
   _sv('pad-vol',     padVol*100,    0,    100,  '%',  'pad-vol-val');
   _sv('arp-vol',     arpVol*100,    0,    100,  '%',  'arp-vol-val');
   _sv('dly-fb',      dlyFeedback*100,0,  85,   '%',  'dly-fb-val');
