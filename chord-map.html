@@ -9996,6 +9996,37 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
   osc.start(startTime); osc.stop(startTime+gateSec+0.05);
 }
 
+// ── Scene別ARPノート発音 ──
+function _playSceneArpNote(actx, midi, startTime, dest){
+  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  const hz = midi2hz(Math.max(24, Math.min(108, midi)));
+  const gateSec = (sc.arpGate / 1000) * 0.75;
+  const nyq = actx.sampleRate / 2 - 100;
+
+  const osc = actx.createOscillator();
+  osc.type = sc.arpOsc || 'sawtooth';
+  osc.frequency.value = hz;
+
+  const lpf = actx.createBiquadFilter();
+  lpf.type = 'lowpass';
+  lpf.Q.value = sc.arpRes || 1.5;
+  const peakCutoff = Math.min(sc.arpCutoff * (1 + (sc.arpEnvMod || 0.5) * 4.0), nyq);
+  lpf.frequency.setValueAtTime(peakCutoff, startTime);
+  lpf.frequency.exponentialRampToValueAtTime(
+    Math.max(sc.arpCutoff * 0.4, 80), startTime + (sc.arpAttack || 0.005) + (sc.arpDecay || 0.2)
+  );
+
+  const env = actx.createGain();
+  const vol = sc.arpVol || 0.28;
+  env.gain.setValueAtTime(0.001, startTime);
+  env.gain.linearRampToValueAtTime(vol, startTime + (sc.arpAttack || 0.005));
+  env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
+
+  const target = dest || actx.destination;
+  osc.connect(lpf); lpf.connect(env); env.connect(target);
+  osc.start(startTime); osc.stop(startTime + gateSec + 0.05);
+}
+
 // ── ARPスケジューラー ──
 let arpLookAheadMs=80;
 let arpScheduleMs=25; // より短いポーリング間隔
@@ -10038,10 +10069,10 @@ function scheduleArpNotes(){
       if(Array.isArray(item)){
         // CHORDパターン: 同時発音（ストラム）
         item.forEach((midi,i)=>{
-          synthSH101Note(actx, midi, t+i*0.012, stepMs_*0.8, arpVol, dest);
+          _playSceneArpNote(actx, midi, t+i*0.012, dest);
         });
       } else {
-        synthSH101Note(actx, item, t, stepMs_*0.8, arpVol, dest);
+        _playSceneArpNote(actx, item, t, dest);
       }
       arpStep++;
     }
@@ -10177,7 +10208,10 @@ const SCENE_PRESETS = {
     cutoff:1200, res:0.6, envMod:0.45,
     attack:0.12, decay:0.8, sustain:0.55, release:2.8,
     vol:0.42, chorus:0.08, wet:0.45, strum:10,
-    arpGate:320, arpVol:0.28, arpWet:0.38,
+    // ARP: 控えめ、sineで柔らかく、delay少なめ
+    arpOsc:'sine', arpCutoff:900, arpRes:0.5, arpEnvMod:0.3,
+    arpAttack:0.015, arpDecay:0.4, arpSustain:0.0,
+    arpGate:320, arpVol:0.22, arpWet:0.35,
   },
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
@@ -10187,7 +10221,10 @@ const SCENE_PRESETS = {
     cutoff:1900, res:0.8, envMod:0.52,
     attack:0.08, decay:0.7, sustain:0.65, release:2.2,
     vol:0.46, chorus:0.18, wet:0.42, strum:8,
-    arpGate:280, arpVol:0.30, arpWet:0.40,
+    // ARP: 中域、triangle、柔らかいfilter env
+    arpOsc:'triangle', arpCutoff:1400, arpRes:0.8, arpEnvMod:0.45,
+    arpAttack:0.008, arpDecay:0.35, arpSustain:0.0,
+    arpGate:280, arpVol:0.26, arpWet:0.38,
   },
 
   // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
@@ -10197,7 +10234,10 @@ const SCENE_PRESETS = {
     cutoff:3200, res:1.2, envMod:0.35,
     attack:0.025, decay:0.5, sustain:0.42, release:1.8,
     vol:0.40, chorus:0.05, wet:0.55, strum:5,
-    arpGate:180, arpVol:0.25, arpWet:0.50,
+    // ARP: 細い、高域、sine、短いgate、冷たい
+    arpOsc:'sine', arpCutoff:3500, arpRes:1.5, arpEnvMod:0.6,
+    arpAttack:0.003, arpDecay:0.18, arpSustain:0.0,
+    arpGate:160, arpVol:0.20, arpWet:0.55,
   },
 
   // 4. LOVE STAB — ガラージ/ハウス的。暖かいコードスタブ、跳ねる
@@ -10207,7 +10247,10 @@ const SCENE_PRESETS = {
     cutoff:2600, res:1.4, envMod:0.62,
     attack:0.012, decay:0.35, sustain:0.35, release:0.55,
     vol:0.52, chorus:0.12, wet:0.28, strum:3,
-    arpGate:160, arpVol:0.36, arpWet:0.32,
+    // ARP: 暖かいsaw、短gate、中域、ハウス的なアタック
+    arpOsc:'sawtooth', arpCutoff:2200, arpRes:1.2, arpEnvMod:0.7,
+    arpAttack:0.003, arpDecay:0.20, arpSustain:0.0,
+    arpGate:150, arpVol:0.32, arpWet:0.28,
   },
 
   // 5. METALLIC PLUCK — Âme的。金属的、催眠的、短い反復
@@ -10217,7 +10260,10 @@ const SCENE_PRESETS = {
     cutoff:3800, res:3.5, envMod:0.80,
     attack:0.004, decay:0.22, sustain:0.08, release:0.28,
     vol:0.48, chorus:0.00, wet:0.22, strum:0,
-    arpGate:120, arpVol:0.40, arpWet:0.55,
+    // ARP: 金属的、square、高resonance、強いfilter env、delay多め
+    arpOsc:'square', arpCutoff:4500, arpRes:4.0, arpEnvMod:0.95,
+    arpAttack:0.001, arpDecay:0.12, arpSustain:0.0,
+    arpGate:110, arpVol:0.36, arpWet:0.52,
   },
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
@@ -10227,7 +10273,10 @@ const SCENE_PRESETS = {
     cutoff:2200, res:0.7, envMod:0.40,
     attack:0.25, decay:1.2, sustain:0.78, release:4.2,
     vol:0.50, chorus:0.28, wet:0.52, strum:18,
-    arpGate:380, arpVol:0.32, arpWet:0.48,
+    // ARP: sawtooth、広め、ゆっくりアタック、Detroit的な推進力
+    arpOsc:'sawtooth', arpCutoff:1800, arpRes:0.6, arpEnvMod:0.35,
+    arpAttack:0.012, arpDecay:0.5, arpSustain:0.15,
+    arpGate:350, arpVol:0.28, arpWet:0.45,
   },
 };
 
