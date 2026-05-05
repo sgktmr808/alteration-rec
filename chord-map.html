@@ -962,7 +962,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.6</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.7</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -3111,14 +3111,15 @@ function hitNode(x,y){
 function initCanvas(){
   const canvas=document.getElementById('map-canvas');
 
-  // iOS Safari: 最初のタッチでAudioContextをユーザー操作文脈内で初期化
-  // K4-H1/H2: safeGetCtx/safeResumeで外部ファイル未ロード時も安全に動作
+  // iOS Safari: 最初のタッチでAudioContextを初期化
+  // getCtx()を同期コンテキスト内で呼ぶことでiOS AudioContext unlock
   const iosAudioUnlock=()=>{
-    const ctx=safeGetCtx();
-    if(ctx) safeResume(ctx);
+    try{ if(typeof getCtx==='function') getCtx(); }catch(e){}
   };
   canvas.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
   canvas.addEventListener('pointerdown',iosAudioUnlock,{once:true});
+  document.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
+  document.addEventListener('pointerdown',iosAudioUnlock,{once:true});
 
   canvas.addEventListener('pointerdown',e=>{
     const{x,y}=canvasXY(e);
@@ -9956,15 +9957,19 @@ function padVoiceRelease(voice, actx, releaseSec){
 // コードチェンジ: 継続音は保持、不要音はリリース、新音はアタック
 function triggerPad(root, type){
   if(!synthPanelOpen) return;
-  const actx=safeGetCtx();
+
+  // getCtx()を直接呼ぶ（audio.jsが初期化＋resume()してくれる）
+  // safeGetCtx()経由だとresume()のタイミングがずれる場合がある
+  let actx;
+  try{ actx=(typeof getCtx==='function')?getCtx():safeGetCtx(); }catch(e){ return; }
   if(!actx) return;
 
-  // ユーザー操作のコールスタック内でresume()を同期呼び出し（iOS初回対応）
-  if(actx.state==='suspended') actx.resume().catch(()=>{});
-
   function _play(){
-    const out=getPadMasterOut(actx);
-    out.gain.value=1.0;
+    // getOut() = audio.jsのmasterGain+reverb経由出力（確実に音が出る）
+    // getOutがなければactx.destinationに直接
+    const out=(typeof getOut==='function')
+      ? getOut(actx, 0.25)
+      : actx.destination;
 
     // MODIFY対応ボイシング
     let newMidis=(typeof buildPadVoicingWithModify==='function')
@@ -9976,7 +9981,7 @@ function triggerPad(root, type){
     const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
     const activeSet=new Set(activeVoices.map(v=>v.midi));
 
-    // 不要音をリリース（長めの1.2秒で滑らか）
+    // 不要音をリリース
     activeVoices.forEach(v=>{
       if(!newSet.has(v.midi)) padVoiceRelease(v,actx,1.2);
     });
@@ -9986,13 +9991,10 @@ function triggerPad(root, type){
       if(!activeSet.has(midi)) padVoices.push(padVoiceStart(actx,midi,out));
     });
 
-    // ARP連動
     if(arpOn&&typeof updateArpChord==='function') updateArpChord(root,type);
-
     setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },3000);
   }
 
-  // running状態なら即発音、suspendedなら20msポーリング（最大300ms待つ）
   if(actx.state==='running'){ _play(); }
   else{ let n=0; const p=()=>{ if(actx.state==='running')_play(); else if(n++<15)setTimeout(p,20); }; p(); }
 }
