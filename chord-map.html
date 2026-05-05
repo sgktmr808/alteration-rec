@@ -962,7 +962,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.6.7</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.7.0</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
 </div>
@@ -2416,6 +2416,7 @@ const S={root:'A',type:'m9',history:[{root:'A',type:'m9'}],histIdx:0,voicing:nul
 // true に戻すだけで即復活
 const FEATURES={
   phraseEngine: false,  // アドリブ/メロディフレーズエンジン
+  legacyPad:    false,  // 旧PADシンセエンジン（無効化済み・コード保温）
 };
 
 // MAP MODE: 'radial' | 'expand' | 'link' | 'chain' | 'graph' | 'wave' | 'bridge'
@@ -9445,7 +9446,7 @@ function hitTestBartok(tx,ty){
 // ── 状態変数 ──
 let padOn=true; // PADは常時有効（タップで発音）
 let arpOn=false;
-let synthPanelOpen=true;
+let synthPanelOpen=false; // legacyPad無効化につき固定。playScene()で発音。
 
 // PADパラメーター（幻想的・広がりのあるデフォルト）
 let padVoicing='open';
@@ -9955,52 +9956,36 @@ function padVoiceRelease(voice, actx, releaseSec){
 }
 
 // コードチェンジ: 継続音は保持、不要音はリリース、新音はアタック
+// ── legacyPad: 旧PADシンセエンジン（FEATURES.legacyPad=falseで無効）──
 function triggerPad(root, type){
+  if(!FEATURES.legacyPad) return; // legacyPad無効時はplayScene()が担当
   if(!synthPanelOpen) return;
 
-  // getCtx()を直接呼ぶ（audio.jsが初期化＋resume()してくれる）
-  // safeGetCtx()経由だとresume()のタイミングがずれる場合がある
   let actx;
   try{ actx=(typeof getCtx==='function')?getCtx():safeGetCtx(); }catch(e){ return; }
   if(!actx) return;
 
   function _play(){
-    // getOut() = audio.jsのmasterGain+reverb経由出力（確実に音が出る）
-    // getOutがなければactx.destinationに直接
-    const out=(typeof getOut==='function')
-      ? getOut(actx, 0.25)
-      : actx.destination;
-
-    // MODIFY対応ボイシング
+    const out=(typeof getOut==='function') ? getOut(actx,0.25) : actx.destination;
     let newMidis=(typeof buildPadVoicingWithModify==='function')
       ? buildPadVoicingWithModify(root,type,padVoicing)
       : buildPadVoicing(root,type,padVoicing);
     if(newMidis.length>padMaxVoices) newMidis=newMidis.slice(0,padMaxVoices);
     const newSet=new Set(newMidis);
-
     const activeVoices=padVoices.filter(v=>v.active&&!v.releasing);
     const activeSet=new Set(activeVoices.map(v=>v.midi));
-
-    // 不要音をリリース
-    activeVoices.forEach(v=>{
-      if(!newSet.has(v.midi)) padVoiceRelease(v,actx,1.2);
-    });
-
-    // 新音を発音
-    newMidis.forEach(midi=>{
-      if(!activeSet.has(midi)) padVoices.push(padVoiceStart(actx,midi,out));
-    });
-
+    activeVoices.forEach(v=>{ if(!newSet.has(v.midi)) padVoiceRelease(v,actx,1.2); });
+    newMidis.forEach(midi=>{ if(!activeSet.has(midi)) padVoices.push(padVoiceStart(actx,midi,out)); });
     if(arpOn&&typeof updateArpChord==='function') updateArpChord(root,type);
     setTimeout(()=>{ padVoices=padVoices.filter(v=>v.active||v.releasing); },3000);
   }
-
   if(actx.state==='running'){ _play(); }
   else{ let n=0; const p=()=>{ if(actx.state==='running')_play(); else if(n++<15)setTimeout(p,20); }; p(); }
 }
 
-// PAD全停止
+// PAD全停止（legacyPad保温）
 function stopAllPadVoices(){
+  if(!FEATURES.legacyPad) return;
   const actx=safeGetCtx();
   if(!actx) return;
   padVoices.forEach(v=>padVoiceRelease(v, actx, 0.15));
@@ -10288,7 +10273,13 @@ function initSynthUI(){
 
 // ── moveToChordからSYNTHに通知するフック ──
 function notifySynth(root, type){
-  if(synthPanelOpen) triggerPad(root, type);
+  // 新サウンドエンジン: playScene()が発音とARP連動を一元管理
+  if(typeof playScene==='function'){
+    playScene(root, type);
+    return;
+  }
+  // フォールバック（playScene未実装時）
+  if(!synthPanelOpen) playChord(root, type);
   if(arpOn) updateArpChord(root, type);
 }
 
@@ -11530,13 +11521,12 @@ function updateModifyResult(){
 
 // MODIFYの内容をVoice Pool / ARPシーケンスに反映
 function applyModifyToSynth(){
+  if(!FEATURES.legacyPad){ updateModifyResult(); return; } // legacyPad無効時はスキップ
   updateModifyResult();
-  // SYNTHパネルが開いていれば即再発音
   if(synthPanelOpen){
     stopAllPadVoices();
     setTimeout(()=>triggerPadWithModify(S.root, S.type), 100);
   }
-  // ARPが動いていればシーケンス更新
   if(arpOn){
     arpSeq=buildArpSeqWithModify(S.root, S.type);
     arpStep=0;
@@ -11622,8 +11612,14 @@ function triggerPadWithModify(root, type){
 
 // triggerPad は L.9951 に定義済み（padVoiceStart使用）
 
-// updateArpChordのMODIFY対応
+// updateArpChord MODIFY対応版（legacyPad保温）
 function updateArpChord(root, type){
+  if(!FEATURES.legacyPad){ // legacyPad無効時は上のupdateArpChordを使う
+    if(!arpOn) return;
+    arpSeq=buildArpSeq(root, type);
+    arpStep=0;
+    return;
+  }
   if(!arpOn) return;
   arpSeq=(modifyTensions.size>0||modifyOnChordNote)
     ? buildArpSeqWithModify(root, type)
