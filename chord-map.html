@@ -9486,14 +9486,14 @@ function applyPadPreset(name){
 
 // ARPパラメーター
 let arpPattern='up';
-let arpRate='1/4'; // ゆったりしたレート
+let arpRate='1/16'; // 16分音符をデフォルトに
 let arpFreeMs=200;
 let arpOctCenter=3;
 let arpOctRange=1;         // 1=±0oct, 2=±1oct, 3=±2oct
 let arpVol=0.38; // PADより控えめ（幻想的な重なり）
 
 // DILAYパラメーター
-let dlyTime='1/2';   // 長めのディレイで空間を作る
+let dlyTime='1/8D';  // 付点8分（16分ARPとの相性が良い）
 let dlyFreeMs=500;
 let dlyFeedback=0.42; // フィードバック多め
 let dlyMix=0.52;      // ウェット多め
@@ -9718,7 +9718,7 @@ function calcDelayTimeSec(){
   if(dlyTime==='off') return 0;
   if(dlyTime==='free') return dlyFreeMs/1000;
   const beat=60/autoBpm;
-  const map={'1/4':beat,'1/8':beat/2,'1/8D':beat*0.75,'1/16':beat/4,'ping':beat/2};
+  const map={'1/4':beat,'1/8':beat/2,'1/8D':beat*0.75,'1/16':beat/4,'1/16D':beat*0.375,'ping':beat/2};
   return map[dlyTime]??(beat/2);
 }
 
@@ -10063,9 +10063,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   env.gain.linearRampToValueAtTime(vol, startTime + atk);
   env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
 
-  // ── OSC2 mix ──
+  // ── OSC2 mix（triangleは倍音少ないので音量UP）──
   const osc2g = actx.createGain();
-  osc2g.gain.value = 0.6;
+  osc2g.gain.value = 0.75;
 
   // ── ルーティング ──
   osc1.connect(lpf);
@@ -10073,9 +10073,11 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   sub.connect(subG);   subG.connect(lpf);
   lpf.connect(env);
 
-  // delay + reverb 両方に送る
-  env.connect(dlyTarget);
-  env.connect(rvbTarget);
+  // delay 30% + reverb 70%（reverb感を強める）
+  const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
+  const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
+  env.connect(dlyG); dlyG.connect(dlyTarget);
+  env.connect(rvbG); rvbG.connect(rvbTarget);
 
   osc1.start(startTime); osc2.start(startTime); sub.start(startTime);
   osc1.stop(startTime + gateSec + 0.08);
@@ -12891,12 +12893,15 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
     v=Math.max(40,Math.min(180,Math.round(v/4)*4));
     autoBpm=v;
     updateDial(v);
-    // ディレイタイムをBPMに追従（ノード再構築不要）
+    // ディレイタイムをBPMに追従
     updateDelayTime();
-    // ARPが動いていれば次ビートタイムを更新
+    // ARP動作中はdelayノードを再構築してBPMに完全追従
     if(arpOn && arpScheduleTimer){
       const actx=safeGetCtx();
-      if(actx) arpNextBeat=actx.currentTime+0.05;
+      if(actx){
+        safeResume(actx, ()=>buildDelayNodes(actx));
+        arpNextBeat=actx.currentTime+0.05;
+      }
     }
   }
   // F4: グローバル公開（grooveから呼び出せるように）
