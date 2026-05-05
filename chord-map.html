@@ -3103,6 +3103,9 @@ function initCanvas(){
   document.addEventListener('touchstart',iosAudioUnlock,{once:true,passive:true});
   document.addEventListener('pointerdown',iosAudioUnlock,{once:true});
 
+  // スライダー操作中フラグ（スワイプと競合しないよう管理）
+  let _sliderDragging = false;
+
   canvas.addEventListener('pointerdown',e=>{
     const{x,y}=canvasXY(e);
     fxAddTrail(x,y);
@@ -3115,6 +3118,7 @@ function initCanvas(){
       const idx=hitSlider(angle);
       if(idx>=0){
         e.preventDefault();canvas.setPointerCapture(e.pointerId);
+        _sliderDragging = true; // スライダー操作開始
         const now=Date.now();
         if(lastTap.idx===idx&&now-lastTap.t<380){
           SL[idx].val=0;SL[idx].disp=0;relCache=null;invalidate();lastTap={idx:-1,t:0};
@@ -3208,6 +3212,7 @@ function initCanvas(){
   });
 
   canvas.addEventListener('pointerup',()=>{
+    _sliderDragging = false; // スライダー操作終了
     if(drag){
       // Snap to 0.05 grid on release
       const sl=SL[drag.idx];
@@ -13485,11 +13490,14 @@ updateSaveBtnVisibility(); // SAVEボタン初期状態
   function getH(){ return paneMap.clientHeight || window.innerHeight; }
 
   function onStart(e){
+    if(_sliderDragging) return; // スライダー操作中はスワイプ開始を無視
     tsY=e.touches[0].clientY; tsX=e.touches[0].clientX;
     dragStartPct=pctOffset; dragging=false; dirLocked=false; isVert=false;
     slide.style.transition='none';
   }
   function onMove(e){
+    // スライダー操作中は画面スワイプを完全にブロック
+    if(_sliderDragging){ e.stopPropagation(); return; }
     const dy=e.touches[0].clientY-tsY, dx=e.touches[0].clientX-tsX;
     if(!dirLocked&&(Math.abs(dy)>8||Math.abs(dx)>8)){
       dirLocked=true; isVert=Math.abs(dy)>Math.abs(dx)*1.2;
