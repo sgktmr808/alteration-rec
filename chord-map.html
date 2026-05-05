@@ -1339,8 +1339,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   <span class="synth-lbl">RATE</span>
                   <div class="synth-pills" id="arp-rate-pills">
                     <div class="synth-pill arp" data-r="1/4">1/4</div>
-                    <div class="synth-pill arp on" data-r="1/8">1/8</div>
-                    <div class="synth-pill arp" data-r="1/16">1/16</div>
+                    <div class="synth-pill arp" data-r="1/8">1/8</div>
+                    <div class="synth-pill arp on" data-r="1/16">1/16</div>
                     <div class="synth-pill arp" data-r="1/32">1/32</div>
                   </div>
                 </div>
@@ -10652,15 +10652,21 @@ function playScene(root, type){
   if(!actx) return;
 
   const _doPlay = () => {
-    // CHORD系を発音
+    // CHORD系を発音（SOURCE が CHORD または CHORD+ARP のとき）
     if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
       playSceneChord(actx, root, type);
     } else {
-      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
-      _sceneVoices = [];
+      // ARP専用モード：前のCHORDボイスを止める
+      if(_sceneVoices.length > 0){
+        _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
+        _sceneVoices = [];
+      }
     }
-    // ARP連動
-    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
+    // ARP連動（SOURCE が ARP または CHORD+ARP のときのみ）
+    if((sceneCurrentSource === 'ARP' || sceneCurrentSource === 'CHORD+ARP')
+        && arpOn && typeof updateArpChord === 'function'){
+      updateArpChord(root, type);
+    }
   };
 
   if(actx.state === 'running'){
@@ -10786,6 +10792,16 @@ function applyScene(name){
 
 // ── Source切替 ──
 function applySource(src){
+  const actx = safeGetCtx();
+  // 前のCHORDボイスをフェードアウト（ARP/CHORD+ARPに切り替える場合）
+  if(src === 'ARP'){
+    if(actx && _sceneVoices.length > 0){
+      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
+      _sceneVoices = [];
+    }
+    // ARPがOFFなら自動でON
+    if(!arpOn) toggleArp();
+  }
   sceneCurrentSource = src;
   document.querySelectorAll('.source-pill').forEach(el =>
     el.classList.toggle('on', el.dataset.source === src)
