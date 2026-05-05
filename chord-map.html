@@ -10000,46 +10000,97 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 function _playSceneArpNote(actx, midi, startTime, dest){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
-  const gateSec = (sc.arpGate / 1000) * 0.75;
+  const gateSec = (sc.arpGate / 1000) * 0.78;
   const nyq = actx.sampleRate / 2 - 100;
-  const target = dest || actx.destination;
 
-  const _makeArpVoice = (hzVal, volMul, delayMs, cutoffMul) => {
-    const osc = actx.createOscillator();
-    osc.type = sc.arpOsc || 'sawtooth';
-    osc.frequency.value = hzVal;
+  // ARP音はdelay経由 + reverb経由の両方に送る
+  const dlyTarget = dest || actx.destination;
+  const rvbTarget = (typeof getOut === 'function')
+    ? getOut(actx, sc.arpWet || 0.35)
+    : actx.destination;
 
-    const lpf = actx.createBiquadFilter();
-    lpf.type = 'lowpass';
-    lpf.Q.value = sc.arpRes || 1.5;
-    const peakCutoff = Math.min(
-      sc.arpCutoff * cutoffMul * (1 + (sc.arpEnvMod || 0.5) * 4.0), nyq
-    );
-    const t0 = startTime + delayMs / 1000;
-    lpf.frequency.setValueAtTime(peakCutoff, t0);
-    lpf.frequency.exponentialRampToValueAtTime(
-      Math.max(sc.arpCutoff * cutoffMul * 0.4, 80),
-      t0 + (sc.arpAttack || 0.005) + (sc.arpDecay || 0.2)
-    );
+  const vol   = sc.arpVol    || 0.26;
+  const atk   = sc.arpAttack || 0.006;
+  const decay = sc.arpDecay  || 0.22;
+  const res   = sc.arpRes    || 1.2;
+  const envMod= sc.arpEnvMod || 0.5;
+  const cutoff= sc.arpCutoff || 1800;
+  const oscType = sc.arpOsc  || 'sawtooth';
 
-    const env = actx.createGain();
-    const vol = (sc.arpVol || 0.28) * volMul;
-    env.gain.setValueAtTime(0.001, t0);
-    env.gain.linearRampToValueAtTime(vol, t0 + (sc.arpAttack || 0.005));
-    env.gain.exponentialRampToValueAtTime(0.001, t0 + gateSec);
+  // ── OSC1: メイン ──
+  const osc1 = actx.createOscillator();
+  osc1.type = oscType;
+  osc1.frequency.value = hz;
 
-    osc.connect(lpf); lpf.connect(env); env.connect(target);
-    osc.start(t0); osc.stop(t0 + gateSec + 0.05);
-  };
+  // ── OSC2: わずかにデチューン（厚み）──
+  const osc2 = actx.createOscillator();
+  osc2.type = oscType;
+  osc2.frequency.value = hz * Math.pow(2, 7 / 1200); // +7cent
 
-  // メインARP音
-  _makeArpVoice(hz, 1.0, 0, 1.0);
+  // ── SUB OSC: 1oct下のsine（深み・重み）──
+  const sub = actx.createOscillator();
+  sub.type = 'sine';
+  sub.frequency.value = hz * 0.5;
+  const subG = actx.createGain();
+  subG.gain.value = 0.18;
 
-  // Arp Ghost: 1オクターブ上、velocity低め、遅延20〜40ms、filter暗め
+  // ── LPF with filter envelope ──
+  const lpf = actx.createBiquadFilter();
+  lpf.type = 'lowpass';
+  lpf.Q.value = res;
+  const peakCutoff = Math.min(cutoff * (1 + envMod * 3.5), nyq);
+  const closeCutoff = Math.max(cutoff * 0.35, 60);
+  lpf.frequency.setValueAtTime(peakCutoff, startTime);
+  // アタック直後に急速に閉じ、その後ゆっくり暗くなる（有機的な動き）
+  lpf.frequency.exponentialRampToValueAtTime(
+    Math.max(cutoff * 0.8, 80), startTime + atk
+  );
+  lpf.frequency.exponentialRampToValueAtTime(
+    closeCutoff, startTime + atk + decay
+  );
+
+  // ── VCA Envelope ──
+  const env = actx.createGain();
+  env.gain.setValueAtTime(0.001, startTime);
+  env.gain.linearRampToValueAtTime(vol, startTime + atk);
+  env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
+
+  // ── OSC2 mix ──
+  const osc2g = actx.createGain();
+  osc2g.gain.value = 0.6;
+
+  // ── ルーティング ──
+  osc1.connect(lpf);
+  osc2.connect(osc2g); osc2g.connect(lpf);
+  sub.connect(subG);   subG.connect(lpf);
+  lpf.connect(env);
+
+  // delay + reverb 両方に送る
+  env.connect(dlyTarget);
+  env.connect(rvbTarget);
+
+  osc1.start(startTime); osc2.start(startTime); sub.start(startTime);
+  osc1.stop(startTime + gateSec + 0.08);
+  osc2.stop(startTime + gateSec + 0.08);
+  sub.stop(startTime + gateSec + 0.08);
+
+  // ── Arp Ghost: 1oct上、暗め、遅延 ──
   const ghostVol = sc.arpGhost || 0;
   if(ghostVol > 0.02){
-    const ghostDelayMs = 20 + Math.random() * 20;
-    _makeArpVoice(hz * 2, ghostVol * 0.5, ghostDelayMs, 0.45);
+    const gDelay = 0.022 + Math.random() * 0.018;
+    const t1 = startTime + gDelay;
+    const gosc = actx.createOscillator();
+    gosc.type = 'sine';
+    gosc.frequency.value = hz * 2;
+    const glpf = actx.createBiquadFilter();
+    glpf.type = 'lowpass';
+    glpf.frequency.value = Math.min(cutoff * 0.4, 1200);
+    const genv = actx.createGain();
+    genv.gain.setValueAtTime(0.001, t1);
+    genv.gain.linearRampToValueAtTime(vol * ghostVol * 0.4, t1 + atk);
+    genv.gain.exponentialRampToValueAtTime(0.001, t1 + gateSec * 0.7);
+    gosc.connect(glpf); glpf.connect(genv); genv.connect(rvbTarget);
+    gosc.start(t1); gosc.stop(t1 + gateSec + 0.05);
   }
 }
 
