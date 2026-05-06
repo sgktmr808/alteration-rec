@@ -10452,9 +10452,12 @@ const SCENE_PRESETS = {
     // gate長め（x1.15）: 前の音と薄く重なりrippling感
     // sustain少し: 音が繋がって流れる
     // cutoff高め: Synclavierの輝き
-    arpOsc:'sine', arpCutoff:4200, arpRes:0.35, arpEnvMod:0.30,
-    arpAttack:0.004, arpDecay:0.60, arpSustain:0.12,
-    arpGate:480, arpVol:0.20, arpWet:0.58, arpGhost:0.30,
+    // envMod低め: filterが開いたまま維持 → 詰まらず輝き続ける
+    // sustain高め: 音が持続・マリンバ的な「ポン」で終わらない
+    // decay長め: ゆっくり消えていく
+    arpOsc:'sine', arpCutoff:3800, arpRes:0.25, arpEnvMod:0.12,
+    arpAttack:0.005, arpDecay:1.20, arpSustain:0.45,
+    arpGate:520, arpVol:0.18, arpWet:0.62, arpGhost:0.32,
     // 1小節リフレイン（合計16.0）・さざ波のような流れ
     arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 1.0, 2.0], arpRestProb:0.15,
   },
