@@ -10226,7 +10226,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     const hiShelf = actx.createBiquadFilter();
     hiShelf.type = 'highshelf';
     hiShelf.frequency.value = 3000;
-    hiShelf.gain.value = 6.0; // 高域を持ち上げて抜けを出す
+    // bright SLで高域の輝きをコントロール（-1:暗=2dB / 0:中=6dB / +1:明=11dB）
+    const _brightVal = sv ? sv('bright') : 0;
+    hiShelf.gain.value = 6.0 + _brightVal * 5.0;
     env.connect(hiShelf);
 
     // ── コーラス: LFOで音を揺らしてまろやかな広がりを出す ──
@@ -10234,8 +10236,10 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     chorusDly.delayTime.value = 0.022; // 22ms
     const chorusLfo = actx.createOscillator();
     const chorusLfoG = actx.createGain();
-    chorusLfo.frequency.value = 0.35; // 0.35Hz: ゆっくりした揺れ
-    chorusLfoG.gain.value = 0.006;   // 揺れ幅: 6ms
+    // tense SLでコーラスの深さをコントロール（tense→深く揺れる）
+    const _tenseVal = sv ? sv('tense') : 0;
+    chorusLfo.frequency.value = 0.35 + _tenseVal * 0.3; // 0.35〜0.65Hz
+    chorusLfoG.gain.value = 0.006 + _tenseVal * 0.008;  // 6〜14ms
     chorusLfo.connect(chorusLfoG);
     chorusLfoG.connect(chorusDly.delayTime);
     chorusLfo.start(startTime);
@@ -10249,7 +10253,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     const loveDly = actx.createDelay(1.0);
     loveDly.delayTime.value = 0.19; // 約190ms
     const loveDlyFb = actx.createGain();
-    loveDlyFb.gain.value = 0.32; // フィードバック量
+    // warm SLでディレイのフィードバックをコントロール（warm→残響豊か）
+    const _warmVal = sv ? sv('warm') : 0;
+    loveDlyFb.gain.value = 0.32 + _warmVal * 0.18; // 0.14〜0.50
     const loveDlyG = actx.createGain();
     loveDlyG.gain.value = 0.52; // ディレイのwet量（深め）
     hiShelf.connect(loveDly);
@@ -11126,14 +11132,7 @@ function applySLToArp(){
     } else if(strange < -0.3){
       _slArpPattern = 'updown';
     } else {
-      // LOVEはDOWN2（1oct上から流れ落ちる）
-  if(name === 'love'){
-    arpPattern = 'down2';
-  } else if(_prevSceneName === 'love'){
-    // LOVE以外に切り替えたときはデフォルトに戻す
-    arpPattern = 'up';
-  }
-  _slArpPattern = null; // Scene設定維持
+      _slArpPattern = null; // Scene設定維持
     }
   } else {
     _slArpPattern = null;
