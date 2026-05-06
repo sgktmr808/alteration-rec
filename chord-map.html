@@ -10312,6 +10312,10 @@ let sceneCurrentSource = 'CHORD'; // 'CHORD' | 'ARP' | 'CHORD+ARP'
 let chordPatternMode = 'hold';    // 'hold' | 'stab' | 'broken' | 'pulse' | 'pluck_arp' | 'float_arp' | 'inner_line' | 'trail'
 let _chordPulseTimer = null;      // PULSEモードの反復タイマー
 let _patternArpParams = null;     // PLUCK ARP / FLOAT ARP / INNER LINE 用パラメーター上書き
+// ── Trail Wave LFO（波打ち際の呼吸）──
+// TRAILパターン時のtrailSecを正弦波でゆっくり揺らす
+let _trailWavePhase = 0;          // 現在の位相（ラジアン）
+let _trailWaveLastTime = 0;       // 最後に更新した時刻（performance.now ms）
 
 // ── Scene定義 ──
 // 各Sceneは以下を持つ:
@@ -10664,19 +10668,36 @@ function playSceneChord(actx, root, type){
   // 前回リリース中のボイスを即座に消音（濁り防止）
   _killReleasingVoices(actx);
 
-  // 既存ボイスをChord Trail（SL反映済みtrailSec）でフェードアウト
+  // ── 共通ノード保持リリース ──
+  // 次コードのmidi一覧を先に取得して照合する
+  const _nextMidis = buildSceneVoicing(root, type, sc.voicingFlavor);
+  const _nextMidiSet = new Set(_nextMidis);
   const trailSec = sc.trailSec;
-  _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, trailSec));
-  _sceneVoices = [];
+
+  // 前コードのボイスを照合: 次コードに含まれるノートは保持、それ以外はリリース
+  const _keptVoices = [];
+  _sceneVoices.forEach(v => {
+    if(v && v.midi !== undefined && _nextMidiSet.has(v.midi)){
+      // 共通ノード: リリースせず保持（次コードの発音でも使い回す）
+      _keptVoices.push(v);
+    } else {
+      // 非共通ノード: trailSecでフェードアウト
+      _releaseSceneVoice(v, actx, trailSec);
+    }
+  });
+  _sceneVoices = _keptVoices;
 
   // getOut() = masterGain + reverb
   const out = (typeof getOut === 'function')
     ? getOut(actx, sc.wet)
     : actx.destination;
 
-  // Scene別voicingFlavorでボイシング取得
-  const midis = buildSceneVoicing(root, type, sc.voicingFlavor);
+  // Scene別voicingFlavorでボイシング取得（_nextMidisを使い回す）
+  const midis = _nextMidis;
   if(!midis.length) return;
+
+  // 既に保持中のmidi（共通ノード）はスキップするためのSet
+  const _keptMidiSet = new Set(_sceneVoices.map(v => v && v.midi).filter(m => m !== undefined));
 
   // Strum: 低→高の順にずらして発音
   const strumSec = sc.strum / 1000;
@@ -10694,10 +10715,20 @@ function playSceneChord(actx, root, type){
     // BROKEN: 各音を低→中→高の順に2〜25msずらす（ピアノ/ギター的）
     // → forEach内で処理するためここはフラグのみ
   } else if(chordPatternMode === 'trail'){
-    // TRAIL: trailSecを最大値に固定（前コードの尾を長く残す）
+    // TRAIL: 波打ち際の呼吸 — trailSecを正弦波でゆっくり揺らす
+    // 周期8〜16秒、基準2.5s ±1.5s → 1.0s〜4.0sの範囲で自然に変化
+    const now = performance.now();
+    const elapsed = (now - _trailWaveLastTime) / 1000; // 秒
+    _trailWaveLastTime = now;
+    // 位相を進める（周期約12秒 = 2π/12 rad/s）
+    _trailWavePhase += elapsed * (2 * Math.PI / 12);
+    // sin波で揺らす: 基準2.5s ± 1.5s
+    const trailBase = 2.5;
+    const trailDepth = 1.5;
+    const trailWave = trailBase + Math.sin(_trailWavePhase) * trailDepth;
     sc = Object.assign({}, sc, {
-      trailSec: 4.0,
-      release:  Math.max(sc.release, 3.0),
+      trailSec: Math.max(1.0, Math.min(4.0, trailWave)),
+      release:  Math.max(sc.release, 2.5),
     });
   }
 
@@ -10710,20 +10741,35 @@ function playSceneChord(actx, root, type){
   midis.forEach((midi, i) => {
     let t, velScale;
     if(chordPatternMode === 'broken'){
-      // BROKEN: 2〜25msのランダムなズレ（低→高順）
-      const brokenOffsetMs = 2 + Math.random() * 23;
-      t = tBase + i * (brokenOffsetMs / 1000);
-      velScale = 0.85 + Math.random() * 0.3; // 0.85〜1.15
+      // BROKEN: 音の位置（低→高）に応じた音楽的ズレ
+      // 低音: 基準、中音: 4〜8ms、高音: 8〜14ms
+      // → ピアノの自然な打鍵順序を模倣
+      const n = midis.length;
+      let brokenOffsetMs;
+      if(i === 0){
+        brokenOffsetMs = 0; // 低音は基準（0ms）
+      } else if(i < n - 1){
+        brokenOffsetMs = 4 + Math.random() * 4; // 中音: 4〜8ms
+      } else {
+        brokenOffsetMs = 8 + Math.random() * 6; // 高音: 8〜14ms
+      }
+      // 累積オフセット（各音は前の音からではなく低音からの絶対時間）
+      t = tBase + (brokenOffsetMs / 1000);
+      // velocityも位置で変える: 低音やや強め、高音やや弱め（ピアノ的）
+      velScale = 1.0 - (i / Math.max(n - 1, 1)) * 0.15; // 1.0〜0.85
     } else {
       t = tBase + i * strumSec;
       velScale = 1.0;
     }
+    // 共通ノードとして保持中の音はスキップ（重複発音しない）
+    if(_keptMidiSet.has(midi)){ return; }
     const hz = midi2hz(Math.max(24, Math.min(108, midi)));
     // scのvolをvelScaleで一時上書き（BROKENのみ音量差）
     const scNote = (chordPatternMode === 'broken' && velScale !== 1.0)
       ? Object.assign({}, sc, { vol: (sc.vol || 0.18) * velScale })
       : sc;
     const voice = _playSceneNote(actx, hz, scNote, t, out, panPositions[i]);
+    if(voice) voice.midi = midi; // 共通ノード保持のためmidiを記録
     _sceneVoices.push(voice);
   });
 
@@ -10733,7 +10779,7 @@ function playSceneChord(actx, root, type){
   const holdSec = (chordPatternMode === 'stab')
     ? sc.attack + sc.decay + 0.05   // STABは発音後すぐリリース
     : (chordPatternMode === 'trail')
-      ? sc.attack + sc.decay + 8.0  // TRAILは長く保持
+      ? sc.attack + sc.decay + sc.trailSec + 2.0  // TRAILは波のtrailSecに連動
       : sc.attack + sc.decay + 4.5;
   _sceneTrailTimer = setTimeout(()=>{
     const a2 = safeGetCtx(); if(!a2) return;
@@ -10933,8 +10979,17 @@ function applyChordPattern(mode){
       applySource('CHORD');
     }
   } else {
-    // CHORD系パターンのときはARP用上書きをクリア
+    // CHORD系パターン（HOLD/STAB/BROKEN/TRAIL）:
+    // ARP用上書きをクリア + SOURCEがARPのみならCHORDに自動切替
     _patternArpParams = null;
+    if(sceneCurrentSource === 'ARP'){
+      applySource('CHORD');
+    }
+    // ARP停止（CHORD系PatternではARPを止める）
+    if(arpOn){
+      const arpBtn = document.getElementById('arp-on-btn');
+      if(arpBtn) arpBtn.click();
+    }
   }
 
   chordPatternMode = mode;
@@ -10977,6 +11032,18 @@ function applyScene(name){
   }
   // ARP共有outをリセット（新Sceneのwet値を反映）
   _resetArpOut();
+
+  // ── Scene別デフォルトPattern自動切替 ──
+  const _sceneDefaultPattern = {
+    plain:   'broken',
+    velvet:  'inner_line',
+    glass:   'float_arp',
+    love:    'stab',
+    pluck:   'pluck_arp',
+    strings: 'trail',
+  };
+  const defaultPattern = _sceneDefaultPattern[name];
+  if(defaultPattern) applyChordPattern(defaultPattern);
 }
 
 // ── Source切替 ──
@@ -12352,6 +12419,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(wrap) wrap.classList.add('open');
   if(tog) tog.textContent='▲';
   initSynthUI();
+  // 初期Scene（plain）に合ったPatternを設定
+  applyChordPattern('broken');
 });
 
 document.addEventListener('DOMContentLoaded',()=>{
