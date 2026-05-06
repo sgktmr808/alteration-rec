@@ -10736,7 +10736,6 @@ function playSceneChord(actx, root, type){
 
   // 前コードのボイスを照合: 次コードに含まれるノートは保持、それ以外はリリース
   const _keptVoices = [];
-
   _sceneVoices.forEach(v => {
     if(v && v.midi !== undefined && _nextMidiSet.has(v.midi)){
       // 共通ノード: リリースせず保持（次コードでも鳴り続ける）
@@ -11179,26 +11178,8 @@ function applyScene(name){
   _resetArpOut();
 
   // ── Scene切替後のボイス処理 ──
-  // 補間が終わったらボイスをリリースする（継続音防止）
-  {
-    const actx2 = safeGetCtx();
-    if(actx2 && _sceneVoices.length > 0){
-      const scNew2 = SCENE_PRESETS[name] || SCENE_PRESETS.plain;
-      const _quietScenes2 = new Set(['plain', 'glass', 'velvet']);
-      const _clubScenes2  = new Set(['love', 'pluck', 'strings']);
-      const _crossSystem2 = (_quietScenes2.has(_prevSceneName) !== _quietScenes2.has(name));
-      const morphSec2 = _crossSystem2 ? 0.3
-        : _quietScenes2.has(name) ? 2.5
-        : _clubScenes2.has(name)  ? 1.2 : 0.8;
-      const relSec = Math.max(scNew2.release, 0.5);
-      // 補間時間が終わったあとにリリース
-      setTimeout(()=>{
-        const a3 = safeGetCtx(); if(!a3) return;
-        _sceneVoices.forEach(v => _releaseSceneVoice(v, a3, relSec));
-        setTimeout(()=>{ _sceneVoices = []; }, Math.round(relSec * 1000) + 200);
-      }, Math.round(morphSec2 * 1000));
-    }
-  }
+  // ボイスのリリースはplaySceneChordの_sceneTrailTimerに一元化
+  // ここでは触れない（setTimeoutで_sceneVoicesを操作すると競合が発生する）
 
   // Scene切替バーの表示を更新
   // ※ PatternはSceneと独立。ユーザーが明示的に選ぶもの。自動連動しない。
