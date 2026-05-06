@@ -10430,22 +10430,26 @@ const SCENE_PRESETS = {
     arpRhythm:[1.0, 4.0, 2.0, 6.0, 1.0, 3.0, 1.0, 5.0], arpRestProb:0.38,
   },
 
-  // 4. LOVE STAB — ガラージ/ハウス的。暖かいコードスタブ、跳ねる
+  // 4. LOVE STAB — 透明感のある跳ねるコードスタブ
+  // 身体性は残しつつ、空気・余韻・透明感を加える
   love: {
     label:'LOVE STAB',
-    osc1:'sawtooth', osc2:'triangle', detune:6,
-    cutoff:2400, res:1.3, envMod:0.60,
-    attack:0.008, decay:0.30, sustain:0.30, release:0.50,
-    vol:0.50, chorus:0.10, wet:0.26, strum:2,
-    trailSec:0.4, width:0.60, feltAttack:0.08, ghost:0.0, filterDrift:0.05,
+    // sine+triangleで柔らかく透明に。sawtoothの重さを取る
+    osc1:'sine', osc2:'triangle', detune:4,
+    // cutoffを抑えて刺さらない・resを下げて素直な音に
+    cutoff:1600, res:0.7, envMod:0.45,
+    // attackは速く（跳ねる感覚を維持）・reverbを増やして空間を作る
+    attack:0.010, decay:0.28, sustain:0.22, release:0.80,
+    vol:0.44, chorus:0.04, wet:0.44, strum:3,
+    trailSec:0.8, width:0.62, feltAttack:0.10, ghost:0.0, filterDrift:0.08,
     voicingFlavor:'garage',
-    // ARP: ガラージ/ハウス的。身体性。裏拍・短い・跳ねる
-    // sawtooth・明るめcutoff・短gate・高velocity・詰まった感
-    arpOsc:'sawtooth', arpCutoff:2200, arpRes:1.2, arpEnvMod:0.72,
-    arpAttack:0.003, arpDecay:0.14, arpSustain:0.0,
-    arpGate:110, arpVol:0.32, arpWet:0.22, arpGhost:0.06,
-    // リズム: 裏拍主役・短連打の詰まり感・休符少なめ・身体が動く
-    arpRhythm:[0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.5], arpRestProb:0.08,
+    // ARP: 透明感のある跳ねるARP
+    // sine+triangleで柔らかく・gateを少し延ばして余韻を出す
+    arpOsc:'triangle', arpCutoff:1800, arpRes:0.8, arpEnvMod:0.55,
+    arpAttack:0.005, arpDecay:0.20, arpSustain:0.0,
+    arpGate:160, arpVol:0.26, arpWet:0.38, arpGhost:0.14,
+    // リズム: 裏拍感は維持・少し余白を作って透明感を出す
+    arpRhythm:[0.5, 1.0, 0.5, 1.5, 0.5, 1.0, 0.5, 2.0], arpRestProb:0.14,
   },
 
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
