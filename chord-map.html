@@ -10110,20 +10110,37 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const lpf = actx.createBiquadFilter();
   lpf.type = 'lowpass';
   lpf.Q.value = res;
-  const baseCutoff = Math.max(cutoff * 0.15, 60);   // 閉じた状態
-  const peakCutoff = Math.min(cutoff * (1 + envMod * 2.8), nyq); // 開いた状態
+
+  // ── LOVE Scene専用: filterを最初から開いた状態に ──
+  // 通常: baseCutoffから開く（filter env） → マリンバ的な「ポン」感
+  // LOVE: peakCutoffから始めてゆっくり維持 → グラス感・暖かさが持続
+  const isLoveScene = (sceneCurrentName === 'love');
+  const baseCutoff = isLoveScene
+    ? Math.min(cutoff * (1 + envMod * 1.5), nyq)  // 最初から開いた状態
+    : Math.max(cutoff * 0.15, 60);                  // 通常: 閉じた状態
+  const peakCutoff = Math.min(cutoff * (1 + envMod * 2.8), nyq);
   lpf.frequency.setValueAtTime(baseCutoff, startTime);
-  // 素早く開いて → ゆっくり閉じる（ディープテクノのswell感）
-  lpf.frequency.exponentialRampToValueAtTime(peakCutoff, startTime + atk + 0.01);
-  lpf.frequency.exponentialRampToValueAtTime(
-    Math.max(cutoff * 0.25, 60), startTime + atk + decay
-  );
+  if(!isLoveScene){
+    lpf.frequency.exponentialRampToValueAtTime(peakCutoff, startTime + atk + 0.01);
+    lpf.frequency.exponentialRampToValueAtTime(
+      Math.max(cutoff * 0.25, 60), startTime + atk + decay
+    );
+  }
+  // LOVEはfilterをほぼ固定 → 輝きが持続する
 
   // ── VCA Envelope ──
   const env = actx.createGain();
+  const sustainVol = vol * (sc.arpSustain || 0);
   env.gain.setValueAtTime(0.001, startTime);
   env.gain.linearRampToValueAtTime(vol, startTime + atk);
-  env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
+  if(isLoveScene && sustainVol > 0.01){
+    // LOVE: attack → decay → sustain → gate終わりにリリース
+    env.gain.exponentialRampToValueAtTime(Math.max(sustainVol, 0.001), startTime + atk + decay);
+    env.gain.setValueAtTime(Math.max(sustainVol, 0.001), startTime + gateSec - 0.05);
+    env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec + 0.15);
+  } else {
+    env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
+  }
 
   // ── OSC2 mix（warm→triangle多め / cold→osc1寄り）──
   const osc2g = actx.createGain();
