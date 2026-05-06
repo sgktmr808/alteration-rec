@@ -10158,19 +10158,58 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   // → ウェーブテーブル的な自然な輝き
   let arpEnvOut = env;
   if(sceneCurrentName === 'love'){
+    // ── ハイシェルフ: 3kHz以上を少し持ち上げて輝きを追加 ──
     const hiShelf = actx.createBiquadFilter();
     hiShelf.type = 'highshelf';
     hiShelf.frequency.value = 3000;
-    hiShelf.gain.value = 4.5; // 4.5dB持ち上げ
+    hiShelf.gain.value = 3.5;
     env.connect(hiShelf);
-    arpEnvOut = hiShelf;
+
+    // ── コーラス: LFOで音を揺らしてまろやかな広がりを出す ──
+    const chorusDly = actx.createDelay(0.05);
+    chorusDly.delayTime.value = 0.022; // 22ms
+    const chorusLfo = actx.createOscillator();
+    const chorusLfoG = actx.createGain();
+    chorusLfo.frequency.value = 0.35; // 0.35Hz: ゆっくりした揺れ
+    chorusLfoG.gain.value = 0.006;   // 揺れ幅: 6ms
+    chorusLfo.connect(chorusLfoG);
+    chorusLfoG.connect(chorusDly.delayTime);
+    chorusLfo.start(startTime);
+    chorusLfo.stop(startTime + gateSec + 0.2);
+    const chorusG = actx.createGain();
+    chorusG.gain.value = 0.45; // コーラスのwet量
+    hiShelf.connect(chorusDly);
+    chorusDly.connect(chorusG);
+
+    // ── ディレイ: 付点8分（dotted 8th的）の雰囲気 ──
+    const loveDly = actx.createDelay(1.0);
+    loveDly.delayTime.value = 0.19; // 約190ms
+    const loveDlyFb = actx.createGain();
+    loveDlyFb.gain.value = 0.28; // フィードバック量
+    const loveDlyG = actx.createGain();
+    loveDlyG.gain.value = 0.35; // ディレイのwet量
+    hiShelf.connect(loveDly);
+    loveDly.connect(loveDlyFb);
+    loveDlyFb.connect(loveDly);
+    loveDly.connect(loveDlyG);
+
+    // ルーティング: dry + chorus + delay → reverb/dly
+    const loveRvbG = actx.createGain(); loveRvbG.gain.value = 0.65;
+    const loveDryG = actx.createGain(); loveDryG.gain.value = 0.50;
+    hiShelf.connect(loveDryG);
+    loveDryG.connect(rvbTarget);
+    chorusG.connect(loveRvbG); loveRvbG.connect(rvbTarget);
+    loveDlyG.connect(rvbTarget);
+    arpEnvOut = null; // 以下の共通ルーティングをスキップ
   }
 
   // delay 30% + reverb 70%（reverb感を強める）
-  const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
-  const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
-  arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget);
-  arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
+  if(arpEnvOut !== null){
+    const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
+    const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
+    arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget);
+    arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
+  }
 
   osc1.start(startTime); osc2.start(startTime); sub.start(startTime);
   osc1.stop(startTime + gateSec + 0.08);
@@ -10480,9 +10519,10 @@ const SCENE_PRESETS = {
     // ARP: sawtooth（倍音・温かみ）+ square pulse（透明感・奥行き）
     // filterを開き気味 → 冷たくなりすぎない透明感
     // sustain高め・decay長め: 音が持続して流れる（さざ波感）
-    arpOsc:'sawtooth', arpOsc2:'square', arpCutoff:2200, arpRes:0.4, arpEnvMod:0.15,
-    arpAttack:0.005, arpDecay:0.90, arpSustain:0.40,
-    arpGate:500, arpVol:0.17, arpWet:0.58, arpGhost:0.24,
+    // 音量抑えめ・cutoff下げてまろやかに・resも控えめ
+    arpOsc:'sawtooth', arpOsc2:'square', arpCutoff:1800, arpRes:0.3, arpEnvMod:0.15,
+    arpAttack:0.006, arpDecay:0.95, arpSustain:0.42,
+    arpGate:500, arpVol:0.13, arpWet:0.55, arpGhost:0.22,
     // 1小節リフレイン（合計16.0）・さざ波のような流れ
     arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 1.0, 2.0], arpRestProb:0.15,
   },
