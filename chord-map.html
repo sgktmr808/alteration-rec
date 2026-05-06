@@ -10143,17 +10143,51 @@ function _playSceneArpNote(actx, midi, startTime, dest){
 
   // ── OSC1: メイン ──
   const osc1 = actx.createOscillator();
-  // LOVEはPeriodicWave（Synclavier的倍音構造）を使用
   if(sceneCurrentName === 'love'){
-    osc1.setPeriodicWave(_getLoveWave(actx));
+    // LOVEのARPはwarmスライダーでsine → PeriodicWaveをモーフィング
+    // warm=-1: pure sine / warm=0: 50:50ブレンド / warm=+1: PeriodicWaveフル
+    const _warmMorph = sv ? ((sv('warm') + 1) / 2) : 0.5; // 0.0〜1.0
+
+    // sine系osc（warm=-1側）
+    const osc1_sine = actx.createOscillator();
+    osc1_sine.type = 'sine';
+    osc1_sine.frequency.value = hz;
+    const osc1_sineG = actx.createGain();
+    osc1_sineG.gain.value = 1.0 - _warmMorph;
+
+    // PeriodicWave系osc（warm=+1側）
+    const osc1_wt = actx.createOscillator();
+    osc1_wt.setPeriodicWave(_getLoveWave(actx));
+    osc1_wt.frequency.value = hz;
+    const osc1_wtG = actx.createGain();
+    osc1_wtG.gain.value = _warmMorph;
+
+    // モーフィングGain（2系統をここに集約）
+    const osc1_morph = actx.createGain();
+    osc1_morph.gain.value = 1.0;
+    osc1_sine.connect(osc1_sineG); osc1_sineG.connect(osc1_morph);
+    osc1_wt.connect(osc1_wtG);     osc1_wtG.connect(osc1_morph);
+
+    // osc1の代わりにosc1_morphをlpfに接続（後続のrouting用にosc1に差し替え）
+    osc1_sine.start(startTime); osc1_sine.stop(startTime + gateSec + oscStopExtra);
+    osc1_wt.start(startTime);   osc1_wt.stop(startTime + gateSec + oscStopExtra);
+
+    // lpfへの接続はosc1_morphで行う（osc1.connect(lpf)の代わり）
+    osc1_morph.connect(lpf);
+
+    // osc1自体はダミー（後続のosc1.start/stopを無効化するためのフラグ）
+    osc1.type = 'sine';
+    osc1.frequency.value = hz;
+    // osc1は使わない（start/stopしない）→ _loveOsc1Handled フラグで制御
+    var _loveOsc1Handled = true;
   } else {
     osc1.type = oscType;
+    var _loveOsc1Handled = false;
   }
-  osc1.frequency.value = hz;
+  if(!_loveOsc1Handled) osc1.frequency.value = hz;
 
-  // ── OSC2: デチューン（厚み）/ arpOsc2があれば別のwave type ──
+  // ── OSC2: デチューン（厚み）──
   const osc2 = actx.createOscillator();
-  // LOVEのosc2もPeriodicWaveで統一（わずかにデチューン）
   if(sceneCurrentName === 'love'){
     osc2.setPeriodicWave(_getLoveWave(actx));
   } else {
@@ -10222,7 +10256,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.38 : 0.75;
 
   // ── ルーティング ──
-  osc1.connect(lpf);
+  // LOVEのosc1はモーフィング側で既にlpfに接続済み
+  if(!_loveOsc1Handled) osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
   sub.connect(subG);   subG.connect(lpf);
   lpf.connect(env);
@@ -10293,10 +10328,11 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
   }
 
-  osc1.start(startTime); osc2.start(startTime); sub.start(startTime);
+  if(!_loveOsc1Handled) osc1.start(startTime);
+  osc2.start(startTime); sub.start(startTime);
   // LOVEはrelease余韻分長めにoscを維持
   const oscStopExtra = isLoveScene ? 0.65 : 0.08;
-  osc1.stop(startTime + gateSec + oscStopExtra);
+  if(!_loveOsc1Handled) osc1.stop(startTime + gateSec + oscStopExtra);
   osc2.stop(startTime + gateSec + oscStopExtra);
   sub.stop(startTime + gateSec + oscStopExtra);
 
