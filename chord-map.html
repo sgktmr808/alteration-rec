@@ -10093,7 +10093,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   sub.type = 'sine';
   sub.frequency.value = hz * 0.5;
   const subG = actx.createGain();
-  subG.gain.value = (sceneCurrentName === 'pluck') ? 0.35 : 0.15;
+  // LOVE: sub(1oct下)を切る → スティールパン的な金属低域を除去
+  subG.gain.value = (sceneCurrentName === 'pluck') ? 0.35 : (sceneCurrentName === 'love') ? 0.0 : 0.15;
 
   // ── ピッチLFO: 微細なゆらぎで生気を出す ──
   const lfoDepth = hz * 0.0015; // 約0.15%のピッチ揺れ
@@ -10144,7 +10145,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
 
   // ── OSC2 mix（warm→triangle多め / cold→osc1寄り）──
   const osc2g = actx.createGain();
-  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : 0.75;
+  // LOVE: osc2(デチューン)を切る → 金属的なうなりを除去・sineの純粋な透明感
+  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.0 : 0.75;
 
   // ── ルーティング ──
   osc1.connect(lpf);
@@ -10152,11 +10154,24 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   sub.connect(subG);   subG.connect(lpf);
   lpf.connect(env);
 
+  // ── LOVE専用: ハイシェルフで有機的な倍音を薄く加える ──
+  // sineだけでは冷たい・ハイシェルフで3kHz以上をわずかに持ち上げる
+  // → ウェーブテーブル的な自然な輝き
+  let arpEnvOut = env;
+  if(sceneCurrentName === 'love'){
+    const hiShelf = actx.createBiquadFilter();
+    hiShelf.type = 'highshelf';
+    hiShelf.frequency.value = 3000;
+    hiShelf.gain.value = 4.5; // 4.5dB持ち上げ
+    env.connect(hiShelf);
+    arpEnvOut = hiShelf;
+  }
+
   // delay 30% + reverb 70%（reverb感を強める）
   const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
   const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
-  env.connect(dlyG); dlyG.connect(dlyTarget);
-  env.connect(rvbG); rvbG.connect(rvbTarget);
+  arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget);
+  arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
 
   osc1.start(startTime); osc2.start(startTime); sub.start(startTime);
   osc1.stop(startTime + gateSec + 0.08);
