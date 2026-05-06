@@ -3211,6 +3211,80 @@ function initCanvas(){
     invalidate();
   });
 
+  // ── 片手・外縁操作: Scene（上下）/ モード（左右）──
+  let _edgeGesture = null; // { startX, startY, startScene, startModeIdx, moved }
+  const _sceneOrder = ['plain', 'glass', 'velvet', 'love', 'pluck', 'strings'];
+  const _modeOrder  = ['radial', 'link', 'chain', 'pivot', 'expand', 'wave', 'bridge'];
+
+  function _isEdgeZone(x, y){
+    const dist = distFromCenter(x, y);
+    return dist > L.SR + 10; // スライダーリングの外側
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    const {x, y} = canvasXY(e);
+    if(!_isEdgeZone(x, y)) return; // 外縁以外は通常のpointerdownに任せる
+    // 外縁タッチ開始
+    _edgeGesture = {
+      startX: x, startY: y,
+      startSceneIdx: _sceneOrder.indexOf(sceneCurrentName),
+      startModeIdx:  _modeOrder.indexOf(MAP_MODE),
+      moved: false,
+      pointerId: e.pointerId,
+    };
+    canvas.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+  }, { capture: true });
+
+  canvas.addEventListener('pointermove', e => {
+    if(!_edgeGesture || e.pointerId !== _edgeGesture.pointerId) return;
+    const {x, y} = canvasXY(e);
+    const dx = x - _edgeGesture.startX;
+    const dy = y - _edgeGesture.startY;
+    const absDx = Math.abs(dx), absDy = Math.abs(dy);
+    if(absDx < 8 && absDy < 8) return; // 微小移動は無視
+    _edgeGesture.moved = true;
+
+    if(absDy > absDx){
+      // 上下ドラッグ → Scene変容
+      // 40px で1段階
+      const steps = Math.round(-dy / 40);
+      const newIdx = Math.max(0, Math.min(
+        _sceneOrder.length - 1,
+        _edgeGesture.startSceneIdx + steps
+      ));
+      const newScene = _sceneOrder[newIdx];
+      if(newScene && newScene !== sceneCurrentName){
+        applyScene(newScene);
+      }
+    } else {
+      // 左右ドラッグ → モード切替
+      // 50px で1段階
+      const steps = Math.round(dx / 50);
+      const newIdx = Math.max(0, Math.min(
+        _modeOrder.length - 1,
+        _edgeGesture.startModeIdx + steps
+      ));
+      const newMode = _modeOrder[newIdx];
+      if(newMode && newMode !== MAP_MODE){
+        // 既存のsetMapMode相当処理
+        document.querySelectorAll('.mode-btn').forEach(b =>
+          b.classList.toggle('on', b.dataset.mode === newMode)
+        );
+        MAP_MODE = newMode;
+        relCache = null;
+        invalidate();
+      }
+    }
+    e.stopPropagation();
+  }, { capture: true });
+
+  canvas.addEventListener('pointerup', e => {
+    if(!_edgeGesture || e.pointerId !== _edgeGesture.pointerId) return;
+    _edgeGesture = null;
+    e.stopPropagation();
+  }, { capture: true });
+
   canvas.addEventListener('pointerup',()=>{
     _sliderDragging = false; // スライダー操作終了
     if(drag){
@@ -10676,12 +10750,51 @@ function playSceneChord(actx, root, type){
 
   // 前コードのボイスを照合: 次コードに含まれるノートは保持、それ以外はリリース
   const _keptVoices = [];
+
+  // ── ポルタメント条件 ──
+  // 静かな系Scene（plain/glass/velvet）のときのみ発動
+  const _portatoScenes = new Set(['plain', 'glass', 'velvet']);
+  const _portaEnabled = _portatoScenes.has(sceneCurrentName);
+  // ポルタメント時間: Sceneのattackに連動（0.15〜0.4秒）
+  const _portaSec = Math.max(0.15, Math.min(0.4, sc.attack * 1.8));
+
   _sceneVoices.forEach(v => {
     if(v && v.midi !== undefined && _nextMidiSet.has(v.midi)){
-      // 共通ノード: リリースせず保持（次コードの発音でも使い回す）
+      // 共通ノード: 保持 + ポルタメント条件チェック
+      // 次コードで同じmidiなら周波数変化なし
+      // → 共通ノード自体は同音なのでポルタメント不要
       _keptVoices.push(v);
+    } else if(v && v.midi !== undefined && _portaEnabled){
+      // 非共通ノードでもポルタメント条件を確認:
+      // 移動距離が5半音以内なら、最も近い次コードの音にスライドしてからリリース
+      let closestMidi = null;
+      let closestDist = Infinity;
+      _nextMidis.forEach(nm => {
+        const dist = Math.abs(nm - v.midi);
+        if(dist < closestDist){ closestDist = dist; closestMidi = nm; }
+      });
+      if(closestDist <= 5 && closestMidi !== null && !v.releasing){
+        // 近い音へポルタメントしてからフェードアウト
+        const nextHz = midi2hz(Math.max(24, Math.min(108, closestMidi)));
+        const tNow = actx.currentTime;
+        try{
+          v.osc1.frequency.cancelScheduledValues(tNow);
+          v.osc1.frequency.setValueAtTime(v.osc1.frequency.value, tNow);
+          v.osc1.frequency.exponentialRampToValueAtTime(nextHz, tNow + _portaSec);
+          v.osc2.frequency.cancelScheduledValues(tNow);
+          v.osc2.frequency.setValueAtTime(v.osc2.frequency.value, tNow);
+          v.osc2.frequency.exponentialRampToValueAtTime(
+            nextHz * Math.pow(2, sc.detune / 1200), tNow + _portaSec
+          );
+        }catch(e){}
+        // ポルタメント完了後にリリース
+        setTimeout(()=>{ _releaseSceneVoice(v, actx, trailSec); }, Math.round(_portaSec * 1000));
+      } else {
+        // 遠い音: 通常リリース
+        _releaseSceneVoice(v, actx, trailSec);
+      }
     } else {
-      // 非共通ノード: trailSecでフェードアウト
+      // 非共通ノード（ポルタメント無効）: 通常リリース
       _releaseSceneVoice(v, actx, trailSec);
     }
   });
@@ -11008,6 +11121,7 @@ function _getPatternArpSc(){
 
 // ── Scene切替 ──
 function applyScene(name){
+  const _prevSceneName = sceneCurrentName; // 変容判定用に前のScene名を保持
   sceneCurrentName = name;
   // UI更新
   document.querySelectorAll('.scene-pill').forEach(el =>
@@ -11019,15 +11133,53 @@ function applyScene(name){
     const sc = SCENE_PRESETS[name];
     titleEl.textContent = sc ? sc.label : name.toUpperCase();
   }
-  // Scene切替: 再発音しない（次のコードタップで新Sceneが適用される）
-  // 鳴っている前ボイスは自然なリリースでフェードアウト
-  if(_sceneVoices.length > 0){
+  // ── Scene変容: 鳴っているボイスのパラメーターを補間しながら変化させる ──
+  {
     const actx = safeGetCtx();
-    if(actx && actx.state === 'running'){
-      const sc = SCENE_PRESETS[name] || SCENE_PRESETS.plain;
-      const fadeSec = Math.max(0.8, sc.release * 0.5);
-      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, fadeSec));
-      _sceneVoices = [];
+    if(actx && actx.state === 'running' && _sceneVoices.length > 0){
+      const scNew = SCENE_PRESETS[name] || SCENE_PRESETS.plain;
+
+      // Scene間の距離でモーフ時間を決定
+      const _quietScenes = new Set(['plain', 'glass', 'velvet']);
+      const _clubScenes  = new Set(['love', 'pluck', 'strings']);
+      const _wasQuiet = _quietScenes.has(_prevSceneName);
+      const _isQuiet  = _quietScenes.has(name);
+      const _isClub   = _clubScenes.has(name);
+      const _crossSystem = (_wasQuiet !== _isQuiet); // 系をまたぐ
+      let morphSec;
+      if(_crossSystem)  morphSec = 0.3;  // 系をまたぐ: 短く・突然感を残す
+      else if(_isQuiet) morphSec = 2.5;  // 静かな系内: ゆっくり溶ける
+      else if(_isClub)  morphSec = 1.2;  // クラブ系内: 少し速く
+      else              morphSec = 0.8;  // その他
+
+      const tNow = actx.currentTime;
+      _sceneVoices.forEach(v => {
+        if(!v || v.releasing) return;
+        // LPFのcutoffを新Sceneの値へ補間
+        try{
+          v.lpf.frequency.cancelScheduledValues(tNow);
+          v.lpf.frequency.setValueAtTime(v.lpf.frequency.value, tNow);
+          v.lpf.frequency.exponentialRampToValueAtTime(
+            Math.max(scNew.cutoff, 80), tNow + morphSec
+          );
+          // resonance（Q）も補間
+          v.lpf.Q.cancelScheduledValues(tNow);
+          v.lpf.Q.setValueAtTime(v.lpf.Q.value, tNow);
+          v.lpf.Q.linearRampToValueAtTime(
+            Math.max(scNew.res, 0.1), tNow + morphSec
+          );
+        }catch(e){}
+        // gainをわずかに補間（vol差を滑らかに）
+        try{
+          const curGain = v.vca.gain.value;
+          const targetGain = scNew.vol * 0.68 * scNew.sustain;
+          if(Math.abs(curGain - targetGain) > 0.01){
+            v.vca.gain.cancelScheduledValues(tNow);
+            v.vca.gain.setValueAtTime(curGain, tNow);
+            v.vca.gain.linearRampToValueAtTime(targetGain, tNow + morphSec);
+          }
+        }catch(e){}
+      });
     }
   }
   // ARP共有outをリセット（新Sceneのwet値を反映）
