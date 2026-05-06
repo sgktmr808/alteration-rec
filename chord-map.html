@@ -10434,14 +10434,14 @@ const SCENE_PRESETS = {
   // 身体性は残しつつ、空気・余韻・透明感を加える
   love: {
     label:'LOVE STAB',
-    // sine+triangleで柔らかく透明に。sawtoothの重さを取る
-    osc1:'sine', osc2:'triangle', detune:4,
-    // cutoffを抑えて刺さらない・resを下げて素直な音に
-    cutoff:1600, res:0.7, envMod:0.45,
-    // attackは速く（跳ねる感覚を維持）・reverbを増やして空間を作る
-    attack:0.010, decay:0.28, sustain:0.22, release:0.80,
-    vol:0.44, chorus:0.04, wet:0.44, strum:3,
-    trailSec:0.8, width:0.62, feltAttack:0.10, ghost:0.0, filterDrift:0.08,
+    // sine（柔らかさ）+ sawtooth薄レイヤー（芯）→ 透明だが存在感がある
+    osc1:'sine', osc2:'sawtooth', detune:3,
+    // cutoffは中域・resは控えめ → 刺さらず素直
+    cutoff:1800, res:0.6, envMod:0.42,
+    // attackは速く（跳ねる感覚）・reverbを増やして浮遊感
+    attack:0.008, decay:0.25, sustain:0.20, release:0.90,
+    vol:0.42, chorus:0.03, wet:0.46, strum:3,
+    trailSec:0.9, width:0.64, feltAttack:0.10, ghost:0.0, filterDrift:0.08,
     voicingFlavor:'garage',
     // ARP: 透明感のある跳ねるARP
     // sine+triangleで柔らかく・gateを少し延ばして余韻を出す
