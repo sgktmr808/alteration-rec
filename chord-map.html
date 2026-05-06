@@ -10053,7 +10053,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
   const arpGateMs = _slArpGate !== null ? _slArpGate : (sc.arpGate || 280);
-  const gateSec = (arpGateMs / 1000) * 0.78;
+  // gateMul: loveは音を重ねてさざ波感を出す（1.15）、それ以外は0.78で短く切る
+  const _gateMul = (sceneCurrentName === 'love') ? 1.15 : 0.78;
+  const gateSec = (arpGateMs / 1000) * _gateMul;
   const nyq = actx.sampleRate / 2 - 100;
 
   // velocity humanize: 音ごとに音量を微妙にばらかす（0.78〜1.18の範囲）
@@ -10444,16 +10446,17 @@ const SCENE_PRESETS = {
     vol:0.42, chorus:0.02, wet:0.52, strum:2,
     trailSec:1.0, width:0.66, feltAttack:0.12, ghost:0.0, filterDrift:0.06,
     voicingFlavor:'garage',
-    // ARP: クリスタル・透明感
-    // sine: 純粋な正弦波で透明・クリスタルに
-    // attack極短（ベル的な粒）+ decay長め（空間に溶ける）
-    // cutoff高め・res低め: 高域を遮らず透明に通す
-    // reverb深め・ghost強め: 1oct上の倍音が光の尾になる
-    arpOsc:'sine', arpCutoff:5000, arpRes:0.3, arpEnvMod:0.22,
-    arpAttack:0.002, arpDecay:0.80, arpSustain:0.0,
-    arpGate:400, arpVol:0.20, arpWet:0.62, arpGhost:0.38,
-    // 1小節リフレイン（合計16.0）
-    arpRhythm:[2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 2.0, 1.0, 1.0, 2.0], arpRestProb:0.18,
+    // ARP: Synclavier的・さざ波のように流れる
+    // sine: 透明・有機的
+    // attack短め: 明確な粒感
+    // gate長め（x1.15）: 前の音と薄く重なりrippling感
+    // sustain少し: 音が繋がって流れる
+    // cutoff高め: Synclavierの輝き
+    arpOsc:'sine', arpCutoff:4200, arpRes:0.35, arpEnvMod:0.30,
+    arpAttack:0.004, arpDecay:0.60, arpSustain:0.12,
+    arpGate:480, arpVol:0.20, arpWet:0.58, arpGhost:0.30,
+    // 1小節リフレイン（合計16.0）・さざ波のような流れ
+    arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 1.0, 2.0], arpRestProb:0.15,
   },
 
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
