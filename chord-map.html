@@ -10650,7 +10650,7 @@ function playSceneChord(actx, root, type){
   const chordWidth     = Math.max(0.1, Math.min(1.0, (_sc.width || 0.55) + complex * 0.3));
   const chordTrail     = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.8));
 
-  const sc = Object.assign({}, _sc, {
+  let sc = Object.assign({}, _sc, {
     cutoff:      chordCutoff,
     res:         chordRes,
     detune:      chordDetune,
