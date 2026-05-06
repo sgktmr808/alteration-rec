@@ -1339,8 +1339,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   <span class="synth-lbl">RATE</span>
                   <div class="synth-pills" id="arp-rate-pills">
                     <div class="synth-pill arp" data-r="1/4">1/4</div>
-                    <div class="synth-pill arp" data-r="1/8">1/8</div>
-                    <div class="synth-pill arp on" data-r="1/16">1/16</div>
+                    <div class="synth-pill arp on" data-r="1/8">1/8</div>
+                    <div class="synth-pill arp" data-r="1/16">1/16</div>
                     <div class="synth-pill arp" data-r="1/32">1/32</div>
                   </div>
                 </div>
@@ -10597,7 +10597,42 @@ function _killReleasingVoices(actx){
 
 // ── CHORDサウンドを発音 ──
 function playSceneChord(actx, root, type){
-  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  const _sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+
+  // ── SLスライダー → CHORDパラメーター反映 ──
+  const bright  = sv('bright');   // Dark(-1) ↔ Bright(+1)
+  const tense   = sv('tense');    // Calm(-1) ↔ Tense(+1)
+  const warm    = sv('warm');     // Cold(-1) ↔ Warm(+1)
+  const complex = sv('complex');  // Simple(-1) ↔ Complex(+1)
+  const moving  = sv('moving');   // Static(-1) ↔ Moving(+1)
+  const strange = sv('strange');  // Familiar(-1) ↔ Strange(+1)
+
+  // bright → cutoff上下（Bright→明るく / Dark→暗く）
+  const chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.7));
+
+  // tense → resonance上下（Tense→張りある / Calm→なだらか）
+  const chordRes = Math.max(0.3, _sc.res * (1.0 + tense * 0.6));
+
+  // warm → detune量（Warm→広がり / Cold→タイト）
+  const chordDetune = _sc.detune + warm * 8; // ±8cent
+
+  // complex → strum速度（Complex→ゆっくりアルペジオ的 / Simple→ピシッと）
+  const chordStrum = Math.max(4, _sc.strum * (1.0 + complex * 1.2));
+
+  // moving → strum速度をさらに加速（Moving→速く / Static→遅く）
+  const chordStrumFinal = Math.max(4, chordStrum * (1.0 - moving * 0.5));
+
+  // strange → wet（reverb量）上下（Strange→深い残響 / Familiar→ドライ）
+  const chordWet = Math.max(0, Math.min(1, _sc.wet + strange * 0.3));
+
+  // SL適用済みのscオブジェクト（元のscは変更しない）
+  const sc = Object.assign({}, _sc, {
+    cutoff: chordCutoff,
+    res:    chordRes,
+    detune: chordDetune,
+    strum:  chordStrumFinal,
+    wet:    chordWet,
+  });
 
   // 前回リリース中のボイスを即座に消音（濁り防止）
   _killReleasingVoices(actx);
@@ -10652,21 +10687,15 @@ function playScene(root, type){
   if(!actx) return;
 
   const _doPlay = () => {
-    // CHORD系を発音（SOURCE が CHORD または CHORD+ARP のとき）
+    // CHORD系を発音
     if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
       playSceneChord(actx, root, type);
     } else {
-      // ARP専用モード：前のCHORDボイスを止める
-      if(_sceneVoices.length > 0){
-        _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
-        _sceneVoices = [];
-      }
+      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
+      _sceneVoices = [];
     }
-    // ARP連動（SOURCE が ARP または CHORD+ARP のときのみ）
-    if((sceneCurrentSource === 'ARP' || sceneCurrentSource === 'CHORD+ARP')
-        && arpOn && typeof updateArpChord === 'function'){
-      updateArpChord(root, type);
-    }
+    // ARP連動
+    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
   };
 
   if(actx.state === 'running'){
@@ -10792,16 +10821,6 @@ function applyScene(name){
 
 // ── Source切替 ──
 function applySource(src){
-  const actx = safeGetCtx();
-  // 前のCHORDボイスをフェードアウト（ARP/CHORD+ARPに切り替える場合）
-  if(src === 'ARP'){
-    if(actx && _sceneVoices.length > 0){
-      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
-      _sceneVoices = [];
-    }
-    // ARPがOFFなら自動でON
-    if(!arpOn) toggleArp();
-  }
   sceneCurrentSource = src;
   document.querySelectorAll('.source-pill').forEach(el =>
     el.classList.toggle('on', el.dataset.source === src)
