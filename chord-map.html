@@ -10444,13 +10444,15 @@ const SCENE_PRESETS = {
     vol:0.42, chorus:0.02, wet:0.52, strum:2,
     trailSec:1.0, width:0.66, feltAttack:0.12, ghost:0.0, filterDrift:0.06,
     voicingFlavor:'garage',
-    // ARP: 透明感のある跳ねるARP
-    // sine+triangleで柔らかく・gateを少し延ばして余韻を出す
-    arpOsc:'triangle', arpCutoff:1800, arpRes:0.8, arpEnvMod:0.55,
-    arpAttack:0.005, arpDecay:0.20, arpSustain:0.0,
-    arpGate:160, arpVol:0.26, arpWet:0.38, arpGhost:0.14,
-    // リズム: 裏拍感は維持・少し余白を作って透明感を出す
-    arpRhythm:[0.5, 1.0, 0.5, 1.5, 0.5, 1.0, 0.5, 2.0], arpRestProb:0.14,
+    // ARP: 透明・余韻あり・疎
+    // sine: 透明感 / cutoff高め: 明るく刺さらない
+    // gate長め: 余韻を残す / ghost強め: 光の尾
+    // リズム疎: 来ない間が心地よい
+    arpOsc:'sine', arpCutoff:2800, arpRes:0.6, arpEnvMod:0.40,
+    arpAttack:0.006, arpDecay:0.30, arpSustain:0.05,
+    arpGate:280, arpVol:0.22, arpWet:0.52, arpGhost:0.28,
+    // リズム: 疎・長い間隔・来た音が印象的
+    arpRhythm:[1.0, 2.0, 0.5, 3.0, 1.0, 1.5, 0.5, 2.5], arpRestProb:0.28,
   },
 
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
