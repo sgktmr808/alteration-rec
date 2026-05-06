@@ -9660,6 +9660,31 @@ function buildArpSeq(root, type){
     case 'up2':      return [...n,...n.map(x=>x+12)];
     case 'down2':    return [...n.map(x=>x+12),...n].reverse();
     case 'random':   return shuffleArr([...n]);
+    case 'rand':      return shuffleArr([...n]); // UIボタンのdata-pat="rand"と対応
+    case 'shimmer':{
+      // 水面の煌めき: 前の音から近い音に移動しやすい加重ランダム
+      // 完全ランダムではなく、波の動きに沿った自然な揺れ
+      const seq = [];
+      let prev = n[Math.floor(n.length / 2)]; // 中央音から開始
+      const seqLen = n.length * 2; // 2周分生成
+      for(let i = 0; i < seqLen; i++){
+        // 各音への距離に応じた重みを計算（近いほど選ばれやすい）
+        const weights = n.map(note => {
+          const dist = Math.abs(note - prev);
+          return 1 / (dist + 1.5); // 距離0=最大重み・距離大=小さい重み
+        });
+        const total = weights.reduce((a, b) => a + b, 0);
+        let r = Math.random() * total;
+        let chosen = n[n.length - 1];
+        for(let j = 0; j < n.length; j++){
+          r -= weights[j];
+          if(r <= 0){ chosen = n[j]; break; }
+        }
+        seq.push(chosen);
+        prev = chosen;
+      }
+      return seq;
+    }
     case 'randoct':  return shuffleArr([...n,...n.map(x=>x+12)]);
     case 'chord':    return [n]; // 特殊: 配列の配列（同時発音）
     case 'skip1up':  return n.filter((_,i)=>i%2===0);
@@ -10273,6 +10298,7 @@ function stopArpScheduler(){
 
 // ARPリズムステップカウンター
 let _arpRhythmStep = 0;
+let _arpLastMidi = null; // shimmerモード用: 前回発音したMIDIノート
 
 function scheduleArpNotes(){
   if(!arpOn) return;
@@ -10302,15 +10328,39 @@ function scheduleArpNotes(){
       const isRest = restProb > 0 && Math.random() < restProb;
 
       if(!isRest){
-        const item=arpSeq[arpStep%arpSeq.length];
-        const dest=dlyDestination||actx.destination;
+        const dest = dlyDestination || actx.destination;
 
-        if(Array.isArray(item)){
-          item.forEach((midi,i)=>{
-            _playSceneArpNote(actx, midi, t+i*0.012, dest);
+        // ── LOVEのshimmerモード: リアルタイムで次の音を選ぶ ──
+        // 事前生成シーケンスではなく毎ステップ音楽的に選択
+        if(sceneCurrentName === 'love' && arpSeq.length > 0){
+          // 前の音から近い音に移動しやすい加重ランダム
+          // ただし同じ音が連続しないよう除外
+          const candidates = arpSeq.filter(m => m !== _arpLastMidi);
+          const pool = candidates.length > 0 ? candidates : arpSeq;
+          const weights = pool.map(note => {
+            const dist = _arpLastMidi !== null ? Math.abs(note - _arpLastMidi) : 1;
+            // 3〜5半音の跳躍を少し優遇（音楽的な動きを促す）
+            const musicBonus = (dist >= 3 && dist <= 7) ? 1.4 : 1.0;
+            return (1 / (dist + 1.2)) * musicBonus;
           });
+          const total = weights.reduce((a, b) => a + b, 0);
+          let r = Math.random() * total;
+          let chosen = pool[pool.length - 1];
+          for(let j = 0; j < pool.length; j++){
+            r -= weights[j];
+            if(r <= 0){ chosen = pool[j]; break; }
+          }
+          _arpLastMidi = chosen;
+          _playSceneArpNote(actx, chosen, t, dest);
         } else {
-          _playSceneArpNote(actx, item, t, dest);
+          const item = arpSeq[arpStep % arpSeq.length];
+          if(Array.isArray(item)){
+            item.forEach((midi, i) => {
+              _playSceneArpNote(actx, midi, t + i * 0.012, dest);
+            });
+          } else {
+            _playSceneArpNote(actx, item, t, dest);
+          }
         }
       }
       arpStep++;
@@ -10324,6 +10374,7 @@ function updateArpChord(root, type){
   if(!arpOn) return;
   arpSeq=buildArpSeq(root, type);
   arpStep=0;
+  _arpLastMidi = null; // shimmerモードのリセット
   // リズムパターンはリセットしない（コードチェンジをまたいでリズムが継続）
 }
 
@@ -11195,12 +11246,13 @@ function applyScene(name){
   const _prevSceneName = sceneCurrentName; // 変容判定用に前のScene名を保持
   sceneCurrentName = name;
   // SLスライダーのARP上書き値をリセット
-  // → 新SceneのデフォルトARPパラメーターが正しく反映されるようにする
   _slArpCutoff = null;
   _slArpRes = null;
   _slArpRestProb = null;
   _slArpGate = null;
   _slRhythmDensity = null;
+  // LOVEのARPはshimmerパターン（水面の煌めき・加重ランダム）を使う
+  _slArpPattern = (name === 'love') ? 'shimmer' : null;
   // UI更新
   document.querySelectorAll('.scene-pill').forEach(el =>
     el.classList.toggle('on', el.dataset.scene === name)
