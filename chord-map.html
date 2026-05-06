@@ -10525,8 +10525,10 @@ const SCENE_PRESETS = {
     arpOsc:'sawtooth', arpOsc2:'square', arpCutoff:1100, arpRes:0.3, arpEnvMod:0.18,
     arpAttack:0.005, arpDecay:0.22, arpSustain:0.04,
     arpGate:500, arpVol:0.13, arpWet:0.50, arpGhost:0.20,
-    // 1小節リフレイン（合計16.0）・さざ波のような流れ
-    arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 1.0, 2.0], arpRestProb:0.15,
+    // 1小節リフレイン（合計16.0）
+    // 非対称・長短が不規則・同じペアを繰り返さない
+    // 「来るかと思ったら来ない」という引っかかりが気持ちよさを作る
+    arpRhythm:[2.0, 1.0, 0.5, 2.5, 1.0, 0.5, 3.5, 1.0, 0.5, 1.5, 2.0], arpRestProb:0.22,
   },
 
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
