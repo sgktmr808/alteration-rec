@@ -10083,9 +10083,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   osc1.type = oscType;
   osc1.frequency.value = hz;
 
-  // ── OSC2: デチューン（厚み）──
+  // ── OSC2: デチューン（厚み）/ arpOsc2があれば別のwave type ──
   const osc2 = actx.createOscillator();
-  osc2.type = oscType;
+  osc2.type = sc.arpOsc2 || oscType;
   osc2.frequency.value = hz * Math.pow(2, 6 / 1200);
 
   // ── SUB OSC: 1oct下のsine（深み）──
@@ -10093,8 +10093,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   sub.type = 'sine';
   sub.frequency.value = hz * 0.5;
   const subG = actx.createGain();
-  // LOVE: sub(1oct下)を切る → スティールパン的な金属低域を除去
-  subG.gain.value = (sceneCurrentName === 'pluck') ? 0.35 : (sceneCurrentName === 'love') ? 0.0 : 0.15;
+  subG.gain.value = (sceneCurrentName === 'pluck') ? 0.35 : 0.15;
 
   // ── ピッチLFO: 微細なゆらぎで生気を出す ──
   const lfoDepth = hz * 0.0015; // 約0.15%のピッチ揺れ
@@ -10145,8 +10144,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
 
   // ── OSC2 mix（warm→triangle多め / cold→osc1寄り）──
   const osc2g = actx.createGain();
-  // LOVE: osc2(デチューン)を切る → 金属的なうなりを除去・sineの純粋な透明感
-  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.0 : 0.75;
+  // LOVE: osc2(square/pulse)を薄くブレンド → 有機的な倍音
+  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.45 : 0.75;
 
   // ── ルーティング ──
   osc1.connect(lpf);
@@ -10478,18 +10477,12 @@ const SCENE_PRESETS = {
     vol:0.42, chorus:0.02, wet:0.52, strum:2,
     trailSec:1.0, width:0.66, feltAttack:0.12, ghost:0.0, filterDrift:0.06,
     voicingFlavor:'garage',
-    // ARP: Synclavier的・さざ波のように流れる
-    // sine: 透明・有機的
-    // attack短め: 明確な粒感
-    // gate長め（x1.15）: 前の音と薄く重なりrippling感
-    // sustain少し: 音が繋がって流れる
-    // cutoff高め: Synclavierの輝き
-    // envMod低め: filterが開いたまま維持 → 詰まらず輝き続ける
-    // sustain高め: 音が持続・マリンバ的な「ポン」で終わらない
-    // decay長め: ゆっくり消えていく
-    arpOsc:'sine', arpCutoff:3800, arpRes:0.25, arpEnvMod:0.12,
-    arpAttack:0.005, arpDecay:1.20, arpSustain:0.45,
-    arpGate:520, arpVol:0.18, arpWet:0.62, arpGhost:0.32,
+    // ARP: sawtooth（倍音・温かみ）+ square pulse（透明感・奥行き）
+    // filterを開き気味 → 冷たくなりすぎない透明感
+    // sustain高め・decay長め: 音が持続して流れる（さざ波感）
+    arpOsc:'sawtooth', arpOsc2:'square', arpCutoff:2200, arpRes:0.4, arpEnvMod:0.15,
+    arpAttack:0.005, arpDecay:0.90, arpSustain:0.40,
+    arpGate:500, arpVol:0.17, arpWet:0.58, arpGhost:0.24,
     // 1小節リフレイン（合計16.0）・さざ波のような流れ
     arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 1.0, 2.0], arpRestProb:0.15,
   },
