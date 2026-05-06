@@ -10601,14 +10601,16 @@ const SCENE_PRESETS = {
     vol:0.40, chorus:0.06, wet:0.48, strum:12,
     trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0, filterDrift:0.28,
     voicingFlavor:'plain',
-    // ARP: サティ的。音が来ないことが美しい。ぽつ…ぽつ…という間
-    // sine・低めcutoff・長いgate・低velocity・Ghostで尾を引く
-    arpOsc:'sine', arpCutoff:700, arpRes:0.3, arpEnvMod:0.18,
-    arpAttack:0.025, arpDecay:0.55, arpSustain:0.08,
-    arpGate:480, arpVol:0.16, arpWet:0.42, arpGhost:0.28,
-    // リズム: 長い間隔・休符多め・均等でない揺れ
-    // 「来るか来ないか分からない」という緊張感
-    arpRhythm:[2.0, 3.0, 1.5, 4.0, 2.0, 1.0, 3.0], arpRestProb:0.42,
+    // ARP: サティ的。芯を残しつつ余白がある
+    // triangle: sineより倍音があり存在感・でも重くない
+    // cutoffを上げて音が埋もれないようにする
+    // パターン: 長い間隔の中に短い連打を混ぜてアクセントを作る
+    arpOsc:'triangle', arpCutoff:1600, arpRes:0.4, arpEnvMod:0.22,
+    arpAttack:0.015, arpDecay:0.60, arpSustain:0.06,
+    arpGate:420, arpVol:0.18, arpWet:0.46, arpGhost:0.25,
+    // ぽつ…ぽつぽつ…ぽつ…という不規則な息遣い
+    // 長い間隔 + 突然の短い連打 + また沈黙
+    arpRhythm:[3.0, 0.5, 0.5, 2.5, 1.0, 4.0, 0.5, 1.5, 3.0, 1.0, 0.5, 2.0], arpRestProb:0.28,
   },
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
