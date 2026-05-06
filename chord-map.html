@@ -10169,8 +10169,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     osc1_wt.connect(osc1_wtG);     osc1_wtG.connect(osc1_morph);
 
     // osc1の代わりにosc1_morphをlpfに接続（後続のrouting用にosc1に差し替え）
-    osc1_sine.start(startTime); osc1_sine.stop(startTime + gateSec + oscStopExtra);
-    osc1_wt.start(startTime);   osc1_wt.stop(startTime + gateSec + oscStopExtra);
+    // oscStopExtraはこの時点では未定義のため直接値を使用（LOVEは0.65）
+    osc1_sine.start(startTime); osc1_sine.stop(startTime + gateSec + 0.65);
+    osc1_wt.start(startTime);   osc1_wt.stop(startTime + gateSec + 0.65);
 
     // lpfへの接続はosc1_morphで行う（osc1.connect(lpf)の代わり）
     osc1_morph.connect(lpf);
