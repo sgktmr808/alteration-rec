@@ -10751,50 +10751,12 @@ function playSceneChord(actx, root, type){
   // 前コードのボイスを照合: 次コードに含まれるノートは保持、それ以外はリリース
   const _keptVoices = [];
 
-  // ── ポルタメント条件 ──
-  // 静かな系Scene（plain/glass/velvet）のときのみ発動
-  const _portatoScenes = new Set(['plain', 'glass', 'velvet']);
-  const _portaEnabled = _portatoScenes.has(sceneCurrentName);
-  // ポルタメント時間: Sceneのattackに連動（0.15〜0.4秒）
-  const _portaSec = Math.max(0.15, Math.min(0.4, sc.attack * 1.8));
-
   _sceneVoices.forEach(v => {
     if(v && v.midi !== undefined && _nextMidiSet.has(v.midi)){
-      // 共通ノード: 保持 + ポルタメント条件チェック
-      // 次コードで同じmidiなら周波数変化なし
-      // → 共通ノード自体は同音なのでポルタメント不要
+      // 共通ノード: リリースせず保持（次コードでも鳴り続ける）
       _keptVoices.push(v);
-    } else if(v && v.midi !== undefined && _portaEnabled){
-      // 非共通ノードでもポルタメント条件を確認:
-      // 移動距離が5半音以内なら、最も近い次コードの音にスライドしてからリリース
-      let closestMidi = null;
-      let closestDist = Infinity;
-      _nextMidis.forEach(nm => {
-        const dist = Math.abs(nm - v.midi);
-        if(dist < closestDist){ closestDist = dist; closestMidi = nm; }
-      });
-      if(closestDist <= 5 && closestMidi !== null && !v.releasing){
-        // 近い音へポルタメントしてからフェードアウト
-        const nextHz = midi2hz(Math.max(24, Math.min(108, closestMidi)));
-        const tNow = actx.currentTime;
-        try{
-          v.osc1.frequency.cancelScheduledValues(tNow);
-          v.osc1.frequency.setValueAtTime(v.osc1.frequency.value, tNow);
-          v.osc1.frequency.exponentialRampToValueAtTime(nextHz, tNow + _portaSec);
-          v.osc2.frequency.cancelScheduledValues(tNow);
-          v.osc2.frequency.setValueAtTime(v.osc2.frequency.value, tNow);
-          v.osc2.frequency.exponentialRampToValueAtTime(
-            nextHz * Math.pow(2, sc.detune / 1200), tNow + _portaSec
-          );
-        }catch(e){}
-        // ポルタメント完了後にリリース
-        setTimeout(()=>{ _releaseSceneVoice(v, actx, trailSec); }, Math.round(_portaSec * 1000));
-      } else {
-        // 遠い音: 通常リリース
-        _releaseSceneVoice(v, actx, trailSec);
-      }
     } else {
-      // 非共通ノード（ポルタメント無効）: 通常リリース
+      // 非共通ノード: trailSecでフェードアウト
       _releaseSceneVoice(v, actx, trailSec);
     }
   });
