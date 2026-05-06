@@ -112,6 +112,34 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:var(--bg);
 }
 /* スワイプヒント */
+/* ── Scene切替バー（MAPタブ下部） ── */
+#scene-switcher{
+  position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:0;z-index:20;
+  background:rgba(0,0,0,0.45);border-radius:20px;
+  padding:4px 6px;backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,0.08);
+}
+#scene-switcher .ss-prev,
+#scene-switcher .ss-next{
+  font-family:var(--fm);font-size:8px;letter-spacing:.08em;
+  color:rgba(255,255,255,0.28);padding:4px 8px;cursor:pointer;
+  user-select:none;-webkit-user-select:none;
+  transition:color .2s;
+}
+#scene-switcher .ss-prev:active,
+#scene-switcher .ss-next:active{ color:rgba(255,255,255,0.7); }
+#scene-switcher .ss-cur{
+  font-family:var(--fm);font-size:9px;letter-spacing:.14em;
+  color:var(--acc);padding:4px 12px;
+  border-left:1px solid rgba(255,255,255,0.1);
+  border-right:1px solid rgba(255,255,255,0.1);
+  min-width:80px;text-align:center;cursor:pointer;
+  user-select:none;-webkit-user-select:none;
+}
+#scene-switcher .ss-arrow{
+  font-size:7px;color:rgba(255,255,255,0.35);margin:0 2px;
+}
 .swipe-pip{
   position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
   display:flex;flex-direction:column;align-items:center;gap:3px;
@@ -1167,6 +1195,13 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <button id="chain-pivot-btn" onclick="chainToPivot()">→ PIVOT</button>
         <!-- Q4: COMPASS → CHAIN 転送ボタン (COMPASSモード時のみ表示) -->
         <button id="compass-chain-btn" onclick="compassToChain()">+ CHAIN</button>
+
+        <!-- Scene切替バー -->
+        <div id="scene-switcher">
+          <div class="ss-prev" id="ss-prev" onclick="switchScenePrev()">◀</div>
+          <div class="ss-cur" id="ss-cur" onclick="switchSceneNext()">PLAIN</div>
+          <div class="ss-next" id="ss-next" onclick="switchSceneNext()">▶</div>
+        </div>
 
         <!-- 上スワイプ促進インジケーター -->
         <div class="swipe-pip" id="swipe-pip">
@@ -11080,6 +11115,42 @@ function _getPatternArpSc(){
 }
 
 // ── Scene切替 ──
+// ── Scene切替バー更新 ──
+const _sceneSwitcherOrder = ['plain','glass','velvet','love','pluck','strings'];
+const _sceneSwitcherLabel = {
+  plain:   'PLAIN',
+  glass:   'GLASS',
+  velvet:  'VELVET',
+  love:    'LOVE',
+  pluck:   'PLUCK',
+  strings: 'STRINGS',
+};
+
+function _updateSceneSwitcher(){
+  const cur  = document.getElementById('ss-cur');
+  const prev = document.getElementById('ss-prev');
+  const next = document.getElementById('ss-next');
+  if(!cur) return;
+  const idx  = _sceneSwitcherOrder.indexOf(sceneCurrentName);
+  const prevScene = _sceneSwitcherOrder[idx - 1];
+  const nextScene = _sceneSwitcherOrder[idx + 1];
+  cur.textContent  = _sceneSwitcherLabel[sceneCurrentName] || sceneCurrentName.toUpperCase();
+  prev.textContent = prevScene ? '◀ ' + _sceneSwitcherLabel[prevScene] : '◀';
+  prev.style.opacity = prevScene ? '1' : '0.2';
+  next.textContent = nextScene ? _sceneSwitcherLabel[nextScene] + ' ▶' : '▶';
+  next.style.opacity = nextScene ? '1' : '0.2';
+}
+
+function switchScenePrev(){
+  const idx = _sceneSwitcherOrder.indexOf(sceneCurrentName);
+  if(idx > 0) applyScene(_sceneSwitcherOrder[idx - 1]);
+}
+
+function switchSceneNext(){
+  const idx = _sceneSwitcherOrder.indexOf(sceneCurrentName);
+  if(idx < _sceneSwitcherOrder.length - 1) applyScene(_sceneSwitcherOrder[idx + 1]);
+}
+
 function applyScene(name){
   const _prevSceneName = sceneCurrentName; // 変容判定用に前のScene名を保持
   sceneCurrentName = name;
@@ -11156,6 +11227,8 @@ function applyScene(name){
   };
   const defaultPattern = _sceneDefaultPattern[name];
   if(defaultPattern) applyChordPattern(defaultPattern);
+  // Scene切替バーの表示を更新
+  _updateSceneSwitcher();
 }
 
 // ── Source切替 ──
@@ -12533,6 +12606,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   initSynthUI();
   // 初期Scene（plain）に合ったPatternを設定
   applyChordPattern('broken');
+  // Scene切替バーの初期表示
+  _updateSceneSwitcher();
 });
 
 document.addEventListener('DOMContentLoaded',()=>{
