@@ -10920,12 +10920,22 @@ function playScene(root, type){
 function applySLToArp(){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
 
-  const bright  = sv('bright');   // Dark(-1) ↔ Bright(+1)
-  const tense   = sv('tense');    // Calm(-1) ↔ Tense(+1)
-  const warm    = sv('warm');     // Cold(-1) ↔ Warm(+1)
-  const complex = sv('complex');  // Simple(-1) ↔ Complex(+1)
-  const moving  = sv('moving');   // Static(-1) ↔ Moving(+1)
-  const strange = sv('strange');  // Familiar(-1) ↔ Strange(+1)
+  // スライダーが全て中立（0）のときはnullを維持してSceneのデフォルト値を使う
+  const bright  = sv('bright');
+  const tense   = sv('tense');
+  const warm    = sv('warm');
+  const complex = sv('complex');
+  const moving  = sv('moving');
+  const strange = sv('strange');
+  const allNeutral = Math.abs(bright) < 0.05 && Math.abs(tense) < 0.05 &&
+    Math.abs(warm) < 0.05 && Math.abs(complex) < 0.05 &&
+    Math.abs(moving) < 0.05 && Math.abs(strange) < 0.05;
+  if(allNeutral){
+    _slArpCutoff = null; _slArpRes = null; _slArpRestProb = null;
+    _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
+    _slArpOctRange = null; _slArpPattern = null;
+    return;
+  }
 
   // ── bright: ARP cutoffを上下 ──
   // Bright→高域明るく / Dark→暗く閉じる
@@ -11021,17 +11031,15 @@ function applyChordPattern(mode){
   // PULSEタイマーをまず停止（前モードのPULSEを確実にクリア）
   if(_chordPulseTimer){ clearInterval(_chordPulseTimer); _chordPulseTimer = null; }
 
-  // ARP系パターン: SOURCEをARPに切替・arpパラメーター上書き設定
+  // ARP系パターン: ARPパラメーター上書きを設定
+  // SOURCEとARPのON/OFFはユーザーの意思を尊重 → 強制切替しない
   const isArpPattern = (mode === 'pluck_arp' || mode === 'float_arp' || mode === 'inner_line');
   if(isArpPattern){
     _patternArpParams = _ARP_PATTERN_PRESETS[mode] || null;
-    // SOURCEをARPに自動切替（arpOnにする）
-    applySource('ARP');
-    // ARPがオフなら自動でONにする
+    // ARPがオフのときだけ自動ONにする（ユーザーが明示的にOFFにした場合は尊重しない）
+    // → ARP系Patternを選んだ = ARPで鳴らしたい意思とみなす
     if(!arpOn){
-      // toggleArp() はUIとarpSchedulerを同時に制御するため経由する
-      const arpBtn = document.getElementById('arp-on-btn');
-      if(arpBtn) arpBtn.click();
+      toggleArp();
     }
   } else if(mode === 'pulse'){
     // PULSE: CHORDを反復するためSOURCEをCHORDに自動切替
@@ -11042,20 +11050,9 @@ function applyChordPattern(mode){
   } else {
     // CHORD系パターン（HOLD/STAB/BROKEN/TRAIL）:
     // ARP用上書きをクリア + SOURCEがARPのみならCHORDに自動切替
+    // CHORD系Pattern: ARP用パラメーター上書きをクリア
+    // ARPのON/OFFはユーザーの意思を尊重 → 強制停止しない
     _patternArpParams = null;
-    if(sceneCurrentSource === 'ARP'){
-      applySource('CHORD');
-    }
-    // ARP停止（CHORD系PatternではARPを止める）
-    if(arpOn){
-      stopArpScheduler();
-      arpOn = false;
-      document.querySelectorAll('#arp-on-btn, #hdr-arp-btn').forEach(btn => {
-        if(!btn) return;
-        btn.textContent = btn.id === 'hdr-arp-btn' ? 'ARP' : 'OFF';
-        btn.classList.remove('on');
-      });
-    }
   }
 
   chordPatternMode = mode;
@@ -11112,6 +11109,13 @@ function switchSceneNext(){
 function applyScene(name){
   const _prevSceneName = sceneCurrentName; // 変容判定用に前のScene名を保持
   sceneCurrentName = name;
+  // SLスライダーのARP上書き値をリセット
+  // → 新SceneのデフォルトARPパラメーターが正しく反映されるようにする
+  _slArpCutoff = null;
+  _slArpRes = null;
+  _slArpRestProb = null;
+  _slArpGate = null;
+  _slRhythmDensity = null;
   // UI更新
   document.querySelectorAll('.scene-pill').forEach(el =>
     el.classList.toggle('on', el.dataset.scene === name)
@@ -11196,20 +11200,8 @@ function applyScene(name){
     }
   }
 
-  // ── Scene別デフォルトPattern自動切替 ──
-  // ARP系パターンへの自動切替は行わない（意図せずARPになる問題を防ぐ）
-  // CHORD系のみ自動切替する
-  const _sceneDefaultPattern = {
-    plain:   'broken',
-    velvet:  'broken',   // inner_lineは手動で選ぶ
-    glass:   'hold',     // float_arpは手動で選ぶ
-    love:    'stab',
-    pluck:   'hold',     // pluck_arpは手動で選ぶ
-    strings: 'trail',
-  };
-  const defaultPattern = _sceneDefaultPattern[name];
-  if(defaultPattern) applyChordPattern(defaultPattern);
   // Scene切替バーの表示を更新
+  // ※ PatternはSceneと独立。ユーザーが明示的に選ぶもの。自動連動しない。
   _updateSceneSwitcher();
 }
 
@@ -12586,8 +12578,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(wrap) wrap.classList.add('open');
   if(tog) tog.textContent='▲';
   initSynthUI();
-  // 初期Scene（plain）に合ったPatternを設定
-  applyChordPattern('broken');
   // Scene切替バーの初期表示
   _updateSceneSwitcher();
 });
