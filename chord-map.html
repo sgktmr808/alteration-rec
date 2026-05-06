@@ -10143,12 +10143,22 @@ function _playSceneArpNote(actx, midi, startTime, dest){
 
   // ── OSC1: メイン ──
   const osc1 = actx.createOscillator();
-  osc1.type = oscType;
+  // LOVEはPeriodicWave（Synclavier的倍音構造）を使用
+  if(sceneCurrentName === 'love'){
+    osc1.setPeriodicWave(_getLoveWave(actx));
+  } else {
+    osc1.type = oscType;
+  }
   osc1.frequency.value = hz;
 
   // ── OSC2: デチューン（厚み）/ arpOsc2があれば別のwave type ──
   const osc2 = actx.createOscillator();
-  osc2.type = sc.arpOsc2 || oscType;
+  // LOVEのosc2もPeriodicWaveで統一（わずかにデチューン）
+  if(sceneCurrentName === 'love'){
+    osc2.setPeriodicWave(_getLoveWave(actx));
+  } else {
+    osc2.type = sc.arpOsc2 || oscType;
+  }
   osc2.frequency.value = hz * Math.pow(2, 6 / 1200);
 
   // ── SUB OSC: 1oct下のsine（深み）──
@@ -10344,7 +10354,32 @@ function stopArpScheduler(){
 
 // ARPリズムステップカウンター
 let _arpRhythmStep = 0;
-let _arpLastMidi = null; // shimmerモード用: 前回発音したMIDIノート
+let _arpLastMidi = null;
+// ── LOVE ARP用 PeriodicWave キャッシュ ──
+let _lovePeriodicWave = null;
+let _lovePeriodicWaveCtx = null;
+
+function _getLoveWave(actx){
+  // AudioContextが変わったらリセット
+  if(_lovePeriodicWave && _lovePeriodicWaveCtx === actx) return _lovePeriodicWave;
+  // Synclavier的倍音構造:
+  // 基音強め・2倍音で温かみ・3倍音で透明感・4倍音で輝き・5以上ほぼゼロ
+  const size = 8; // 倍音の数
+  const real = new Float32Array(size);
+  const imag = new Float32Array(size);
+  // imagが実際の倍音係数（realは位相、通常0）
+  imag[0] = 0;    // DC成分（不使用）
+  imag[1] = 1.00; // 基音
+  imag[2] = 0.55; // 2倍音（1oct上）→ 温かみ
+  imag[3] = 0.28; // 3倍音 → 透明感
+  imag[4] = 0.12; // 4倍音 → 輝き
+  imag[5] = 0.05; // 5倍音 → ごくわずか
+  imag[6] = 0.02; // 6倍音 → ほぼゼロ
+  imag[7] = 0.01; // 7倍音 → ほぼゼロ
+  _lovePeriodicWave = actx.createPeriodicWave(real, imag, { disableNormalization: false });
+  _lovePeriodicWaveCtx = actx;
+  return _lovePeriodicWave;
+}
 
 function scheduleArpNotes(){
   if(!arpOn) return;
