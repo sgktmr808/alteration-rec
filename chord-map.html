@@ -3222,6 +3222,8 @@ function initCanvas(){
   }
 
   canvas.addEventListener('pointerdown', e => {
+    // コントロール画面表示中は外縁操作を無効にする
+    if(window._isCtrlScreen) return;
     const {x, y} = canvasXY(e);
     if(!_isEdgeZone(x, y)) return; // 外縁以外は通常のpointerdownに任せる
     // 外縁タッチ開始
@@ -3233,8 +3235,8 @@ function initCanvas(){
       pointerId: e.pointerId,
     };
     canvas.setPointerCapture(e.pointerId);
-    e.stopPropagation();
-  }, { capture: true });
+    e.preventDefault();
+  });
 
   canvas.addEventListener('pointermove', e => {
     if(!_edgeGesture || e.pointerId !== _edgeGesture.pointerId) return;
@@ -3244,10 +3246,10 @@ function initCanvas(){
     const absDx = Math.abs(dx), absDy = Math.abs(dy);
     if(absDx < 8 && absDy < 8) return; // 微小移動は無視
     _edgeGesture.moved = true;
+    e.preventDefault();
 
     if(absDy > absDx){
-      // 上下ドラッグ → Scene変容
-      // 40px で1段階
+      // 上下ドラッグ → Scene変容（40pxで1段階）
       const steps = Math.round(-dy / 40);
       const newIdx = Math.max(0, Math.min(
         _sceneOrder.length - 1,
@@ -3258,8 +3260,7 @@ function initCanvas(){
         applyScene(newScene);
       }
     } else {
-      // 左右ドラッグ → モード切替
-      // 50px で1段階
+      // 左右ドラッグ → モード切替（50pxで1段階）
       const steps = Math.round(dx / 50);
       const newIdx = Math.max(0, Math.min(
         _modeOrder.length - 1,
@@ -3267,7 +3268,6 @@ function initCanvas(){
       ));
       const newMode = _modeOrder[newIdx];
       if(newMode && newMode !== MAP_MODE){
-        // 既存のsetMapMode相当処理
         document.querySelectorAll('.mode-btn').forEach(b =>
           b.classList.toggle('on', b.dataset.mode === newMode)
         );
@@ -3276,14 +3276,12 @@ function initCanvas(){
         invalidate();
       }
     }
-    e.stopPropagation();
-  }, { capture: true });
+  });
 
   canvas.addEventListener('pointerup', e => {
     if(!_edgeGesture || e.pointerId !== _edgeGesture.pointerId) return;
     _edgeGesture = null;
-    e.stopPropagation();
-  }, { capture: true });
+  });
 
   canvas.addEventListener('pointerup',()=>{
     _sliderDragging = false; // スライダー操作終了
@@ -13845,6 +13843,7 @@ updateSaveBtnVisibility(); // SAVEボタン初期状態
   function snap(toCtrl, animated){
     if(animated===undefined) animated=true;
     isCtrl = toCtrl;
+    window._isCtrlScreen = toCtrl; // 外縁操作の判定用にグローバルに公開
     applyPct(toCtrl ? -50 : 0, animated);
     if(!toCtrl) setTimeout(()=>{ if(typeof getL==='function'){getL();drawFrame();} }, 340);
   }
