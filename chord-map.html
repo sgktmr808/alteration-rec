@@ -10173,17 +10173,15 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     osc1_sine.start(startTime); osc1_sine.stop(startTime + gateSec + 0.65);
     osc1_wt.start(startTime);   osc1_wt.stop(startTime + gateSec + 0.65);
 
-    // lpfへの接続はosc1_morphで行う（osc1.connect(lpf)の代わり）
-    osc1_morph.connect(lpf);
-
-    // osc1自体はダミー（後続のosc1.start/stopを無効化するためのフラグ）
+    // osc1自体はダミー
     osc1.type = 'sine';
     osc1.frequency.value = hz;
-    // osc1は使わない（start/stopしない）→ _loveOsc1Handled フラグで制御
     var _loveOsc1Handled = true;
+    var _loveOsc1Morph = osc1_morph; // lpf宣言後に接続するため保持
   } else {
     osc1.type = oscType;
     var _loveOsc1Handled = false;
+    var _loveOsc1Morph = null;
   }
   if(!_loveOsc1Handled) osc1.frequency.value = hz;
 
@@ -10257,8 +10255,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.38 : 0.75;
 
   // ── ルーティング ──
-  // LOVEのosc1はモーフィング側で既にlpfに接続済み
-  if(!_loveOsc1Handled) osc1.connect(lpf);
+  // LOVEのosc1はosc1_morphをlpfに接続
+  if(_loveOsc1Morph) _loveOsc1Morph.connect(lpf);
+  else osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
   sub.connect(subG);   subG.connect(lpf);
   lpf.connect(env);
