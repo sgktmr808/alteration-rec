@@ -10444,15 +10444,16 @@ const SCENE_PRESETS = {
     vol:0.42, chorus:0.02, wet:0.52, strum:2,
     trailSec:1.0, width:0.66, feltAttack:0.12, ghost:0.0, filterDrift:0.06,
     voicingFlavor:'garage',
-    // ARP: 透明・余韻あり・疎
-    // sine: 透明感 / cutoff高め: 明るく刺さらない
-    // gate長め: 余韻を残す / ghost強め: 光の尾
-    // リズム疎: 来ない間が心地よい
-    arpOsc:'sine', arpCutoff:2800, arpRes:0.6, arpEnvMod:0.40,
-    arpAttack:0.006, arpDecay:0.30, arpSustain:0.05,
-    arpGate:280, arpVol:0.22, arpWet:0.52, arpGhost:0.28,
-    // リズム: 疎・長い間隔・来た音が印象的
-    arpRhythm:[1.0, 2.0, 0.5, 3.0, 1.0, 1.5, 0.5, 2.5], arpRestProb:0.28,
+    // ARP: エレピ的・1小節リフレイン
+    // triangle: 暖かく存在感あり・sineより芯がある
+    // attack短め+decay長め: 鍵盤の粒と余韻
+    // arpRhythm合計=16（1小節=16ステップでループ）
+    arpOsc:'triangle', arpCutoff:2400, arpRes:0.5, arpEnvMod:0.48,
+    arpAttack:0.008, arpDecay:0.55, arpSustain:0.08,
+    arpGate:320, arpVol:0.24, arpWet:0.50, arpGhost:0.22,
+    // 1小節リフレイン（合計16.0）
+    // 跳ねる感覚を維持しつつ、疎な間が心地よい
+    arpRhythm:[2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 2.0, 1.0, 1.0, 2.0], arpRestProb:0.18,
   },
 
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
