@@ -9682,6 +9682,23 @@ function buildArpSeq(root, type){
       }
       return seq;
     }
+    case 'innerline':{
+      // 3度・7度など内声だけを動かす（VELVET用）
+      // ivs内で3rd(3,4)と7th(10,11)とtension(2,14)を優先
+      const innerIntervals = new Set([2,3,4,9,10,11,14]);
+      const ivs2 = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
+      const ri2 = (typeof ni === 'function') ? ni(root) : 0;
+      const rootMidi2 = 12*(arpOctCenter+1)+ri2;
+      let inner = ivs2
+        .filter(iv => innerIntervals.has(iv % 12))
+        .map(iv => {
+          let m = rootMidi2 + (iv % 12);
+          if(m < rootMidi2) m += 12;
+          return m;
+        });
+      if(inner.length === 0) inner = n.slice(1, -1); // フォールバック
+      return inner.sort((a,b)=>a-b);
+    }
     default: return [...n];
   }
 }
@@ -9998,78 +10015,216 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
   osc.start(startTime); osc.stop(startTime+gateSec+0.05);
 }
 
-// ── Scene別ARPノート発音（Arp Ghost対応）──
+// ── Euclideanリズム生成ユーティリティ ──
+function buildEuclidean(steps, pulses){
+  // Bjorklundアルゴリズムで均等分散リズムを生成
+  if(pulses >= steps) return new Array(steps).fill(1);
+  if(pulses <= 0) return new Array(steps).fill(0);
+  let pattern = [];
+  let counts = [];
+  let remainders = [];
+  let divisor = steps - pulses;
+  remainders.push(pulses);
+  let level = 0;
+  while(true){
+    counts.push(Math.floor(divisor / remainders[level]));
+    remainders.push(divisor % remainders[level]);
+    divisor = remainders[level];
+    level++;
+    if(remainders[level] <= 1) break;
+  }
+  counts.push(divisor);
+  function build(level){
+    if(level === -1){ pattern.push(0); }
+    else if(level === -2){ pattern.push(1); }
+    else {
+      for(let i=0; i<counts[level]; i++) build(level-1);
+      if(remainders[level] !== 0) build(level-2);
+    }
+  }
+  build(level);
+  return pattern;
+}
+
+// Euclideanリズムキャッシュ（SceneのarpRhythmとして変換）
+function getEuclideanRhythm(steps, pulses){
+  const pat = buildEuclidean(steps, pulses);
+  // 1=発音(0.5拍)、0=休符(0.5拍)として展開
+  const rhythm = [];
+  let consecutive = 0;
+  for(let i=0; i<pat.length; i++){
+    if(pat[i] === 1){
+      if(consecutive > 0) rhythm.push(consecutive * 0.5);
+      rhythm.push(0.5);
+      consecutive = 0;
+    } else {
+      consecutive++;
+    }
+  }
+  if(consecutive > 0) rhythm.push(consecutive * 0.5);
+  return rhythm.length > 0 ? rhythm : [0.5];
+}
+
+// ── Ping Pong Delay（glass/float ARP用）──
+let _pingPongL = null, _pingPongR = null, _pingPongCtx = null;
+function _getPingPong(actx){
+  if(_pingPongCtx !== actx || !_pingPongL){
+    const dlyTime = arpStepMs() / 1000 * 0.5; // 8分音符
+    _pingPongL = actx.createDelay(2.0);
+    _pingPongR = actx.createDelay(2.0);
+    _pingPongL.delayTime.value = dlyTime;
+    _pingPongR.delayTime.value = dlyTime * 1.33;
+    const fbL = actx.createGain(); fbL.gain.value = 0.38;
+    const fbR = actx.createGain(); fbR.gain.value = 0.34;
+    const panL = actx.createStereoPanner(); panL.pan.value = -0.85;
+    const panR = actx.createStereoPanner(); panR.pan.value =  0.85;
+    const hpf = actx.createBiquadFilter();
+    hpf.type = 'highpass'; hpf.frequency.value = 200;
+    _pingPongL.connect(panL); panL.connect(actx.destination);
+    _pingPongR.connect(panR); panR.connect(actx.destination);
+    _pingPongL.connect(fbL); fbL.connect(_pingPongR);
+    _pingPongR.connect(fbR); fbR.connect(_pingPongL);
+    _pingPongCtx = actx;
+  }
+  return { l: _pingPongL, r: _pingPongR };
+}
+function _resetPingPong(){ _pingPongL=null; _pingPongR=null; _pingPongCtx=null; }
+
+// ── Scene別ARPノート発音（arpMode対応）──
 function _playSceneArpNote(actx, midi, startTime, dest){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  const mode = sc.arpMode || 'pluck';
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
-  const arpGateMs = _slArpGate !== null ? _slArpGate : (sc.arpGate || 280);
-  const gateSec = (arpGateMs / 1000) * 0.78;
   const nyq = actx.sampleRate / 2 - 100;
 
+  const res    = _slArpRes    !== null ? _slArpRes    : (sc.arpRes    || 1.2);
+  const cutoff = _slArpCutoff !== null ? _slArpCutoff : (sc.arpCutoff || 1800);
+  const arpGateMs = _slArpGate !== null ? _slArpGate : (sc.arpGate || 280);
+  const gateSec = (arpGateMs / 1000) * 0.78;
   const vol    = sc.arpVol    || 0.26;
   const atk    = sc.arpAttack || 0.006;
   const decay  = sc.arpDecay  || 0.22;
   const envMod = sc.arpEnvMod || 0.5;
   const oscType = sc.arpOsc   || 'sawtooth';
-  // SLスライダー反映（nullなら各Sceneのデフォルト値を使用）
-  const res    = _slArpRes    !== null ? _slArpRes    : (sc.arpRes    || 1.2);
-  const cutoff = _slArpCutoff !== null ? _slArpCutoff : (sc.arpCutoff || 1800);
-
-  // ARP出力: delay経由（共有ノード）+ reverb経由（共有ノード）
-  // getOut()を毎音呼ばない → 音量膨れを防ぐ
-  const dlyTarget = dest || actx.destination;
   const rvbTarget = _getArpOut(actx);
+  const dlyTarget = dest || actx.destination;
 
-  // ── OSC1: メイン ──
+  // ── モード別パラメーター上書き ──
+  let finalAtk = atk, finalDecay = decay, finalGate = gateSec;
+  let finalCutoff = cutoff, finalRes = res, finalEnvMod = envMod;
+  let finalOsc = oscType, subMix = 0.15, osc2Mix = 0.65;
+  let usePingPong = false, ghostVol = sc.arpGhost || 0;
+
+  if(mode === 'float'){
+    // PLAIN: サティ的余白、sine、柔らかく長い尾
+    finalOsc = 'sine';
+    finalAtk = 0.025;
+    finalGate = Math.max(gateSec, 0.45);
+    finalCutoff = Math.min(cutoff * 0.85, 1800);
+    finalEnvMod = 0.18;
+    subMix = 0.08;
+  }
+  else if(mode === 'glass'){
+    // GLASS: 超短gate、高域、Ping Pong Delay
+    finalOsc = 'sine';
+    finalAtk = 0.003;
+    finalGate = Math.min(gateSec, 0.12);
+    finalCutoff = Math.min(cutoff, nyq * 0.7);
+    finalRes = Math.min(res * 1.3, 6.0);
+    finalEnvMod = 0.65;
+    subMix = 0.0;
+    osc2Mix = 0.4;
+    usePingPong = true;
+    ghostVol = Math.max(ghostVol, 0.22);
+  }
+  else if(mode === 'inner'){
+    // VELVET: 中域、温かみ、triangle寄り
+    finalOsc = 'triangle';
+    finalAtk = 0.012;
+    finalGate = Math.max(gateSec, 0.28);
+    finalCutoff = Math.min(cutoff * 0.9, 2200);
+    finalEnvMod = 0.38;
+    subMix = 0.12;
+    osc2Mix = _slOsc2Mix !== null ? _slOsc2Mix : 0.80;
+  }
+  else if(mode === 'stab'){
+    // LOVE: 短くタイト、filter env強め、裏拍感
+    finalAtk = 0.003;
+    finalGate = Math.min(gateSec, 0.16);
+    finalCutoff = cutoff;
+    finalRes = Math.min(res * 1.2, 5.0);
+    finalEnvMod = Math.min(envMod * 1.3, 1.0);
+    subMix = 0.05;
+    ghostVol = 0.0; // stabにゴーストは不要
+  }
+  else if(mode === 'pluck'){
+    // DEEP TECH: filter swell、sub強め、催眠的
+    finalAtk = 0.004;
+    finalGate = Math.max(gateSec, 0.38);
+    finalCutoff = cutoff;
+    finalRes = Math.min(res, 4.0);
+    finalEnvMod = Math.min(envMod, 0.95);
+    subMix = 0.35;
+    osc2Mix = _slOsc2Mix !== null ? _slOsc2Mix : 0.72;
+  }
+  else if(mode === 'pulse'){
+    // BLACK STRINGS: 長めsustain、低域中心、Detroit
+    finalAtk = 0.018;
+    finalGate = Math.max(gateSec, 0.50);
+    finalCutoff = Math.min(cutoff * 0.75, 2000);
+    finalEnvMod = 0.28;
+    subMix = 0.28;
+    osc2Mix = _slOsc2Mix !== null ? _slOsc2Mix : 0.70;
+    ghostVol = Math.max(ghostVol, 0.12);
+  }
+
+  // ── OSC1 ──
   const osc1 = actx.createOscillator();
-  osc1.type = oscType;
+  osc1.type = finalOsc;
   osc1.frequency.value = hz;
 
-  // ── OSC2: デチューン（厚み）──
+  // ── OSC2（デチューン）──
   const osc2 = actx.createOscillator();
-  osc2.type = oscType;
+  osc2.type = finalOsc === 'sine' ? 'triangle' : finalOsc;
   osc2.frequency.value = hz * Math.pow(2, 6 / 1200);
+  const osc2g = actx.createGain();
+  osc2g.gain.value = osc2Mix;
 
-  // ── SUB OSC: 1oct下のsine（深み）──
+  // ── SUB OSC ──
   const sub = actx.createOscillator();
   sub.type = 'sine';
   sub.frequency.value = hz * 0.5;
   const subG = actx.createGain();
-  subG.gain.value = (sceneCurrentName === 'pluck') ? 0.35 : 0.15;
+  subG.gain.value = subMix;
 
-  // ── ピッチLFO: 微細なゆらぎで生気を出す ──
-  const lfoDepth = hz * 0.0015; // 約0.15%のピッチ揺れ
+  // ── ピッチLFO（生気）──
+  const lfoDepth = hz * 0.0015;
   const pitchLfo = actx.createOscillator();
   const pitchLfoG = actx.createGain();
-  pitchLfo.frequency.value = 0.3 + Math.random() * 0.4; // 0.3〜0.7Hz
+  pitchLfo.frequency.value = 0.3 + Math.random() * 0.4;
   pitchLfoG.gain.value = lfoDepth;
   pitchLfo.connect(pitchLfoG);
   pitchLfoG.connect(osc1.frequency);
   pitchLfoG.connect(osc2.frequency);
-  pitchLfo.start(startTime); pitchLfo.stop(startTime + gateSec + 0.1);
+  pitchLfo.start(startTime); pitchLfo.stop(startTime + finalGate + 0.1);
 
-  // ── LPF with filter envelope（閉じた状態から開く）──
+  // ── LPF with filter envelope ──
   const lpf = actx.createBiquadFilter();
   lpf.type = 'lowpass';
-  lpf.Q.value = res;
-  const baseCutoff = Math.max(cutoff * 0.15, 60);   // 閉じた状態
-  const peakCutoff = Math.min(cutoff * (1 + envMod * 2.8), nyq); // 開いた状態
+  lpf.Q.value = finalRes;
+  const baseCutoff = Math.max(finalCutoff * 0.15, 60);
+  const peakCutoff = Math.min(finalCutoff * (1 + finalEnvMod * 2.8), nyq);
   lpf.frequency.setValueAtTime(baseCutoff, startTime);
-  // 素早く開いて → ゆっくり閉じる（ディープテクノのswell感）
-  lpf.frequency.exponentialRampToValueAtTime(peakCutoff, startTime + atk + 0.01);
+  lpf.frequency.exponentialRampToValueAtTime(peakCutoff, startTime + finalAtk + 0.01);
   lpf.frequency.exponentialRampToValueAtTime(
-    Math.max(cutoff * 0.25, 60), startTime + atk + decay
+    Math.max(finalCutoff * 0.25, 60), startTime + finalAtk + finalDecay
   );
 
-  // ── VCA Envelope ──
+  // ── VCA ──
   const env = actx.createGain();
   env.gain.setValueAtTime(0.001, startTime);
-  env.gain.linearRampToValueAtTime(vol, startTime + atk);
-  env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
-
-  // ── OSC2 mix（warm→triangle多め / cold→osc1寄り）──
-  const osc2g = actx.createGain();
-  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : 0.75;
+  env.gain.linearRampToValueAtTime(vol, startTime + finalAtk);
+  env.gain.exponentialRampToValueAtTime(0.001, startTime + finalGate);
 
   // ── ルーティング ──
   osc1.connect(lpf);
@@ -10077,19 +10232,28 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   sub.connect(subG);   subG.connect(lpf);
   lpf.connect(env);
 
-  // delay 30% + reverb 70%（reverb感を強める）
-  const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
-  const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
-  env.connect(dlyG); dlyG.connect(dlyTarget);
-  env.connect(rvbG); rvbG.connect(rvbTarget);
+  if(usePingPong){
+    // glass: Ping Pong Delay
+    const pp = _getPingPong(actx);
+    const ppG = actx.createGain(); ppG.gain.value = 0.45;
+    const dryG = actx.createGain(); dryG.gain.value = 0.55;
+    env.connect(dryG); dryG.connect(rvbTarget);
+    env.connect(ppG);
+    ppG.connect(pp.l);
+    ppG.connect(pp.r);
+  } else {
+    const dlyG = actx.createGain(); dlyG.gain.value = 0.28;
+    const rvbG = actx.createGain(); rvbG.gain.value = 0.72;
+    env.connect(dlyG); dlyG.connect(dlyTarget);
+    env.connect(rvbG); rvbG.connect(rvbTarget);
+  }
 
   osc1.start(startTime); osc2.start(startTime); sub.start(startTime);
-  osc1.stop(startTime + gateSec + 0.08);
-  osc2.stop(startTime + gateSec + 0.08);
-  sub.stop(startTime + gateSec + 0.08);
+  osc1.stop(startTime + finalGate + 0.08);
+  osc2.stop(startTime + finalGate + 0.08);
+  sub.stop(startTime + finalGate + 0.08);
 
-  // ── Arp Ghost: 1oct上、暗め、遅延 ──
-  const ghostVol = sc.arpGhost || 0;
+  // ── Arp Ghost ──
   if(ghostVol > 0.02){
     const gDelay = 0.022 + Math.random() * 0.018;
     const t1 = startTime + gDelay;
@@ -10098,13 +10262,13 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     gosc.frequency.value = hz * 2;
     const glpf = actx.createBiquadFilter();
     glpf.type = 'lowpass';
-    glpf.frequency.value = Math.min(cutoff * 0.4, 1200);
+    glpf.frequency.value = Math.min(finalCutoff * 0.4, 1200);
     const genv = actx.createGain();
     genv.gain.setValueAtTime(0.001, t1);
-    genv.gain.linearRampToValueAtTime(vol * ghostVol * 0.4, t1 + atk);
-    genv.gain.exponentialRampToValueAtTime(0.001, t1 + gateSec * 0.7);
+    genv.gain.linearRampToValueAtTime(vol * ghostVol * 0.4, t1 + finalAtk);
+    genv.gain.exponentialRampToValueAtTime(0.001, t1 + finalGate * 0.7);
     gosc.connect(glpf); glpf.connect(genv); genv.connect(rvbTarget);
-    gosc.start(t1); gosc.stop(t1 + gateSec + 0.05);
+    gosc.start(t1); gosc.stop(t1 + finalGate + 0.05);
   }
 }
 
@@ -10143,7 +10307,14 @@ function scheduleArpNotes(){
   const baseSec=arpStepMs()/1000; // 1拍の長さ
   const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
-  const rhythm = sc.arpRhythm; // Scene別リズムパターン
+  const mode = sc.arpMode || 'pluck';
+  // pluckモード（DEEP TECH）はEuclideanリズムを動的生成
+  const euclidPulses = _slRhythmDensity !== null
+    ? Math.round(5 + _slRhythmDensity * 3)  // SL complex → 5〜8 pulses
+    : (mode === 'pluck' ? 5 : null);
+  const rhythm = (mode === 'pluck' && euclidPulses)
+    ? getEuclideanRhythm(16, euclidPulses)
+    : sc.arpRhythm;
   // SLスライダー反映（nullならSceneデフォルト）
   const restProb = _slArpRestProb !== null ? _slArpRestProb : (sc.arpRestProb || 0);
   const densityMul = _slRhythmDensity !== null ? _slRhythmDensity : 1.0;
@@ -10184,7 +10355,14 @@ function scheduleArpNotes(){
 // コード変更でARPシーケンスを更新
 function updateArpChord(root, type){
   if(!arpOn) return;
+  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  // innerモード（VELVET）は自動でinnerlineパターンを使用
+  const prevPat = arpPattern;
+  if(sc.arpMode === 'inner' && arpPattern === 'up'){
+    arpPattern = 'innerline';
+  }
   arpSeq=buildArpSeq(root, type);
+  arpPattern = prevPat;
   arpStep=0;
   // リズムパターンはリセットしない（コードチェンジをまたいでリズムが継続）
 }
@@ -10317,6 +10495,7 @@ const SCENE_PRESETS = {
     arpAttack:0.018, arpDecay:0.45, arpSustain:0.0,
     arpGate:340, arpVol:0.20, arpWet:0.30, arpGhost:0.12,
     // リズム: 長短混合、サティ的な余白（1.0=1拍、2.0=2拍休符的）
+    arpMode:'float',
     arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.5, 0.5], arpRestProb:0.25,
   },
 
@@ -10334,6 +10513,7 @@ const SCENE_PRESETS = {
     arpAttack:0.010, arpDecay:0.38, arpSustain:0.0,
     arpGate:300, arpVol:0.24, arpWet:0.36, arpGhost:0.18,
     // リズム: 付点+短連打、エヴァンス的なブロークンリズム
+    arpMode:'inner',
     arpRhythm:[1.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 1.5], arpRestProb:0.15,
   },
 
@@ -10351,6 +10531,7 @@ const SCENE_PRESETS = {
     arpAttack:0.004, arpDecay:0.16, arpSustain:0.0,
     arpGate:150, arpVol:0.18, arpWet:0.52, arpGhost:0.22,
     // リズム: 疎、断片的、長い間隔あり
+    arpMode:'glass',
     arpRhythm:[1.0, 3.0, 1.0, 1.0, 2.0, 1.0, 4.0], arpRestProb:0.30,
   },
 
@@ -10368,6 +10549,7 @@ const SCENE_PRESETS = {
     arpAttack:0.004, arpDecay:0.18, arpSustain:0.0,
     arpGate:140, arpVol:0.30, arpWet:0.25, arpGhost:0.08,
     // リズム: 裏拍中心、ハウス的な跳ねるリズム
+    arpMode:'stab',
     arpRhythm:[0.5, 0.5, 1.0, 0.5, 1.5, 0.5, 0.5, 0.5, 1.5], arpRestProb:0.10,
   },
 
@@ -10386,6 +10568,7 @@ const SCENE_PRESETS = {
     arpAttack:0.004, arpDecay:0.65, arpSustain:0.0,
     arpGate:380, arpVol:0.28, arpWet:0.46, arpGhost:0.10,
     // リズム: 16分ベース、シンコペーション、催眠的
+    arpMode:'pluck',
     arpRhythm:[0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.5, 1.0, 0.5], arpRestProb:0.10,
   },
 
@@ -10403,6 +10586,7 @@ const SCENE_PRESETS = {
     arpAttack:0.015, arpDecay:0.48, arpSustain:0.12,
     arpGate:360, arpVol:0.26, arpWet:0.42, arpGhost:0.15,
     // リズム: Detroit的推進感、2拍+細分の組み合わせ
+    arpMode:'pulse',
     arpRhythm:[2.0, 1.0, 1.0, 2.0, 0.5, 0.5, 1.0], arpRestProb:0.08,
   },
 };
@@ -10597,42 +10781,7 @@ function _killReleasingVoices(actx){
 
 // ── CHORDサウンドを発音 ──
 function playSceneChord(actx, root, type){
-  const _sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
-
-  // ── SLスライダー → CHORDパラメーター反映 ──
-  const bright  = sv('bright');   // Dark(-1) ↔ Bright(+1)
-  const tense   = sv('tense');    // Calm(-1) ↔ Tense(+1)
-  const warm    = sv('warm');     // Cold(-1) ↔ Warm(+1)
-  const complex = sv('complex');  // Simple(-1) ↔ Complex(+1)
-  const moving  = sv('moving');   // Static(-1) ↔ Moving(+1)
-  const strange = sv('strange');  // Familiar(-1) ↔ Strange(+1)
-
-  // bright → cutoff上下（Bright→明るく / Dark→暗く）
-  const chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.7));
-
-  // tense → resonance上下（Tense→張りある / Calm→なだらか）
-  const chordRes = Math.max(0.3, _sc.res * (1.0 + tense * 0.6));
-
-  // warm → detune量（Warm→広がり / Cold→タイト）
-  const chordDetune = _sc.detune + warm * 8; // ±8cent
-
-  // complex → strum速度（Complex→ゆっくりアルペジオ的 / Simple→ピシッと）
-  const chordStrum = Math.max(4, _sc.strum * (1.0 + complex * 1.2));
-
-  // moving → strum速度をさらに加速（Moving→速く / Static→遅く）
-  const chordStrumFinal = Math.max(4, chordStrum * (1.0 - moving * 0.5));
-
-  // strange → wet（reverb量）上下（Strange→深い残響 / Familiar→ドライ）
-  const chordWet = Math.max(0, Math.min(1, _sc.wet + strange * 0.3));
-
-  // SL適用済みのscオブジェクト（元のscは変更しない）
-  const sc = Object.assign({}, _sc, {
-    cutoff: chordCutoff,
-    res:    chordRes,
-    detune: chordDetune,
-    strum:  chordStrumFinal,
-    wet:    chordWet,
-  });
+  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
 
   // 前回リリース中のボイスを即座に消音（濁り防止）
   _killReleasingVoices(actx);
@@ -10794,6 +10943,9 @@ let _slArpPattern  = null;
 // ── Scene切替 ──
 function applyScene(name){
   sceneCurrentName = name;
+  // SceneのarpModeが変わるのでPing Pong / ARPアウトをリセット
+  _resetArpOut();
+  _resetPingPong();
   // UI更新
   document.querySelectorAll('.scene-pill').forEach(el =>
     el.classList.toggle('on', el.dataset.scene === name)
