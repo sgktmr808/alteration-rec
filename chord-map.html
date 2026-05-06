@@ -3246,77 +3246,6 @@ function initCanvas(){
     invalidate();
   });
 
-  // ── 片手・外縁操作: Scene（上下）/ モード（左右）──
-  let _edgeGesture = null; // { startX, startY, startScene, startModeIdx, moved }
-  const _sceneOrder = ['plain', 'glass', 'velvet', 'love', 'pluck', 'strings'];
-  const _modeOrder  = ['radial', 'link', 'chain', 'pivot', 'expand', 'wave', 'bridge'];
-
-  function _isEdgeZone(x, y){
-    const dist = distFromCenter(x, y);
-    return dist > L.SR + 10; // スライダーリングの外側
-  }
-
-  canvas.addEventListener('pointerdown', e => {
-    // コントロール画面表示中は外縁操作を無効にする
-    if(window._isCtrlScreen) return;
-    const {x, y} = canvasXY(e);
-    if(!_isEdgeZone(x, y)) return; // 外縁以外は通常のpointerdownに任せる
-    // 外縁タッチ開始
-    _edgeGesture = {
-      startX: x, startY: y,
-      startSceneIdx: _sceneOrder.indexOf(sceneCurrentName),
-      startModeIdx:  _modeOrder.indexOf(MAP_MODE),
-      moved: false,
-      pointerId: e.pointerId,
-    };
-    canvas.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-
-  canvas.addEventListener('pointermove', e => {
-    if(!_edgeGesture || e.pointerId !== _edgeGesture.pointerId) return;
-    const {x, y} = canvasXY(e);
-    const dx = x - _edgeGesture.startX;
-    const dy = y - _edgeGesture.startY;
-    const absDx = Math.abs(dx), absDy = Math.abs(dy);
-    if(absDx < 8 && absDy < 8) return; // 微小移動は無視
-    _edgeGesture.moved = true;
-    e.preventDefault();
-
-    if(absDy > absDx){
-      // 上下ドラッグ → Scene変容（40pxで1段階）
-      const steps = Math.round(-dy / 40);
-      const newIdx = Math.max(0, Math.min(
-        _sceneOrder.length - 1,
-        _edgeGesture.startSceneIdx + steps
-      ));
-      const newScene = _sceneOrder[newIdx];
-      if(newScene && newScene !== sceneCurrentName){
-        applyScene(newScene);
-      }
-    } else {
-      // 左右ドラッグ → モード切替（50pxで1段階）
-      const steps = Math.round(dx / 50);
-      const newIdx = Math.max(0, Math.min(
-        _modeOrder.length - 1,
-        _edgeGesture.startModeIdx + steps
-      ));
-      const newMode = _modeOrder[newIdx];
-      if(newMode && newMode !== MAP_MODE){
-        document.querySelectorAll('.mode-btn').forEach(b =>
-          b.classList.toggle('on', b.dataset.mode === newMode)
-        );
-        MAP_MODE = newMode;
-        relCache = null;
-        invalidate();
-      }
-    }
-  });
-
-  canvas.addEventListener('pointerup', e => {
-    if(!_edgeGesture || e.pointerId !== _edgeGesture.pointerId) return;
-    _edgeGesture = null;
-  });
 
   canvas.addEventListener('pointerup',()=>{
     _sliderDragging = false; // スライダー操作終了
@@ -10127,7 +10056,13 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const gateSec = (arpGateMs / 1000) * 0.78;
   const nyq = actx.sampleRate / 2 - 100;
 
-  const vol    = sc.arpVol    || 0.26;
+  // velocity humanize: 音ごとに音量を微妙にばらかす（0.78〜1.18の範囲）
+  // 静かなScene（plain/glass/velvet）は揺らぎ大きめ → 表情豊かに
+  // クラブ系（love/pluck/strings）は揺らぎ小さめ → 安定したグルーブ
+  const _quietArpScenes = new Set(['plain', 'glass', 'velvet']);
+  const _velHumanizeRange = _quietArpScenes.has(sceneCurrentName) ? 0.32 : 0.14;
+  const _velHumanize = 0.86 + Math.random() * _velHumanizeRange;
+  const vol    = (sc.arpVol    || 0.26) * _velHumanize;
   const atk    = sc.arpAttack || 0.006;
   const decay  = sc.arpDecay  || 0.22;
   const envMod = sc.arpEnvMod || 0.5;
@@ -10209,23 +10144,30 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   osc2.stop(startTime + gateSec + 0.08);
   sub.stop(startTime + gateSec + 0.08);
 
-  // ── Arp Ghost: 1oct上、暗め、遅延 ──
+  // ── Arp Ghost: 「光の尾」として粒を線に変える ──
+  // 1oct上・暗いフィルター・遅延・長めのリリースで尾を引く
   const ghostVol = sc.arpGhost || 0;
   if(ghostVol > 0.02){
-    const gDelay = 0.022 + Math.random() * 0.018;
+    // メイン音の発音から少し遅れて現れる（光の残像）
+    const gDelay = 0.018 + Math.random() * 0.022;
     const t1 = startTime + gDelay;
     const gosc = actx.createOscillator();
     gosc.type = 'sine';
-    gosc.frequency.value = hz * 2;
+    gosc.frequency.value = hz * 2; // 1oct上
     const glpf = actx.createBiquadFilter();
     glpf.type = 'lowpass';
-    glpf.frequency.value = Math.min(cutoff * 0.4, 1200);
+    // フィルターを暗めに（cutoffの25〜35%）→ 霞んだ高域
+    glpf.frequency.value = Math.min(cutoff * 0.30, 900);
+    glpf.Q.value = 0.5;
     const genv = actx.createGain();
+    const ghostPeak = vol * ghostVol * 0.5;
+    // ゆっくり立ち上がり → 長めに尾を引く
     genv.gain.setValueAtTime(0.001, t1);
-    genv.gain.linearRampToValueAtTime(vol * ghostVol * 0.4, t1 + atk);
-    genv.gain.exponentialRampToValueAtTime(0.001, t1 + gateSec * 0.7);
+    genv.gain.linearRampToValueAtTime(ghostPeak, t1 + atk + 0.02);
+    genv.gain.exponentialRampToValueAtTime(ghostPeak * 0.3, t1 + gateSec * 0.8);
+    genv.gain.exponentialRampToValueAtTime(0.001, t1 + gateSec * 1.4); // 本体より長く残る
     gosc.connect(glpf); glpf.connect(genv); genv.connect(rvbTarget);
-    gosc.start(t1); gosc.stop(t1 + gateSec + 0.05);
+    gosc.start(t1); gosc.stop(t1 + gateSec * 1.5 + 0.05);
   }
 }
 
@@ -10440,12 +10382,14 @@ const SCENE_PRESETS = {
     vol:0.40, chorus:0.06, wet:0.48, strum:12,
     trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0, filterDrift:0.28,
     voicingFlavor:'plain',
-    // ARP: sineで柔らかく、音数少なめ、余白あり
-    arpOsc:'sine', arpCutoff:850, arpRes:0.4, arpEnvMod:0.28,
-    arpAttack:0.018, arpDecay:0.45, arpSustain:0.0,
-    arpGate:340, arpVol:0.20, arpWet:0.30, arpGhost:0.12,
-    // リズム: 長短混合、サティ的な余白（1.0=1拍、2.0=2拍休符的）
-    arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.5, 0.5], arpRestProb:0.25,
+    // ARP: サティ的。音が来ないことが美しい。ぽつ…ぽつ…という間
+    // sine・低めcutoff・長いgate・低velocity・Ghostで尾を引く
+    arpOsc:'sine', arpCutoff:700, arpRes:0.3, arpEnvMod:0.18,
+    arpAttack:0.025, arpDecay:0.55, arpSustain:0.08,
+    arpGate:480, arpVol:0.16, arpWet:0.42, arpGhost:0.28,
+    // リズム: 長い間隔・休符多め・均等でない揺れ
+    // 「来るか来ないか分からない」という緊張感
+    arpRhythm:[2.0, 3.0, 1.5, 4.0, 2.0, 1.0, 3.0], arpRestProb:0.42,
   },
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
@@ -10457,12 +10401,14 @@ const SCENE_PRESETS = {
     vol:0.44, chorus:0.16, wet:0.44, strum:7,
     trailSec:1.4, width:0.65, feltAttack:0.14, ghost:0.0, filterDrift:0.20,
     voicingFlavor:'rootless',
-    // ARP: triangle、中域、内声的な動き
-    arpOsc:'triangle', arpCutoff:1300, arpRes:0.7, arpEnvMod:0.42,
-    arpAttack:0.010, arpDecay:0.38, arpSustain:0.0,
-    arpGate:300, arpVol:0.24, arpWet:0.36, arpGhost:0.18,
-    // リズム: 付点+短連打、エヴァンス的なブロークンリズム
-    arpRhythm:[1.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 1.5], arpRestProb:0.15,
+    // ARP: ビル・エヴァンス的。内声が歌う。付点リズム・中域・柔らかい
+    // triangle・中域cutoff・長めgate・ベロシティに揺らぎ
+    arpOsc:'triangle', arpCutoff:1100, arpRes:0.55, arpEnvMod:0.35,
+    arpAttack:0.014, arpDecay:0.50, arpSustain:0.06,
+    arpGate:420, arpVol:0.22, arpWet:0.40, arpGhost:0.24,
+    // リズム: 付点が主役・短連打で人間味・長い休符で呼吸
+    // 「歌っている」感覚
+    arpRhythm:[1.5, 0.5, 2.0, 1.5, 0.5, 1.0, 2.5], arpRestProb:0.20,
   },
 
   // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
@@ -10474,12 +10420,14 @@ const SCENE_PRESETS = {
     vol:0.38, chorus:0.04, wet:0.58, strum:4,
     trailSec:1.2, width:0.45, feltAttack:0.18, ghost:0.0, filterDrift:0.15,
     voicingFlavor:'glass',
-    // ARP: sine、高域、細い、坂本龍一的断片
-    arpOsc:'sine', arpCutoff:3200, arpRes:1.4, arpEnvMod:0.58,
-    arpAttack:0.004, arpDecay:0.16, arpSustain:0.0,
-    arpGate:150, arpVol:0.18, arpWet:0.52, arpGhost:0.22,
-    // リズム: 疎、断片的、長い間隔あり
-    arpRhythm:[1.0, 3.0, 1.0, 1.0, 2.0, 1.0, 4.0], arpRestProb:0.30,
+    // ARP: 坂本龍一的。点が線になる。高域・極短gate・Ping Pong Delayで空間に散らす
+    // sine・高めcutoff・極短gate・Ghost強め・音量控えめ
+    arpOsc:'sine', arpCutoff:3800, arpRes:1.6, arpEnvMod:0.65,
+    arpAttack:0.003, arpDecay:0.12, arpSustain:0.0,
+    arpGate:95, arpVol:0.15, arpWet:0.62, arpGhost:0.35,
+    // リズム: 非常に疎・長い沈黙・突然来る一音が印象的
+    // 「沈黙の中に光が差す」感覚
+    arpRhythm:[1.0, 4.0, 2.0, 6.0, 1.0, 3.0, 1.0, 5.0], arpRestProb:0.38,
   },
 
   // 4. LOVE STAB — ガラージ/ハウス的。暖かいコードスタブ、跳ねる
@@ -10491,12 +10439,13 @@ const SCENE_PRESETS = {
     vol:0.50, chorus:0.10, wet:0.26, strum:2,
     trailSec:0.4, width:0.60, feltAttack:0.08, ghost:0.0, filterDrift:0.05,
     voicingFlavor:'garage',
-    // ARP: sawtooth、暖かい、ハウス的シンコペーション
-    arpOsc:'sawtooth', arpCutoff:2000, arpRes:1.1, arpEnvMod:0.68,
-    arpAttack:0.004, arpDecay:0.18, arpSustain:0.0,
-    arpGate:140, arpVol:0.30, arpWet:0.25, arpGhost:0.08,
-    // リズム: 裏拍中心、ハウス的な跳ねるリズム
-    arpRhythm:[0.5, 0.5, 1.0, 0.5, 1.5, 0.5, 0.5, 0.5, 1.5], arpRestProb:0.10,
+    // ARP: ガラージ/ハウス的。身体性。裏拍・短い・跳ねる
+    // sawtooth・明るめcutoff・短gate・高velocity・詰まった感
+    arpOsc:'sawtooth', arpCutoff:2200, arpRes:1.2, arpEnvMod:0.72,
+    arpAttack:0.003, arpDecay:0.14, arpSustain:0.0,
+    arpGate:110, arpVol:0.32, arpWet:0.22, arpGhost:0.06,
+    // リズム: 裏拍主役・短連打の詰まり感・休符少なめ・身体が動く
+    arpRhythm:[0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.5], arpRestProb:0.08,
   },
 
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
@@ -10509,12 +10458,14 @@ const SCENE_PRESETS = {
     vol:0.42, chorus:0.12, wet:0.42, strum:8,
     trailSec:0.7, width:0.62, feltAttack:0.0, ghost:0.0, filterDrift:0.08,
     voicingFlavor:'detroit',
-    // ARP: sawtooth、閉じた状態から開くfilter env、サブ強め、余韻長め
-    arpOsc:'sawtooth', arpCutoff:1100, arpRes:2.0, arpEnvMod:0.88,
-    arpAttack:0.004, arpDecay:0.65, arpSustain:0.0,
-    arpGate:380, arpVol:0.28, arpWet:0.46, arpGhost:0.10,
-    // リズム: 16分ベース、シンコペーション、催眠的
-    arpRhythm:[0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.5, 1.0, 0.5], arpRestProb:0.10,
+    // ARP: Âme / Mathew Jonson的。催眠。16分の反復・フィルターが開く
+    // sawtooth・高res・強いfilter env・長めgate・疲れない密度
+    arpOsc:'sawtooth', arpCutoff:950, arpRes:2.2, arpEnvMod:0.92,
+    arpAttack:0.003, arpDecay:0.70, arpSustain:0.0,
+    arpGate:320, arpVol:0.26, arpWet:0.50, arpGhost:0.08,
+    // リズム: 16分ベース・一定の密度・たまに長い音で変化
+    // 「繰り返しても疲れない」催眠的パターン
+    arpRhythm:[0.5, 0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.5, 1.0], arpRestProb:0.06,
   },
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
@@ -10526,12 +10477,14 @@ const SCENE_PRESETS = {
     vol:0.48, chorus:0.25, wet:0.54, strum:20,
     trailSec:0.8, width:0.80, feltAttack:0.0, ghost:0.0, filterDrift:0.18,
     voicingFlavor:'detroit',
-    // ARP: sawtooth、Detroit的推進力、広め
-    arpOsc:'sawtooth', arpCutoff:1700, arpRes:0.55, arpEnvMod:0.32,
-    arpAttack:0.015, arpDecay:0.48, arpSustain:0.12,
-    arpGate:360, arpVol:0.26, arpWet:0.42, arpGhost:0.15,
-    // リズム: Detroit的推進感、2拍+細分の組み合わせ
-    arpRhythm:[2.0, 1.0, 1.0, 2.0, 0.5, 0.5, 1.0], arpRestProb:0.08,
+    // ARP: Detroit的。推進力・少ない音数・広がり・アンセム感
+    // sawtooth・中域cutoff・長めgate・低めres・広いステレオ
+    arpOsc:'sawtooth', arpCutoff:1500, arpRes:0.45, arpEnvMod:0.28,
+    arpAttack:0.020, arpDecay:0.55, arpSustain:0.15,
+    arpGate:440, arpVol:0.24, arpWet:0.48, arpGhost:0.18,
+    // リズム: 2拍単位の重い推進・少ない音数・Detroit的なうねり
+    // 「前に進んでいく」感覚
+    arpRhythm:[2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 1.5, 0.5], arpRestProb:0.05,
   },
 };
 
@@ -11095,8 +11048,13 @@ function applyChordPattern(mode){
     }
     // ARP停止（CHORD系PatternではARPを止める）
     if(arpOn){
-      const arpBtn = document.getElementById('arp-on-btn');
-      if(arpBtn) arpBtn.click();
+      stopArpScheduler();
+      arpOn = false;
+      document.querySelectorAll('#arp-on-btn, #hdr-arp-btn').forEach(btn => {
+        if(!btn) return;
+        btn.textContent = btn.id === 'hdr-arp-btn' ? 'ARP' : 'OFF';
+        btn.classList.remove('on');
+      });
     }
   }
 
@@ -11216,13 +11174,37 @@ function applyScene(name){
   // ARP共有outをリセット（新Sceneのwet値を反映）
   _resetArpOut();
 
+  // ── Scene切替後のボイス処理 ──
+  // 補間が終わったらボイスをリリースする（継続音防止）
+  {
+    const actx2 = safeGetCtx();
+    if(actx2 && _sceneVoices.length > 0){
+      const scNew2 = SCENE_PRESETS[name] || SCENE_PRESETS.plain;
+      const _quietScenes2 = new Set(['plain', 'glass', 'velvet']);
+      const _clubScenes2  = new Set(['love', 'pluck', 'strings']);
+      const _crossSystem2 = (_quietScenes2.has(_prevSceneName) !== _quietScenes2.has(name));
+      const morphSec2 = _crossSystem2 ? 0.3
+        : _quietScenes2.has(name) ? 2.5
+        : _clubScenes2.has(name)  ? 1.2 : 0.8;
+      const relSec = Math.max(scNew2.release, 0.5);
+      // 補間時間が終わったあとにリリース
+      setTimeout(()=>{
+        const a3 = safeGetCtx(); if(!a3) return;
+        _sceneVoices.forEach(v => _releaseSceneVoice(v, a3, relSec));
+        setTimeout(()=>{ _sceneVoices = []; }, Math.round(relSec * 1000) + 200);
+      }, Math.round(morphSec2 * 1000));
+    }
+  }
+
   // ── Scene別デフォルトPattern自動切替 ──
+  // ARP系パターンへの自動切替は行わない（意図せずARPになる問題を防ぐ）
+  // CHORD系のみ自動切替する
   const _sceneDefaultPattern = {
     plain:   'broken',
-    velvet:  'inner_line',
-    glass:   'float_arp',
+    velvet:  'broken',   // inner_lineは手動で選ぶ
+    glass:   'hold',     // float_arpは手動で選ぶ
     love:    'stab',
-    pluck:   'pluck_arp',
+    pluck:   'hold',     // pluck_arpは手動で選ぶ
     strings: 'trail',
   };
   const defaultPattern = _sceneDefaultPattern[name];
