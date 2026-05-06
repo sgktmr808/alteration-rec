@@ -10219,13 +10219,15 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     loveDlyFb.connect(loveDly);
     loveDly.connect(loveDlyG);
 
-    // ルーティング: dry + chorus + delay → reverb/dly
-    const loveRvbG = actx.createGain(); loveRvbG.gain.value = 0.65;
-    const loveDryG = actx.createGain(); loveDryG.gain.value = 0.62;
+    // ルーティング: dry → dlyTarget（直接出力）+ rvbTarget（残響）
+    const loveDryG = actx.createGain(); loveDryG.gain.value = 0.85;
+    const loveRvbG = actx.createGain(); loveRvbG.gain.value = 0.50;
     hiShelf.connect(loveDryG);
-    loveDryG.connect(rvbTarget);
-    chorusG.connect(loveRvbG); loveRvbG.connect(rvbTarget);
-    loveDlyG.connect(rvbTarget);
+    loveDryG.connect(dlyTarget);  // 直接出力（音量を確保）
+    hiShelf.connect(loveRvbG);
+    loveRvbG.connect(rvbTarget);  // reverb送り
+    loveDlyG.connect(rvbTarget);  // ディレイ → reverb
+    chorusG.connect(rvbTarget);   // コーラス → reverb
     arpEnvOut = null; // 以下の共通ルーティングをスキップ
   }
 
@@ -11086,10 +11088,12 @@ function applySLToArp(){
     } else if(strange < -0.3){
       _slArpPattern = 'updown';
     } else {
-      // LOVEはDOWN2（1oct上から流れ落ちる）+ 2oct音域
+      // LOVEはDOWN2（1oct上から流れ落ちる）
   if(name === 'love'){
     arpPattern = 'down2';
-    _slArpOctRange = 2; // 2octの音域で流れ落ちる
+  } else if(_prevSceneName === 'love'){
+    // LOVE以外に切り替えたときはデフォルトに戻す
+    arpPattern = 'up';
   }
   _slArpPattern = null; // Scene設定維持
     }
