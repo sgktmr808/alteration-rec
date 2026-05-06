@@ -10434,14 +10434,15 @@ const SCENE_PRESETS = {
   // 身体性は残しつつ、空気・余韻・透明感を加える
   love: {
     label:'LOVE STAB',
-    // sine（柔らかさ）+ sawtooth薄レイヤー（芯）→ 透明だが存在感がある
-    osc1:'sine', osc2:'sawtooth', detune:3,
-    // cutoffは中域・resは控えめ → 刺さらず素直
-    cutoff:1800, res:0.6, envMod:0.42,
-    // attackは速く（跳ねる感覚）・reverbを増やして浮遊感
-    attack:0.008, decay:0.25, sustain:0.20, release:0.90,
-    vol:0.42, chorus:0.03, wet:0.46, strum:3,
-    trailSec:0.9, width:0.64, feltAttack:0.10, ghost:0.0, filterDrift:0.08,
+    // Korg M1的なFM感: sine基音 + sine1oct上（osc2）で透明な倍音を作る
+    // sawtoothの重さを排除し、sineの積み重ねで明るさと透明感を両立
+    osc1:'sine', osc2:'sine', osc2oct:2, detune:1,
+    // cutoffは中域よりやや上・envModでスタブ的な開きを出す
+    cutoff:2000, res:0.5, envMod:0.55,
+    // 速いattack（跳ねる）・sustain低め（完全なスタブ感）
+    attack:0.006, decay:0.22, sustain:0.12, release:1.0,
+    vol:0.42, chorus:0.02, wet:0.52, strum:2,
+    trailSec:1.0, width:0.66, feltAttack:0.12, ghost:0.0, filterDrift:0.06,
     voicingFlavor:'garage',
     // ARP: 透明感のある跳ねるARP
     // sine+triangleで柔らかく・gateを少し延ばして余韻を出す
@@ -10578,10 +10579,11 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   osc1.type = sc.osc1;
   osc1.frequency.value = hz;
 
-  // OSC2（デチューン）
+  // OSC2（デチューン + oct倍率）
+  // sc.osc2oct: 1=同音（デフォルト）, 2=1oct上（M1的FM感）
   const osc2 = actx.createOscillator();
   osc2.type = sc.osc2;
-  osc2.frequency.value = hz * Math.pow(2, sc.detune / 1200);
+  osc2.frequency.value = hz * (sc.osc2oct || 1) * Math.pow(2, sc.detune / 1200);
 
   // LPF with ENV MOD
   const lpf = actx.createBiquadFilter();
@@ -10628,8 +10630,10 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   vca.gain.setValueAtTime(sc.vol * 0.68 * sc.sustain, t + sc.attack + sc.decay);
 
   // OSC2 mix
+  // osc2oct=2（1oct上）のとき: 薄い倍音として0.28程度
+  // 通常のデチューン: 0.55
   const osc2g = actx.createGain();
-  osc2g.gain.value = 0.55;
+  osc2g.gain.value = (sc.osc2oct && sc.osc2oct > 1) ? 0.28 : 0.55;
 
   osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
