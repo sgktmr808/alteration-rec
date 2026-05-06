@@ -3259,6 +3259,44 @@ function initCanvas(){
     }
     drag=null;
   });
+
+  // ── モード切り替えスワイプ（左右）──
+  // MAPタブ表示中・サークル外側・上下移動量より左右が大きいときのみ反応
+  const _modeOrder = ['radial','link','chain','pivot','expand','wave','bridge'];
+  let _modeSwipe = null;
+
+  canvas.addEventListener('pointerdown', e => {
+    if(window._isCtrlScreen) return;
+    const {x, y} = canvasXY(e);
+    const dist = distFromCenter(x, y);
+    if(dist < L.SR - 10) return; // サークル内はコード操作に任せる
+    _modeSwipe = { startX: x, startY: y, startIdx: _modeOrder.indexOf(MAP_MODE), pointerId: e.pointerId };
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if(!_modeSwipe || e.pointerId !== _modeSwipe.pointerId) return;
+    const {x, y} = canvasXY(e);
+    const dx = x - _modeSwipe.startX;
+    const dy = y - _modeSwipe.startY;
+    if(Math.abs(dy) > Math.abs(dx)) return; // 上下が大きければコントロールに任せる
+    if(Math.abs(dx) < 40) return; // 閾値
+    const steps = Math.round(-dx / 60);
+    const newIdx = Math.max(0, Math.min(_modeOrder.length - 1, _modeSwipe.startIdx + steps));
+    const newMode = _modeOrder[newIdx];
+    if(newMode !== MAP_MODE){
+      document.querySelectorAll('.mode-btn').forEach(b =>
+        b.classList.toggle('on', b.dataset.mode === newMode)
+      );
+      MAP_MODE = newMode;
+      relCache = null;
+      invalidate();
+    }
+  });
+
+  canvas.addEventListener('pointerup', e => {
+    if(_modeSwipe && e.pointerId === _modeSwipe.pointerId) _modeSwipe = null;
+  });
+
 }
 
 // ═══════════════════════
@@ -10188,7 +10226,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     const hiShelf = actx.createBiquadFilter();
     hiShelf.type = 'highshelf';
     hiShelf.frequency.value = 3000;
-    hiShelf.gain.value = 3.5;
+    hiShelf.gain.value = 6.0; // 高域を持ち上げて抜けを出す
     env.connect(hiShelf);
 
     // ── コーラス: LFOで音を揺らしてまろやかな広がりを出す ──
@@ -10552,7 +10590,7 @@ const SCENE_PRESETS = {
     // CHORDはsine+sine(1oct上) → ARPも同じ倍音構造に寄せる
     // CHORDより高めの音域・小さめの音量 → 水面の光として存在する
     // osc2octは_playSceneArpNoteでは未使用のため、ghost（1oct上sine）で倍音を出す
-    arpOsc:'sine', arpOsc2:'sine', arpCutoff:3200, arpRes:0.28, arpEnvMod:0.10,
+    arpOsc:'sine', arpOsc2:'sine', arpCutoff:4500, arpRes:0.25, arpEnvMod:0.08,
     arpAttack:0.004, arpDecay:0.35, arpSustain:0.06,
     arpGate:480, arpVol:0.11, arpWet:0.52, arpGhost:0.35,
     // shimmerパターンで毎ステップリアルタイム選択（arpRhythmは間隔制御のみ）
