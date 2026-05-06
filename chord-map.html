@@ -9232,7 +9232,7 @@ function findNodePos(root, type){
   let hit=nodeHits.find(h=>ni(h.root)===ri && h.type===type);
   // ルートのみ一致でフォールバック
   if(!hit) hit=nodeHits.find(h=>ni(h.root)===ri);
-  return hit?{x:h.x,y:h.y,r:h.r||18}:null;
+  return hit?{x:hit.x,y:hit.y,r:hit.r||18}:null;
 }
 
 // BRTKオーバーレイ描画
