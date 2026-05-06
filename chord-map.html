@@ -1309,6 +1309,19 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   </div>
                 </div>
                 <div class="synth-row">
+                  <span class="synth-lbl">PATTERN</span>
+                  <div class="synth-pills" style="flex-wrap:wrap;gap:3px 3px;">
+                    <div class="synth-pill pattern-pill on" data-pattern="hold" onclick="applyChordPattern('hold')">HOLD</div>
+                    <div class="synth-pill pattern-pill" data-pattern="stab" onclick="applyChordPattern('stab')">STAB</div>
+                    <div class="synth-pill pattern-pill" data-pattern="broken" onclick="applyChordPattern('broken')">BROKEN</div>
+                    <div class="synth-pill pattern-pill" data-pattern="pulse" onclick="applyChordPattern('pulse')">PULSE</div>
+                    <div class="synth-pill pattern-pill" data-pattern="trail" onclick="applyChordPattern('trail')">TRAIL</div>
+                    <div class="synth-pill pattern-pill" data-pattern="pluck_arp" onclick="applyChordPattern('pluck_arp')">PLUCK ARP</div>
+                    <div class="synth-pill pattern-pill" data-pattern="float_arp" onclick="applyChordPattern('float_arp')">FLOAT ARP</div>
+                    <div class="synth-pill pattern-pill" data-pattern="inner_line" onclick="applyChordPattern('inner_line')">INNER LINE</div>
+                  </div>
+                </div>
+                <div class="synth-row">
                   <span class="synth-lbl">SOURCE</span>
                   <div class="synth-pills">
                     <div class="synth-pill source-pill on" data-source="CHORD" onclick="applySource('CHORD')">CHORD</div>
@@ -10000,7 +10013,8 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 
 // ── Scene別ARPノート発音（Arp Ghost対応）──
 function _playSceneArpNote(actx, midi, startTime, dest){
-  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  // Pattern GrammarのARP系パターン選択中はそのパラメーターで上書き
+  const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
   const arpGateMs = _slArpGate !== null ? _slArpGate : (sc.arpGate || 280);
   const gateSec = (arpGateMs / 1000) * 0.78;
@@ -10142,7 +10156,7 @@ function scheduleArpNotes(){
   if(!actx) return;
   const baseSec=arpStepMs()/1000; // 1拍の長さ
   const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
-  const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const rhythm = sc.arpRhythm; // Scene別リズムパターン
   // SLスライダー反映（nullならSceneデフォルト）
   const restProb = _slArpRestProb !== null ? _slArpRestProb : (sc.arpRestProb || 0);
@@ -10295,6 +10309,9 @@ function initSynthUI(){
 // ── 現在のScene / Source 状態 ──
 let sceneCurrentName = 'plain';   // 現在のScene名
 let sceneCurrentSource = 'CHORD'; // 'CHORD' | 'ARP' | 'CHORD+ARP'
+let chordPatternMode = 'hold';    // 'hold' | 'stab' | 'broken' | 'pulse' | 'pluck_arp' | 'float_arp' | 'inner_line' | 'trail'
+let _chordPulseTimer = null;      // PULSEモードの反復タイマー
+let _patternArpParams = null;     // PLUCK ARP / FLOAT ARP / INNER LINE 用パラメーター上書き
 
 // ── Scene定義 ──
 // 各Sceneは以下を持つ:
@@ -10665,6 +10682,25 @@ function playSceneChord(actx, root, type){
   const strumSec = sc.strum / 1000;
   const tBase = Math.max(actx.currentTime, 0.1) + 0.3;
 
+  // ── Pattern Grammar: HOLD / STAB / BROKEN ──
+  // chordPatternMode に応じて sc パラメーターを上書き
+  if(chordPatternMode === 'stab'){
+    // STAB: 短くコードを刻む（ガレージ/ハウス的）
+    sc = Object.assign({}, sc, {
+      attack:  Math.min(sc.attack, 0.018),   // 速いアタック
+      release: 0.28 + Math.random() * 0.12,  // 200〜400ms程度のリリース
+    });
+  } else if(chordPatternMode === 'broken'){
+    // BROKEN: 各音を低→中→高の順に2〜25msずらす（ピアノ/ギター的）
+    // → forEach内で処理するためここはフラグのみ
+  } else if(chordPatternMode === 'trail'){
+    // TRAIL: trailSecを最大値に固定（前コードの尾を長く残す）
+    sc = Object.assign({}, sc, {
+      trailSec: 4.0,
+      release:  Math.max(sc.release, 3.0),
+    });
+  }
+
   // Stereo Width（SL連動済みwidth）: 音数に応じてパン位置を分散
   const panPositions = midis.map((_, i) => {
     if(midis.length === 1) return 0;
@@ -10672,20 +10708,67 @@ function playSceneChord(actx, root, type){
   });
 
   midis.forEach((midi, i) => {
-    const t = tBase + i * strumSec;
+    let t, velScale;
+    if(chordPatternMode === 'broken'){
+      // BROKEN: 2〜25msのランダムなズレ（低→高順）
+      const brokenOffsetMs = 2 + Math.random() * 23;
+      t = tBase + i * (brokenOffsetMs / 1000);
+      velScale = 0.85 + Math.random() * 0.3; // 0.85〜1.15
+    } else {
+      t = tBase + i * strumSec;
+      velScale = 1.0;
+    }
     const hz = midi2hz(Math.max(24, Math.min(108, midi)));
-    const voice = _playSceneNote(actx, hz, sc, t, out, panPositions[i]);
+    // scのvolをvelScaleで一時上書き（BROKENのみ音量差）
+    const scNote = (chordPatternMode === 'broken' && velScale !== 1.0)
+      ? Object.assign({}, sc, { vol: (sc.vol || 0.18) * velScale })
+      : sc;
+    const voice = _playSceneNote(actx, hz, scNote, t, out, panPositions[i]);
     _sceneVoices.push(voice);
   });
 
   // 自動リリース（sustainに基づく）
   if(_sceneTrailTimer) clearTimeout(_sceneTrailTimer);
-  const holdSec = sc.attack + sc.decay + 4.5;
+  // STAB: 短く切る / TRAIL: 長く / HOLD・BROKEN・PULSE: 通常
+  const holdSec = (chordPatternMode === 'stab')
+    ? sc.attack + sc.decay + 0.05   // STABは発音後すぐリリース
+    : (chordPatternMode === 'trail')
+      ? sc.attack + sc.decay + 8.0  // TRAILは長く保持
+      : sc.attack + sc.decay + 4.5;
   _sceneTrailTimer = setTimeout(()=>{
     const a2 = safeGetCtx(); if(!a2) return;
     _sceneVoices.forEach(v => _releaseSceneVoice(v, a2, sc.release));
     setTimeout(()=>{ _sceneVoices = []; }, Math.round(sc.release * 1000) + 200);
   }, Math.round(holdSec * 1000));
+
+  // ── PULSE: 一定間隔でコードを自動反復（CHORDのみ） ──
+  // ※ PULSEタイマーはapplyChordPattern('pulse')時のみ起動
+  // playSceneChord呼び出し後、PULSEが有効ならタイマーをセット
+  if(chordPatternMode === 'pulse' && !_chordPulseTimer){
+    const pulseIntervalMs = arpStepMs() * 2; // 2拍ごとに反復
+    _chordPulseTimer = setInterval(()=>{
+      if(chordPatternMode !== 'pulse'){ clearInterval(_chordPulseTimer); _chordPulseTimer = null; return; }
+      if(!S || !S.root) return;
+      const a3 = safeGetCtx(); if(!a3) return;
+      // PULSEは短い発音（STABに近い）
+      const _pBase = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+      const pSc = Object.assign({}, _pBase, {
+        attack:   0.012,
+        release:  0.35,
+        trailSec: 0.2,
+        vol:      _pBase.vol * 0.7,
+      });
+      const pOut = (typeof getOut === 'function') ? getOut(a3, pSc.wet) : a3.destination;
+      const pMidis = buildSceneVoicing(S.root, S.type, pSc.voicingFlavor);
+      const pBase = Math.max(a3.currentTime, 0.1) + 0.05;
+      pMidis.forEach((midi, i) => {
+        const hz = midi2hz(Math.max(24, Math.min(108, midi)));
+        const pan = (pMidis.length > 1) ? (i / (pMidis.length - 1) * 2 - 1) * pSc.width : 0;
+        const v = _playSceneNote(a3, hz, pSc, pBase + i * (pSc.strum / 1000), pOut, pan);
+        _sceneVoices.push(v);
+      });
+    }, pulseIntervalMs);
+  }
 }
 
 // ── メインディスパッチャー ──
@@ -10799,6 +10882,74 @@ let _slArpOctRange = null;
 let _slRhythmDensity = null;
 let _slArpGate     = null;
 let _slArpPattern  = null;
+
+// ── Pattern Grammar 切替（HOLD / STAB / BROKEN / PULSE / TRAIL / PLUCK ARP / FLOAT ARP / INNER LINE） ──
+
+// ARP系パターン用パラメーター定義（既存SceneのARPパラメーターをベースに調整）
+const _ARP_PATTERN_PRESETS = {
+  pluck_arp: {
+    // DEEP TECH (pluck) 系: 短く金属的、催眠的
+    arpOsc:'sawtooth', arpCutoff:1100, arpRes:2.0, arpEnvMod:0.88,
+    arpAttack:0.004, arpDecay:0.65, arpSustain:0.0,
+    arpGate:200, arpVol:0.28, arpWet:0.46, arpGhost:0.10,
+    arpRhythm:[0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.5, 1.0, 0.5], arpRestProb:0.10,
+  },
+  float_arp: {
+    // GLASS PIANO 系: 透明、疎、余白、坂本龍一的
+    arpOsc:'sine', arpCutoff:3200, arpRes:1.4, arpEnvMod:0.58,
+    arpAttack:0.004, arpDecay:0.16, arpSustain:0.0,
+    arpGate:150, arpVol:0.18, arpWet:0.52, arpGhost:0.22,
+    arpRhythm:[1.0, 3.0, 1.0, 1.0, 2.0, 1.0, 4.0], arpRestProb:0.30,
+  },
+  inner_line: {
+    // VELVET ROOTLESS 系: 中域、内声的、エヴァンス的
+    arpOsc:'triangle', arpCutoff:1300, arpRes:0.7, arpEnvMod:0.42,
+    arpAttack:0.010, arpDecay:0.38, arpSustain:0.0,
+    arpGate:300, arpVol:0.24, arpWet:0.36, arpGhost:0.18,
+    arpRhythm:[1.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 1.5], arpRestProb:0.15,
+  },
+};
+
+function applyChordPattern(mode){
+  // PULSEタイマーをまず停止（前モードのPULSEを確実にクリア）
+  if(_chordPulseTimer){ clearInterval(_chordPulseTimer); _chordPulseTimer = null; }
+
+  // ARP系パターン: SOURCEをARPに切替・arpパラメーター上書き設定
+  const isArpPattern = (mode === 'pluck_arp' || mode === 'float_arp' || mode === 'inner_line');
+  if(isArpPattern){
+    _patternArpParams = _ARP_PATTERN_PRESETS[mode] || null;
+    // SOURCEをARPに自動切替（arpOnにする）
+    applySource('ARP');
+    // ARPがオフなら自動でONにする
+    if(!arpOn){
+      // toggleArp() はUIとarpSchedulerを同時に制御するため経由する
+      const arpBtn = document.getElementById('arp-on-btn');
+      if(arpBtn) arpBtn.click();
+    }
+  } else if(mode === 'pulse'){
+    // PULSE: CHORDを反復するためSOURCEをCHORDに自動切替
+    _patternArpParams = null;
+    if(sceneCurrentSource !== 'CHORD' && sceneCurrentSource !== 'CHORD+ARP'){
+      applySource('CHORD');
+    }
+  } else {
+    // CHORD系パターンのときはARP用上書きをクリア
+    _patternArpParams = null;
+  }
+
+  chordPatternMode = mode;
+  document.querySelectorAll('.pattern-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.pattern === mode)
+  );
+}
+
+// _playSceneArpNote でpatternArpParamsを反映するためSCENE_PRESETSを動的上書きするラッパー
+// ※ SCENE_PRESETS自体は変更せず、getArpScParams()でパラメーターを取得する箇所で参照
+function _getPatternArpSc(){
+  if(!_patternArpParams) return null;
+  const base = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
+  return Object.assign({}, base, _patternArpParams);
+}
 
 // ── Scene切替 ──
 function applyScene(name){
