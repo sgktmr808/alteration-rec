@@ -10177,7 +10177,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     chorusLfo.start(startTime);
     chorusLfo.stop(startTime + gateSec + 0.2);
     const chorusG = actx.createGain();
-    chorusG.gain.value = 0.45; // コーラスのwet量
+    chorusG.gain.value = 0.25; // コーラスのwet量（控えめ）
     hiShelf.connect(chorusDly);
     chorusDly.connect(chorusG);
 
@@ -10185,9 +10185,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     const loveDly = actx.createDelay(1.0);
     loveDly.delayTime.value = 0.19; // 約190ms
     const loveDlyFb = actx.createGain();
-    loveDlyFb.gain.value = 0.28; // フィードバック量
+    loveDlyFb.gain.value = 0.18; // フィードバック量（控えめ）
     const loveDlyG = actx.createGain();
-    loveDlyG.gain.value = 0.35; // ディレイのwet量
+    loveDlyG.gain.value = 0.22; // ディレイのwet量（控えめ）
     hiShelf.connect(loveDly);
     loveDly.connect(loveDlyFb);
     loveDlyFb.connect(loveDly);
@@ -10519,10 +10519,9 @@ const SCENE_PRESETS = {
     // ARP: sawtooth（倍音・温かみ）+ square pulse（透明感・奥行き）
     // filterを開き気味 → 冷たくなりすぎない透明感
     // sustain高め・decay長め: 音が持続して流れる（さざ波感）
-    // 音量抑えめ・cutoff下げてまろやかに・resも控えめ
-    arpOsc:'sawtooth', arpOsc2:'square', arpCutoff:1800, arpRes:0.3, arpEnvMod:0.15,
-    arpAttack:0.006, arpDecay:0.95, arpSustain:0.42,
-    arpGate:500, arpVol:0.13, arpWet:0.55, arpGhost:0.22,
+    arpOsc:'sawtooth', arpOsc2:'square', arpCutoff:1100, arpRes:0.3, arpEnvMod:0.18,
+    arpAttack:0.005, arpDecay:0.55, arpSustain:0.12,
+    arpGate:380, arpVol:0.13, arpWet:0.50, arpGhost:0.18,
     // 1小節リフレイン（合計16.0）・さざ波のような流れ
     arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 1.0, 2.0], arpRestProb:0.15,
   },
