@@ -10251,13 +10251,13 @@ function _playSceneArpNote(actx, midi, startTime, dest){
 
   // ── OSC2 mix（warm→triangle多め / cold→osc1寄り）──
   const osc2g = actx.createGain();
-  // LOVE: osc2(sine)を薄くブレンド → CHORDと同じsine系の世界
-  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.38 : 0.75;
+  // LOVE: osc2はデチューンのみ・薄く
+  osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.20 : 0.75;
 
   // ── ルーティング ──
-  // LOVEのosc1はosc1_morphをlpfに接続
+  // LOVEはosc1_morphをlpfに接続・osc1本体は使わない
   if(_loveOsc1Morph) _loveOsc1Morph.connect(lpf);
-  else osc1.connect(lpf);
+  else if(!_loveOsc1Handled) osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
   sub.connect(subG);   subG.connect(lpf);
   lpf.connect(env);
@@ -10328,7 +10328,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
   }
 
-  if(!_loveOsc1Handled) osc1.start(startTime);
+  if(!_loveOsc1Handled) osc1.start(startTime); // LOVEはosc1_sine/osc1_wtで起動済み
   osc2.start(startTime); sub.start(startTime);
   // LOVEはrelease余韻分長めにoscを維持
   const oscStopExtra = isLoveScene ? 0.65 : 0.08;
@@ -10669,7 +10669,7 @@ const SCENE_PRESETS = {
     // osc2octは_playSceneArpNoteでは未使用のため、ghost（1oct上sine）で倍音を出す
     arpOsc:'sine', arpOsc2:'sine', arpCutoff:4500, arpRes:0.25, arpEnvMod:0.08,
     arpAttack:0.004, arpDecay:0.35, arpSustain:0.06,
-    arpGate:480, arpVol:0.11, arpWet:0.52, arpGhost:0.35,
+    arpGate:480, arpVol:0.09, arpWet:0.52, arpGhost:0.30,
     // shimmerパターンで毎ステップリアルタイム選択（arpRhythmは間隔制御のみ）
     arpRhythm:[2.0, 1.0, 0.5, 2.5, 1.0, 0.5, 3.5, 1.0, 0.5, 1.5, 2.0], arpRestProb:0.22,
   },
