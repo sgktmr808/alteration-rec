@@ -11161,16 +11161,7 @@ function applyScene(name){
             Math.max(scNew.res, 0.1), tNow + morphSec
           );
         }catch(e){}
-        // gainをわずかに補間（vol差を滑らかに）
-        try{
-          const curGain = v.vca.gain.value;
-          const targetGain = scNew.vol * 0.68 * scNew.sustain;
-          if(Math.abs(curGain - targetGain) > 0.01){
-            v.vca.gain.cancelScheduledValues(tNow);
-            v.vca.gain.setValueAtTime(curGain, tNow);
-            v.vca.gain.linearRampToValueAtTime(targetGain, tNow + morphSec);
-          }
-        }catch(e){}
+        // gain補間はしない（_releaseSceneVoiceのスケジュールと競合するため）
       });
     }
   }
@@ -11182,7 +11173,6 @@ function applyScene(name){
   // ここでは触れない（setTimeoutで_sceneVoicesを操作すると競合が発生する）
 
   // Scene切替バーの表示を更新
-  // ※ PatternはSceneと独立。ユーザーが明示的に選ぶもの。自動連動しない。
   _updateSceneSwitcher();
 }
 
