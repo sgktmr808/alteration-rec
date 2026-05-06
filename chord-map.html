@@ -10133,11 +10133,12 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const sustainVol = vol * (sc.arpSustain || 0);
   env.gain.setValueAtTime(0.001, startTime);
   env.gain.linearRampToValueAtTime(vol, startTime + atk);
-  if(isLoveScene && sustainVol > 0.01){
-    // LOVE: attack → decay → sustain → gate終わりにリリース
-    env.gain.exponentialRampToValueAtTime(Math.max(sustainVol, 0.001), startTime + atk + decay);
-    env.gain.setValueAtTime(Math.max(sustainVol, 0.001), startTime + gateSec - 0.05);
-    env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec + 0.15);
+  if(isLoveScene){
+    // LOVE: attack → decay（短め）→ sustain低め → gate後に余韻を残してリリース
+    const loveDecayVol = Math.max(vol * (sc.arpSustain || 0.04), 0.001);
+    env.gain.exponentialRampToValueAtTime(loveDecayVol, startTime + atk + decay);
+    // gate終了後もゆっくりフェード（リリースの余韻）
+    env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec + 0.55);
   } else {
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
   }
@@ -10185,9 +10186,9 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     const loveDly = actx.createDelay(1.0);
     loveDly.delayTime.value = 0.19; // 約190ms
     const loveDlyFb = actx.createGain();
-    loveDlyFb.gain.value = 0.18; // フィードバック量（控えめ）
+    loveDlyFb.gain.value = 0.32; // フィードバック量
     const loveDlyG = actx.createGain();
-    loveDlyG.gain.value = 0.22; // ディレイのwet量（控えめ）
+    loveDlyG.gain.value = 0.52; // ディレイのwet量（深め）
     hiShelf.connect(loveDly);
     loveDly.connect(loveDlyFb);
     loveDlyFb.connect(loveDly);
@@ -10212,9 +10213,11 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   }
 
   osc1.start(startTime); osc2.start(startTime); sub.start(startTime);
-  osc1.stop(startTime + gateSec + 0.08);
-  osc2.stop(startTime + gateSec + 0.08);
-  sub.stop(startTime + gateSec + 0.08);
+  // LOVEはrelease余韻分長めにoscを維持
+  const oscStopExtra = isLoveScene ? 0.65 : 0.08;
+  osc1.stop(startTime + gateSec + oscStopExtra);
+  osc2.stop(startTime + gateSec + oscStopExtra);
+  sub.stop(startTime + gateSec + oscStopExtra);
 
   // ── Arp Ghost: 「光の尾」として粒を線に変える ──
   // 1oct上・暗いフィルター・遅延・長めのリリースで尾を引く
@@ -10520,8 +10523,8 @@ const SCENE_PRESETS = {
     // filterを開き気味 → 冷たくなりすぎない透明感
     // sustain高め・decay長め: 音が持続して流れる（さざ波感）
     arpOsc:'sawtooth', arpOsc2:'square', arpCutoff:1100, arpRes:0.3, arpEnvMod:0.18,
-    arpAttack:0.005, arpDecay:0.55, arpSustain:0.12,
-    arpGate:380, arpVol:0.13, arpWet:0.50, arpGhost:0.18,
+    arpAttack:0.005, arpDecay:0.22, arpSustain:0.04,
+    arpGate:500, arpVol:0.13, arpWet:0.50, arpGhost:0.20,
     // 1小節リフレイン（合計16.0）・さざ波のような流れ
     arpRhythm:[1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 1.0, 2.0], arpRestProb:0.15,
   },
