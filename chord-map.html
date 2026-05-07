@@ -6129,48 +6129,74 @@ function playGrooveBeat(ctx, type, hz, t, vol){
   else if(type==='clap')  synthClap(ctx,t,vol);
 }
 
+// 旧grooveTick_step: _grooveScheduleに置き換え済み（互換性のため残す）
 function grooveTick_step(){
-  if(!grooveMode){grooveTimer=null;return;}
-  const preset=GROOVE_PRESETS[grooveMode];
-  const step=grooveTick%16;
-  const audioCtx=safeGetCtx();
-  if(!audioCtx){grooveTimer=setTimeout(grooveTick_step,grooveStepMs());return;}
+  // 新スケジューラー（_grooveSchedule）が起動していない場合のみ実行
+  if(_grooveScheduleTimer) return;
+  if(!grooveMode){ grooveTimer = null; return; }
+  _grooveSchedule();
+}
+
+// ── Groove AudioContextスケジューラー ──
+// setTimeoutの代わりにAudioContext.currentTimeベースのルックアヘッドで
+// タイミング精度を大幅改善する
+let _grooveNextBeat = 0;       // 次ステップのAudioContext時刻
+let _grooveLookAheadMs = 80;   // ルックアヘッド幅（ms）
+let _grooveScheduleMs = 20;    // ポーリング間隔（ms）
+let _grooveScheduleTimer = null;
+
+function _grooveSchedule(){
+  if(!grooveMode){ _grooveScheduleTimer = null; return; }
+  const audioCtx = safeGetCtx();
+  if(!audioCtx){ _grooveScheduleTimer = setTimeout(_grooveSchedule, _grooveScheduleMs); return; }
   safeResume(audioCtx);
-  const t=audioCtx.currentTime+0.01;
 
-  // スウィング: 奇数ステップを少し遅らせる
-  const swingDelay=(step%2===1)?(grooveStepMs()/1000)*(preset.swing-0.5)*0.8:0;
+  const lookAhead = audioCtx.currentTime + (_grooveLookAheadMs / 1000);
+  const preset = GROOVE_PRESETS[grooveMode];
+  const stepSec = grooveStepMs() / 1000;
 
-  // 現在コードのルート音を基準周波数に
-  const ri=ni(S.root);
-  const rootHz=midi2hz(36+ri); // C2基準
+  while(_grooveNextBeat < lookAhead){
+    const t = _grooveNextBeat;
+    const step = grooveTick % 16;
 
-  if(preset.kick[step]){
-    groovePulse=1.0;
-    playGrooveBeat(audioCtx,'kick',rootHz,t+swingDelay,0.88);
-    dirty=true;
-  }
-  if(preset.snare[step]){
-    playGrooveBeat(audioCtx,'snare',rootHz,t+swingDelay,0.70);
-    dirty=true;
-  }
-  if(preset.hihat[step]){
-    playGrooveBeat(audioCtx,'hihat',rootHz,t+swingDelay,0.42);
-  }
-  if(preset.ohhat&&preset.ohhat[step]){
-    playGrooveBeat(audioCtx,'ohhat',rootHz,t+swingDelay,0.38);
-  }
-  if(preset.clap&&preset.clap[step]){
-    playGrooveBeat(audioCtx,'clap',rootHz,t+swingDelay,0.55);
+    // スウィング: 奇数ステップを少し遅らせる
+    const swingDelay = (step % 2 === 1)
+      ? stepSec * (preset.swing - 0.5) * 0.8
+      : 0;
+    const tSwing = t + swingDelay;
+
+    const ri = ni(S.root);
+    const rootHz = midi2hz(36 + ri);
+
+    if(preset.kick[step]){
+      groovePulse = 1.0;
+      playGrooveBeat(audioCtx, 'kick', rootHz, tSwing, 0.88);
+      dirty = true;
+    }
+    if(preset.snare[step]){
+      playGrooveBeat(audioCtx, 'snare', rootHz, tSwing, 0.70);
+      dirty = true;
+    }
+    if(preset.hihat[step]){
+      playGrooveBeat(audioCtx, 'hihat', rootHz, tSwing, 0.42);
+    }
+    if(preset.ohhat && preset.ohhat[step]){
+      playGrooveBeat(audioCtx, 'ohhat', rootHz, tSwing, 0.38);
+    }
+    if(preset.clap && preset.clap[step]){
+      playGrooveBeat(audioCtx, 'clap', rootHz, tSwing, 0.55);
+    }
+
+    // PHRASEがGROOVEスタイルのとき、4ステップごとにトリガー
+    if(phraseMode !== 'off' && phraseStyle === 'groove' && step % 4 === 0 && !phraseIsPlaying){
+      if(FEATURES.phraseEngine) triggerPhrase(S.root, S.type);
+    }
+
+    grooveTick++;
+    _grooveNextBeat += stepSec;
   }
 
-  // PHRASEがGROOVEスタイルのとき、4ステップごとにリズムノートをトリガー
-  if(phraseMode!=='off'&&phraseStyle==='groove'&&step%4===0&&!phraseIsPlaying){
-    if(FEATURES.phraseEngine) triggerPhrase(S.root,S.type);
-  }
-
-  grooveTick++;
-  grooveTimer=setTimeout(grooveTick_step, grooveStepMs());
+  _grooveScheduleTimer = setTimeout(_grooveSchedule, _grooveScheduleMs);
 }
 
 function startGroove(mode){
@@ -6185,12 +6211,10 @@ function startGroove(mode){
   groovePulse=0;
 
   const preset=GROOVE_PRESETS[mode];
-  // BPMを自動設定
   autoBpm=preset.bpm;
   updateBpmDisplay(autoBpm);
-  updateDelayTime(); // ディレイタイムをGROOVE BPMに追従
+  updateDelayTime();
 
-  // PHRASEをGROOVEスタイルに自動切り替え
   if(phraseMode!=='off'){
     phraseStyle='groove';
     document.querySelectorAll('.phrase-style-btn').forEach(b=>{
@@ -6198,17 +6222,27 @@ function startGroove(mode){
     });
   }
 
-  // ボタンUIを更新
   document.querySelectorAll('.groove-btn').forEach(b=>{
     b.classList.toggle('on',b.dataset.groove===mode);
   });
 
-  grooveTick_step();
+  // AudioContextベースのスケジューラーを起動
+  const audioCtx = safeGetCtx();
+  if(audioCtx){
+    safeResume(audioCtx, ()=>{
+      _grooveNextBeat = audioCtx.currentTime + 0.05;
+      _grooveSchedule();
+    });
+  } else {
+    _grooveNextBeat = 0;
+    _grooveSchedule();
+  }
   dirty=true;
 }
 
 function stopGroove(){
-  if(grooveTimer){clearTimeout(grooveTimer);grooveTimer=null;}
+  if(_grooveScheduleTimer){ clearTimeout(_grooveScheduleTimer); _grooveScheduleTimer = null; }
+  if(grooveTimer){ clearTimeout(grooveTimer); grooveTimer = null; } // 旧タイマーも念のため
   grooveMode=null;
   groovePulse=0;
   document.querySelectorAll('.groove-btn').forEach(b=>b.classList.remove('on'));
@@ -10617,8 +10651,13 @@ const _phraseState = {
   phraseCount: 0,        // フレーズ完了カウント
   phrasePos: 0,          // フレーズ内の位置
 
+  // 前コード記憶（PLAIN: 解決感のある音の選択に使用）
+  prevChordMidis: [],    // 前コードのMIDI音リスト
+  prevChordRoot: null,   // 前コードのルート
+  hangingMidi: null,     // 前コードから引きずる音（未解決音）
+
   // PLAIN固有
-  plainMotifType: 0,     // 0:収束 1:拡散 2:落下
+  plainMotifType: 0,     // 0:収束 1:拡散 2:落下 3:跳躍（エモーショナル）
   plainSilenceNext: false, // 次ステップを強制休符にする
 
   // VELVET固有
@@ -10659,37 +10698,101 @@ function _resetPhraseState(){
 // baseSec倍率として使用
 const _GLASS_INTERVAL_PATTERN = [4.0, 3.5, 2.0, 1.0, 3.0, 1.5, 5.0, 2.5];
 
-// PLAIN動機定義: [音列インデックスのオフセット配列]
-// 音列から中央を0として相対インデックスで指定
+// PLAIN動機定義: スケール音・テンション跳躍・前コード引きずりを含む
+// notes: arpSeq（コードトーン、octRange=2で2オクターブ分）
+// motifType: 0=収束 1=拡散 2=落下 3=跳躍（エモーショナル）
 function _buildPlainMotif(notes, motifType, lastMidi){
   const n = notes;
-  if(!n || n.length === 0) return [n ? n[Math.floor(n.length/2)] : 60];
+  if(!n || n.length === 0) return [60];
   const mid = Math.floor(n.length / 2);
+
+  // 現在コードのスケール音を取得（コードトーン外の音への移動に使用）
+  let scaleTones = null;
+  try{
+    if(S && S.root && S.type && typeof getScaleNotes === 'function'){
+      const sg = getScaleNotes(S.root, S.type, arpOctCenter);
+      scaleTones = sg.scaleTones;
+    }
+  }catch(e){}
+
   // 前の音から最も近い音のインデックスを起点とする
   let startIdx = mid;
   if(lastMidi !== null){
     let minDist = Infinity;
     n.forEach((m,i) => { const d = Math.abs(m - lastMidi); if(d < minDist){ minDist=d; startIdx=i; } });
   }
-  switch(motifType % 3){
-    case 0: // 収束: 高め→中央へ
-      return [
-        n[Math.min(n.length-1, startIdx+2)] ?? n[n.length-1],
-        n[Math.min(n.length-1, startIdx+1)] ?? n[mid],
-        n[mid],
-      ].filter(m => m !== undefined);
-    case 1: // 拡散: 中央→外へ
-      return [
-        n[mid],
-        n[Math.max(0, mid-1)],
-        n[Math.min(n.length-1, mid+2)] ?? n[n.length-1],
-      ].filter(m => m !== undefined);
-    case 2: // 落下: 上から下へ
-      return [
-        n[Math.min(n.length-1, startIdx+1)] ?? n[n.length-1],
-        n[startIdx],
-        n[Math.max(0, startIdx-1)],
-      ].filter(m => m !== undefined);
+
+  // 前コードの引きずり音: 現コードにぶつからない音を選ぶ
+  const ps = _phraseState;
+  let hangNote = null;
+  if(ps.hangingMidi !== null && scaleTones){
+    // 前コードから引きずる音がスケール内にあれば使う（半音ずれでなければOK）
+    const chordPcs = new Set(n.map(m => m % 12));
+    const hangPc = ps.hangingMidi % 12;
+    // コードトーンと半音関係でなければ使える（ぶつからない）
+    const isClash = [...chordPcs].some(pc => Math.abs(pc - hangPc) === 1 || Math.abs(pc - hangPc) === 11);
+    if(!isClash && scaleTones.some(m => m % 12 === hangPc)){
+      // 引きずる音を現在の音域に収める
+      const targetOct = Math.round(n[mid] / 12);
+      hangNote = targetOct * 12 + hangPc;
+    }
+  }
+
+  // スケール音への跳躍先を選ぶ（コードトーン外のエモーショナルな音）
+  function _getScaleLeap(fromMidi, direction){
+    if(!scaleTones) return null;
+    const chordPcs = new Set(n.map(m => m % 12));
+    // コードトーン外のスケール音でfromMidiから3〜7半音離れた音
+    const candidates = scaleTones.filter(m => {
+      const diff = m - fromMidi;
+      const absDiff = Math.abs(diff);
+      const pc = m % 12;
+      return absDiff >= 3 && absDiff <= 9
+        && (direction > 0 ? diff > 0 : diff < 0)
+        && !chordPcs.has(pc);
+    });
+    if(candidates.length === 0) return null;
+    // 最も近いものを返す
+    return candidates.reduce((a, b) =>
+      Math.abs(a - fromMidi) < Math.abs(b - fromMidi) ? a : b
+    );
+  }
+
+  const hi = n[n.length - 1];
+  const lo = n[0];
+
+  switch(motifType % 4){
+    case 0: { // 収束: 高め→スケール経過音→コードトーンへ着地
+      const fromMidi = lastMidi || n[Math.min(n.length-1, startIdx+2)] || hi;
+      const leap = _getScaleLeap(fromMidi, -1); // 下方向のスケール音
+      const land = n[Math.max(0, startIdx - 1)] || lo; // 着地（コードトーン）
+      return leap
+        ? [n[Math.min(n.length-1, startIdx+2)] || hi, leap, land]
+        : [n[Math.min(n.length-1, startIdx+2)] || hi, n[mid], land];
+    }
+    case 1: { // 拡散+引きずり: 前コードの音から始まり現コードへ解決
+      const start = hangNote || n[mid];
+      const leap = _getScaleLeap(start, 1); // 上方向のスケール音
+      return leap
+        ? [start, leap, n[Math.min(n.length-1, mid+1)] || hi]
+        : [start, n[Math.max(0, mid-1)], n[Math.min(n.length-1, mid+2)] || hi];
+    }
+    case 2: { // 落下: 高音スケール音 → コードトーン（サティ的な下降）
+      const fromTop = n[n.length-1]; // 最高音から
+      const leap = _getScaleLeap(fromTop, -1);
+      const land = n[Math.max(0, startIdx-1)] || lo;
+      return leap
+        ? [fromTop, leap, land]
+        : [fromTop, n[mid], land];
+    }
+    case 3: { // 跳躍（エモーショナル）: 低→スケール音の大跳躍→コードトーン着地
+      const fromLo = lo;
+      const leap = _getScaleLeap(fromLo + 7, 1) || _getScaleLeap(fromLo, 1); // 5度上付近から探す
+      const land = n[Math.min(n.length-1, startIdx+1)] || hi;
+      return leap
+        ? [fromLo, leap, land]
+        : [fromLo, hi, n[mid]]; // leapがなければ最高音へ跳躍
+    }
   }
   return [n[mid]];
 }
@@ -10739,14 +10842,17 @@ function _phraseNext(notes, baseSec, sc, densityMul){
   switch(sceneCurrentName){
 
     // ────────────────────────────────────────────
-    // PLAIN: 短い動機（2〜3音）+ 必ず長い沈黙
+    // PLAIN: 短い動機（2〜3音）+ 必ず沈黙。スケール跳躍・前コード引きずり
     // ────────────────────────────────────────────
     case 'plain': {
       // 強制休符フラグ
       if(ps.plainSilenceNext){
         ps.plainSilenceNext = false;
-        // 沈黙の長さ: 2.5〜5.0拍（Sceneのリズムから長めを選ぶ）
-        const silRatio = (2.5 + Math.random() * 2.5) * densityMul;
+        // 沈黙の長さ: motifTypeで変化（エモーショナルな動機の後は長め）
+        // 跳躍(3)の後: 長い余韻 / 通常: 短め〜中程度
+        const silBase = ps.plainMotifType === 3 ? 3.0 : 2.0;
+        const silRand = ps.plainMotifType === 3 ? 2.0 : 1.5;
+        const silRatio = (silBase + Math.random() * silRand) * densityMul;
         return { midi: null, stepRatio: silRatio };
       }
 
@@ -10762,14 +10868,21 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         ps.phrasePos = 0;
         ps.phraseCount++;
         ps.plainSilenceNext = true;
-        // 4フレーズに1回、動機タイプを変える
-        if(ps.phraseCount % 4 === 0){
-          ps.plainMotifType = (ps.plainMotifType + 1) % 3;
+        // 3フレーズに1回、動機タイプを変える（4種類をローテーション）
+        // 跳躍(3)は6フレーズに1回だけ出現（出すぎない）
+        if(ps.phraseCount % 6 === 5){
+          ps.plainMotifType = 3; // エモーショナル跳躍
+        } else if(ps.phraseCount % 3 === 0){
+          ps.plainMotifType = (ps.plainMotifType < 3)
+            ? (ps.plainMotifType + 1) % 3
+            : 0;
         }
       }
 
-      // 動機内の音は短め（0.4〜0.7拍）+ わずかなjitter
-      const noteRatio = (0.4 + Math.random() * 0.3) * densityMul;
+      // 動機内の音間隔: 一定リズム感を保ちながら微妙に揺れる（±10%）
+      // サティ的な「揺れながら前に進む」感覚
+      const noteBase = ps.phrasePos === 1 ? 0.55 : 0.45; // 動機最初は少し長め
+      const noteRatio = noteBase * (0.9 + Math.random() * 0.2) * densityMul;
       return { midi, stepRatio: noteRatio };
     }
 
@@ -10895,7 +11008,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       }
 
       // PLUCK: 16分基準のリズム（0.4〜0.6拍・均一感）
-      const pluckRatio = (0.45 + Math.random() * 0.15) * densityMul;
+      const pluckRatio = (0.47 + Math.random() * 0.06) * densityMul; // 16分を安定化
       return { midi, stepRatio: pluckRatio };
     }
 
@@ -10957,7 +11070,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       }
 
       // STRINGS: 2拍単位の重い音（1.8〜2.2拍）
-      const strRatio = (1.8 + Math.random() * 0.4) * densityMul;
+      const strRatio = (1.8 + Math.random() * 0.15) * densityMul; // 幅を縮小
       return { midi, stepRatio: strRatio };
     }
 
@@ -11078,13 +11191,22 @@ function scheduleArpNotes(){
 // コード変更でARPシーケンスを更新
 function updateArpChord(root, type){
   if(!arpOn) return;
+  // 前コードの情報を記憶してから更新（フレーズ文法の前コード引きずりに使用）
+  if(arpSeq && arpSeq.length > 0){
+    _phraseState.prevChordMidis = [...arpSeq.filter(m => typeof m === 'number')];
+    _phraseState.prevChordRoot = (S && S.root) ? S.root : null;
+    // 直前に発音した音を「引きずる音」として保持
+    if(_phraseState.lastMidi !== null){
+      _phraseState.hangingMidi = _phraseState.lastMidi;
+    }
+  }
   arpSeq=buildArpSeq(root, type);
   arpStep=0;
   _arpLastMidi = null;
   _arpRhythmJitter = null;
   _plainPatternPhase = 0;
   _plainPatternCycleCount = 0;
-  // フレーズ文法状態をリセット（コードチェンジをまたいで一部の状態は保持）
+  // フレーズ文法状態をリセット（前コード記憶・lastMidi・hangingMidiは保持）
   _resetPhraseState();
   // リズムパターンはリセットしない（コードチェンジをまたいでリズムが継続）
 }
@@ -11227,6 +11349,7 @@ const SCENE_PRESETS = {
     arpOsc:'triangle', arpCutoff:2200, arpRes:0.35, arpEnvMod:0.42,
     arpAttack:0.008, arpDecay:0.45, arpSustain:0.04,
     arpGate:280, arpVol:0.20, arpWet:0.44, arpGhost:0.22,
+    arpOctRange:2, // 2オクターブ: 跳躍感・エモーショナルな動き
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
 
@@ -11244,6 +11367,7 @@ const SCENE_PRESETS = {
     arpOsc:'triangle', arpCutoff:1100, arpRes:0.55, arpEnvMod:0.35,
     arpAttack:0.014, arpDecay:0.50, arpSustain:0.06,
     arpGate:420, arpVol:0.22, arpWet:0.40, arpGhost:0.24,
+    arpOctRange:2, // 内声が上下に歌う
     // リズム: 付点が主役・短連打で人間味・長い休符で呼吸
     // 「歌っている」感覚
     arpRhythm:[1.5, 0.5, 2.0, 1.5, 0.5, 1.0, 2.5], arpRestProb:0.20,
@@ -11263,6 +11387,7 @@ const SCENE_PRESETS = {
     arpOsc:'sine', arpCutoff:3800, arpRes:1.6, arpEnvMod:0.65,
     arpAttack:0.003, arpDecay:0.12, arpSustain:0.0,
     arpGate:95, arpVol:0.15, arpWet:0.62, arpGhost:0.35,
+    arpOctRange:2, // 高域〜中域に広がる光
     // リズム: 非常に疎・長い沈黙・突然来る一音が印象的
     // 「沈黙の中に光が差す」感覚
     arpRhythm:[1.0, 4.0, 2.0, 6.0, 1.0, 3.0, 1.0, 5.0], arpRestProb:0.38,
@@ -11308,6 +11433,7 @@ const SCENE_PRESETS = {
     arpOsc:'sawtooth', arpCutoff:950, arpRes:2.2, arpEnvMod:0.92,
     arpAttack:0.003, arpDecay:0.70, arpSustain:0.0,
     arpGate:320, arpVol:0.26, arpWet:0.50, arpGhost:0.08,
+    arpOctRange:2, // 1オクターブ上まで含む催眠的反復
     // リズム: 16分ベース・一定の密度・たまに長い音で変化
     // 「繰り返しても疲れない」催眠的パターン
     arpRhythm:[0.5, 0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.5, 1.0], arpRestProb:0.06,
@@ -11327,6 +11453,7 @@ const SCENE_PRESETS = {
     arpOsc:'sawtooth', arpCutoff:1500, arpRes:0.45, arpEnvMod:0.28,
     arpAttack:0.020, arpDecay:0.55, arpSustain:0.15,
     arpGate:440, arpVol:0.24, arpWet:0.48, arpGhost:0.18,
+    arpOctRange:2, // 広い音域・アンセム感
     // リズム: 2拍単位の重い推進・少ない音数・Detroit的なうねり
     // 「前に進んでいく」感覚
     arpRhythm:[2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 1.5, 0.5], arpRestProb:0.05,
@@ -11597,8 +11724,11 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
     driftLfo.type = 'sine';
     driftLfo.connect(driftG);
     driftG.connect(lpf.frequency);
-    driftLfo.start(t);
-    driftLfo.stop(t + 30);
+    // oscの最大生存時間: attack + decay + sustain保持上限 + release + 0.3秒の余裕
+  // 30秒固定をやめ、リリース時間に連動させる
+  const _oscMaxLife = sc.attack + sc.decay + 6.0 + (sc.release || 2.0) + 0.3;
+  driftLfo.start(t);
+  driftLfo.stop(t + _oscMaxLife);
   }
 
   // VCA Envelope
@@ -11627,7 +11757,7 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   }
 
   osc1.start(t); osc2.start(t);
-  osc1.stop(t + 30); osc2.stop(t + 30);
+  osc1.stop(t + _oscMaxLife); osc2.stop(t + _oscMaxLife);
 
   // ── Felt Attack: ピアノ的な短い粒を発音頭に加える ──
   if(sc.feltAttack > 0.02){
@@ -11655,16 +11785,19 @@ function _releaseSceneVoice(v, actx, relSec){
   v.releasing = true;
   _sceneReleasingVoices.push(v);
   const t = actx.currentTime;
+  // relSecを上限3.5秒にクランプ（長すぎるリリースによる濁りを防ぐ）
+  const clampedRel = Math.min(relSec, 3.5);
   try{
     v.vca.gain.cancelScheduledValues(t);
     v.vca.gain.setValueAtTime(v.vca.gain.value, t);
-    v.vca.gain.linearRampToValueAtTime(0.0001, t + relSec);
+    v.vca.gain.linearRampToValueAtTime(0.0001, t + clampedRel);
   }catch(e){}
-  const stopMs = Math.round(relSec * 1000) + 50;
+  // AudioContextのstopTimeでoscを確実に停止（setValueAtTimeより確実）
+  try{ v.osc1.stop(t + clampedRel + 0.05); }catch(e){}
+  try{ v.osc2.stop(t + clampedRel + 0.05); }catch(e){}
+  const stopMs = Math.round(clampedRel * 1000) + 100;
   setTimeout(()=>{
-    try{ v.osc1.stop(); }catch(e){}
-    try{ v.osc2.stop(); }catch(e){}
-    // リリース完了後に管理配列から除去
+    // 管理配列から除去
     const idx = _sceneReleasingVoices.indexOf(v);
     if(idx >= 0) _sceneReleasingVoices.splice(idx, 1);
   }, stopMs);
@@ -11677,12 +11810,11 @@ function _killReleasingVoices(actx){
     try{
       v.vca.gain.cancelScheduledValues(t);
       v.vca.gain.setValueAtTime(v.vca.gain.value, t);
-      v.vca.gain.linearRampToValueAtTime(0.0001, t + 0.08);
+      v.vca.gain.linearRampToValueAtTime(0.0001, t + 0.06);
     }catch(e){}
-    setTimeout(()=>{
-      try{ v.osc1.stop(); }catch(e){}
-      try{ v.osc2.stop(); }catch(e){}
-    }, 120);
+    // AudioContextのstopTimeで即時停止（setTimeoutより確実）
+    try{ v.osc1.stop(t + 0.07); }catch(e){}
+    try{ v.osc2.stop(t + 0.07); }catch(e){}
   });
   _sceneReleasingVoices = [];
 }
@@ -11908,16 +12040,18 @@ function playSceneChord(actx, root, type){
 
   // 自動リリース（sustainに基づく）
   if(_sceneTrailTimer) clearTimeout(_sceneTrailTimer);
-  // STAB: 短く切る / TRAIL: 長く / HOLD・BROKEN・PULSE: 通常
+  // STAB: 短く切る / TRAIL: trailSec連動 / HOLD・BROKEN: 適切な保持時間
+  // 4.5秒固定をやめ、SceneのtrailSecに連動させる（濁り防止）
+  const _baseHold = sc.attack + sc.decay;
   const holdSec = (chordPatternMode === 'stab')
-    ? sc.attack + sc.decay + 0.05   // STABは発音後すぐリリース
+    ? _baseHold + 0.05
     : (chordPatternMode === 'trail')
-      ? sc.attack + sc.decay + sc.trailSec + 2.0  // TRAILは波のtrailSecに連動
-      : sc.attack + sc.decay + 4.5;
+      ? _baseHold + Math.min(sc.trailSec, 3.5) + 1.5
+      : _baseHold + Math.min(sc.trailSec || 2.0, 3.0) + 1.0;
   _sceneTrailTimer = setTimeout(()=>{
     const a2 = safeGetCtx(); if(!a2) return;
     _sceneVoices.forEach(v => _releaseSceneVoice(v, a2, sc.release));
-    setTimeout(()=>{ _sceneVoices = []; }, Math.round(sc.release * 1000) + 200);
+    setTimeout(()=>{ _sceneVoices = []; }, Math.round(Math.min(sc.release, 3.5) * 1000) + 200);
   }, Math.round(holdSec * 1000));
 
   // ── PULSE: 一定間隔でコードを自動反復（CHORDのみ） ──
