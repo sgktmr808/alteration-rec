@@ -1400,10 +1400,26 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                 </div>
               </div>
 
+              <!-- ── SPACE PRESET ── -->
+              <div class="synth-sec">
+                <div class="synth-sec-hdr">
+                  <span class="synth-sec-title">SPACE</span>
+                </div>
+                <div class="synth-row">
+                  <div class="synth-pills" id="space-preset-pills">
+                    <div class="synth-pill space-pill" data-space="dry" onclick="applySpacePreset('dry')">DRY</div>
+                    <div class="synth-pill space-pill on" data-space="room" onclick="applySpacePreset('room')">ROOM</div>
+                    <div class="synth-pill space-pill" data-space="plate" onclick="applySpacePreset('plate')">PLATE</div>
+                    <div class="synth-pill space-pill" data-space="fog" onclick="applySpacePreset('fog')">FOG</div>
+                    <div class="synth-pill space-pill" data-space="tide" onclick="applySpacePreset('tide')">TIDE</div>
+                  </div>
+                </div>
+              </div>
+
               <!-- ── DELAY / SPACE ── -->
               <div class="synth-sec">
                 <div class="synth-sec-hdr">
-                  <span class="synth-sec-title">DELAY · SPACE</span>
+                  <span class="synth-sec-title">DELAY</span>
                 </div>
                 <div class="synth-row">
                   <span class="synth-lbl">TIME</span>
@@ -9836,6 +9852,179 @@ function calcDelayTimeSec(){
   return map[dlyTime]??(beat/2);
 }
 
+// ════════════════════════════════════════════════════════
+// SPACE PRESET ENGINE
+// DRY / ROOM / PLATE / FOG / TIDE
+// リバーブバスを構築し、Space Presetがそのパラメーターを制御する
+// ════════════════════════════════════════════════════════
+
+// Space Preset定義
+const SPACE_PRESETS = {
+  // DRY: リバーブなし。直接出力。
+  dry: {
+    label: 'DRY',
+    reverbSize: 0.0,    // リバーブ量（0=なし）
+    reverbDamp: 0.8,    // 高域の減衰（高=暗い残響）
+    reverbMix:  0.0,    // CHORD/ARPへのリバーブsend量
+    earlyRef:   0.0,    // 早期反射（部屋感）
+    chordWetMod:  0.0,  // CHORD wetの加算補正
+    arpWetMod:    0.0,  // ARP wetの加算補正
+  },
+  // ROOM: 小さな部屋。自然な空気感。
+  room: {
+    label: 'ROOM',
+    reverbSize: 0.25,
+    reverbDamp: 0.55,
+    reverbMix:  0.28,
+    earlyRef:   0.15,
+    chordWetMod:  0.0,
+    arpWetMod:    0.0,
+  },
+  // PLATE: プレートリバーブ。金属的・滑らか・中密度。
+  plate: {
+    label: 'PLATE',
+    reverbSize: 0.45,
+    reverbDamp: 0.35,
+    reverbMix:  0.42,
+    earlyRef:   0.08,
+    chordWetMod:  0.06,
+    arpWetMod:    0.08,
+  },
+  // FOG: 深い霧。長く霞む。アンビエント的。
+  fog: {
+    label: 'FOG',
+    reverbSize: 0.75,
+    reverbDamp: 0.20,
+    reverbMix:  0.60,
+    earlyRef:   0.02,
+    chordWetMod:  0.12,
+    arpWetMod:    0.15,
+  },
+  // TIDE: 最大の残響。波のような広がり。
+  tide: {
+    label: 'TIDE',
+    reverbSize: 0.95,
+    reverbDamp: 0.10,
+    reverbMix:  0.75,
+    earlyRef:   0.0,
+    chordWetMod:  0.18,
+    arpWetMod:    0.22,
+  },
+};
+
+let spaceCurrentName = 'room';
+let _spaceReverbNode = null;   // ConvolverNode or MultiDelayNode
+let _spaceReverbGain = null;   // リバーブsend gain
+let _spaceReverbReturnGain = null; // リバーブreturn gain
+let _spaceReverbCtx = null;
+
+// 簡易リバーブ: 複数の短いDelayを組み合わせたAllpass/Combフィルター網
+// ConvolverNodeより軽量・Web Audio APIのみで完結
+function _buildReverbBuffer(actx, size, damp){
+  // size: 0.0〜1.0 (残響時間の目安)
+  // damp: 0.0〜1.0 (高域減衰 高=暗い)
+  const sampleRate = actx.sampleRate;
+  const duration = 0.4 + size * 3.5; // 0.4〜3.9秒
+  const length = Math.floor(sampleRate * duration);
+  const buf = actx.createBuffer(2, length, sampleRate);
+
+  for(let ch = 0; ch < 2; ch++){
+    const data = buf.getChannelData(ch);
+    // ランダムなインパルス応答（簡易）
+    for(let i = 0; i < length; i++){
+      const decay = Math.exp(-i / (sampleRate * duration * 0.5));
+      // dampで高域を減衰（ローパス的効果をエンベロープで近似）
+      const dampFactor = Math.exp(-damp * i / (sampleRate * 0.3));
+      data[i] = (Math.random() * 2 - 1) * decay * dampFactor;
+    }
+    // ステレオで少しずらす（自然な広がり）
+    if(ch === 1){
+      const shift = Math.floor(sampleRate * 0.007);
+      for(let i = length - 1; i >= shift; i--) data[i] = data[i - shift];
+      for(let i = 0; i < shift; i++) data[i] = 0;
+    }
+  }
+  return buf;
+}
+
+// リバーブバスを構築（Space Preset適用時に呼ぶ）
+function _buildSpaceReverb(actx, preset){
+  // 既存ノードを切断
+  try{ if(_spaceReverbNode) _spaceReverbNode.disconnect(); }catch(e){}
+  try{ if(_spaceReverbGain) _spaceReverbGain.disconnect(); }catch(e){}
+  try{ if(_spaceReverbReturnGain) _spaceReverbReturnGain.disconnect(); }catch(e){}
+
+  if(!preset || preset.reverbMix <= 0.01){
+    _spaceReverbNode = null;
+    _spaceReverbGain = null;
+    _spaceReverbReturnGain = null;
+    _spaceReverbCtx = actx;
+    return;
+  }
+
+  // ConvolverNodeでリバーブ構築
+  const convolver = actx.createConvolver();
+  convolver.buffer = _buildReverbBuffer(actx, preset.reverbSize, preset.reverbDamp);
+
+  // send gain（リバーブへの送り量）
+  const sendGain = actx.createGain();
+  sendGain.gain.value = preset.reverbMix;
+
+  // return gain（リバーブからの戻り量）
+  const returnGain = actx.createGain();
+  returnGain.gain.value = 0.7;
+
+  // highshelf cut（リバーブ出力の高域を少し丸める）
+  const hpf = actx.createBiquadFilter();
+  hpf.type = 'highshelf';
+  hpf.frequency.value = 6000;
+  hpf.gain.value = -4;
+
+  // routing: sendGain → convolver → hpf → returnGain → destination
+  sendGain.connect(convolver);
+  convolver.connect(hpf);
+  hpf.connect(returnGain);
+  returnGain.connect(actx.destination);
+
+  _spaceReverbNode = convolver;
+  _spaceReverbGain = sendGain;
+  _spaceReverbReturnGain = returnGain;
+  _spaceReverbCtx = actx;
+}
+
+// Space Presetを適用する
+function applySpacePreset(name){
+  const preset = SPACE_PRESETS[name] || SPACE_PRESETS.room;
+  spaceCurrentName = name;
+
+  // UI更新
+  document.querySelectorAll('.space-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.space === name)
+  );
+
+  // リバーブバスを再構築
+  const actx = safeGetCtx();
+  if(actx){
+    safeResume(actx, () => {
+      _buildSpaceReverb(actx, preset);
+      // ARP出力ノードをリセット（新しいリバーブバスに再接続させる）
+      _resetArpOut();
+    });
+  }
+}
+
+// リバーブsendノードを取得（_playSceneArpNote / _playSceneNoteから呼ぶ）
+// nullの場合はactx.destinationを使う
+function getSpaceReverbSend(){
+  return _spaceReverbGain || null;
+}
+
+// 現在のSpaceプリセットのwet補正値を返す
+function getSpaceWetMod(isArp){
+  const preset = SPACE_PRESETS[spaceCurrentName] || SPACE_PRESETS.room;
+  return isArp ? (preset.arpWetMod || 0) : (preset.chordWetMod || 0);
+}
+
 function buildDelayNodes(actx){
   // 既存ノードを切断
   try{
@@ -10327,6 +10516,14 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
     arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget);
     arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
+    // Space Presetリバーブsendに接続
+    const _arpRvbSend = getSpaceReverbSend();
+    if(_arpRvbSend && _spaceReverbCtx === actx){
+      const _arpSpaceG = actx.createGain();
+      _arpSpaceG.gain.value = 0.5 + getSpaceWetMod(true);
+      arpEnvOut.connect(_arpSpaceG);
+      _arpSpaceG.connect(_arpRvbSend);
+    }
   }
 
   if(!_loveOsc1Handled) osc1.start(startTime); // LOVEはosc1_sine/osc1_wtで起動済み
@@ -11145,12 +11342,23 @@ let _sceneTrailTimer = null;
 let _arpOut = null;
 let _arpOutCtx = null;
 function _getArpOut(actx){
-  // contextが変わった or 未初期化なら再作成
   if(!_arpOut || _arpOutCtx !== actx){
     const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
-    _arpOut = (typeof getOut === 'function')
-      ? getOut(actx, sc.arpWet || 0.35)
-      : actx.destination;
+    if(typeof getOut === 'function'){
+      _arpOut = getOut(actx, sc.arpWet || 0.35);
+    } else {
+      // Space Presetリバーブバス経由の出力ノードを構築
+      const mixGain = actx.createGain();
+      mixGain.gain.value = 1.0;
+      const dest = actx.destination;
+      // リバーブsendが存在する場合は接続
+      const rvbSend = getSpaceReverbSend();
+      if(rvbSend && _spaceReverbCtx === actx){
+        mixGain.connect(rvbSend);
+      }
+      mixGain.connect(dest);
+      _arpOut = mixGain;
+    }
     _arpOutCtx = actx;
   }
   return _arpOut;
@@ -11408,6 +11616,15 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
+
+  // Space Presetリバーブsendに接続（存在する場合）
+  const _chordRvbSend = getSpaceReverbSend();
+  if(_chordRvbSend && _spaceReverbCtx === actx){
+    const _chordRvbG = actx.createGain();
+    _chordRvbG.gain.value = 0.6 + getSpaceWetMod(false);
+    panner.connect(_chordRvbG);
+    _chordRvbG.connect(_chordRvbSend);
+  }
 
   osc1.start(t); osc2.start(t);
   osc1.stop(t + 30); osc2.stop(t + 30);
@@ -13528,6 +13745,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   initSynthUI();
   // Scene切替バーの初期表示
   _updateSceneSwitcher();
+  // Space Presetの初期UI状態を設定（デフォルト: room）
+  document.querySelectorAll('.space-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.space === spaceCurrentName)
+  );
 });
 
 document.addEventListener('DOMContentLoaded',()=>{
