@@ -10374,6 +10374,13 @@ function startArpScheduler(){
   arpSeq=buildArpSeq(S.root, S.type);
   arpStep=0;
   _arpRhythmStep=0;
+  _resetPhraseState();
+  // フレーズ状態を完全初期化
+  _phraseState.plainMotifType = 0;
+  _phraseState.velvetDir = 1; _phraseState.velvetDirCount = 0;
+  _phraseState.glassHighNext = true;
+  _phraseState.stringsDir = 1; _phraseState.stringsDirMeasure = 0;
+  _phraseState.stringsAccentNext = false;
 
   const actx=safeGetCtx();
   if(!actx) return;
@@ -10399,6 +10406,368 @@ let _arpRhythmJitterLen = 0;
 const _PLAIN_PATTERN_CYCLE = ['outsidein', 'pendulum', 'cascade', 'bounce'];
 let _plainPatternPhase = 0;    // 現在のフェーズ（0〜3）
 let _plainPatternCycleCount = 0; // 何周したか
+
+// ── フレーズ文法エンジン ──
+// Scene別の意思を持つフレーズ状態管理
+// buildArpSeq/arpSeq/arpStepは破壊しない。フレーズ文法有効時のみ新パスを通る。
+const _PHRASE_SCENES = new Set(['plain','velvet','glass','pluck','strings']);
+
+const _phraseState = {
+  // 共通
+  notesSinceChord: 0,    // コードチェンジからの発音数
+  lastMidi: null,        // 直前に発音したMIDI音
+  lastDirection: 1,      // 直前の移動方向（+1上行/-1下行）
+  phraseCount: 0,        // フレーズ完了カウント
+  phrasePos: 0,          // フレーズ内の位置
+
+  // PLAIN固有
+  plainMotifType: 0,     // 0:収束 1:拡散 2:落下
+  plainSilenceNext: false, // 次ステップを強制休符にする
+
+  // VELVET固有
+  velvetDir: 1,          // 現在の進行方向（+1/-1）
+  velvetDirCount: 0,     // 同方向継続カウント（2で反転）
+
+  // GLASS固有
+  glassIntervalIdx: 0,   // 間隔パターンのインデックス
+  glassHighNext: true,   // 次は高音か低音か（対話感）
+
+  // PLUCK固有
+  pluckCell: null,       // 現在の細胞（4〜6音配列）
+  pluckCellPos: 0,       // 細胞内の位置
+  pluckRepeatCount: 0,   // 同細胞の繰り返し数
+
+  // STRINGS固有
+  stringsDir: 1,         // 現在の方向（+1上行/-1下行）
+  stringsDirMeasure: 0,  // 方向を保つ小節カウント
+  stringsAccentNext: false, // 次にアクセント音を入れる
+};
+
+// フレーズ状態リセット（コードチェンジ時・ARP再起動時）
+function _resetPhraseState(){
+  _phraseState.notesSinceChord = 0;
+  _phraseState.phrasePos = 0;
+  _phraseState.phraseCount = 0;
+  // PLAINはmotifTypeとsilenceを保持（コードをまたいで動機が継続）
+  _phraseState.plainSilenceNext = false;
+  // GLASSの対話感は保持（intervalIdxはリセット）
+  _phraseState.glassIntervalIdx = 0;
+  // PLUCKの細胞はコードチェンジで再生成
+  _phraseState.pluckCell = null;
+  _phraseState.pluckCellPos = 0;
+  _phraseState.pluckRepeatCount = 0;
+}
+
+// GLASS専用: 間隔パターン（長・長・中・短・長・中の繰り返し）
+// baseSec倍率として使用
+const _GLASS_INTERVAL_PATTERN = [4.0, 3.5, 2.0, 1.0, 3.0, 1.5, 5.0, 2.5];
+
+// PLAIN動機定義: [音列インデックスのオフセット配列]
+// 音列から中央を0として相対インデックスで指定
+function _buildPlainMotif(notes, motifType, lastMidi){
+  const n = notes;
+  if(!n || n.length === 0) return [n ? n[Math.floor(n.length/2)] : 60];
+  const mid = Math.floor(n.length / 2);
+  // 前の音から最も近い音のインデックスを起点とする
+  let startIdx = mid;
+  if(lastMidi !== null){
+    let minDist = Infinity;
+    n.forEach((m,i) => { const d = Math.abs(m - lastMidi); if(d < minDist){ minDist=d; startIdx=i; } });
+  }
+  switch(motifType % 3){
+    case 0: // 収束: 高め→中央へ
+      return [
+        n[Math.min(n.length-1, startIdx+2)] ?? n[n.length-1],
+        n[Math.min(n.length-1, startIdx+1)] ?? n[mid],
+        n[mid],
+      ].filter(m => m !== undefined);
+    case 1: // 拡散: 中央→外へ
+      return [
+        n[mid],
+        n[Math.max(0, mid-1)],
+        n[Math.min(n.length-1, mid+2)] ?? n[n.length-1],
+      ].filter(m => m !== undefined);
+    case 2: // 落下: 上から下へ
+      return [
+        n[Math.min(n.length-1, startIdx+1)] ?? n[n.length-1],
+        n[startIdx],
+        n[Math.max(0, startIdx-1)],
+      ].filter(m => m !== undefined);
+  }
+  return [n[mid]];
+}
+
+// PLUCKの細胞を生成（4〜6音）
+function _buildPluckCell(notes){
+  if(!notes || notes.length === 0) return [60];
+  const n = notes;
+  const len = 4 + Math.floor(Math.random() * 3); // 4〜6音
+  const cell = [];
+  // 低い音から順に密度高めで並べる（催眠的反復の基礎）
+  const base = Math.floor(n.length * 0.15); // 低め寄り
+  for(let i = 0; i < len; i++){
+    const idx = (base + i) % n.length;
+    cell.push(n[idx]);
+  }
+  return cell;
+}
+
+// PLUCKの細胞に微細な変奏を加える（1音だけ差し替え・追加・省く）
+function _mutatePluckCell(cell, notes){
+  if(!cell || cell.length === 0) return cell;
+  const mutated = [...cell];
+  const op = Math.random();
+  if(op < 0.4 && notes.length > 0){
+    // 1音差し替え
+    const idx = Math.floor(Math.random() * mutated.length);
+    mutated[idx] = notes[Math.floor(Math.random() * notes.length)];
+  } else if(op < 0.65 && mutated.length < 7){
+    // 1音追加
+    mutated.push(notes[Math.floor(Math.random() * notes.length)]);
+  } else if(op < 0.85 && mutated.length > 3){
+    // 1音省く
+    mutated.splice(Math.floor(Math.random() * mutated.length), 1);
+  }
+  return mutated;
+}
+
+// フレーズ文法エンジン: 次の発音情報を返す
+// 戻り値: { midi: number|null, stepRatio: number }
+// midi=null → 休符
+function _phraseNext(notes, baseSec, sc, densityMul){
+  if(!notes || notes.length === 0) return { midi: null, stepRatio: 1.0 };
+  const ps = _phraseState;
+  const restProb = _slArpRestProb !== null ? _slArpRestProb : (sc.arpRestProb || 0);
+
+  switch(sceneCurrentName){
+
+    // ────────────────────────────────────────────
+    // PLAIN: 短い動機（2〜3音）+ 必ず長い沈黙
+    // ────────────────────────────────────────────
+    case 'plain': {
+      // 強制休符フラグ
+      if(ps.plainSilenceNext){
+        ps.plainSilenceNext = false;
+        // 沈黙の長さ: 2.5〜5.0拍（Sceneのリズムから長めを選ぶ）
+        const silRatio = (2.5 + Math.random() * 2.5) * densityMul;
+        return { midi: null, stepRatio: silRatio };
+      }
+
+      // 動機の音を取得
+      const motif = _buildPlainMotif(notes, ps.plainMotifType, ps.lastMidi);
+      const midi = motif[ps.phrasePos % motif.length];
+
+      ps.phrasePos++;
+      ps.lastMidi = midi;
+
+      if(ps.phrasePos >= motif.length){
+        // 動機完了 → 次は必ず沈黙
+        ps.phrasePos = 0;
+        ps.phraseCount++;
+        ps.plainSilenceNext = true;
+        // 4フレーズに1回、動機タイプを変える
+        if(ps.phraseCount % 4 === 0){
+          ps.plainMotifType = (ps.plainMotifType + 1) % 3;
+        }
+      }
+
+      // 動機内の音は短め（0.4〜0.7拍）+ わずかなjitter
+      const noteRatio = (0.4 + Math.random() * 0.3) * densityMul;
+      return { midi, stepRatio: noteRatio };
+    }
+
+    // ────────────────────────────────────────────
+    // VELVET: 付点リズムの3音フレーズ・前音から近い音へ
+    // ────────────────────────────────────────────
+    case 'velvet': {
+      // 付点リズム: 長・短・中 のパターン
+      const velvetRhythm = [1.5, 0.5, 1.0];
+      const rIdx = ps.phrasePos % velvetRhythm.length;
+      const stepRatio = velvetRhythm[rIdx] * densityMul;
+
+      // 確率的な休符（Calmほど多い）
+      if(restProb > 0 && Math.random() < restProb && rIdx === 0){
+        // フレーズの先頭のみ休符可能
+        const restRatio = (1.0 + Math.random() * 1.0) * densityMul;
+        return { midi: null, stepRatio: restRatio };
+      }
+
+      // 音選択: 前の音から近い音へ（ボイスリーディング的）
+      let midi;
+      if(ps.lastMidi === null){
+        midi = notes[Math.floor(notes.length / 2)]; // 初回は中央
+      } else {
+        // 方向を考慮しながら近い音を選ぶ
+        const dir = ps.velvetDir;
+        const candidates = notes.filter(m => dir > 0 ? m > ps.lastMidi : m < ps.lastMidi);
+        if(candidates.length > 0){
+          // 方向に沿った最も近い音
+          midi = dir > 0
+            ? candidates.reduce((a,b) => Math.abs(a-ps.lastMidi) < Math.abs(b-ps.lastMidi) ? a : b)
+            : candidates.reduce((a,b) => Math.abs(a-ps.lastMidi) < Math.abs(b-ps.lastMidi) ? a : b);
+        } else {
+          // 端に達したら方向反転
+          ps.velvetDir *= -1;
+          midi = notes[dir > 0 ? 0 : notes.length-1];
+        }
+      }
+
+      ps.lastMidi = midi;
+      ps.phrasePos++;
+
+      if(ps.phrasePos >= velvetRhythm.length){
+        ps.phrasePos = 0;
+        ps.phraseCount++;
+        ps.velvetDirCount++;
+        // 2フレーズ同方向で反転
+        if(ps.velvetDirCount >= 2){
+          ps.velvetDir *= -1;
+          ps.velvetDirCount = 0;
+        }
+      }
+
+      return { midi, stepRatio };
+    }
+
+    // ────────────────────────────────────────────
+    // GLASS: 孤立した1〜2音・意図的な間隔パターン
+    // ────────────────────────────────────────────
+    case 'glass': {
+      const intervalPattern = _GLASS_INTERVAL_PATTERN;
+      const iIdx = ps.glassIntervalIdx % intervalPattern.length;
+      const stepRatio = intervalPattern[iIdx] * densityMul;
+      ps.glassIntervalIdx++;
+
+      // 確率的な完全スキップ（より孤独な光）
+      if(restProb > 0.25 && Math.random() < restProb * 0.6){
+        // 間隔だけ消費して発音しない
+        return { midi: null, stepRatio };
+      }
+
+      // 高音/低音の対話（交互に出る傾向）
+      let midi;
+      if(ps.glassHighNext){
+        // 高域から選ぶ（上3/4の範囲）
+        const hiRange = notes.slice(Math.floor(notes.length * 0.5));
+        midi = hiRange[Math.floor(Math.random() * hiRange.length)] || notes[notes.length-1];
+      } else {
+        // 低域から選ぶ（下1/2の範囲）
+        const loRange = notes.slice(0, Math.ceil(notes.length * 0.5));
+        midi = loRange[Math.floor(Math.random() * loRange.length)] || notes[0];
+      }
+      // 稀に同じ域が続く（完全な交互にしない）
+      if(Math.random() > 0.25) ps.glassHighNext = !ps.glassHighNext;
+
+      ps.lastMidi = midi;
+      ps.phraseCount++;
+
+      return { midi, stepRatio };
+    }
+
+    // ────────────────────────────────────────────
+    // PLUCK: 4〜6音の細胞が催眠的に反復
+    // ────────────────────────────────────────────
+    case 'pluck': {
+      // 細胞を初期化（未生成の場合）
+      if(!ps.pluckCell || ps.pluckCell.length === 0){
+        ps.pluckCell = _buildPluckCell(notes);
+        ps.pluckCellPos = 0;
+      }
+
+      const midi = ps.pluckCell[ps.pluckCellPos % ps.pluckCell.length];
+      ps.lastMidi = midi;
+      ps.pluckCellPos++;
+
+      if(ps.pluckCellPos >= ps.pluckCell.length){
+        ps.pluckCellPos = 0;
+        ps.pluckRepeatCount++;
+
+        // 8反復に1回: 大きな変化（octジャンプまたはパターン反転）
+        if(ps.pluckRepeatCount % 8 === 0){
+          ps.pluckCell = _buildPluckCell(notes); // 完全再生成
+        } else {
+          // それ以外は微細変奏（1音だけ変化）
+          ps.pluckCell = _mutatePluckCell(ps.pluckCell, notes);
+        }
+      }
+
+      // 確率的な休符（密度を少し間引く）
+      if(restProb > 0 && Math.random() < restProb){
+        ps.lastMidi = null;
+        return { midi: null, stepRatio: 0.5 * densityMul };
+      }
+
+      // PLUCK: 16分基準のリズム（0.4〜0.6拍・均一感）
+      const pluckRatio = (0.45 + Math.random() * 0.15) * densityMul;
+      return { midi, stepRatio: pluckRatio };
+    }
+
+    // ────────────────────────────────────────────
+    // STRINGS: 大きな呼吸・2拍単位・方向性のある動き
+    // ────────────────────────────────────────────
+    case 'strings': {
+      // フレーズ先頭の空白（必須）
+      if(ps.phrasePos === 0 && ps.phraseCount > 0){
+        ps.phrasePos = 1;
+        const gapRatio = (1.0 + Math.random() * 0.5) * densityMul;
+        return { midi: null, stepRatio: gapRatio };
+      }
+
+      // 確率的な休符（Calm方向で増える）
+      if(restProb > 0 && Math.random() < restProb){
+        const gapRatio = (1.5 + Math.random() * 1.0) * densityMul;
+        return { midi: null, stepRatio: gapRatio };
+      }
+
+      // 方向に沿った音選択（上行/下行）
+      let midi;
+      const dir = ps.stringsDir;
+      if(ps.lastMidi === null){
+        midi = dir > 0 ? notes[0] : notes[notes.length-1];
+      } else {
+        const candidates = notes.filter(m => dir > 0 ? m >= ps.lastMidi : m <= ps.lastMidi);
+        if(candidates.length > 1){
+          // 方向に沿って1〜2音進む
+          const sortedC = dir > 0 ? candidates : [...candidates].reverse();
+          midi = sortedC[Math.min(1, sortedC.length-1)];
+        } else {
+          // 端に達したら方向反転
+          ps.stringsDir *= -1;
+          ps.stringsDirMeasure++;
+          midi = ps.stringsDir > 0 ? notes[0] : notes[notes.length-1];
+          // 4小節に1回アクセント（跳躍）
+          if(ps.stringsDirMeasure % 4 === 0){
+            ps.stringsAccentNext = true;
+          }
+        }
+      }
+
+      // アクセント音（跳躍）
+      if(ps.stringsAccentNext){
+        midi = ps.stringsDir > 0 ? notes[notes.length-1] : notes[0];
+        ps.stringsAccentNext = false;
+      }
+
+      ps.lastMidi = midi;
+      ps.phrasePos++;
+      if(ps.phrasePos >= 2){
+        ps.phrasePos = 0;
+        ps.phraseCount++;
+        // 2小節で方向チェック
+        if(ps.phraseCount % 2 === 0){
+          ps.stringsDir *= -1;
+        }
+      }
+
+      // STRINGS: 2拍単位の重い音（1.8〜2.2拍）
+      const strRatio = (1.8 + Math.random() * 0.4) * densityMul;
+      return { midi, stepRatio: strRatio };
+    }
+
+    default:
+      return null; // フレーズ文法を使わない（既存パスへ）
+  }
+}
 // ── LOVE ARP用 PeriodicWave キャッシュ ──
 let _lovePeriodicWave = null;
 let _lovePeriodicWaveCtx = null;
@@ -10429,38 +10798,55 @@ function scheduleArpNotes(){
   if(!arpOn) return;
   const actx=safeGetCtx();
   if(!actx) return;
-  const baseSec=arpStepMs()/1000; // 1拍の長さ
+  const baseSec=arpStepMs()/1000;
   const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
   const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
-  const rhythm = sc.arpRhythm; // Scene別リズムパターン
-  // SLスライダー反映（nullならSceneデフォルト）
+  const rhythm = sc.arpRhythm;
   const restProb = _slArpRestProb !== null ? _slArpRestProb : (sc.arpRestProb || 0);
   const densityMul = _slRhythmDensity !== null ? _slRhythmDensity : 1.0;
 
+  // フレーズ文法有効判定
+  // PatternGrammarのARP系（PLUCK/FLOAT/INNER）使用中は既存パスを使う
+  const _patternArpActive = typeof _getPatternArpSc === 'function' && _getPatternArpSc() !== null;
+  const _usePhraseGrammar = _PHRASE_SCENES.has(sceneCurrentName) && !_patternArpActive;
+
   while(arpNextBeat<lookAhead){
     const t=arpNextBeat;
+    const dest = dlyDestination || actx.destination;
 
-    // リズムパターン × densityMul（complex→短く / simple→長く）
+    // ── フレーズ文法パス ──
+    if(_usePhraseGrammar && arpSeq.length > 0){
+      const result = _phraseNext(arpSeq, baseSec, sc, densityMul);
+      if(result !== null){
+        const stepSec = Math.max(baseSec * 0.2, baseSec * result.stepRatio);
+        if(result.midi !== null){
+          _phraseState.notesSinceChord++;
+          _playSceneArpNote(actx, result.midi, t, dest);
+        }
+        arpNextBeat += stepSec;
+        continue;
+      }
+      // resultがnullの場合は既存パスへフォールスルー
+    }
+
+    // ── 既存パス（LOVE・PatternARP系・フォールバック）──
     let stepRatio = 1.0;
     if(rhythm && rhythm.length > 0){
       const rIdx = _arpRhythmStep % rhythm.length;
 
-      // PLAINのとき: 1周ごとにパターンを切替 + リズムに微妙なゆらぎ
-      if(sceneCurrentName === 'plain'){
+      if(sceneCurrentName === 'plain' && !_usePhraseGrammar){
+        // フレーズ文法無効時のみPLAINパターンサイクルを使う（フォールバック）
         if(rIdx === 0 || !_arpRhythmJitter || _arpRhythmJitter.length !== rhythm.length){
-          // 1周したらパターンを次のフェーズに進める
           if(_arpRhythmJitter !== null){
             _plainPatternCycleCount++;
             _plainPatternPhase = _plainPatternCycleCount % _PLAIN_PATTERN_CYCLE.length;
-            // パターンを切替（arpSeqを再生成）
             const nextPat = _PLAIN_PATTERN_CYCLE[_plainPatternPhase];
             const prevPat = arpPattern;
             arpPattern = nextPat;
             if(S && S.root) arpSeq = buildArpSeq(S.root, S.type);
             arpStep = 0;
-            arpPattern = prevPat; // UIのarpPatternは変えない
+            arpPattern = prevPat;
           }
-          // jitterを再生成（±15%のゆらぎ）
           _arpRhythmJitter = rhythm.map(v => {
             const jitter = 0.85 + Math.random() * 0.30;
             return Math.max(v * jitter, 0.25);
@@ -10475,12 +10861,8 @@ function scheduleArpNotes(){
     const stepSec = Math.max(baseSec * 0.25, baseSec * stepRatio);
 
     if(arpSeq.length > 0){
-      // 休符確率チェック
       const isRest = restProb > 0 && Math.random() < restProb;
-
       if(!isRest){
-        const dest = dlyDestination || actx.destination;
-
         const item = arpSeq[arpStep % arpSeq.length];
         if(Array.isArray(item)){
           item.forEach((midi, i) => {
@@ -10502,9 +10884,11 @@ function updateArpChord(root, type){
   arpSeq=buildArpSeq(root, type);
   arpStep=0;
   _arpLastMidi = null;
-  _arpRhythmJitter = null;  // jitterをリセット
-  _plainPatternPhase = 0;    // PLAINパターンフェーズをリセット
+  _arpRhythmJitter = null;
+  _plainPatternPhase = 0;
   _plainPatternCycleCount = 0;
+  // フレーズ文法状態をリセット（コードチェンジをまたいで一部の状態は保持）
+  _resetPhraseState();
   // リズムパターンはリセットしない（コードチェンジをまたいでリズムが継続）
 }
 
@@ -10636,18 +11020,17 @@ const SCENE_PRESETS = {
     cutoff:1100, res:0.5, envMod:0.40,
     attack:0.15, decay:0.7, sustain:0.50, release:3.0,
     vol:0.40, chorus:0.06, wet:0.48, strum:12,
-    trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0, filterDrift:0.28,
+    trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0, filterDrift:0.12,
     voicingFlavor:'plain',
-    // ARP: サティ的。芯を残しつつ余白がある
-    // triangle: sineより倍音があり存在感・でも重くない
-    // cutoffを上げて音が埋もれないようにする
-    // パターン: 長い間隔の中に短い連打を混ぜてアクセントを作る
-    arpOsc:'triangle', arpCutoff:1600, arpRes:0.4, arpEnvMod:0.22,
-    arpAttack:0.015, arpDecay:0.60, arpSustain:0.06,
-    arpGate:420, arpVol:0.18, arpWet:0.46, arpGhost:0.25,
-    // ぽつ…ぽつぽつ…ぽつ…という不規則な息遣い
-    // 長い間隔 + 突然の短い連打 + また沈黙
-    arpRhythm:[3.0, 0.5, 0.5, 2.5, 1.0, 4.0, 0.5, 1.5, 3.0, 1.0, 0.5, 2.0], arpRestProb:0.28,
+    // ARP: 水の粒感。短い動機 + 長い沈黙。一定のテンポ感はあるが機械的でない。
+    // triangle → sineに近づけてぼやけを減らす（sineよりわずかに芯がある）
+    // filterDriftを下げて輪郭を立てる
+    // envModを上げてアタックの粒感を明確にする
+    // フレーズ文法エンジンがリズムを担うためarpRhythmは参照されない
+    arpOsc:'triangle', arpCutoff:2200, arpRes:0.35, arpEnvMod:0.42,
+    arpAttack:0.008, arpDecay:0.45, arpSustain:0.04,
+    arpGate:280, arpVol:0.20, arpWet:0.44, arpGhost:0.22,
+    arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
