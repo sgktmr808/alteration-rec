@@ -10391,6 +10391,13 @@ function stopArpScheduler(){
 // ARPリズムステップカウンター
 let _arpRhythmStep = 0;
 let _arpLastMidi = null;
+// PLAINのリズムゆらぎ: 1周ごとに各ステップを±15%揺らす係数配列
+let _arpRhythmJitter = null;
+let _arpRhythmJitterLen = 0;
+// PLAINのパターンサイクル（outsidein→pendulum→cascade→bounce）
+const _PLAIN_PATTERN_CYCLE = ['outsidein', 'pendulum', 'cascade', 'bounce'];
+let _plainPatternPhase = 0;    // 現在のフェーズ（0〜3）
+let _plainPatternCycleCount = 0; // 何周したか
 // ── LOVE ARP用 PeriodicWave キャッシュ ──
 let _lovePeriodicWave = null;
 let _lovePeriodicWaveCtx = null;
@@ -10435,7 +10442,33 @@ function scheduleArpNotes(){
     // リズムパターン × densityMul（complex→短く / simple→長く）
     let stepRatio = 1.0;
     if(rhythm && rhythm.length > 0){
-      stepRatio = rhythm[_arpRhythmStep % rhythm.length] * densityMul;
+      const rIdx = _arpRhythmStep % rhythm.length;
+
+      // PLAINのとき: 1周ごとにパターンを切替 + リズムに微妙なゆらぎ
+      if(sceneCurrentName === 'plain'){
+        if(rIdx === 0 || !_arpRhythmJitter || _arpRhythmJitter.length !== rhythm.length){
+          // 1周したらパターンを次のフェーズに進める
+          if(_arpRhythmJitter !== null){
+            _plainPatternCycleCount++;
+            _plainPatternPhase = _plainPatternCycleCount % _PLAIN_PATTERN_CYCLE.length;
+            // パターンを切替（arpSeqを再生成）
+            const nextPat = _PLAIN_PATTERN_CYCLE[_plainPatternPhase];
+            const prevPat = arpPattern;
+            arpPattern = nextPat;
+            if(S && S.root) arpSeq = buildArpSeq(S.root, S.type);
+            arpStep = 0;
+            arpPattern = prevPat; // UIのarpPatternは変えない
+          }
+          // jitterを再生成（±15%のゆらぎ）
+          _arpRhythmJitter = rhythm.map(v => {
+            const jitter = 0.85 + Math.random() * 0.30;
+            return Math.max(v * jitter, 0.25);
+          });
+        }
+        stepRatio = _arpRhythmJitter[rIdx] * densityMul;
+      } else {
+        stepRatio = rhythm[rIdx] * densityMul;
+      }
       _arpRhythmStep++;
     }
     const stepSec = Math.max(baseSec * 0.25, baseSec * stepRatio);
@@ -10467,7 +10500,10 @@ function updateArpChord(root, type){
   if(!arpOn) return;
   arpSeq=buildArpSeq(root, type);
   arpStep=0;
-  _arpLastMidi = null; // shimmerモードのリセット
+  _arpLastMidi = null;
+  _arpRhythmJitter = null;  // jitterをリセット
+  _plainPatternPhase = 0;    // PLAINパターンフェーズをリセット
+  _plainPatternCycleCount = 0;
   // リズムパターンはリセットしない（コードチェンジをまたいでリズムが継続）
 }
 
