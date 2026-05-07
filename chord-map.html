@@ -10775,55 +10775,182 @@ function _getArpOut(actx){
 function _resetArpOut(){ _arpOut = null; _arpOutCtx = null; }
 
 // ── Scene別ボイシング取得 ──
-function buildSceneVoicing(root, type, flavor){
+// slComplex(-1〜+1): 音数・音域の密度（全Scene共通）
+// slWarm(-1〜+1):    Scene固有の密集度・重心
+// slStrange(-1〜+1): Scene固有のキャラクターを崩す方向
+function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
   if(!flavor) flavor = 'plain';
+  const _slC = (typeof slComplex === 'number') ? slComplex : 0;
+  const _slW = (typeof slWarm    === 'number') ? slWarm    : 0;
+  const _slS = (typeof slStrange === 'number') ? slStrange : 0;
+
   const ri = (typeof ni === 'function') ? ni(root) : 0;
   const ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
   const rootMidi = 48 + (ri % 12);
 
+  // 基本コードトーンを生成
   let notes = ivs.map(iv => {
     let m = rootMidi + (iv % 12);
     if(m < rootMidi) m += 12;
     return m;
   }).sort((a,b) => a-b);
 
-  if(flavor === 'rootless'){
-    // ルートを抜き3rd/7thを優先、中域中心
-    if(notes.length >= 3) notes = notes.slice(1); // ルート除去
-    notes = notes.map((n,i) => n + (i===0?12:0)); // 3rdを1oct上げて中域へ
-    // 9thを追加（ivs内で9=14のものを探す）
-    const has9 = ivs.some(iv => (iv%12)===2);
-    if(!has9 && notes.length <= 4){
-      notes.push(rootMidi + 14); // 9th追加
+  // ── complex共通処理: 音数・音域の変化 ──
+  // complex+: テンション音追加・上に広げる / complex-: 音数削減・中域に絞る
+  function _applyComplex(arr){
+    let result = [...arr];
+    if(_slC > 0.3){
+      // 9thを追加（なければ）
+      const has9 = ivs.some(iv => (iv%12)===2);
+      if(!has9) result.push(rootMidi + 14);
+      // complex強め: 11thも追加
+      if(_slC > 0.7) result.push(rootMidi + 17);
+      // 最高音を1oct上に押し上げる
+      result = result.sort((a,b)=>a-b);
+      result[result.length-1] += 12;
+    } else if(_slC < -0.3){
+      // 音数削減（最大3音に絞る）
+      result = result.slice(0, Math.max(2, Math.round(3 + _slC * 1.5)));
     }
+    return [...new Set(result)].sort((a,b)=>a-b).slice(0,6);
+  }
+
+  if(flavor === 'rootless'){
+    // ── VELVET ROOTLESS ──
+    // ベース: ルートを抜き3rd/7th優先・中域中心
+    if(notes.length >= 3) notes = notes.slice(1);
+    notes = notes.map((n,i) => n + (i===0?12:0));
+    const has9v = ivs.some(iv => (iv%12)===2);
+    if(!has9v && notes.length <= 4) notes.push(rootMidi + 14);
+    notes = notes.sort((a,b)=>a-b).slice(0,5);
+
+    // warm: +→内声を中域に集める / -→上下に広げる
+    if(_slW > 0.3){
+      // 上下の音を中域に寄せる（最低音+12、最高音-12）
+      if(notes[0] < rootMidi - 2) notes[0] += 12;
+    } else if(_slW < -0.3){
+      // 上下に広げる
+      notes[notes.length-1] += 12;
+      if(notes.length >= 2) notes[0] -= 12;
+    }
+
+    // strange: +→13th・#11追加（ジャズ的緊張） / -→ルートを戻す（安定）
+    if(_slS > 0.4){
+      notes.push(rootMidi + 21); // 13th
+      if(_slS > 0.7) notes.push(rootMidi + 18); // #11
+    } else if(_slS < -0.4){
+      // ルートを先頭に戻す
+      notes.unshift(rootMidi);
+    }
+
+    notes = _applyComplex(notes);
     return notes.sort((a,b)=>a-b).slice(0,5);
   }
 
   if(flavor === 'glass'){
-    // 音数少なめ、高域の透明な上声、sus2風
-    const glassNotes = [notes[0]]; // root
-    if(notes.length >= 3) glassNotes.push(notes[1]); // 3rd
-    if(notes.length >= 3) glassNotes.push(notes[notes.length-1] + 12); // 5th or 7th 1oct上
-    glassNotes.push(rootMidi + 14); // 9th（透明感）
-    return glassNotes.sort((a,b)=>a-b).slice(0,4);
+    // ── GLASS PIANO ──
+    // ベース: 音数少なめ・9th必須・最高音1oct上
+    let glassNotes = [notes[0]];
+    if(notes.length >= 3) glassNotes.push(notes[1]);
+    if(notes.length >= 3) glassNotes.push(notes[notes.length-1] + 12);
+    glassNotes.push(rootMidi + 14);
+    glassNotes = glassNotes.sort((a,b)=>a-b).slice(0,4);
+
+    // warm: +→音を上方向に押し上げる / -→音数を減らして孤立させる
+    if(_slW > 0.3){
+      glassNotes = glassNotes.map(n => n + 12); // 全体を1oct上に
+    } else if(_slW < -0.3){
+      // 音数を2〜3に絞って孤立させる
+      glassNotes = glassNotes.slice(0, Math.max(2, Math.round(3 + _slW)));
+    }
+
+    // strange: +→sus2・#11優先（無重力） / -→5thを省いた孤立した2音
+    if(_slS > 0.4){
+      // sus2風: 9thを前面に・#11追加
+      glassNotes = [rootMidi, rootMidi + 14, rootMidi + 18]; // root・9th・#11
+    } else if(_slS < -0.4){
+      // 最小化: root + 最高音のみ
+      glassNotes = [glassNotes[0], glassNotes[glassNotes.length-1] + 12];
+    }
+
+    glassNotes = _applyComplex(glassNotes);
+    return [...new Set(glassNotes)].sort((a,b)=>a-b).slice(0,4);
   }
 
   if(flavor === 'garage'){
-    // 暖かい中域、3rd/7thを強調、閉じたvoicing
+    // ── LOVE STAB: 変化なし・固定 ──
     return notes.slice(0, Math.min(4, notes.length));
   }
 
   if(flavor === 'detroit'){
-    // 広いvoicing、5th/9thで広げる
-    const det = [notes[0]-12, ...notes]; // ルートを1oct下にも
-    if(det.length <= 4) det.push(rootMidi + 14); // 9th
-    return det.sort((a,b)=>a-b).slice(0,5);
+    // ── PLUCK / STRINGS (detroit) ──
+    let det = [notes[0]-12, ...notes];
+    if(det.length <= 4) det.push(rootMidi + 14);
+    det = det.sort((a,b)=>a-b).slice(0,5);
+
+    if(flavor === 'detroit'){
+      // warm: PLUCK +→sub強調（1oct下を強化）/ -→上声だけ残す
+      // STRINGS +→厚みを増す（detune系はJS外で処理）/ -→骨格のみ
+      if(_slW > 0.3){
+        // sub強調: ルートをさらに1oct下にも
+        det.unshift(notes[0] - 24);
+      } else if(_slW < -0.3){
+        // 上声だけ: sub（一番低い音）を除去
+        det = det.slice(1);
+      }
+
+      // strange（PLUCK）: +→音域を下に広げる / -→power chord的に絞る
+      // strange（STRINGS）: +→上声を広げる / -→5th中心の骨格
+      if(sceneCurrentName === 'pluck'){
+        if(_slS > 0.4){
+          det.unshift(notes[0] - 24); // さらに低く
+        } else if(_slS < -0.4){
+          // power chord: root + 5thのみ
+          const fifth = rootMidi + 7;
+          det = [rootMidi - 12, rootMidi, fifth];
+        }
+      } else if(sceneCurrentName === 'strings'){
+        if(_slS > 0.4){
+          // 上声を広げる（最高音を1oct上）
+          det[det.length-1] += 12;
+          det.push(rootMidi + 14); // 9thで広がり
+        } else if(_slS < -0.4){
+          // 骨格のみ: root + 5th
+          const fifth = rootMidi + 7;
+          det = [rootMidi - 12, rootMidi, fifth];
+        }
+      }
+    }
+
+    det = _applyComplex(det);
+    return [...new Set(det)].sort((a,b)=>a-b).slice(0,5);
   }
 
-  // plain / default: open voicing
-  const open = [notes[0]-12, ...notes.slice(1)];
+  // ── PLAIN (open voicing) ──
+  let open = [notes[0]-12, ...notes.slice(1)];
   if(open.length >= 2) open[open.length-1] += 12;
-  return open.sort((a,b)=>a-b).slice(0,5);
+  open = open.sort((a,b)=>a-b).slice(0,5);
+
+  // warm: +→close voicing（音が寄り添う） / -→open voicing（さらに離れる）
+  if(_slW > 0.3){
+    // close: 1oct下を除去して中域に集める
+    open = open.filter(n => n >= rootMidi - 6);
+  } else if(_slW < -0.3){
+    // さらにopen: 最高音をさらに1oct上
+    if(open.length >= 1) open[open.length-1] += 12;
+  }
+
+  // strange: +→9th・add2追加（淡く曖昧に） / -→3音トライアドに絞る
+  if(_slS > 0.4){
+    open.push(rootMidi + 14); // 9th
+    if(_slS > 0.7) open.push(rootMidi + 2); // add2
+  } else if(_slS < -0.4){
+    // 3音に絞る（ルート・3rd・5th）
+    open = open.slice(0, 3);
+  }
+
+  open = _applyComplex(open);
+  return [...new Set(open)].sort((a,b)=>a-b).slice(0,5);
 }
 
 // ── 1音のCHORDボイスを発音（Felt Attack / Stereo Width 対応）──
@@ -11076,7 +11203,7 @@ function playSceneChord(actx, root, type){
 
   // ── 共通ノード保持リリース ──
   // 次コードのmidi一覧を先に取得して照合する
-  const _nextMidis = buildSceneVoicing(root, type, sc.voicingFlavor);
+  const _nextMidis = buildSceneVoicing(root, type, sc.voicingFlavor, sv('complex'), sv('warm'), sv('strange'));
   const _nextMidiSet = new Set(_nextMidis);
   const trailSec = sc.trailSec;
 
@@ -11211,7 +11338,7 @@ function playSceneChord(actx, root, type){
         vol:      _pBase.vol * 0.7,
       });
       const pOut = (typeof getOut === 'function') ? getOut(a3, pSc.wet) : a3.destination;
-      const pMidis = buildSceneVoicing(S.root, S.type, pSc.voicingFlavor);
+      const pMidis = buildSceneVoicing(S.root, S.type, pSc.voicingFlavor, sv('complex'), sv('warm'), sv('strange'));
       const pBase = Math.max(a3.currentTime, 0.1) + 0.05;
       pMidis.forEach((midi, i) => {
         const hz = midi2hz(Math.max(24, Math.min(108, midi)));
