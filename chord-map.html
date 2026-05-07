@@ -10130,7 +10130,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const vol    = (sc.arpVol    || 0.26) * _velHumanize;
   const atk    = sc.arpAttack || 0.006;
   const decay  = sc.arpDecay  || 0.22;
-  const envMod = sc.arpEnvMod || 0.5;
+  const envMod = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.5);
   const oscType = sc.arpOsc   || 'sawtooth';
   // SLスライダー反映（nullなら各Sceneのデフォルト値を使用）
   const res    = _slArpRes    !== null ? _slArpRes    : (sc.arpRes    || 1.2);
@@ -10199,7 +10199,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   sub.type = 'sine';
   sub.frequency.value = hz * 0.5;
   const subG = actx.createGain();
-  subG.gain.value = (sceneCurrentName === 'pluck') ? 0.35 : 0.15;
+  subG.gain.value = _slArpSubGain !== null ? _slArpSubGain
+    : (sceneCurrentName === 'pluck') ? 0.35 : 0.15;
 
   // ── ピッチLFO: 微細なゆらぎで生気を出す ──
   const lfoDepth = hz * 0.0015; // 約0.15%のピッチ揺れ
@@ -10963,7 +10964,7 @@ function _killReleasingVoices(actx){
 function playSceneChord(actx, root, type){
   const _sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
 
-  // ── SLスライダー → CHORDパラメーター反映 ──
+  // ── SLスライダー → CHORDパラメーター反映（Scene固有） ──
   const bright  = sv('bright');
   const tense   = sv('tense');
   const warm    = sv('warm');
@@ -10971,15 +10972,92 @@ function playSceneChord(actx, root, type){
   const moving  = sv('moving');
   const strange = sv('strange');
 
-  const chordCutoff    = Math.max(200, _sc.cutoff * (1.0 + bright * 0.7));
-  const chordRes       = Math.max(0.3, _sc.res * (1.0 + tense * 0.6));
-  const chordDetune    = _sc.detune + warm * 8;
-  const chordStrum     = Math.max(4, _sc.strum * (1.0 + complex * 1.2));
-  const chordStrumFinal= Math.max(4, chordStrum * (1.0 - moving * 0.5));
-  const chordWet       = Math.max(0, Math.min(1, _sc.wet + strange * 0.3));
-  const chordDrift     = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.1) + strange * 0.25));
-  const chordWidth     = Math.max(0.1, Math.min(1.0, (_sc.width || 0.55) + complex * 0.3));
-  const chordTrail     = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.8));
+  // complex: 全Scene共通（strum広がり・width）
+  const chordStrum  = Math.max(4, _sc.strum * (1.0 + complex * 1.2));
+  const chordWidth  = Math.max(0.1, Math.min(1.0, (_sc.width || 0.55) + complex * 0.3));
+
+  // Scene固有パラメーター計算
+  let chordCutoff, chordRes, chordDetune, chordWet, chordDrift, chordTrail, chordChorus;
+  chordChorus = _sc.chorus; // デフォルトはSceneの値をそのまま使う
+
+  switch(sceneCurrentName){
+    case 'plain':
+      // bright: 狭い範囲のcutoff変化（部屋が少し明るくなる感）
+      chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.45));
+      chordRes    = Math.max(0.2, _sc.res * (1.0 + tense * 0.5));
+      chordDetune = _sc.detune + warm * 6;
+      chordWet    = Math.max(0, Math.min(1, _sc.wet + strange * 0.2));
+      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.1) + strange * 0.20));
+      chordTrail  = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.7));
+      break;
+    case 'velvet':
+      // bright: cutoff + res同時上昇（テンション音が浮かぶ）
+      chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.60));
+      chordRes    = Math.max(0.3, _sc.res * (1.0 + bright * 0.3 + tense * 0.55));
+      // warm: detune増加 + chorus増加（音が溶け合う）
+      chordDetune = _sc.detune + warm * 10;
+      chordChorus = Math.max(0, Math.min(0.5, _sc.chorus + warm * 0.12));
+      chordWet    = Math.max(0, Math.min(1, _sc.wet + strange * 0.25));
+      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.1) + strange * 0.22));
+      chordTrail  = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.75));
+      break;
+    case 'glass':
+      // bright: 大幅cutoff上昇（光が散る）
+      chordCutoff = Math.max(500, _sc.cutoff * (1.0 + bright * 0.85));
+      chordRes    = Math.max(0.5, _sc.res * (1.0 + tense * 0.6));
+      chordDetune = _sc.detune + warm * 3; // GLASSはdetune変化を小さく
+      chordWet    = Math.max(0, Math.min(1, _sc.wet + strange * 0.30));
+      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.05) + strange * 0.18));
+      chordTrail  = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.6));
+      break;
+    case 'love':
+      // LOVEはCHORDパラメーター固定。変化は最小限
+      chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.3));
+      chordRes    = Math.max(0.3, _sc.res * (1.0 + tense * 0.3));
+      chordDetune = _sc.detune + warm * 2;
+      chordWet    = _sc.wet;
+      chordDrift  = _sc.filterDrift || 0.05;
+      chordTrail  = Math.max(0.5, _sc.trailSec - moving * 0.3);
+      break;
+    case 'pluck':
+      // bright: cutoff大幅上昇（フィルターが鋭く開く）
+      chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.90));
+      chordRes    = Math.max(0.5, _sc.res * (1.0 + tense * 0.65));
+      chordDetune = _sc.detune + warm * 8;
+      chordWet    = Math.max(0, Math.min(1, _sc.wet + strange * 0.25));
+      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.05) + strange * 0.20));
+      chordTrail  = Math.max(0.1, Math.min(3.0, (_sc.trailSec || 0.7) - moving * 0.4));
+      break;
+    case 'strings':
+      // bright: ストリングスが開く感覚
+      chordCutoff = Math.max(300, _sc.cutoff * (1.0 + bright * 0.65));
+      chordRes    = Math.max(0.2, _sc.res * (1.0 + tense * 0.5));
+      // warm: detune + chorus増加（厚みが増す）
+      chordDetune = _sc.detune + warm * 12;
+      chordChorus = Math.max(0, Math.min(0.6, _sc.chorus + warm * 0.18));
+      chordWet    = Math.max(0, Math.min(1, _sc.wet + strange * 0.28));
+      // strange+: width拡大（アンセム的）
+      const stringsWidth = Math.max(0.1, Math.min(1.0, chordWidth + strange * 0.25));
+      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.1) + strange * 0.22));
+      chordTrail  = Math.max(0.3, Math.min(5.0, (_sc.trailSec || 0.8) - moving * 0.6));
+      // widthをstrings固有で上書き
+      Object.defineProperty && (chordWidth !== stringsWidth) && (() => {})();
+      // stringsWidthを後でscに反映するためここで変数を再定義
+      var _stringsWidthOverride = stringsWidth;
+      break;
+    default:
+      chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.7));
+      chordRes    = Math.max(0.3, _sc.res * (1.0 + tense * 0.6));
+      chordDetune = _sc.detune + warm * 8;
+      chordWet    = Math.max(0, Math.min(1, _sc.wet + strange * 0.3));
+      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.1) + strange * 0.25));
+      chordTrail  = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.8));
+      break;
+  }
+
+  const chordStrumFinal = Math.max(4, chordStrum * (1.0 - moving * 0.5));
+  const finalWidth = (sceneCurrentName === 'strings' && typeof _stringsWidthOverride !== 'undefined')
+    ? _stringsWidthOverride : chordWidth;
 
   let sc = Object.assign({}, _sc, {
     cutoff:      chordCutoff,
@@ -10988,8 +11066,9 @@ function playSceneChord(actx, root, type){
     strum:       chordStrumFinal,
     wet:         chordWet,
     filterDrift: chordDrift,
-    width:       chordWidth,
+    width:       finalWidth,
     trailSec:    chordTrail,
+    chorus:      chordChorus,
   });
 
   // 前回リリース中のボイスを即座に消音（濁り防止）
@@ -11183,16 +11262,17 @@ function playScene(root, type){
 
 // ── SLスライダー → ARP/CHORDリアルタイム反映 ──
 // 各スライダー値（-1〜+1）をSCENE_PRESETSのベース値に重ねて適用する
+// Scene別固有パラメーター変化 + complexのみ全Scene共通
 function applySLToArp(){
   const sc = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
 
-  // スライダーが全て中立（0）のときはnullを維持してSceneのデフォルト値を使う
   const bright  = sv('bright');
   const tense   = sv('tense');
   const warm    = sv('warm');
   const complex = sv('complex');
   const moving  = sv('moving');
   const strange = sv('strange');
+
   const allNeutral = Math.abs(bright) < 0.05 && Math.abs(tense) < 0.05 &&
     Math.abs(warm) < 0.05 && Math.abs(complex) < 0.05 &&
     Math.abs(moving) < 0.05 && Math.abs(strange) < 0.05;
@@ -11200,60 +11280,176 @@ function applySLToArp(){
     _slArpCutoff = null; _slArpRes = null; _slArpRestProb = null;
     _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
     _slArpOctRange = null; _slArpPattern = null;
+    _slArpEnvMod = null; _slArpSubGain = null;
     return;
   }
 
-  // ── bright: ARP cutoffを上下 ──
-  // Bright→高域明るく / Dark→暗く閉じる
-  const cutoffMul = 1.0 + bright * 0.7; // 0.3〜1.7倍
-  _slArpCutoff = Math.max(200, (sc.arpCutoff || 1200) * cutoffMul);
+  // ── complex: 全Scene共通 — octaveRange + リズム密度 ──
+  _slArpOctRange = Math.max(1, Math.min(3,
+    (sc.arpOctRange || 1) + complex * 1.5
+  ));
+  _slRhythmDensity = 1.0 - complex * 0.4; // 0.6〜1.4倍のstep長さ
 
-  // ── tense: resonance + 休符確率（緊張→密に鳴る）──
-  const resMul = 1.0 + tense * 0.6; // 0.4〜1.6倍
-  _slArpRes = Math.max(0.3, (sc.arpRes || 1.2) * resMul);
-  _slArpRestProb = Math.max(0, (sc.arpRestProb || 0.1) - tense * 0.15);
-
-  // ── warm: OSC2のmix比率（暖→triangle多め / 冷→sawtooth寄り）──
-  // 実装: osc2gのgain値を動的に変える（0.4〜0.9）
-  _slOsc2Mix = 0.65 + warm * 0.25; // 0.4〜0.9
-
-  // ── complex: octaveRange + リズム密度 ──
-  // Complex→音域広く/リズム細かく / Simple→音域狭く/ゆったり
-  _slArpOctRange = Math.max(1, Math.min(3, Math.round(
-    (sc.arpOctRange || 1) + complex * 1.2
-  )));
-  // リズムの基本stepを短縮（complex→16分寄り）
-  _slRhythmDensity = 1.0 - complex * 0.35; // 0.65〜1.35倍のstep長さ
-
-  // ── moving: arpGate長さ（Moving→短く歯切れよく / Static→長く残響）──
-  const gateMul = 1.0 - moving * 0.4; // 0.6〜1.4倍
-  _slArpGate = Math.max(60, (sc.arpGate || 280) * gateMul);
-
-  // ── strange: arpPatternを自動切替 ──
-  // Familiar(-1)→up / 中立(0)→Scene設定維持 / Strange(+1)→random/insideout
-  if(Math.abs(strange) > 0.3){
-    if(strange > 0.6){
-      _slArpPattern = 'insideout';
-    } else if(strange > 0.3){
-      _slArpPattern = 'random';
-    } else if(strange < -0.6){
-      _slArpPattern = 'up';
-    } else if(strange < -0.3){
-      _slArpPattern = 'updown';
-    } else {
-      _slArpPattern = null; // Scene設定維持
-    }
-  } else {
-    _slArpPattern = null;
+  // ── LOVEは専用実装に任せる ──
+  if(sceneCurrentName === 'love'){
+    _slArpCutoff = Math.max(200, (sc.arpCutoff || 1200) * (1.0 + bright * 0.7));
+    _slArpRes    = Math.max(0.3, (sc.arpRes || 0.25) * (1.0 + tense * 0.4));
+    _slArpRestProb = Math.max(0, Math.min(0.6, (sc.arpRestProb || 0.22) - tense * 0.15));
+    _slArpGate   = Math.max(60, (sc.arpGate || 480) * (1.0 - moving * 0.4));
+    _slArpEnvMod = null; _slArpSubGain = null; _slArpPattern = null;
+    _rebuildArpIfNeeded();
+    return;
   }
 
-  // ARPシーケンスを再構築（パターン変更の場合）
+  // ── Scene固有処理 ──
+  switch(sceneCurrentName){
+    case 'plain':   _applySL_plain(sc, bright, tense, warm, moving, strange);   break;
+    case 'velvet':  _applySL_velvet(sc, bright, tense, warm, moving, strange);  break;
+    case 'glass':   _applySL_glass(sc, bright, tense, warm, moving, strange);   break;
+    case 'pluck':   _applySL_pluck(sc, bright, tense, warm, moving, strange);   break;
+    case 'strings': _applySL_strings(sc, bright, tense, warm, moving, strange); break;
+    default:        _applySL_default(sc, bright, tense, warm, moving, strange); break;
+  }
+
+  _rebuildArpIfNeeded();
+}
+
+// ARPシーケンス再構築（パターン変更時）
+function _rebuildArpIfNeeded(){
   if(arpOn && S && S.root){
     const prevPat = arpPattern;
     if(_slArpPattern) arpPattern = _slArpPattern;
     arpSeq = buildArpSeq(S.root, S.type);
-    arpPattern = prevPat; // arpPattern変数自体は変えない（UIとの整合性）
+    arpPattern = prevPat;
   }
+}
+
+// ── PLAIN: サティ的・余白・水の粒感 ──
+// bright: cutoff上昇（狭い範囲・上げすぎない）
+// tense:  restProb増減（Calm=音減る / Tense=粒が締まる）+ envMod強化
+// warm:   attack丸め + decay伸ばし（溶けていく感）
+// moving: gate短縮（粒感） / 延長（余韻）
+// strange: リズムシャッフルの深さ
+function _applySL_plain(sc, bright, tense, warm, moving, strange){
+  _slArpCutoff = Math.max(300, (sc.arpCutoff || 1600) * (1.0 + bright * 0.5));
+  // tense+: restProb減少(粒増)・envMod増(締まる) / tense-: restProb増加(音減る)
+  _slArpRes = Math.max(0.2, (sc.arpRes || 0.4) * (1.0 + tense * 0.5));
+  _slArpRestProb = Math.max(0, Math.min(0.7, (sc.arpRestProb || 0.28) - tense * 0.25));
+  _slArpEnvMod = Math.max(0.05, (sc.arpEnvMod || 0.22) * (1.0 + tense * 0.6));
+  // warm: osc2mix + gate延長（溶ける感）
+  _slOsc2Mix = 0.55 + warm * 0.35; // 0.20〜0.90
+  _slArpGate = Math.max(80, (sc.arpGate || 420) * (1.0 + warm * 0.3) * (1.0 - moving * 0.45));
+  _slArpSubGain = null;
+  // strange: パターンを連続的に変化（Familiar=outsidein / Strange=shimmer/pendulum）
+  if(strange > 0.6)       _slArpPattern = 'shimmer';
+  else if(strange > 0.25) _slArpPattern = 'pendulum';
+  else if(strange < -0.6) _slArpPattern = 'up';
+  else if(strange < -0.25)_slArpPattern = 'outsidein';
+  else                    _slArpPattern = null;
+}
+
+// ── VELVET: エヴァンス的・内声・付点リズム ──
+// bright: cutoff + res同時上昇（テンション音が浮かぶ）
+// tense:  restProb + 音域の上下（Tense=上寄り）
+// warm:   gate延長・decay伸ばし（音が溶け合う）+ chorus的なosc2mix
+// moving: gate短縮（スタッカート的）
+// strange: 外声への飛躍パターン
+function _applySL_velvet(sc, bright, tense, warm, moving, strange){
+  const brightMul = 1.0 + bright * 0.65;
+  _slArpCutoff = Math.max(300, (sc.arpCutoff || 1100) * brightMul);
+  _slArpRes    = Math.max(0.3, (sc.arpRes || 0.55) * (1.0 + bright * 0.4 + tense * 0.5));
+  _slArpRestProb = Math.max(0, Math.min(0.65, (sc.arpRestProb || 0.20) - tense * 0.22));
+  _slArpEnvMod = Math.max(0.1, (sc.arpEnvMod || 0.35) * (1.0 + tense * 0.4));
+  // warm: osc2mix増加（音が溶け合う）+ gate延長
+  _slOsc2Mix = 0.50 + warm * 0.40; // 0.10〜0.90
+  _slArpGate = Math.max(80, (sc.arpGate || 420) * (1.0 + warm * 0.35) * (1.0 - moving * 0.50));
+  _slArpSubGain = null;
+  // strange: 飛躍パターン（Familiar=thumbup内声的 / Strange=insideout外声）
+  if(strange > 0.6)       _slArpPattern = 'insideout';
+  else if(strange > 0.25) _slArpPattern = 'updown';
+  else if(strange < -0.6) _slArpPattern = 'thumbup';
+  else if(strange < -0.25)_slArpPattern = 'up';
+  else                    _slArpPattern = null;
+}
+
+// ── GLASS: 坂本的・透明・硬質・点滅 ──
+// bright: cutoff大幅上昇（光が散る）
+// tense:  restProb大幅増減（Tense=密・緊張 / Calm=疎・孤独）
+// warm:   ghost gain増減 + gate延長（残像）
+// moving: リズム間隔（Moving=連続した光 / Static=孤独な点）
+// strange: random pattern確率
+function _applySL_glass(sc, bright, tense, warm, moving, strange){
+  _slArpCutoff = Math.max(500, (sc.arpCutoff || 3800) * (1.0 + bright * 0.8));
+  _slArpRes    = Math.max(0.5, (sc.arpRes || 1.6) * (1.0 + tense * 0.55));
+  // tense+: restProb大幅減少（密） / tense-: 大幅増加（孤独な光）
+  _slArpRestProb = Math.max(0, Math.min(0.80, (sc.arpRestProb || 0.38) - tense * 0.35));
+  _slArpEnvMod = Math.max(0.2, (sc.arpEnvMod || 0.65) * (1.0 + tense * 0.3));
+  // warm: ghost感（osc2mix）+ gate（残像が増える）
+  _slOsc2Mix = 0.30 + warm * 0.50; // 負=0.30 / 正=0.80
+  _slArpGate = Math.max(40, (sc.arpGate || 95) * (1.0 + warm * 0.5) * (1.0 - moving * 0.35));
+  _slArpSubGain = null;
+  // strange: 完全ランダム方向（Familiar=skip1up几何学的 / Strange=shimmer流動的）
+  if(strange > 0.6)       _slArpPattern = 'shimmer';
+  else if(strange > 0.25) _slArpPattern = 'random';
+  else if(strange < -0.6) _slArpPattern = 'skip1up';
+  else if(strange < -0.25)_slArpPattern = 'up';
+  else                    _slArpPattern = null;
+}
+
+// ── PLUCK: Ame的・催眠・金属・Euclidean ──
+// bright: cutoff上昇 + envMod強化（フィルターが鋭く開く）
+// tense:  res大幅増減 + restProb（Tense=密な反復 / Calm=間引かれた催眠）
+// warm:   sub osc gain増加（低域の重さ）
+// moving: gate短縮（パーカッシブ）
+// strange: Euclidean変形パターン
+function _applySL_pluck(sc, bright, tense, warm, moving, strange){
+  _slArpCutoff = Math.max(200, (sc.arpCutoff || 950) * (1.0 + bright * 0.9));
+  _slArpRes    = Math.max(0.5, (sc.arpRes || 2.2) * (1.0 + tense * 0.7));
+  _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.06) - tense * 0.20));
+  _slArpEnvMod = Math.max(0.3, (sc.arpEnvMod || 0.92) * (1.0 + bright * 0.3));
+  _slOsc2Mix = 0.60 + warm * 0.30; // osc2（同音デチューン）の混ぜ具合
+  _slArpSubGain = 0.15 + warm * 0.25; // sub osc: 0.15(cold)〜0.40(warm)
+  _slArpGate = Math.max(60, (sc.arpGate || 320) * (1.0 - moving * 0.50));
+  // strange: bounce/thumbdn系（Familiar=下方向重視 / Strange=spiral/skip系）
+  if(strange > 0.6)       _slArpPattern = 'spiral';
+  else if(strange > 0.25) _slArpPattern = 'skip1up';
+  else if(strange < -0.6) _slArpPattern = 'thumbdn';
+  else if(strange < -0.25)_slArpPattern = 'down';
+  else                    _slArpPattern = null;
+}
+
+// ── STRINGS: Detroit的・広い・アンセム・大きな呼吸 ──
+// bright: cutoff上昇（ストリングスが開く）
+// tense:  restProb減少 + gate延長（推進力増加）/ Calm=間引いて広大感
+// warm:   osc2mix + chorus増加（厚みが増す）
+// moving: gate短縮（Detroit的刻み）
+// strange: 上声への飛躍・アンセム的広がり
+function _applySL_strings(sc, bright, tense, warm, moving, strange){
+  _slArpCutoff = Math.max(300, (sc.arpCutoff || 1500) * (1.0 + bright * 0.65));
+  _slArpRes    = Math.max(0.2, (sc.arpRes || 0.45) * (1.0 + tense * 0.5));
+  // tense+: restProb減少・gate延長（推進力） / tense-: restProb増加（間引き）
+  _slArpRestProb = Math.max(0, Math.min(0.55, (sc.arpRestProb || 0.05) - tense * 0.25));
+  _slArpEnvMod = Math.max(0.1, (sc.arpEnvMod || 0.28) * (1.0 + tense * 0.4));
+  // warm: osc2mix増加（厚み）+ gate延長
+  _slOsc2Mix = 0.55 + warm * 0.35; // 0.20〜0.90
+  _slArpSubGain = null;
+  _slArpGate = Math.max(100, (sc.arpGate || 440) * (1.0 + warm * 0.3) * (1.0 - moving * 0.45));
+  // strange: アンセム的飛躍（Familiar=thumbup安定 / Strange=up2高音域へ）
+  if(strange > 0.6)       _slArpPattern = 'up2';
+  else if(strange > 0.25) _slArpPattern = 'updown';
+  else if(strange < -0.6) _slArpPattern = 'thumbup';
+  else if(strange < -0.25)_slArpPattern = 'down';
+  else                    _slArpPattern = null;
+}
+
+// ── デフォルト（フォールバック）──
+function _applySL_default(sc, bright, tense, warm, moving, strange){
+  _slArpCutoff = Math.max(200, (sc.arpCutoff || 1200) * (1.0 + bright * 0.7));
+  _slArpRes    = Math.max(0.3, (sc.arpRes || 1.2) * (1.0 + tense * 0.6));
+  _slArpRestProb = Math.max(0, Math.min(0.6, (sc.arpRestProb || 0.1) - tense * 0.15));
+  _slOsc2Mix = 0.65 + warm * 0.25;
+  _slArpGate = Math.max(60, (sc.arpGate || 280) * (1.0 - moving * 0.4));
+  _slArpEnvMod = null; _slArpSubGain = null; _slArpPattern = null;
 }
 
 // SLスライダー → ARP動的パラメーター（applySLToArp()が更新）
@@ -11265,6 +11461,8 @@ let _slArpOctRange = null;
 let _slRhythmDensity = null;
 let _slArpGate     = null;
 let _slArpPattern  = null;
+let _slArpEnvMod   = null; // Scene固有: envMod上書き
+let _slArpSubGain  = null; // Scene固有: sub osc gainの上書き（pluck/warm連動）
 
 // ── Pattern Grammar 切替（HOLD / STAB / BROKEN / PULSE / TRAIL / PLUCK ARP / FLOAT ARP / INNER LINE） ──
 
@@ -11382,6 +11580,8 @@ function applyScene(name){
   _slArpGate = null;
   _slRhythmDensity = null;
   _slArpPattern = null;
+  _slArpEnvMod = null;
+  _slArpSubGain = null;
   // UI更新
   document.querySelectorAll('.scene-pill').forEach(el =>
     el.classList.toggle('on', el.dataset.scene === name)
