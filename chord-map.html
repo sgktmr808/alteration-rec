@@ -1424,9 +1424,12 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                 <div class="synth-row">
                   <span class="synth-lbl">TIME</span>
                   <div class="synth-pills" id="dly-time-pills">
+                    <div class="synth-pill arp" data-t="1/16">1/16</div>
+                    <div class="synth-pill arp" data-t="1/16D">1/16D</div>
                     <div class="synth-pill arp" data-t="1/8">1/8</div>
-                    <div class="synth-pill arp on" data-t="1/4">1/4</div>
-                    <div class="synth-pill arp" data-t="1/2">1/2</div>
+                    <div class="synth-pill arp on" data-t="1/8D">1/8D</div>
+                    <div class="synth-pill arp" data-t="1/4">1/4</div>
+                    <div class="synth-pill arp" data-t="1/4D">1/4D</div>
                     <div class="synth-pill arp" data-t="ping">PING</div>
                     <div class="synth-pill arp" data-t="off">OFF</div>
                   </div>
@@ -9914,7 +9917,7 @@ function calcDelayTimeSec(){
   if(dlyTime==='off') return 0;
   if(dlyTime==='free') return dlyFreeMs/1000;
   const beat=60/autoBpm;
-  const map={'1/4':beat,'1/8':beat/2,'1/8D':beat*0.75,'1/16':beat/4,'1/16D':beat*0.375,'ping':beat/2};
+  const map={'1/4':beat,'1/4D':beat*1.5,'1/8':beat/2,'1/8D':beat*0.75,'1/16':beat/4,'1/16D':beat*0.375,'ping':beat/2};
   return map[dlyTime]??(beat/2);
 }
 
@@ -10587,7 +10590,7 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul){
     const loveDryG = actx.createGain(); loveDryG.gain.value = 0.85;
     const loveRvbG = actx.createGain(); loveRvbG.gain.value = 0.50;
     hiShelf.connect(loveDryG);
-    loveDryG.connect(dlyTarget);  // 直接出力（音量を確保）
+    loveDryG.connect(actx.destination);  // 直接出力（共有ディレイをバイパス）
     hiShelf.connect(loveRvbG);
     loveRvbG.connect(rvbTarget);  // reverb送り
     loveDlyG.connect(rvbTarget);  // ディレイ → reverb
