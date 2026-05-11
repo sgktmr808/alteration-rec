@@ -2451,7 +2451,7 @@ let MAP_MODE='radial';
 
 // ── AUTO PLAY ──
 let autoPlay=false;
-let autoBpm=72;
+let autoBpm=100;
 let autoTimer=null;
 
 // ── F4: GROOVE ENGINE ──
@@ -4353,10 +4353,42 @@ function midi2hz(m){return 440*Math.pow(2,(m-69)/12);}
 function getScaleNotes(root,type,octBase=5){
   const ri=ni(root);
   const chordIvs=CT[type]?.iv??[0,4,7];
-  // スケール：コードトーン優先、残りはメジャー/マイナースケールで補完
-  const isMin=type.startsWith('m')&&!['maj7','maj9','mmaj7'].includes(type);
-  const scaleIvs=isMin?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+
+  // コードタイプに応じたスケールを選択（二択では不十分なため細分化）
+  // 各スケールはコードトーンと矛盾しない音だけを使う
+  let scaleIvs;
+  if(['m','minor','m7','m9','m6','m11'].includes(type)){
+    // 自然短音階（ナチュラルマイナー）
+    scaleIvs=[0,2,3,5,7,8,10];
+  } else if(['mmaj7','mMaj7'].includes(type)){
+    // 和声的短音階（メロディックマイナー）: b3+長7度
+    scaleIvs=[0,2,3,5,7,8,11];
+  } else if(['m7b5','ø'].includes(type)){
+    // ロクリアン: b2,b3,b5,b6,b7
+    scaleIvs=[0,1,3,5,6,8,10];
+  } else if(['dim','dim7','°','°7'].includes(type)){
+    // ディミニッシュスケール（全半）
+    scaleIvs=[0,2,3,5,6,8,9,11];
+  } else if(['7','dom7','9','7b9','7s9','11','13','7s11'].includes(type)){
+    // ミクソリディアン: メジャーだがb7を含む
+    scaleIvs=[0,2,4,5,7,9,10];
+  } else if(['7b9'].includes(type)){
+    // オルタードスケール: b9を含むドミナント
+    scaleIvs=[0,1,3,4,6,8,10];
+  } else if(['sus2','sus4','7sus4'].includes(type)){
+    // メジャーペンタ寄り: sus系はb3を避ける
+    scaleIvs=[0,2,4,5,7,9,10];
+  } else if(['aug','augM7'].includes(type)){
+    // 全音音階: 増三和音
+    scaleIvs=[0,2,4,6,8,10];
+  } else {
+    // メジャー系デフォルト（major,maj7,maj9,add9,6,6/9など）
+    scaleIvs=[0,2,4,5,7,9,11];
+  }
+
+  const isMin = scaleIvs.includes(3) && !scaleIvs.includes(4); // b3を含みM3を含まない
   const allIvs=[...new Set([...chordIvs,...scaleIvs])].sort((a,b)=>a-b);
+
   // 3オクターブ分（4,5,6）展開
   const notes=[];
   [octBase-1,octBase,octBase+1].forEach(oct=>{
@@ -10334,7 +10366,8 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 }
 
 // ── Scene別ARPノート発音（Arp Ghost対応）──
-function _playSceneArpNote(actx, midi, startTime, dest){
+function _playSceneArpNote(actx, midi, startTime, dest, velMul){
+  velMul = (velMul !== undefined) ? velMul : 1.0;
   // Pattern GrammarのARP系パターン選択中はそのパラメーターで上書き
   const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
@@ -10350,7 +10383,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const _quietArpScenes = new Set(['plain', 'glass', 'velvet']);
   const _velHumanizeRange = _quietArpScenes.has(sceneCurrentName) ? 0.32 : 0.14;
   const _velHumanize = 0.86 + Math.random() * _velHumanizeRange;
-  const vol    = (sc.arpVol    || 0.26) * _velHumanize;
+  const vol    = (sc.arpVol    || 0.26) * _velHumanize * velMul;
   const atk    = sc.arpAttack || 0.006;
   const decay  = sc.arpDecay  || 0.22;
   const envMod = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.5);
@@ -10469,6 +10502,14 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     env.gain.exponentialRampToValueAtTime(loveDecayVol, startTime + atk + decay);
     // gate終了後もゆっくりフェード（リリースの余韻）
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec + 0.55);
+  } else if(sceneCurrentName === 'plain'){
+    // PLAIN専用エンベロープ: ギター弦・ピアノ高音域の自然減衰
+    // attack極短 → decay（倍音が自然に消える）→ sustain 0 → release（余韻）
+    // フィルターは動かさない。エンベロープの減衰だけで音色変化を作る。
+    const plainDecay = sc.arpDecay || 0.28;
+    const plainRelease = sc.arpRelease || 0.38;
+    env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.015, 0.001), startTime + atk + plainDecay);
+    env.gain.exponentialRampToValueAtTime(0.001, startTime + atk + plainDecay + plainRelease);
   } else {
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
   }
@@ -10477,6 +10518,16 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const osc2g = actx.createGain();
   // LOVE: osc2はデチューンのみ・薄く
   osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.20 : 0.75;
+
+  // ── PLAIN専用: ギター弦＋ピアノ高音域の音色 ──
+  // osc1(triangle): 基音の芯
+  // osc2(sawtooth): 弦の倍音成分を固定比率で混ぜる（フィルターenvは使わない）
+  // sub osc: 完全にゼロ（低域曇り防止）
+  // → 倍音の自然減衰だけで音色変化を作る（フィルターは動かさない）
+  if(sceneCurrentName === 'plain'){
+    subG.gain.value = 0.0;          // sub oscカット
+    osc2g.gain.value = 0.30;        // sawtooth薄めに固定（多すぎると歪む）
+  }
 
   // ── ルーティング ──
   // LOVEはosc1_morphをlpfに接続・osc1本体は使わない
@@ -10544,12 +10595,51 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     arpEnvOut = null; // 以下の共通ルーティングをスキップ
   }
 
-  // delay 30% + reverb 70%（reverb感を強める）
+  // ── ディレイ設計方針 ──
+  // gate長めのScene（LOVE/VELVET/STRINGS）:
+  //   音色的ディレイ。gateに近い固定値でディレイが音と溶け合う。
+  //   LOVEはarpEnvOut=nullで既に処理済み。
+  //
+  // gate短めのScene（GLASS/PLUCK）:
+  //   BPM連動の共有ディレイ（dlyTarget）でリズム的な反復感。
+  //
+  // PLAIN（中間）:
+  //   gate(140ms)に近い固定ディレイで音色的に機能させる。
+  //   PLAINのgateは短いが、decayとreleaseで余韻があるため
+  //   160ms程度のディレイが音と自然に溶け合う。
+
   if(arpEnvOut !== null){
+    const _warmVal = sv ? sv('warm') : 0;
+
+    // Scene別: 音色的ディレイ（gate長めのScene）
+    if(sceneCurrentName === 'velvet' || sceneCurrentName === 'strings' || sceneCurrentName === 'plain'){
+      // VELVET/STRINGS: gate 420〜440msに対して200ms前後で音色的に溶け合う
+      // PLAIN: gate 140ms + decay/releaseの余韻に対して160msで溶け合う
+      const _colorDlyTime = {
+        velvet:  0.200,  // 200ms: gate420msの約半分
+        strings: 0.220,  // 220ms: gate440msの約半分
+        plain:   0.160,  // 160ms: gate140ms + 余韻に対して自然に溶ける
+      }[sceneCurrentName] || 0.200;
+
+      const colorDly = actx.createDelay(1.0);
+      colorDly.delayTime.value = _colorDlyTime;
+      const colorDlyFb = actx.createGain();
+      colorDlyFb.gain.value = 0.25 + _warmVal * 0.15; // warm連動: 0.25〜0.40
+      const colorDlyG = actx.createGain();
+      colorDlyG.gain.value = 0.40; // wet量: 音色の一部として溶け込む
+      arpEnvOut.connect(colorDly);
+      colorDly.connect(colorDlyFb);
+      colorDlyFb.connect(colorDly);
+      colorDly.connect(colorDlyG);
+      colorDlyG.connect(rvbTarget); // ディレイ → reverb（空間に溶ける）
+    }
+
+    // 全Scene共通: dry + reverb出力
     const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
     const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
-    arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget);
+    arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget); // 共有ディレイ経由（BPM連動）
     arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
+
     // Space Presetリバーブsendに接続
     const _arpRvbSend = getSpaceReverbSend();
     if(_arpRvbSend && _spaceReverbCtx === actx){
@@ -10563,7 +10653,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(!_loveOsc1Handled) osc1.start(startTime); // LOVEはosc1_sine/osc1_wtで起動済み
   osc2.start(startTime); sub.start(startTime);
   // LOVEはrelease余韻分長めにoscを維持
-  const oscStopExtra = isLoveScene ? 0.65 : 0.08;
+  const _plainRelSec = (sceneCurrentName === 'plain') ? (sc.arpDecay || 0.28) + (sc.arpRelease || 0.38) + 0.05 : 0.08;
+  const oscStopExtra = isLoveScene ? 0.65 : _plainRelSec;
   if(!_loveOsc1Handled) osc1.stop(startTime + gateSec + oscStopExtra);
   osc2.stop(startTime + gateSec + oscStopExtra);
   sub.stop(startTime + gateSec + oscStopExtra);
@@ -10657,8 +10748,13 @@ const _phraseState = {
   hangingMidi: null,     // 前コードから引きずる音（未解決音）
 
   // PLAIN固有
-  plainMotifType: 0,     // 0:収束 1:拡散 2:落下 3:跳躍（エモーショナル）
-  plainSilenceNext: false, // 次ステップを強制休符にする
+  plainCellPos: 0,       // 循環セル内の位置（0〜cellLen-1）
+  plainCellPhase: 0,     // セル起点のシフト量（ポリリズム的位相ずれ）
+  plainCycleCount: 0,    // セル完了カウント（変容タイミング管理）
+  plainArcDir: 1,        // 旋律の弧の方向（+1上行/-1下行）
+  plainArcPos: 0,        // 弧の中の位置（0〜arcLen-1）
+  plainNoteSeq: null,    // 現在の旋律シーケンス（コードトーンを弧で並べた配列）
+  plainLeapNext: false,  // 跳躍フラグ（SL:strange連動）
 
   // VELVET固有
   velvetDir: 1,          // 現在の進行方向（+1/-1）
@@ -10684,8 +10780,12 @@ function _resetPhraseState(){
   _phraseState.notesSinceChord = 0;
   _phraseState.phrasePos = 0;
   _phraseState.phraseCount = 0;
-  // PLAINはmotifTypeとsilenceを保持（コードをまたいで動機が継続）
-  _phraseState.plainSilenceNext = false;
+  // PLAINはコードをまたいでlastMidiとarcDirを保持（旋律が続く）
+  // cellPosとcycleCountはリセット（新しいコードで旋律シーケンスを再構築）
+  _phraseState.plainCellPos = 0;
+  _phraseState.plainCycleCount = 0;
+  _phraseState.plainNoteSeq = null; // コードチェンジで旋律シーケンスを再構築
+  _phraseState.plainLeapNext = false;
   // GLASSの対話感は保持（intervalIdxはリセット）
   _phraseState.glassIntervalIdx = 0;
   // PLUCKの細胞はコードチェンジで再生成
@@ -10698,15 +10798,23 @@ function _resetPhraseState(){
 // baseSec倍率として使用
 const _GLASS_INTERVAL_PATTERN = [4.0, 3.5, 2.0, 1.0, 3.0, 1.5, 5.0, 2.5];
 
-// PLAIN動機定義: スケール音・テンション跳躍・前コード引きずりを含む
-// notes: arpSeq（コードトーン、octRange=2で2オクターブ分）
-// motifType: 0=収束 1=拡散 2=落下 3=跳躍（エモーショナル）
-function _buildPlainMotif(notes, motifType, lastMidi){
-  const n = notes;
-  if(!n || n.length === 0) return [60];
-  const mid = Math.floor(n.length / 2);
+// PLAIN旋律シーケンス構築:
+// Shape of My Heart × Rej 的設計。
+//
+// 【音域の使い方】
+//   コードトーンを3つのゾーンに分ける: 低域・中域・高域
+//   サイクルごとにアプローチが変わる4種のパターンをローテーション:
+//     0: 低→中→高（上昇弧）
+//     1: 高→中→低（下降弧）
+//     2: 中→高→中→低（山型）
+//     3: 低→高→低→中（谷型+解決）
+//   → 毎回同じ方向から来ない。音域の使い方に変化がある。
+//
+// 【変容】5サイクルに1回スケール経過音が1音混入（Rej的ミニマル変容）
+function _plainBuildNoteSeq(notes, cycleCount){
+  if(!notes || notes.length === 0) return [60];
 
-  // 現在コードのスケール音を取得（コードトーン外の音への移動に使用）
+  // スケール音を取得（変容用）
   let scaleTones = null;
   try{
     if(S && S.root && S.type && typeof getScaleNotes === 'function'){
@@ -10715,86 +10823,60 @@ function _buildPlainMotif(notes, motifType, lastMidi){
     }
   }catch(e){}
 
-  // 前の音から最も近い音のインデックスを起点とする
-  let startIdx = mid;
-  if(lastMidi !== null){
-    let minDist = Infinity;
-    n.forEach((m,i) => { const d = Math.abs(m - lastMidi); if(d < minDist){ minDist=d; startIdx=i; } });
+  // コードトーンを音域でソート
+  const sorted = [...notes].sort((a,b) => a - b);
+  const len = sorted.length;
+  if(len === 0) return [60];
+
+  // 3ゾーンに分割（音数が少ない場合は重複を許容）
+  const loEnd  = Math.max(1, Math.floor(len * 0.33));
+  const hiStart= Math.min(len - 1, Math.floor(len * 0.66));
+  const lo  = sorted.slice(0, loEnd);           // 低域
+  const mid = sorted.slice(loEnd, hiStart);      // 中域
+  const hi  = sorted.slice(hiStart);             // 高域
+
+  // ゾーンが空の場合のフォールバック
+  const _lo  = lo.length  > 0 ? lo  : [sorted[0]];
+  const _mid = mid.length > 0 ? mid : [sorted[Math.floor(len/2)]];
+  const _hi  = hi.length  > 0 ? hi  : [sorted[len-1]];
+
+  // サイクルごとにアプローチパターンをローテーション（4種）
+  const pattern = cycleCount % 4;
+  let seq;
+  switch(pattern){
+    case 0: // 上昇弧: 低→中→高
+      seq = [..._lo, ..._mid, ..._hi];
+      break;
+    case 1: // 下降弧: 高→中→低
+      seq = [..._hi.slice().reverse(), ..._mid.slice().reverse(), ..._lo.slice().reverse()];
+      break;
+    case 2: // 山型: 中→高→中→低
+      seq = [..._mid, ..._hi, ..._mid.slice().reverse(), ..._lo];
+      break;
+    case 3: // 谷型+解決: 低→高→低→中（解決感）
+      seq = [..._lo, ..._hi.slice().reverse(), ..._lo.slice().reverse(), ..._mid];
+      break;
+    default:
+      seq = [...sorted];
   }
 
-  // 前コードの引きずり音: 現コードにぶつからない音を選ぶ
-  const ps = _phraseState;
-  let hangNote = null;
-  if(ps.hangingMidi !== null && scaleTones){
-    // 前コードから引きずる音がスケール内にあれば使う（半音ずれでなければOK）
-    const chordPcs = new Set(n.map(m => m % 12));
-    const hangPc = ps.hangingMidi % 12;
-    // コードトーンと半音関係でなければ使える（ぶつからない）
-    const isClash = [...chordPcs].some(pc => Math.abs(pc - hangPc) === 1 || Math.abs(pc - hangPc) === 11);
-    if(!isClash && scaleTones.some(m => m % 12 === hangPc)){
-      // 引きずる音を現在の音域に収める
-      const targetOct = Math.round(n[mid] / 12);
-      hangNote = targetOct * 12 + hangPc;
-    }
-  }
-
-  // スケール音への跳躍先を選ぶ（コードトーン外のエモーショナルな音）
-  function _getScaleLeap(fromMidi, direction){
-    if(!scaleTones) return null;
-    const chordPcs = new Set(n.map(m => m % 12));
-    // コードトーン外のスケール音でfromMidiから3〜7半音離れた音
-    const candidates = scaleTones.filter(m => {
-      const diff = m - fromMidi;
-      const absDiff = Math.abs(diff);
-      const pc = m % 12;
-      return absDiff >= 3 && absDiff <= 9
-        && (direction > 0 ? diff > 0 : diff < 0)
-        && !chordPcs.has(pc);
+  // 5サイクルに1回: スケール経過音を1音だけ挿入（Rej的変容）
+  if(scaleTones && cycleCount > 0 && cycleCount % 5 === 0){
+    const chordPcs = new Set(notes.map(m => m % 12));
+    const passing = scaleTones.filter(m => {
+      if(chordPcs.has(m % 12)) return false;
+      return m >= sorted[0] && m <= sorted[len-1];
     });
-    if(candidates.length === 0) return null;
-    // 最も近いものを返す
-    return candidates.reduce((a, b) =>
-      Math.abs(a - fromMidi) < Math.abs(b - fromMidi) ? a : b
-    );
-  }
-
-  const hi = n[n.length - 1];
-  const lo = n[0];
-
-  switch(motifType % 4){
-    case 0: { // 収束: 高め→スケール経過音→コードトーンへ着地
-      const fromMidi = lastMidi || n[Math.min(n.length-1, startIdx+2)] || hi;
-      const leap = _getScaleLeap(fromMidi, -1); // 下方向のスケール音
-      const land = n[Math.max(0, startIdx - 1)] || lo; // 着地（コードトーン）
-      return leap
-        ? [n[Math.min(n.length-1, startIdx+2)] || hi, leap, land]
-        : [n[Math.min(n.length-1, startIdx+2)] || hi, n[mid], land];
-    }
-    case 1: { // 拡散+引きずり: 前コードの音から始まり現コードへ解決
-      const start = hangNote || n[mid];
-      const leap = _getScaleLeap(start, 1); // 上方向のスケール音
-      return leap
-        ? [start, leap, n[Math.min(n.length-1, mid+1)] || hi]
-        : [start, n[Math.max(0, mid-1)], n[Math.min(n.length-1, mid+2)] || hi];
-    }
-    case 2: { // 落下: 高音スケール音 → コードトーン（サティ的な下降）
-      const fromTop = n[n.length-1]; // 最高音から
-      const leap = _getScaleLeap(fromTop, -1);
-      const land = n[Math.max(0, startIdx-1)] || lo;
-      return leap
-        ? [fromTop, leap, land]
-        : [fromTop, n[mid], land];
-    }
-    case 3: { // 跳躍（エモーショナル）: 低→スケール音の大跳躍→コードトーン着地
-      const fromLo = lo;
-      const leap = _getScaleLeap(fromLo + 7, 1) || _getScaleLeap(fromLo, 1); // 5度上付近から探す
-      const land = n[Math.min(n.length-1, startIdx+1)] || hi;
-      return leap
-        ? [fromLo, leap, land]
-        : [fromLo, hi, n[mid]]; // leapがなければ最高音へ跳躍
+    if(passing.length > 0){
+      // シーケンスの中盤に1音挿入
+      const insertPos = Math.floor(seq.length * 0.35) +
+        Math.floor(Math.random() * Math.floor(seq.length * 0.3));
+      const passNote = passing[Math.floor(Math.random() * passing.length)];
+      seq = [...seq.slice(0, insertPos), passNote, ...seq.slice(insertPos)];
     }
   }
-  return [n[mid]];
+
+  return seq.length > 0 ? seq : [sorted[Math.floor(len/2)]];
 }
 
 // PLUCKの細胞を生成（4〜6音）
@@ -10842,48 +10924,118 @@ function _phraseNext(notes, baseSec, sc, densityMul){
   switch(sceneCurrentName){
 
     // ────────────────────────────────────────────
-    // PLAIN: 短い動機（2〜3音）+ 必ず沈黙。スケール跳躍・前コード引きずり
+    // PLAIN: 旋律的な流れ × サティ的呼吸 × ラテンのシンコペーション
+    //
+    // 設計思想:
+    //   パターンを作らない。前の音から旋律として自然に流れる。
+    //   間隔パターンで呼吸を作る（GLASSと同じ考え方、サティ的な長い沈黙）。
+    //   ラテンのシンコペーション = 間隔の非均等（0.75と1.5の組み合わせ）。
+    //   SL:strange で跳躍度が上がる。SL:moving で密度が変わる。
+    //
+    // 間隔パターン（baseSec倍率）:
+    //   音符: 0.75〜1.5（短め〜やや長め）
+    //   沈黙: 2.0〜4.5（音より必ず長い）
+    //   シンコペーション的な非均等がラテン感を作る
     // ────────────────────────────────────────────
     case 'plain': {
-      // 強制休符フラグ
-      if(ps.plainSilenceNext){
-        ps.plainSilenceNext = false;
-        // 沈黙の長さ: motifTypeで変化（エモーショナルな動機の後は長め）
-        // 跳躍(3)の後: 長い余韻 / 通常: 短め〜中程度
-        const silBase = ps.plainMotifType === 3 ? 3.0 : 2.0;
-        const silRand = ps.plainMotifType === 3 ? 2.0 : 1.5;
-        const silRatio = (silBase + Math.random() * silRand) * densityMul;
-        return { midi: null, stepRatio: silRatio };
+      // ── PLAIN フレーズ文法 ──
+      // Shape of My Heart × Ame/Rej 的設計:
+      //
+      // 【旋律】コードトーンを4種の弧パターンで循環。
+      //   同じ型が流れ続け、4サイクルに1回パターンが変わる。
+      //   5サイクルに1回スケール経過音が1音混入（Rej的変容）。
+      //
+      // 【リズム】音符が連続的に流れる。完全な沈黙は最小限。
+      //   ベロシティのアクセント（強弱）でリズム感を作る。
+      //   16分音符ベースで連続し、要所だけ8分・4分で伸ばす。
+      //   スパニッシュギター的: 付点リズムの強弱が基盤。
+      //
+      // リズムセル（16分音符=1.0基準、音符16個+小休符で約5拍）:
+      //   vel=アクセント強度（1.0=標準、1.3=強、0.6=弱）
+
+      const _PLAIN_CELL = [
+        { r: 1.0, rest: false, vel: 1.30 }, // 強（拍頭・アクセント）
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 1.0, rest: false, vel: 0.80 }, // 中
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 2.0, rest: false, vel: 1.20 }, // 強（8分・タメ）
+        { r: 1.0, rest: false, vel: 0.70 }, // 弱
+        { r: 1.0, rest: true,  vel: 1.00 }, // 小休符（呼吸）
+        { r: 1.0, rest: false, vel: 1.15 }, // 中強（シンコペーション）
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 1.0, rest: false, vel: 0.80 }, // 中
+        { r: 3.0, rest: false, vel: 1.25 }, // 強（付点8分・タメ）
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱（食い込み）
+        { r: 1.0, rest: false, vel: 0.75 }, // 中
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 2.0, rest: false, vel: 1.10 }, // 中強（8分）
+        { r: 4.0, rest: true,  vel: 1.00 }, // 長い呼吸（サティ的）
+      ];
+      const _CELL_LEN = _PLAIN_CELL.length;
+
+      // SL値取得
+      const _strangeVal = sv ? sv('strange') : 0;
+      const _movingVal  = sv ? sv('moving')  : 0;
+
+      // 旋律シーケンスを初回または変容タイミングで（再）構築
+      if(!ps.plainNoteSeq || ps.plainNoteSeq.length === 0){
+        ps.plainNoteSeq = _plainBuildNoteSeq(notes, ps.plainCycleCount);
       }
 
-      // 動機の音を取得
-      const motif = _buildPlainMotif(notes, ps.plainMotifType, ps.lastMidi);
-      const midi = motif[ps.phrasePos % motif.length];
+      // セル内の現在位置（位相シフト込み）
+      const cellIdx = (ps.plainCellPos + ps.plainCellPhase) % _CELL_LEN;
+      const step = _PLAIN_CELL[cellIdx];
 
-      ps.phrasePos++;
-      ps.lastMidi = midi;
+      // SL:moving → 長い休符を短縮
+      const _rMul = step.rest
+        ? Math.max(0.4, 1.0 - Math.max(0, _movingVal) * 0.5)
+        : 1.0;
 
-      if(ps.phrasePos >= motif.length){
-        // 動機完了 → 次は必ず沈黙
-        ps.phrasePos = 0;
-        ps.phraseCount++;
-        ps.plainSilenceNext = true;
-        // 3フレーズに1回、動機タイプを変える（4種類をローテーション）
-        // 跳躍(3)は6フレーズに1回だけ出現（出すぎない）
-        if(ps.phraseCount % 6 === 5){
-          ps.plainMotifType = 3; // エモーショナル跳躍
-        } else if(ps.phraseCount % 3 === 0){
-          ps.plainMotifType = (ps.plainMotifType < 3)
-            ? (ps.plainMotifType + 1) % 3
-            : 0;
+      // jitter ±3%（タイミングの精度を保つ）
+      const jitter = 0.97 + Math.random() * 0.06;
+      const stepRatio = step.r * _rMul * jitter * densityMul;
+
+      ps.plainCellPos++;
+
+      // セル1周完了
+      if(ps.plainCellPos >= _CELL_LEN){
+        ps.plainCellPos = 0;
+        ps.plainCycleCount++;
+
+        // 4サイクルに1回: 弧パターン変更（音域アプローチが変わる）
+        // 5サイクルに1回: スケール経過音混入（変容）
+        if(ps.plainCycleCount % 5 === 0){
+          ps.plainNoteSeq = _plainBuildNoteSeq(notes, ps.plainCycleCount);
+          ps.plainArcPos = 0;
+        }
+
+        // 12サイクルに1回: ポリリズム的位相シフト
+        // SL:strangeが高いと6サイクルに早まる
+        const _shiftAt = _strangeVal > 0.4 ? 6 : 12;
+        if(ps.plainCycleCount % _shiftAt === 0){
+          ps.plainCellPhase = (ps.plainCellPhase + 1) % _CELL_LEN;
         }
       }
 
-      // 動機内の音間隔: 一定リズム感を保ちながら微妙に揺れる（±10%）
-      // サティ的な「揺れながら前に進む」感覚
-      const noteBase = ps.phrasePos === 1 ? 0.55 : 0.45; // 動機最初は少し長め
-      const noteRatio = noteBase * (0.9 + Math.random() * 0.2) * densityMul;
-      return { midi, stepRatio: noteRatio };
+      if(step.rest){
+        return { midi: null, stepRatio };
+      }
+
+      // 旋律シーケンスから次の音を取得
+      const seqLen = ps.plainNoteSeq.length;
+      const noteIdx = ps.plainArcPos % seqLen;
+      const midi = ps.plainNoteSeq[noteIdx];
+
+      ps.plainArcPos++;
+      ps.lastMidi = midi;
+      ps.phraseCount++;
+
+      // ベロシティアクセント: セルで定義した強弱をvelMulとして返す
+      // SL:moving が高いとアクセントがより強調される
+      const _movingBoost = 1.0 + Math.max(0, _movingVal) * 0.15;
+      const velMul = step.vel * _movingBoost;
+
+      return { midi, stepRatio, velMul };
     }
 
     // ────────────────────────────────────────────
@@ -11131,7 +11283,7 @@ function scheduleArpNotes(){
         const stepSec = Math.max(baseSec * 0.2, baseSec * result.stepRatio);
         if(result.midi !== null){
           _phraseState.notesSinceChord++;
-          _playSceneArpNote(actx, result.midi, t, dest);
+          _playSceneArpNote(actx, result.midi, t, dest, result.velMul);
         }
         arpNextBeat += stepSec;
         continue;
@@ -11341,15 +11493,18 @@ const SCENE_PRESETS = {
     vol:0.40, chorus:0.06, wet:0.48, strum:12,
     trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0, filterDrift:0.12,
     voicingFlavor:'plain',
-    // ARP: 水の粒感。短い動機 + 長い沈黙。一定のテンポ感はあるが機械的でない。
-    // triangle → sineに近づけてぼやけを減らす（sineよりわずかに芯がある）
-    // filterDriftを下げて輪郭を立てる
-    // envModを上げてアタックの粒感を明確にする
+    // ARP: ティーン感。金属弦的な瞬間的立ち上がり→自然減衰→透明な余韻。
+    // osc1:sine（透明感・基音）+ osc2:triangle（アタック瞬間の金属倍音）
+    // cutoff高め・envMod強め → アタックでパッと開いてすぐ閉じる
+    // attack極短・decay短・sustain0・release中程度 → ティーンの自然な消え方
     // フレーズ文法エンジンがリズムを担うためarpRhythmは参照されない
-    arpOsc:'triangle', arpCutoff:2200, arpRes:0.35, arpEnvMod:0.42,
-    arpAttack:0.008, arpDecay:0.45, arpSustain:0.04,
-    arpGate:280, arpVol:0.20, arpWet:0.44, arpGhost:0.22,
-    arpOctRange:2, // 2オクターブ: 跳躍感・エモーショナルな動き
+    // ARP音色: クラシックギター(スパニッシュ)＋ピアノ高音域の単音
+    // triangle(基音の芯) + sawtooth(弦の倍音)を固定比率で混ぜる
+    // フィルターenvは使わない。倍音の自然減衰だけで音色を作る。
+    arpOsc:'triangle', arpOsc2:'sawtooth', arpCutoff:5500, arpRes:0.12, arpEnvMod:0.0,
+    arpAttack:0.002, arpDecay:0.28, arpSustain:0.0, arpRelease:0.38,
+    arpGate:140, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
+    arpOctRange:2,
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
 
@@ -11713,6 +11868,10 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   }
 
   // ── Filter Drift LFO（SLのstrangeに連動してフィルターをゆっくり揺らす）──
+  // oscの最大生存時間: attack + decay + sustain保持上限 + release + 0.3秒の余裕
+  // 30秒固定をやめ、リリース時間に連動させる
+  const _oscMaxLife = sc.attack + sc.decay + 6.0 + (sc.release || 2.0) + 0.3;
+
   const driftDepth = sc.filterDrift || 0;
   if(driftDepth > 0.01){
     const driftRate = 0.02 + Math.random() * 0.12; // 0.02〜0.14Hz（ゆっくり）
@@ -11724,11 +11883,8 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
     driftLfo.type = 'sine';
     driftLfo.connect(driftG);
     driftG.connect(lpf.frequency);
-    // oscの最大生存時間: attack + decay + sustain保持上限 + release + 0.3秒の余裕
-  // 30秒固定をやめ、リリース時間に連動させる
-  const _oscMaxLife = sc.attack + sc.decay + 6.0 + (sc.release || 2.0) + 0.3;
-  driftLfo.start(t);
-  driftLfo.stop(t + _oscMaxLife);
+    driftLfo.start(t);
+    driftLfo.stop(t + _oscMaxLife);
   }
 
   // VCA Envelope
