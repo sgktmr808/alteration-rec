@@ -10470,11 +10470,12 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     // gate終了後もゆっくりフェード（リリースの余韻）
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec + 0.55);
   } else if(sceneCurrentName === 'plain'){
-    // PLAIN専用エンベロープ: attack → decay（短く）→ sustain 0 → release（余韻）
-    // gateで一気に切らずリリースで自然に消える。ディレイが余韻の空間を作る。
-    const plainDecay = sc.arpDecay || 0.10;
-    const plainRelease = sc.arpRelease || 0.55;
-    env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.03, 0.001), startTime + atk + plainDecay);
+    // PLAIN専用エンベロープ: ギター弦・ピアノ高音域の自然減衰
+    // attack極短 → decay（倍音が自然に消える）→ sustain 0 → release（余韻）
+    // フィルターは動かさない。エンベロープの減衰だけで音色変化を作る。
+    const plainDecay = sc.arpDecay || 0.28;
+    const plainRelease = sc.arpRelease || 0.38;
+    env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.015, 0.001), startTime + atk + plainDecay);
     env.gain.exponentialRampToValueAtTime(0.001, startTime + atk + plainDecay + plainRelease);
   } else {
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
@@ -10485,15 +10486,14 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   // LOVE: osc2はデチューンのみ・薄く
   osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.20 : 0.75;
 
-  // ── PLAIN専用: osc2をアタック直後に急速フェードアウト（ティーン感） ──
-  // sine（osc1）が透明な基音、triangle（osc2）がアタック瞬間の金属倍音を担う。
-  // osc2はattk後すぐ消え、sineの透明感だけ残る → 「ティーン」の自然な減衰。
+  // ── PLAIN専用: ギター弦＋ピアノ高音域の音色 ──
+  // osc1(triangle): 基音の芯
+  // osc2(sawtooth): 弦の倍音成分を固定比率で混ぜる（フィルターenvは使わない）
+  // sub osc: 完全にゼロ（低域曇り防止）
+  // → 倍音の自然減衰だけで音色変化を作る（フィルターは動かさない）
   if(sceneCurrentName === 'plain'){
-    const _plainAtkPeak = 0.85; // アタック瞬間のosc2 gain（倍音の金属感）
-    osc2g.gain.setValueAtTime(0.001, startTime);
-    osc2g.gain.linearRampToValueAtTime(_plainAtkPeak, startTime + atk);
-    // atk後すぐ急速フェードアウト（金属感が消えてsineの透明感へ）
-    osc2g.gain.exponentialRampToValueAtTime(0.001, startTime + atk + 0.06);
+    subG.gain.value = 0.0;          // sub oscカット
+    osc2g.gain.value = 0.30;        // sawtooth薄めに固定（多すぎると歪む）
   }
 
   // ── ルーティング ──
@@ -10571,7 +10571,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     const plainDlyFb = actx.createGain();
     plainDlyFb.gain.value = 0.22 + _plainWarm * 0.14; // warm連動: 0.08〜0.36
     const plainDlyG = actx.createGain();
-    plainDlyG.gain.value = 0.38; // ディレイwet量（控えめ・サティ的余白）
+    plainDlyG.gain.value = 0.22; // ディレイwet量（控えめ・曇り防止）
     arpEnvOut.connect(plainDly);
     plainDly.connect(plainDlyFb);
     plainDlyFb.connect(plainDly);
@@ -10599,7 +10599,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(!_loveOsc1Handled) osc1.start(startTime); // LOVEはosc1_sine/osc1_wtで起動済み
   osc2.start(startTime); sub.start(startTime);
   // LOVEはrelease余韻分長めにoscを維持
-  const _plainRelSec = (sceneCurrentName === 'plain') ? (sc.arpRelease || 0.55) + 0.1 : 0.08;
+  const _plainRelSec = (sceneCurrentName === 'plain') ? (sc.arpDecay || 0.28) + (sc.arpRelease || 0.38) + 0.05 : 0.08;
   const oscStopExtra = isLoveScene ? 0.65 : _plainRelSec;
   if(!_loveOsc1Handled) osc1.stop(startTime + gateSec + oscStopExtra);
   osc2.stop(startTime + gateSec + oscStopExtra);
@@ -11385,9 +11385,12 @@ const SCENE_PRESETS = {
     // cutoff高め・envMod強め → アタックでパッと開いてすぐ閉じる
     // attack極短・decay短・sustain0・release中程度 → ティーンの自然な消え方
     // フレーズ文法エンジンがリズムを担うためarpRhythmは参照されない
-    arpOsc:'sine', arpCutoff:3500, arpRes:0.28, arpEnvMod:0.72,
-    arpAttack:0.004, arpDecay:0.08, arpSustain:0.0, arpRelease:0.50,
-    arpGate:160, arpVol:0.22, arpWet:0.44, arpGhost:0.18,
+    // ARP音色: クラシックギター(スパニッシュ)＋ピアノ高音域の単音
+    // triangle(基音の芯) + sawtooth(弦の倍音)を固定比率で混ぜる
+    // フィルターenvは使わない。倍音の自然減衰だけで音色を作る。
+    arpOsc:'triangle', arpOsc2:'sawtooth', arpCutoff:5500, arpRes:0.12, arpEnvMod:0.0,
+    arpAttack:0.002, arpDecay:0.28, arpSustain:0.0, arpRelease:0.38,
+    arpGate:140, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
     arpOctRange:2,
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
