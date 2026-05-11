@@ -10366,7 +10366,8 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 }
 
 // ── Scene別ARPノート発音（Arp Ghost対応）──
-function _playSceneArpNote(actx, midi, startTime, dest){
+function _playSceneArpNote(actx, midi, startTime, dest, velMul){
+  velMul = (velMul !== undefined) ? velMul : 1.0;
   // Pattern GrammarのARP系パターン選択中はそのパラメーターで上書き
   const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
@@ -10382,7 +10383,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   const _quietArpScenes = new Set(['plain', 'glass', 'velvet']);
   const _velHumanizeRange = _quietArpScenes.has(sceneCurrentName) ? 0.32 : 0.14;
   const _velHumanize = 0.86 + Math.random() * _velHumanizeRange;
-  const vol    = (sc.arpVol    || 0.26) * _velHumanize;
+  const vol    = (sc.arpVol    || 0.26) * _velHumanize * velMul;
   const atk    = sc.arpAttack || 0.006;
   const decay  = sc.arpDecay  || 0.22;
   const envMod = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.5);
@@ -10599,10 +10600,10 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(arpEnvOut !== null && sceneCurrentName === 'plain'){
     const _plainWarm = sv ? sv('warm') : 0;
     const plainDly = actx.createDelay(1.0);
-    // BPM連動: 付点8分音符（beat × 0.75）
-    // 16分音符基準のリズムセルに対して付点8分が自然に乗る
+    // BPM連動: 8分音符（beat × 0.5）
+    // 16分音符ベースの連続音に対して半拍ずれで空間を作る
     const _plainBeatSec = 60 / (autoBpm || 72);
-    plainDly.delayTime.value = _plainBeatSec * 0.75;
+    plainDly.delayTime.value = _plainBeatSec * 0.5;
     const plainDlyFb = actx.createGain();
     plainDlyFb.gain.value = 0.28 + _plainWarm * 0.14; // warm連動: 0.28〜0.42
     const plainDlyG = actx.createGain();
@@ -10922,33 +10923,35 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       // ── PLAIN フレーズ文法 ──
       // Shape of My Heart × Ame/Rej 的設計:
       //
-      // 【旋律】コードトーンを弧（低→高→低）で並べた循環シーケンスを基盤にする。
-      //   同じ旋律の型が循環し、5サイクルに1回スケール音が1つ混入して微細に変容。
-      //   ポリリズム的位相シフト: 16サイクルに1回セル起点が1ずれる（気づかないレベルで変わる）。
+      // 【旋律】コードトーンを4種の弧パターンで循環。
+      //   同じ型が流れ続け、4サイクルに1回パターンが変わる。
+      //   5サイクルに1回スケール経過音が1音混入（Rej的変容）。
       //
-      // 【リズム】音符と沈黙の型を持つ8ステップセル。
-      //   音符間隔は均等ではなくラテン的な非均等（付点・シンコペーション）。
-      //   SL:moving で沈黙が短縮（密度上昇）。
-      //   SL:strange で位相シフトが早まる + 跳躍音の出現。
+      // 【リズム】音符が連続的に流れる。完全な沈黙は最小限。
+      //   ベロシティのアクセント（強弱）でリズム感を作る。
+      //   16分音符ベースで連続し、要所だけ8分・4分で伸ばす。
+      //   スパニッシュギター的: 付点リズムの強弱が基盤。
       //
-      // リズムセル（8ステップ、baseSec単位）:
-      //   音0.75 → 休1.5 → 音0.75 → 音1.25 → 休2.5 → 音1.0 → 休3.0 → 音0.75
-      //   「短・(間)・短・付点・(長い間)・中・(大きな呼吸)・短」
-      //   スパニッシュギター的な非均等リズムが基盤。
+      // リズムセル（16分音符=1.0基準、音符16個+小休符で約5拍）:
+      //   vel=アクセント強度（1.0=標準、1.3=強、0.6=弱）
 
-      // リズムセル: arpRate=1/16基準（1.0=16分音符、2.0=8分音符、4.0=4分音符）
-      // スパニッシュギター的な付点リズムとサティ的な長い沈黙の組み合わせ
-      // 3+1+2+4+3+1+6+2 = 22ステップ で1サイクル（約5.5拍）
-      // 非均等なサイクル長がポリリズム感を自然に生む
       const _PLAIN_CELL = [
-        { r: 3.0, rest: false },  // 音: 付点8分（タメのある入り）
-        { r: 1.0, rest: false },  // 音: 16分（食い込み・シンコペーション）
-        { r: 2.0, rest: true  },  // 休: 8分（小さな呼吸）
-        { r: 4.0, rest: false },  // 音: 4分（安定した中心音）
-        { r: 3.0, rest: true  },  // 休: 付点8分（引き）
-        { r: 1.0, rest: false },  // 音: 16分（短い一閃）
-        { r: 6.0, rest: true  },  // 休: 付点4分（サティ的な長い沈黙）
-        { r: 2.0, rest: false },  // 音: 8分（次サイクルへ橋渡し）
+        { r: 1.0, rest: false, vel: 1.30 }, // 強（拍頭・アクセント）
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 1.0, rest: false, vel: 0.80 }, // 中
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 2.0, rest: false, vel: 1.20 }, // 強（8分・タメ）
+        { r: 1.0, rest: false, vel: 0.70 }, // 弱
+        { r: 1.0, rest: true,  vel: 1.00 }, // 小休符（呼吸）
+        { r: 1.0, rest: false, vel: 1.15 }, // 中強（シンコペーション）
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 1.0, rest: false, vel: 0.80 }, // 中
+        { r: 3.0, rest: false, vel: 1.25 }, // 強（付点8分・タメ）
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱（食い込み）
+        { r: 1.0, rest: false, vel: 0.75 }, // 中
+        { r: 1.0, rest: false, vel: 0.65 }, // 弱
+        { r: 2.0, rest: false, vel: 1.10 }, // 中強（8分）
+        { r: 4.0, rest: true,  vel: 1.00 }, // 長い呼吸（サティ的）
       ];
       const _CELL_LEN = _PLAIN_CELL.length;
 
@@ -10965,14 +10968,14 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const cellIdx = (ps.plainCellPos + ps.plainCellPhase) % _CELL_LEN;
       const step = _PLAIN_CELL[cellIdx];
 
-      // SL:moving → 沈黙を短縮（密度が上がる）
-      const _restMul = step.rest
-        ? Math.max(0.45, 1.0 - Math.max(0, _movingVal) * 0.45)
+      // SL:moving → 長い休符を短縮
+      const _rMul = step.rest
+        ? Math.max(0.4, 1.0 - Math.max(0, _movingVal) * 0.5)
         : 1.0;
 
-      // jitter ±4%（タイミングの精度を保つ）
-      const jitter = 0.96 + Math.random() * 0.08;
-      const stepRatio = step.r * _restMul * jitter * densityMul;
+      // jitter ±3%（タイミングの精度を保つ）
+      const jitter = 0.97 + Math.random() * 0.06;
+      const stepRatio = step.r * _rMul * jitter * densityMul;
 
       ps.plainCellPos++;
 
@@ -10981,16 +10984,17 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         ps.plainCellPos = 0;
         ps.plainCycleCount++;
 
-        // 5サイクルに1回: 旋律シーケンスを再構築（スケール音混入による変容）
+        // 4サイクルに1回: 弧パターン変更（音域アプローチが変わる）
+        // 5サイクルに1回: スケール経過音混入（変容）
         if(ps.plainCycleCount % 5 === 0){
           ps.plainNoteSeq = _plainBuildNoteSeq(notes, ps.plainCycleCount);
-          ps.plainArcPos = 0; // 弧の位置もリセット
+          ps.plainArcPos = 0;
         }
 
-        // 16サイクルに1回: ポリリズム的位相シフト（起点が1ずれる）
-        // SL:strangeが高いと8サイクルに1回に早まる
-        const _shiftInterval = _strangeVal > 0.5 ? 8 : 16;
-        if(ps.plainCycleCount % _shiftInterval === 0){
+        // 12サイクルに1回: ポリリズム的位相シフト
+        // SL:strangeが高いと6サイクルに早まる
+        const _shiftAt = _strangeVal > 0.4 ? 6 : 12;
+        if(ps.plainCycleCount % _shiftAt === 0){
           ps.plainCellPhase = (ps.plainCellPhase + 1) % _CELL_LEN;
         }
       }
@@ -10999,7 +11003,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         return { midi: null, stepRatio };
       }
 
-      // 旋律シーケンスから次の音を取得（弧の位置で決まる）
+      // 旋律シーケンスから次の音を取得
       const seqLen = ps.plainNoteSeq.length;
       const noteIdx = ps.plainArcPos % seqLen;
       const midi = ps.plainNoteSeq[noteIdx];
@@ -11008,7 +11012,12 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       ps.lastMidi = midi;
       ps.phraseCount++;
 
-      return { midi, stepRatio };
+      // ベロシティアクセント: セルで定義した強弱をvelMulとして返す
+      // SL:moving が高いとアクセントがより強調される
+      const _movingBoost = 1.0 + Math.max(0, _movingVal) * 0.15;
+      const velMul = step.vel * _movingBoost;
+
+      return { midi, stepRatio, velMul };
     }
 
     // ────────────────────────────────────────────
@@ -11256,7 +11265,7 @@ function scheduleArpNotes(){
         const stepSec = Math.max(baseSec * 0.2, baseSec * result.stepRatio);
         if(result.midi !== null){
           _phraseState.notesSinceChord++;
-          _playSceneArpNote(actx, result.midi, t, dest);
+          _playSceneArpNote(actx, result.midi, t, dest, result.velMul);
         }
         arpNextBeat += stepSec;
         continue;
