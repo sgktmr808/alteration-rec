@@ -10595,33 +10595,51 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul){
     arpEnvOut = null; // 以下の共通ルーティングをスキップ
   }
 
-  // ── PLAIN専用ディレイ: 余韻と空間を作る ──
-  // サティ的な「音が消えた後に光が残る」感覚。SLのwarmでfb深さが変わる。
-  if(arpEnvOut !== null && sceneCurrentName === 'plain'){
-    const _plainWarm = sv ? sv('warm') : 0;
-    const plainDly = actx.createDelay(1.0);
-    // BPM連動: 8分音符（beat × 0.5）
-    // 16分音符ベースの連続音に対して半拍ずれで空間を作る
-    const _plainBeatSec = 60 / (autoBpm || 72);
-    plainDly.delayTime.value = _plainBeatSec * 0.5;
-    const plainDlyFb = actx.createGain();
-    plainDlyFb.gain.value = 0.28 + _plainWarm * 0.14; // warm連動: 0.28〜0.42
-    const plainDlyG = actx.createGain();
-    plainDlyG.gain.value = 0.26; // ディレイwet量
-    arpEnvOut.connect(plainDly);
-    plainDly.connect(plainDlyFb);
-    plainDlyFb.connect(plainDly);
-    plainDly.connect(plainDlyG);
-    // ディレイ出力 → reverb（ディレイの尾も空間に溶ける）
-    plainDlyG.connect(rvbTarget);
-  }
+  // ── ディレイ設計方針 ──
+  // gate長めのScene（LOVE/VELVET/STRINGS）:
+  //   音色的ディレイ。gateに近い固定値でディレイが音と溶け合う。
+  //   LOVEはarpEnvOut=nullで既に処理済み。
+  //
+  // gate短めのScene（GLASS/PLUCK）:
+  //   BPM連動の共有ディレイ（dlyTarget）でリズム的な反復感。
+  //
+  // PLAIN（中間）:
+  //   gate(140ms)に近い固定ディレイで音色的に機能させる。
+  //   PLAINのgateは短いが、decayとreleaseで余韻があるため
+  //   160ms程度のディレイが音と自然に溶け合う。
 
-  // delay 30% + reverb 70%（reverb感を強める）
   if(arpEnvOut !== null){
+    const _warmVal = sv ? sv('warm') : 0;
+
+    // Scene別: 音色的ディレイ（gate長めのScene）
+    if(sceneCurrentName === 'velvet' || sceneCurrentName === 'strings' || sceneCurrentName === 'plain'){
+      // VELVET/STRINGS: gate 420〜440msに対して200ms前後で音色的に溶け合う
+      // PLAIN: gate 140ms + decay/releaseの余韻に対して160msで溶け合う
+      const _colorDlyTime = {
+        velvet:  0.200,  // 200ms: gate420msの約半分
+        strings: 0.220,  // 220ms: gate440msの約半分
+        plain:   0.160,  // 160ms: gate140ms + 余韻に対して自然に溶ける
+      }[sceneCurrentName] || 0.200;
+
+      const colorDly = actx.createDelay(1.0);
+      colorDly.delayTime.value = _colorDlyTime;
+      const colorDlyFb = actx.createGain();
+      colorDlyFb.gain.value = 0.25 + _warmVal * 0.15; // warm連動: 0.25〜0.40
+      const colorDlyG = actx.createGain();
+      colorDlyG.gain.value = 0.40; // wet量: 音色の一部として溶け込む
+      arpEnvOut.connect(colorDly);
+      colorDly.connect(colorDlyFb);
+      colorDlyFb.connect(colorDly);
+      colorDly.connect(colorDlyG);
+      colorDlyG.connect(rvbTarget); // ディレイ → reverb（空間に溶ける）
+    }
+
+    // 全Scene共通: dry + reverb出力
     const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
     const rvbG = actx.createGain(); rvbG.gain.value = 0.70;
-    arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget);
+    arpEnvOut.connect(dlyG); dlyG.connect(dlyTarget); // 共有ディレイ経由（BPM連動）
     arpEnvOut.connect(rvbG); rvbG.connect(rvbTarget);
+
     // Space Presetリバーブsendに接続
     const _arpRvbSend = getSpaceReverbSend();
     if(_arpRvbSend && _spaceReverbCtx === actx){
