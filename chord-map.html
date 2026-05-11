@@ -10599,11 +10599,14 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(arpEnvOut !== null && sceneCurrentName === 'plain'){
     const _plainWarm = sv ? sv('warm') : 0;
     const plainDly = actx.createDelay(1.0);
-    plainDly.delayTime.value = 0.24; // 240ms固定
+    // BPM連動: 付点8分音符（beat × 0.75）
+    // 16分音符基準のリズムセルに対して付点8分が自然に乗る
+    const _plainBeatSec = 60 / (autoBpm || 72);
+    plainDly.delayTime.value = _plainBeatSec * 0.75;
     const plainDlyFb = actx.createGain();
-    plainDlyFb.gain.value = 0.22 + _plainWarm * 0.14; // warm連動: 0.22〜0.36
+    plainDlyFb.gain.value = 0.28 + _plainWarm * 0.14; // warm連動: 0.28〜0.42
     const plainDlyG = actx.createGain();
-    plainDlyG.gain.value = 0.22; // ディレイwet量
+    plainDlyG.gain.value = 0.26; // ディレイwet量
     arpEnvOut.connect(plainDly);
     plainDly.connect(plainDlyFb);
     plainDlyFb.connect(plainDly);
@@ -10777,9 +10780,18 @@ function _resetPhraseState(){
 const _GLASS_INTERVAL_PATTERN = [4.0, 3.5, 2.0, 1.0, 3.0, 1.5, 5.0, 2.5];
 
 // PLAIN旋律シーケンス構築:
-// コードトーンを弧（上行→下行→上行...）で並べた循環シーケンスを作る。
-// Shape of My Heart的: 決まった音の並びが循環し、その中に旋律が宿る。
-// 数サイクルごとにスケール音が1音混入してRej的な微細な変容を与える。
+// Shape of My Heart × Rej 的設計。
+//
+// 【音域の使い方】
+//   コードトーンを3つのゾーンに分ける: 低域・中域・高域
+//   サイクルごとにアプローチが変わる4種のパターンをローテーション:
+//     0: 低→中→高（上昇弧）
+//     1: 高→中→低（下降弧）
+//     2: 中→高→中→低（山型）
+//     3: 低→高→低→中（谷型+解決）
+//   → 毎回同じ方向から来ない。音域の使い方に変化がある。
+//
+// 【変容】5サイクルに1回スケール経過音が1音混入（Rej的ミニマル変容）
 function _plainBuildNoteSeq(notes, cycleCount){
   if(!notes || notes.length === 0) return [60];
 
@@ -10797,30 +10809,55 @@ function _plainBuildNoteSeq(notes, cycleCount){
   const len = sorted.length;
   if(len === 0) return [60];
 
-  // 弧を作る: 低→高→低 の形でシーケンスを構築
-  // 例: [C3,E3,G3,C4,E4] → [C3,E3,G3,C4,E4,C4,G3,E3] のような往復
-  const ascending  = sorted;
-  const descending = sorted.slice(1, len - 1).reverse(); // 両端を除いた折り返し
-  let seq = [...ascending, ...descending];
+  // 3ゾーンに分割（音数が少ない場合は重複を許容）
+  const loEnd  = Math.max(1, Math.floor(len * 0.33));
+  const hiStart= Math.min(len - 1, Math.floor(len * 0.66));
+  const lo  = sorted.slice(0, loEnd);           // 低域
+  const mid = sorted.slice(loEnd, hiStart);      // 中域
+  const hi  = sorted.slice(hiStart);             // 高域
 
-  // 4〜6サイクルに1回: スケール経過音を1つ挿入して変容させる
-  // （Rejのミニマル的変容: 同じパターンの中に一音だけ異物が混じる）
+  // ゾーンが空の場合のフォールバック
+  const _lo  = lo.length  > 0 ? lo  : [sorted[0]];
+  const _mid = mid.length > 0 ? mid : [sorted[Math.floor(len/2)]];
+  const _hi  = hi.length  > 0 ? hi  : [sorted[len-1]];
+
+  // サイクルごとにアプローチパターンをローテーション（4種）
+  const pattern = cycleCount % 4;
+  let seq;
+  switch(pattern){
+    case 0: // 上昇弧: 低→中→高
+      seq = [..._lo, ..._mid, ..._hi];
+      break;
+    case 1: // 下降弧: 高→中→低
+      seq = [..._hi.slice().reverse(), ..._mid.slice().reverse(), ..._lo.slice().reverse()];
+      break;
+    case 2: // 山型: 中→高→中→低
+      seq = [..._mid, ..._hi, ..._mid.slice().reverse(), ..._lo];
+      break;
+    case 3: // 谷型+解決: 低→高→低→中（解決感）
+      seq = [..._lo, ..._hi.slice().reverse(), ..._lo.slice().reverse(), ..._mid];
+      break;
+    default:
+      seq = [...sorted];
+  }
+
+  // 5サイクルに1回: スケール経過音を1音だけ挿入（Rej的変容）
   if(scaleTones && cycleCount > 0 && cycleCount % 5 === 0){
     const chordPcs = new Set(notes.map(m => m % 12));
     const passing = scaleTones.filter(m => {
       if(chordPcs.has(m % 12)) return false;
-      // シーケンスの音域内に収める
       return m >= sorted[0] && m <= sorted[len-1];
     });
     if(passing.length > 0){
-      // ランダムな位置に1音だけ挿入（シーケンスの中盤あたり）
-      const insertPos = Math.floor(seq.length * 0.4) + Math.floor(Math.random() * Math.floor(seq.length * 0.3));
+      // シーケンスの中盤に1音挿入
+      const insertPos = Math.floor(seq.length * 0.35) +
+        Math.floor(Math.random() * Math.floor(seq.length * 0.3));
       const passNote = passing[Math.floor(Math.random() * passing.length)];
       seq = [...seq.slice(0, insertPos), passNote, ...seq.slice(insertPos)];
     }
   }
 
-  return seq;
+  return seq.length > 0 ? seq : [sorted[Math.floor(len/2)]];
 }
 
 // PLUCKの細胞を生成（4〜6音）
@@ -10899,15 +10936,19 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       //   「短・(間)・短・付点・(長い間)・中・(大きな呼吸)・短」
       //   スパニッシュギター的な非均等リズムが基盤。
 
+      // リズムセル: arpRate=1/16基準（1.0=16分音符、2.0=8分音符、4.0=4分音符）
+      // スパニッシュギター的な付点リズムとサティ的な長い沈黙の組み合わせ
+      // 3+1+2+4+3+1+6+2 = 22ステップ で1サイクル（約5.5拍）
+      // 非均等なサイクル長がポリリズム感を自然に生む
       const _PLAIN_CELL = [
-        { r: 0.75, rest: false },  // 音: 短（入り）
-        { r: 1.50, rest: true  },  // 休: 中
-        { r: 0.75, rest: false },  // 音: 短（シンコペーション）
-        { r: 1.25, rest: false },  // 音: 付点気味（タメ）
-        { r: 2.50, rest: true  },  // 休: 長（呼吸）
-        { r: 1.00, rest: false },  // 音: 中
-        { r: 3.00, rest: true  },  // 休: 大きな沈黙（サティ的）
-        { r: 0.75, rest: false },  // 音: 短（次サイクルへの橋渡し）
+        { r: 3.0, rest: false },  // 音: 付点8分（タメのある入り）
+        { r: 1.0, rest: false },  // 音: 16分（食い込み・シンコペーション）
+        { r: 2.0, rest: true  },  // 休: 8分（小さな呼吸）
+        { r: 4.0, rest: false },  // 音: 4分（安定した中心音）
+        { r: 3.0, rest: true  },  // 休: 付点8分（引き）
+        { r: 1.0, rest: false },  // 音: 16分（短い一閃）
+        { r: 6.0, rest: true  },  // 休: 付点4分（サティ的な長い沈黙）
+        { r: 2.0, rest: false },  // 音: 8分（次サイクルへ橋渡し）
       ];
       const _CELL_LEN = _PLAIN_CELL.length;
 
