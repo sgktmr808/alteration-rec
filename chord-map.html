@@ -10529,7 +10529,10 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul){
   // → 倍音の自然減衰だけで音色変化を作る（フィルターは動かさない）
   if(sceneCurrentName === 'plain'){
     subG.gain.value = 0.0;          // sub oscカット
-    osc2g.gain.value = 0.30;        // sawtooth薄めに固定（多すぎると歪む）
+    // osc2を5度上（Hz×1.5）に設定・brightスライダーで強調
+    osc2.frequency.value = hz * 1.5;
+    const _brightVal = sv ? sv('bright') : 0;
+    osc2g.gain.value = 0.10 + _brightVal * 0.10; // bright=-1:0.0 / 0:0.10 / +1:0.20
   }
 
   // ── ルーティング ──
@@ -11504,7 +11507,7 @@ const SCENE_PRESETS = {
     // ARP音色: クラシックギター(スパニッシュ)＋ピアノ高音域の単音
     // triangle(基音の芯) + sawtooth(弦の倍音)を固定比率で混ぜる
     // フィルターenvは使わない。倍音の自然減衰だけで音色を作る。
-    arpOsc:'sine', arpOsc2:'triangle', arpCutoff:4444, arpRes:0.8, arpEnvMod:0.0,
+    arpOsc:'sine', arpOsc2:'sine', arpCutoff:4444, arpRes:0.8, arpEnvMod:0.0,
     arpAttack:0.002, arpDecay:0.28, arpSustain:0.0, arpRelease:0.38,
     arpGate:140, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
     arpOctRange:2,
