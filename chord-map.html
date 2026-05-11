@@ -10567,7 +10567,7 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(arpEnvOut !== null && sceneCurrentName === 'plain'){
     const _plainWarm = sv ? sv('warm') : 0;
     const plainDly = actx.createDelay(1.0);
-    plainDly.delayTime.value = 0.22 + Math.random() * 0.04; // 220〜260ms（揺れで生気）
+    plainDly.delayTime.value = 0.24; // 240ms固定（BPM72で付点8分相当）
     const plainDlyFb = actx.createGain();
     plainDlyFb.gain.value = 0.22 + _plainWarm * 0.14; // warm連動: 0.08〜0.36
     const plainDlyG = actx.createGain();
@@ -10694,10 +10694,10 @@ const _phraseState = {
   hangingMidi: null,     // 前コードから引きずる音（未解決音）
 
   // PLAIN固有
-  plainMotifType: 0,     // 0:収束 1:拡散 2:落下 3:跳躍（エモーショナル）
-  plainSilenceNext: false, // 次ステップを強制休符にする
-  plainInRestNext: false,  // 動機内部の休符フラグ（シンコペーション間）
-  plainInRestVal: 0,       // 動機内部の休符長さ（stepRatio）
+  plainIntervalIdx: 0,   // 間隔パターンのインデックス
+  plainDir: 1,           // 現在の旋律方向（+1上行/-1下行）
+  plainDirCount: 0,      // 同方向継続カウント
+  plainLeapNext: false,  // 次の音を跳躍させるフラグ（SL:strange連動）
 
   // VELVET固有
   velvetDir: 1,          // 現在の進行方向（+1/-1）
@@ -10723,10 +10723,9 @@ function _resetPhraseState(){
   _phraseState.notesSinceChord = 0;
   _phraseState.phrasePos = 0;
   _phraseState.phraseCount = 0;
-  // PLAINはmotifTypeとsilenceを保持（コードをまたいで動機が継続）
-  _phraseState.plainSilenceNext = false;
-  _phraseState.plainInRestNext = false;
-  _phraseState.plainInRestVal = 0;
+  // PLAINは旋律の流れを保持（コードをまたいでlastMidiが継続）
+  // intervalIdxとdirはリセットしない（呼吸が続く）
+  _phraseState.plainLeapNext = false;
   // GLASSの対話感は保持（intervalIdxはリセット）
   _phraseState.glassIntervalIdx = 0;
   // PLUCKの細胞はコードチェンジで再生成
@@ -10739,15 +10738,14 @@ function _resetPhraseState(){
 // baseSec倍率として使用
 const _GLASS_INTERVAL_PATTERN = [4.0, 3.5, 2.0, 1.0, 3.0, 1.5, 5.0, 2.5];
 
-// PLAIN動機定義: スケール音・テンション跳躍・前コード引きずりを含む
-// notes: arpSeq（コードトーン、octRange=2で2オクターブ分）
-// motifType: 0=収束 1=拡散 2=落下 3=跳躍（エモーショナル）
-function _buildPlainMotif(notes, motifType, lastMidi){
-  const n = notes;
-  if(!n || n.length === 0) return [60];
-  const mid = Math.floor(n.length / 2);
+// PLAIN次音選択: 旋律的な声部進行で次の1音を返す
+// パターンを作らず、前の音から自然に流れる旋律として設計。
+// コードトーン中心に、スケール音が自然に現れる。
+// strangeが高いと跳躍しやすくなる。
+function _plainNextMidi(notes, lastMidi, dir, leapNext){
+  if(!notes || notes.length === 0) return 60;
 
-  // 現在コードのスケール音を取得（コードトーン外の音への移動に使用）
+  // スケール音を取得（コードトーン + スケール経過音）
   let scaleTones = null;
   try{
     if(S && S.root && S.type && typeof getScaleNotes === 'function'){
@@ -10756,86 +10754,61 @@ function _buildPlainMotif(notes, motifType, lastMidi){
     }
   }catch(e){}
 
-  // 前の音から最も近い音のインデックスを起点とする
-  let startIdx = mid;
-  if(lastMidi !== null){
-    let minDist = Infinity;
-    n.forEach((m,i) => { const d = Math.abs(m - lastMidi); if(d < minDist){ minDist=d; startIdx=i; } });
+  // 候補音: コードトーン優先、スケール音を30%で混ぜる
+  let pool = [...notes];
+  if(scaleTones && scaleTones.length > 0 && Math.random() < 0.30){
+    // コードトーンと重複しないスケール音を追加
+    const chordPcs = new Set(notes.map(m => m % 12));
+    const scaleOnly = scaleTones.filter(m => !chordPcs.has(m % 12));
+    if(scaleOnly.length > 0) pool = pool.concat(scaleOnly);
   }
 
-  // 前コードの引きずり音: 現コードにぶつからない音を選ぶ
-  const ps = _phraseState;
-  let hangNote = null;
-  if(ps.hangingMidi !== null && scaleTones){
-    // 前コードから引きずる音がスケール内にあれば使う（半音ずれでなければOK）
-    const chordPcs = new Set(n.map(m => m % 12));
-    const hangPc = ps.hangingMidi % 12;
-    // コードトーンと半音関係でなければ使える（ぶつからない）
-    const isClash = [...chordPcs].some(pc => Math.abs(pc - hangPc) === 1 || Math.abs(pc - hangPc) === 11);
-    if(!isClash && scaleTones.some(m => m % 12 === hangPc)){
-      // 引きずる音を現在の音域に収める
-      const targetOct = Math.round(n[mid] / 12);
-      hangNote = targetOct * 12 + hangPc;
-    }
+  if(lastMidi === null){
+    // 初回: 中域から開始
+    const mid = Math.floor(pool.length / 2);
+    return pool[mid] || notes[0];
   }
 
-  // スケール音への跳躍先を選ぶ（コードトーン外のエモーショナルな音）
-  function _getScaleLeap(fromMidi, direction){
-    if(!scaleTones) return null;
-    const chordPcs = new Set(n.map(m => m % 12));
-    // コードトーン外のスケール音でfromMidiから3〜7半音離れた音
-    const candidates = scaleTones.filter(m => {
-      const diff = m - fromMidi;
-      const absDiff = Math.abs(diff);
-      const pc = m % 12;
-      return absDiff >= 3 && absDiff <= 9
-        && (direction > 0 ? diff > 0 : diff < 0)
-        && !chordPcs.has(pc);
+  if(leapNext){
+    // 跳躍: 現在音から5〜10半音離れた音（strangeが高いとき）
+    const leapCandidates = pool.filter(m => {
+      const d = Math.abs(m - lastMidi);
+      return d >= 5 && d <= 12;
     });
-    if(candidates.length === 0) return null;
-    // 最も近いものを返す
-    return candidates.reduce((a, b) =>
-      Math.abs(a - fromMidi) < Math.abs(b - fromMidi) ? a : b
-    );
-  }
-
-  const hi = n[n.length - 1];
-  const lo = n[0];
-
-  switch(motifType % 4){
-    case 0: { // 収束: 高め→スケール経過音→コードトーンへ着地
-      const fromMidi = lastMidi || n[Math.min(n.length-1, startIdx+2)] || hi;
-      const leap = _getScaleLeap(fromMidi, -1); // 下方向のスケール音
-      const land = n[Math.max(0, startIdx - 1)] || lo; // 着地（コードトーン）
-      return leap
-        ? [n[Math.min(n.length-1, startIdx+2)] || hi, leap, land]
-        : [n[Math.min(n.length-1, startIdx+2)] || hi, n[mid], land];
-    }
-    case 1: { // 拡散+引きずり: 前コードの音から始まり現コードへ解決
-      const start = hangNote || n[mid];
-      const leap = _getScaleLeap(start, 1); // 上方向のスケール音
-      return leap
-        ? [start, leap, n[Math.min(n.length-1, mid+1)] || hi]
-        : [start, n[Math.max(0, mid-1)], n[Math.min(n.length-1, mid+2)] || hi];
-    }
-    case 2: { // 落下: 高音スケール音 → コードトーン（サティ的な下降）
-      const fromTop = n[n.length-1]; // 最高音から
-      const leap = _getScaleLeap(fromTop, -1);
-      const land = n[Math.max(0, startIdx-1)] || lo;
-      return leap
-        ? [fromTop, leap, land]
-        : [fromTop, n[mid], land];
-    }
-    case 3: { // 跳躍（エモーショナル）: 低→スケール音の大跳躍→コードトーン着地
-      const fromLo = lo;
-      const leap = _getScaleLeap(fromLo + 7, 1) || _getScaleLeap(fromLo, 1); // 5度上付近から探す
-      const land = n[Math.min(n.length-1, startIdx+1)] || hi;
-      return leap
-        ? [fromLo, leap, land]
-        : [fromLo, hi, n[mid]]; // leapがなければ最高音へ跳躍
+    if(leapCandidates.length > 0){
+      return leapCandidates[Math.floor(Math.random() * leapCandidates.length)];
     }
   }
-  return [n[mid]];
+
+  // 通常: 方向に沿って近い音へ移動（1〜5半音）
+  // dir=+1で上行、dir=-1で下行
+  const stepCandidates = pool.filter(m => {
+    const diff = m - lastMidi;
+    const absDiff = Math.abs(diff);
+    return absDiff >= 1 && absDiff <= 5
+      && (dir > 0 ? diff > 0 : diff < 0);
+  });
+
+  if(stepCandidates.length > 0){
+    // 最も近い音を基本に、確率的に2番目も選ぶ（単調にならない）
+    const sorted = stepCandidates.sort((a,b) =>
+      Math.abs(a - lastMidi) - Math.abs(b - lastMidi));
+    const pickIdx = Math.random() < 0.75 ? 0 : Math.min(1, sorted.length - 1);
+    return sorted[pickIdx];
+  }
+
+  // 端に達した場合: 方向反転して最も近い音
+  const opposite = pool.filter(m => {
+    const diff = m - lastMidi;
+    return dir > 0 ? diff < 0 : diff > 0;
+  });
+  if(opposite.length > 0){
+    return opposite.reduce((a,b) =>
+      Math.abs(a - lastMidi) < Math.abs(b - lastMidi) ? a : b);
+  }
+
+  // フォールバック: 中域
+  return pool[Math.floor(pool.length / 2)] || notes[0];
 }
 
 // PLUCKの細胞を生成（4〜6音）
@@ -10883,98 +10856,73 @@ function _phraseNext(notes, baseSec, sc, densityMul){
   switch(sceneCurrentName){
 
     // ────────────────────────────────────────────
-    // PLAIN: 短い動機（2〜3音）+ 必ず沈黙。スケール跳躍・前コード引きずり
+    // PLAIN: 旋律的な流れ × サティ的呼吸 × ラテンのシンコペーション
+    //
+    // 設計思想:
+    //   パターンを作らない。前の音から旋律として自然に流れる。
+    //   間隔パターンで呼吸を作る（GLASSと同じ考え方、サティ的な長い沈黙）。
+    //   ラテンのシンコペーション = 間隔の非均等（0.75と1.5の組み合わせ）。
+    //   SL:strange で跳躍度が上がる。SL:moving で密度が変わる。
+    //
+    // 間隔パターン（baseSec倍率）:
+    //   音符: 0.75〜1.5（短め〜やや長め）
+    //   沈黙: 2.0〜4.5（音より必ず長い）
+    //   シンコペーション的な非均等がラテン感を作る
     // ────────────────────────────────────────────
     case 'plain': {
-      // ────────────────────────────────────────────
-      // PLAIN フレーズ文法
-      // 動機タイプごとに固定リズム型を持つ（耳に残る構成）。
-      // ランダムではなく「型」として繰り返し、微細なjitter（±6%）で人間味を出す。
-      //
-      // motifType別リズム型（3音動機）:
-      //   0 収束:          [短・中・長]  — タッ・タン・タアー。後ろへ向かって落ち着く
-      //   1 拡散+引きずり: [中・短・中]  — タン・タッ・タン。食い込む感（シンコペーション的）
-      //   2 落下:          [長・短・中]  — タアー・タッ・タン。タメから着地
-      //   3 跳躍:          [短・休・長]  — タッ・(間)・タアー。大きな空白が印象的
-      //
-      // 沈黙はフレーズの後のみ（動機内には基本入れない。type1のみ内部に休がある）
-      // ────────────────────────────────────────────
-
-      // ── PLAIN フレーズ文法 (サティ × ラテン) ──
-      //
-      // 設計思想:
-      //   沈黙が主役。音より間の方が長い。
-      //   動機は耳に残る「型」として繰り返す（完全な反復ではなく微妙にずれる）。
-      //   ラテンのシンコペーション = 拍の頭を外す・食い込む動き。
-      //   jitter ±6% で機械感を消す。
-      //
-      // motifType別リズム型（baseSec = 1拍）:
-      //   0: ター・ンタッ  [1.5, 休0.5, 0.75]  長→食い込み短。拍頭を外す
-      //   1: タッ・ン・ター [0.38, 休0.62, 1.5]  短→大休→長。サティ的呼吸
-      //   2: ター・タッ・ン [1.25, 0.5, 休0.75]  付点気味→短→休。スパニッシュ感
-      //   3: タッ・―――    [0.35, 沈黙大]        跳躍後の大きな空白（6フレーズに1回）
-      //
-      // 動機内の休符はstepRatioをnullでなく間隔として表現（音はnull・間隔は正の値）
-
-      // [音ratio, 内部休ratio（0=なし）, 次音ratio]  ※最後まで鳴らして後続の沈黙へ
-      const _plainRhythms = [
-        { notes:[1.5, 0.75],    inRest:[0, 0.5],   count:2 }, // 0: ター・ン・タッ
-        { notes:[0.38, 1.5],    inRest:[0.62, 0],  count:2 }, // 1: タッ・ン・ター
-        { notes:[1.25, 0.50],   inRest:[0, 0.75],  count:2 }, // 2: ター・タッ・ン
-        { notes:[0.35],         inRest:[0],        count:1 }, // 3: タッ・―――（跳躍）
+      // PLAIN間隔パターン: 音符と沈黙が交互に来る非均等なシーケンス
+      // [値, isRest] — isRest=trueなら沈黙
+      // 全体として「音 → 沈黙 → 音 → 長い沈黙 → 音...」の呼吸感
+      const _PLAIN_SEQ = [
+        { r: 1.0,  rest: false },  // 音（基本）
+        { r: 2.5,  rest: true  },  // 沈黙（中）
+        { r: 0.75, rest: false },  // 音（短め・シンコペーション的）
+        { r: 1.5,  rest: true  },  // 沈黙（短め）
+        { r: 1.25, rest: false },  // 音（やや長め）
+        { r: 3.5,  rest: true  },  // 沈黙（長い・サティ的呼吸）
+        { r: 0.75, rest: false },  // 音（短め）
+        { r: 1.0,  rest: true  },  // 沈黙（短め・次の音へ期待感）
+        { r: 1.5,  rest: false },  // 音（長め）
+        { r: 4.0,  rest: true  },  // 沈黙（最長・大きな呼吸）
+        { r: 0.75, rest: false },  // 音（短め）
+        { r: 2.0,  rest: true  },  // 沈黙（中）
       ];
-      const _silDefs = [2.2, 3.0, 2.5, 4.0]; // 動機後の沈黙基準値
 
-      const mType = ps.plainMotifType % 4;
-      const rDef = _plainRhythms[mType];
+      const seqLen = _PLAIN_SEQ.length;
+      const step = _PLAIN_SEQ[ps.plainIntervalIdx % seqLen];
 
-      // ── 強制休符フラグ（動機完了後の沈黙）──
-      if(ps.plainSilenceNext){
-        ps.plainSilenceNext = false;
-        const silRatio = (_silDefs[mType] + Math.random() * 1.2) * densityMul;
-        return { midi: null, stepRatio: silRatio };
+      // SL:strange → 跳躍フラグ（strangeが高いと次の音が跳躍しやすい）
+      const _strangeVal = sv ? sv('strange') : 0;
+      const _leapProb = Math.max(0, _strangeVal * 0.5); // 0〜0.5
+      if(!step.rest && Math.random() < _leapProb){
+        ps.plainLeapNext = true;
       }
 
-      // ── 内部休符フラグ（動機内のシンコペーション的な間）──
-      if(ps.plainInRestNext){
-        ps.plainInRestNext = false;
-        const inRestRatio = ps.plainInRestVal * (0.94 + Math.random() * 0.12) * densityMul;
-        return { midi: null, stepRatio: inRestRatio };
+      // stepRatioにjitter ±8%
+      const jitter = 0.92 + Math.random() * 0.16;
+      const stepRatio = step.r * jitter * densityMul;
+
+      ps.plainIntervalIdx++;
+
+      if(step.rest){
+        return { midi: null, stepRatio };
       }
 
-      // ── 音を発音 ──
-      const motif = _buildPlainMotif(notes, mType, ps.lastMidi);
-      const noteIdx = ps.phrasePos % rDef.count;
-      const midi = motif[Math.min(noteIdx, motif.length - 1)];
-
-      const rVal = rDef.notes[noteIdx] || 0.5;
-      const jitter = 0.94 + Math.random() * 0.12;
-      const noteRatio = rVal * jitter * densityMul;
-
-      // 内部休符があれば次ステップにセット
-      const inRest = rDef.inRest[noteIdx] || 0;
-      if(inRest > 0){
-        ps.plainInRestNext = true;
-        ps.plainInRestVal = inRest;
+      // 音の選択: 旋律的な声部進行
+      // 方向転換: 4〜6音ごとに方向が変わる（単調な上行・下行にならない）
+      ps.plainDirCount++;
+      const _dirChangeAt = 3 + Math.floor(Math.random() * 3); // 3〜5音で方向転換
+      if(ps.plainDirCount >= _dirChangeAt){
+        ps.plainDir *= -1;
+        ps.plainDirCount = 0;
       }
 
-      ps.phrasePos++;
+      const midi = _plainNextMidi(notes, ps.lastMidi, ps.plainDir, ps.plainLeapNext);
+      ps.plainLeapNext = false;
       ps.lastMidi = midi;
+      ps.phraseCount++;
 
-      if(ps.phrasePos >= rDef.count){
-        ps.phrasePos = 0;
-        ps.phraseCount++;
-        ps.plainSilenceNext = true;
-        // 3フレーズに1回タイプ変更。跳躍(3)は6フレーズに1回
-        if(ps.phraseCount % 6 === 5){
-          ps.plainMotifType = 3;
-        } else if(ps.phraseCount % 3 === 0){
-          ps.plainMotifType = (ps.plainMotifType < 3)
-            ? (ps.plainMotifType + 1) % 3 : 0;
-        }
-      }
-
-      return { midi, stepRatio: noteRatio };
+      return { midi, stepRatio };
     }
 
     // ────────────────────────────────────────────
