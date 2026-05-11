@@ -10505,8 +10505,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     // PLAIN専用エンベロープ: ギター弦・ピアノ高音域の自然減衰
     // attack極短 → decay（倍音が自然に消える）→ sustain 0 → release（余韻）
     // フィルターは動かさない。エンベロープの減衰だけで音色変化を作る。
-    const plainDecay = sc.arpDecay || 0.14;
-    const plainRelease = sc.arpRelease || 0.35;
+    const plainDecay = sc.arpDecay || 0.28;
+    const plainRelease = sc.arpRelease || 0.38;
     env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.015, 0.001), startTime + atk + plainDecay);
     env.gain.exponentialRampToValueAtTime(0.001, startTime + atk + plainDecay + plainRelease);
   } else {
@@ -11455,8 +11455,8 @@ const SCENE_PRESETS = {
     // triangle(基音の芯) + sawtooth(弦の倍音)を固定比率で混ぜる
     // フィルターenvは使わない。倍音の自然減衰だけで音色を作る。
     arpOsc:'triangle', arpOsc2:'sawtooth', arpCutoff:5500, arpRes:0.12, arpEnvMod:0.0,
-    arpAttack:0.002, arpDecay:0.14, arpSustain:0.0, arpRelease:0.35,
-    arpGate:100, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
+    arpAttack:0.002, arpDecay:0.28, arpSustain:0.0, arpRelease:0.38,
+    arpGate:140, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
     arpOctRange:2,
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
