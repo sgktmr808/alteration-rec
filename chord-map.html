@@ -10469,6 +10469,13 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     env.gain.exponentialRampToValueAtTime(loveDecayVol, startTime + atk + decay);
     // gate終了後もゆっくりフェード（リリースの余韻）
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec + 0.55);
+  } else if(sceneCurrentName === 'plain'){
+    // PLAIN専用エンベロープ: attack → decay（短く）→ sustain 0 → release（余韻）
+    // gateで一気に切らずリリースで自然に消える。ディレイが余韻の空間を作る。
+    const plainDecay = sc.arpDecay || 0.10;
+    const plainRelease = sc.arpRelease || 0.55;
+    env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.03, 0.001), startTime + atk + plainDecay);
+    env.gain.exponentialRampToValueAtTime(0.001, startTime + atk + plainDecay + plainRelease);
   } else {
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
   }
@@ -10544,6 +10551,24 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     arpEnvOut = null; // 以下の共通ルーティングをスキップ
   }
 
+  // ── PLAIN専用ディレイ: 余韻と空間を作る ──
+  // サティ的な「音が消えた後に光が残る」感覚。SLのwarmでfb深さが変わる。
+  if(arpEnvOut !== null && sceneCurrentName === 'plain'){
+    const _plainWarm = sv ? sv('warm') : 0;
+    const plainDly = actx.createDelay(1.0);
+    plainDly.delayTime.value = 0.22 + Math.random() * 0.04; // 220〜260ms（揺れで生気）
+    const plainDlyFb = actx.createGain();
+    plainDlyFb.gain.value = 0.22 + _plainWarm * 0.14; // warm連動: 0.08〜0.36
+    const plainDlyG = actx.createGain();
+    plainDlyG.gain.value = 0.38; // ディレイwet量（控えめ・サティ的余白）
+    arpEnvOut.connect(plainDly);
+    plainDly.connect(plainDlyFb);
+    plainDlyFb.connect(plainDly);
+    plainDly.connect(plainDlyG);
+    // ディレイ出力 → reverb（ディレイの尾も空間に溶ける）
+    plainDlyG.connect(rvbTarget);
+  }
+
   // delay 30% + reverb 70%（reverb感を強める）
   if(arpEnvOut !== null){
     const dlyG = actx.createGain(); dlyG.gain.value = 0.30;
@@ -10563,7 +10588,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(!_loveOsc1Handled) osc1.start(startTime); // LOVEはosc1_sine/osc1_wtで起動済み
   osc2.start(startTime); sub.start(startTime);
   // LOVEはrelease余韻分長めにoscを維持
-  const oscStopExtra = isLoveScene ? 0.65 : 0.08;
+  const _plainRelSec = (sceneCurrentName === 'plain') ? (sc.arpRelease || 0.55) + 0.1 : 0.08;
+  const oscStopExtra = isLoveScene ? 0.65 : _plainRelSec;
   if(!_loveOsc1Handled) osc1.stop(startTime + gateSec + oscStopExtra);
   osc2.stop(startTime + gateSec + oscStopExtra);
   sub.stop(startTime + gateSec + oscStopExtra);
@@ -10845,25 +10871,59 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     // PLAIN: 短い動機（2〜3音）+ 必ず沈黙。スケール跳躍・前コード引きずり
     // ────────────────────────────────────────────
     case 'plain': {
-      // 強制休符フラグ
+      // ────────────────────────────────────────────
+      // PLAIN フレーズ文法
+      // 動機タイプごとに固定リズム型を持つ（耳に残る構成）。
+      // ランダムではなく「型」として繰り返し、微細なjitter（±6%）で人間味を出す。
+      //
+      // motifType別リズム型（3音動機）:
+      //   0 収束:          [短・中・長]  — タッ・タン・タアー。後ろへ向かって落ち着く
+      //   1 拡散+引きずり: [中・短・中]  — タン・タッ・タン。食い込む感（シンコペーション的）
+      //   2 落下:          [長・短・中]  — タアー・タッ・タン。タメから着地
+      //   3 跳躍:          [短・休・長]  — タッ・(間)・タアー。大きな空白が印象的
+      //
+      // 沈黙はフレーズの後のみ（動機内には基本入れない。type1のみ内部に休がある）
+      // ────────────────────────────────────────────
+
+      // 動機タイプ別リズム型定義（stepRatio値・baseSec=1拍基準）
+      const _plainRhythms = [
+        [0.38, 0.65, 0.0],   // 0 収束: 短・中・(沈黙へ)。最終音はnull返して沈黙に委ねる
+        [0.55, 0.30, 0.55],  // 1 拡散: 中・短・中。食い込み感
+        [0.80, 0.35, 0.0],   // 2 落下: 長・短・(沈黙へ)
+        [0.30, 0.0,  0.0],   // 3 跳躍: 短・(大沈黙)・(着地は沈黙後)
+      ];
+      // 跳躍(3)は2音構成にする（低→着地）
+      const _plainMotifs3Notes = [3, 3, 3, 2]; // 各タイプの実音数
+
+      const mType = ps.plainMotifType % 4;
+      const rhythm = _plainRhythms[mType];
+      const motifNoteCount = _plainMotifs3Notes[mType]; // 実際に鳴らす音数
+
+      // 強制休符フラグ（動機完了後の沈黙）
       if(ps.plainSilenceNext){
         ps.plainSilenceNext = false;
-        // 沈黙の長さ: motifTypeで変化（エモーショナルな動機の後は長め）
-        // 跳躍(3)の後: 長い余韻 / 通常: 短め〜中程度
-        const silBase = ps.plainMotifType === 3 ? 3.0 : 2.0;
-        const silRand = ps.plainMotifType === 3 ? 2.0 : 1.5;
-        const silRatio = (silBase + Math.random() * silRand) * densityMul;
+        // 沈黙の長さ: タイプで変化
+        // 跳躍(3)の後: 大きな空白 / 落下(2)の後: 中程度 / その他: 短め
+        const silDefs = [1.8, 2.2, 2.8, 3.5];
+        const silBase = silDefs[mType];
+        const silRatio = (silBase + Math.random() * 1.0) * densityMul;
         return { midi: null, stepRatio: silRatio };
       }
 
       // 動機の音を取得
-      const motif = _buildPlainMotif(notes, ps.plainMotifType, ps.lastMidi);
-      const midi = motif[ps.phrasePos % motif.length];
+      const motif = _buildPlainMotif(notes, mType, ps.lastMidi);
+      const noteIdx = ps.phrasePos % motif.length;
+      const midi = motif[noteIdx];
+
+      // このステップのリズム値（jitter ±6%で人間味）
+      const rVal = rhythm[noteIdx] || 0.45;
+      const jitter = 0.94 + Math.random() * 0.12;
+      const noteRatio = rVal * jitter * densityMul;
 
       ps.phrasePos++;
       ps.lastMidi = midi;
 
-      if(ps.phrasePos >= motif.length){
+      if(ps.phrasePos >= motifNoteCount){
         // 動機完了 → 次は必ず沈黙
         ps.phrasePos = 0;
         ps.phraseCount++;
@@ -10871,7 +10931,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         // 3フレーズに1回、動機タイプを変える（4種類をローテーション）
         // 跳躍(3)は6フレーズに1回だけ出現（出すぎない）
         if(ps.phraseCount % 6 === 5){
-          ps.plainMotifType = 3; // エモーショナル跳躍
+          ps.plainMotifType = 3;
         } else if(ps.phraseCount % 3 === 0){
           ps.plainMotifType = (ps.plainMotifType < 3)
             ? (ps.plainMotifType + 1) % 3
@@ -10879,10 +10939,6 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         }
       }
 
-      // 動機内の音間隔: 一定リズム感を保ちながら微妙に揺れる（±10%）
-      // サティ的な「揺れながら前に進む」感覚
-      const noteBase = ps.phrasePos === 1 ? 0.55 : 0.45; // 動機最初は少し長め
-      const noteRatio = noteBase * (0.9 + Math.random() * 0.2) * densityMul;
       return { midi, stepRatio: noteRatio };
     }
 
@@ -11347,8 +11403,8 @@ const SCENE_PRESETS = {
     // envModを上げてアタックの粒感を明確にする
     // フレーズ文法エンジンがリズムを担うためarpRhythmは参照されない
     arpOsc:'triangle', arpCutoff:2200, arpRes:0.35, arpEnvMod:0.42,
-    arpAttack:0.008, arpDecay:0.45, arpSustain:0.04,
-    arpGate:280, arpVol:0.20, arpWet:0.44, arpGhost:0.22,
+    arpAttack:0.007, arpDecay:0.10, arpSustain:0.0, arpRelease:0.55,
+    arpGate:180, arpVol:0.20, arpWet:0.44, arpGhost:0.22,
     arpOctRange:2, // 2オクターブ: 跳躍感・エモーショナルな動き
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
