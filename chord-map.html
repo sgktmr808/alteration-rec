@@ -4353,10 +4353,42 @@ function midi2hz(m){return 440*Math.pow(2,(m-69)/12);}
 function getScaleNotes(root,type,octBase=5){
   const ri=ni(root);
   const chordIvs=CT[type]?.iv??[0,4,7];
-  // スケール：コードトーン優先、残りはメジャー/マイナースケールで補完
-  const isMin=type.startsWith('m')&&!['maj7','maj9','mmaj7'].includes(type);
-  const scaleIvs=isMin?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+
+  // コードタイプに応じたスケールを選択（二択では不十分なため細分化）
+  // 各スケールはコードトーンと矛盾しない音だけを使う
+  let scaleIvs;
+  if(['m','minor','m7','m9','m6','m11'].includes(type)){
+    // 自然短音階（ナチュラルマイナー）
+    scaleIvs=[0,2,3,5,7,8,10];
+  } else if(['mmaj7','mMaj7'].includes(type)){
+    // 和声的短音階（メロディックマイナー）: b3+長7度
+    scaleIvs=[0,2,3,5,7,8,11];
+  } else if(['m7b5','ø'].includes(type)){
+    // ロクリアン: b2,b3,b5,b6,b7
+    scaleIvs=[0,1,3,5,6,8,10];
+  } else if(['dim','dim7','°','°7'].includes(type)){
+    // ディミニッシュスケール（全半）
+    scaleIvs=[0,2,3,5,6,8,9,11];
+  } else if(['7','dom7','9','7b9','7s9','11','13','7s11'].includes(type)){
+    // ミクソリディアン: メジャーだがb7を含む
+    scaleIvs=[0,2,4,5,7,9,10];
+  } else if(['7b9'].includes(type)){
+    // オルタードスケール: b9を含むドミナント
+    scaleIvs=[0,1,3,4,6,8,10];
+  } else if(['sus2','sus4','7sus4'].includes(type)){
+    // メジャーペンタ寄り: sus系はb3を避ける
+    scaleIvs=[0,2,4,5,7,9,10];
+  } else if(['aug','augM7'].includes(type)){
+    // 全音音階: 増三和音
+    scaleIvs=[0,2,4,6,8,10];
+  } else {
+    // メジャー系デフォルト（major,maj7,maj9,add9,6,6/9など）
+    scaleIvs=[0,2,4,5,7,9,11];
+  }
+
+  const isMin = scaleIvs.includes(3) && !scaleIvs.includes(4); // b3を含みM3を含まない
   const allIvs=[...new Set([...chordIvs,...scaleIvs])].sort((a,b)=>a-b);
+
   // 3オクターブ分（4,5,6）展開
   const notes=[];
   [octBase-1,octBase,octBase+1].forEach(oct=>{
