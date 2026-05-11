@@ -10599,13 +10599,11 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(arpEnvOut !== null && sceneCurrentName === 'plain'){
     const _plainWarm = sv ? sv('warm') : 0;
     const plainDly = actx.createDelay(1.0);
-    // BPM連動: 付点8分（beat * 0.75）でリズムに乗る余韻
-    const _plainBeat = 60 / (autoBpm || 72);
-    plainDly.delayTime.value = _plainBeat * 0.75;
+    plainDly.delayTime.value = 0.24; // 240ms固定
     const plainDlyFb = actx.createGain();
-    plainDlyFb.gain.value = 0.32 + _plainWarm * 0.13; // warm連動: 0.32〜0.45
+    plainDlyFb.gain.value = 0.22 + _plainWarm * 0.14; // warm連動: 0.22〜0.36
     const plainDlyG = actx.createGain();
-    plainDlyG.gain.value = 0.30; // ディレイwet量（余韻をしっかり出す）
+    plainDlyG.gain.value = 0.22; // ディレイwet量
     arpEnvOut.connect(plainDly);
     plainDly.connect(plainDlyFb);
     plainDlyFb.connect(plainDly);
@@ -10728,12 +10726,13 @@ const _phraseState = {
   hangingMidi: null,     // 前コードから引きずる音（未解決音）
 
   // PLAIN固有
-  plainIntervalIdx: 0,   // 間隔パターンのインデックス
-  plainDir: 1,           // 現在の旋律方向（+1上行/-1下行）
-  plainDirCount: 0,      // 同方向継続カウント
-  plainLeapNext: false,  // 次の音を跳躍させるフラグ（SL:strange連動）
-  plainWavePhase: 0,     // ずれの波位相（0〜2πで1サイクル）
-  plainDoublNext: false, // 次ステップに2連続音を入れるフラグ
+  plainCellPos: 0,       // 循環セル内の位置（0〜cellLen-1）
+  plainCellPhase: 0,     // セル起点のシフト量（ポリリズム的位相ずれ）
+  plainCycleCount: 0,    // セル完了カウント（変容タイミング管理）
+  plainArcDir: 1,        // 旋律の弧の方向（+1上行/-1下行）
+  plainArcPos: 0,        // 弧の中の位置（0〜arcLen-1）
+  plainNoteSeq: null,    // 現在の旋律シーケンス（コードトーンを弧で並べた配列）
+  plainLeapNext: false,  // 跳躍フラグ（SL:strange連動）
 
   // VELVET固有
   velvetDir: 1,          // 現在の進行方向（+1/-1）
@@ -10759,11 +10758,12 @@ function _resetPhraseState(){
   _phraseState.notesSinceChord = 0;
   _phraseState.phrasePos = 0;
   _phraseState.phraseCount = 0;
-  // PLAINは旋律の流れを保持（コードをまたいでlastMidiが継続）
-  // intervalIdxとdirはリセットしない（呼吸が続く）
+  // PLAINはコードをまたいでlastMidiとarcDirを保持（旋律が続く）
+  // cellPosとcycleCountはリセット（新しいコードで旋律シーケンスを再構築）
+  _phraseState.plainCellPos = 0;
+  _phraseState.plainCycleCount = 0;
+  _phraseState.plainNoteSeq = null; // コードチェンジで旋律シーケンスを再構築
   _phraseState.plainLeapNext = false;
-  _phraseState.plainWavePhase = 0;
-  _phraseState.plainDoublNext = false;
   // GLASSの対話感は保持（intervalIdxはリセット）
   _phraseState.glassIntervalIdx = 0;
   // PLUCKの細胞はコードチェンジで再生成
@@ -10776,14 +10776,14 @@ function _resetPhraseState(){
 // baseSec倍率として使用
 const _GLASS_INTERVAL_PATTERN = [4.0, 3.5, 2.0, 1.0, 3.0, 1.5, 5.0, 2.5];
 
-// PLAIN次音選択: 旋律的な声部進行で次の1音を返す
-// パターンを作らず、前の音から自然に流れる旋律として設計。
-// コードトーン中心に、スケール音が自然に現れる。
-// strangeが高いと跳躍しやすくなる。
-function _plainNextMidi(notes, lastMidi, dir, leapNext){
-  if(!notes || notes.length === 0) return 60;
+// PLAIN旋律シーケンス構築:
+// コードトーンを弧（上行→下行→上行...）で並べた循環シーケンスを作る。
+// Shape of My Heart的: 決まった音の並びが循環し、その中に旋律が宿る。
+// 数サイクルごとにスケール音が1音混入してRej的な微細な変容を与える。
+function _plainBuildNoteSeq(notes, cycleCount){
+  if(!notes || notes.length === 0) return [60];
 
-  // スケール音を取得（コードトーン + スケール経過音）
+  // スケール音を取得（変容用）
   let scaleTones = null;
   try{
     if(S && S.root && S.type && typeof getScaleNotes === 'function'){
@@ -10792,61 +10792,35 @@ function _plainNextMidi(notes, lastMidi, dir, leapNext){
     }
   }catch(e){}
 
-  // 候補音: コードトーン優先、スケール音を30%で混ぜる
-  let pool = [...notes];
-  if(scaleTones && scaleTones.length > 0 && Math.random() < 0.30){
-    // コードトーンと重複しないスケール音を追加
+  // コードトーンを音域でソート
+  const sorted = [...notes].sort((a,b) => a - b);
+  const len = sorted.length;
+  if(len === 0) return [60];
+
+  // 弧を作る: 低→高→低 の形でシーケンスを構築
+  // 例: [C3,E3,G3,C4,E4] → [C3,E3,G3,C4,E4,C4,G3,E3] のような往復
+  const ascending  = sorted;
+  const descending = sorted.slice(1, len - 1).reverse(); // 両端を除いた折り返し
+  let seq = [...ascending, ...descending];
+
+  // 4〜6サイクルに1回: スケール経過音を1つ挿入して変容させる
+  // （Rejのミニマル的変容: 同じパターンの中に一音だけ異物が混じる）
+  if(scaleTones && cycleCount > 0 && cycleCount % 5 === 0){
     const chordPcs = new Set(notes.map(m => m % 12));
-    const scaleOnly = scaleTones.filter(m => !chordPcs.has(m % 12));
-    if(scaleOnly.length > 0) pool = pool.concat(scaleOnly);
-  }
-
-  if(lastMidi === null){
-    // 初回: 中域から開始
-    const mid = Math.floor(pool.length / 2);
-    return pool[mid] || notes[0];
-  }
-
-  if(leapNext){
-    // 跳躍: 現在音から5〜10半音離れた音（strangeが高いとき）
-    const leapCandidates = pool.filter(m => {
-      const d = Math.abs(m - lastMidi);
-      return d >= 5 && d <= 12;
+    const passing = scaleTones.filter(m => {
+      if(chordPcs.has(m % 12)) return false;
+      // シーケンスの音域内に収める
+      return m >= sorted[0] && m <= sorted[len-1];
     });
-    if(leapCandidates.length > 0){
-      return leapCandidates[Math.floor(Math.random() * leapCandidates.length)];
+    if(passing.length > 0){
+      // ランダムな位置に1音だけ挿入（シーケンスの中盤あたり）
+      const insertPos = Math.floor(seq.length * 0.4) + Math.floor(Math.random() * Math.floor(seq.length * 0.3));
+      const passNote = passing[Math.floor(Math.random() * passing.length)];
+      seq = [...seq.slice(0, insertPos), passNote, ...seq.slice(insertPos)];
     }
   }
 
-  // 通常: 方向に沿って近い音へ移動（1〜5半音）
-  // dir=+1で上行、dir=-1で下行
-  const stepCandidates = pool.filter(m => {
-    const diff = m - lastMidi;
-    const absDiff = Math.abs(diff);
-    return absDiff >= 1 && absDiff <= 5
-      && (dir > 0 ? diff > 0 : diff < 0);
-  });
-
-  if(stepCandidates.length > 0){
-    // 最も近い音を基本に、確率的に2番目も選ぶ（単調にならない）
-    const sorted = stepCandidates.sort((a,b) =>
-      Math.abs(a - lastMidi) - Math.abs(b - lastMidi));
-    const pickIdx = Math.random() < 0.75 ? 0 : Math.min(1, sorted.length - 1);
-    return sorted[pickIdx];
-  }
-
-  // 端に達した場合: 方向反転して最も近い音
-  const opposite = pool.filter(m => {
-    const diff = m - lastMidi;
-    return dir > 0 ? diff < 0 : diff > 0;
-  });
-  if(opposite.length > 0){
-    return opposite.reduce((a,b) =>
-      Math.abs(a - lastMidi) < Math.abs(b - lastMidi) ? a : b);
-  }
-
-  // フォールバック: 中域
-  return pool[Math.floor(pool.length / 2)] || notes[0];
+  return seq;
 }
 
 // PLUCKの細胞を生成（4〜6音）
@@ -10908,83 +10882,88 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     //   シンコペーション的な非均等がラテン感を作る
     // ────────────────────────────────────────────
     case 'plain': {
-      // PLAIN間隔パターン: 音符と沈黙が交互に来る非均等なシーケンス
-      // [値, isRest] — isRest=trueなら沈黙
-      // 全体として「音 → 沈黙 → 音 → 長い沈黙 → 音...」の呼吸感
-      const _PLAIN_SEQ = [
-        { r: 1.0,  rest: false },  // 音（基本）
-        { r: 2.5,  rest: true  },  // 沈黙（中）
-        { r: 0.75, rest: false },  // 音（短め・シンコペーション的）
-        { r: 1.5,  rest: true  },  // 沈黙（短め）
-        { r: 1.25, rest: false },  // 音（やや長め）
-        { r: 3.5,  rest: true  },  // 沈黙（長い・サティ的呼吸）
-        { r: 0.75, rest: false },  // 音（短め）
-        { r: 1.0,  rest: true  },  // 沈黙（短め・次の音へ期待感）
-        { r: 1.5,  rest: false },  // 音（長め）
-        { r: 4.0,  rest: true  },  // 沈黙（最長・大きな呼吸）
-        { r: 0.75, rest: false },  // 音（短め）
-        { r: 2.0,  rest: true  },  // 沈黙（中）
+      // ── PLAIN フレーズ文法 ──
+      // Shape of My Heart × Ame/Rej 的設計:
+      //
+      // 【旋律】コードトーンを弧（低→高→低）で並べた循環シーケンスを基盤にする。
+      //   同じ旋律の型が循環し、5サイクルに1回スケール音が1つ混入して微細に変容。
+      //   ポリリズム的位相シフト: 16サイクルに1回セル起点が1ずれる（気づかないレベルで変わる）。
+      //
+      // 【リズム】音符と沈黙の型を持つ8ステップセル。
+      //   音符間隔は均等ではなくラテン的な非均等（付点・シンコペーション）。
+      //   SL:moving で沈黙が短縮（密度上昇）。
+      //   SL:strange で位相シフトが早まる + 跳躍音の出現。
+      //
+      // リズムセル（8ステップ、baseSec単位）:
+      //   音0.75 → 休1.5 → 音0.75 → 音1.25 → 休2.5 → 音1.0 → 休3.0 → 音0.75
+      //   「短・(間)・短・付点・(長い間)・中・(大きな呼吸)・短」
+      //   スパニッシュギター的な非均等リズムが基盤。
+
+      const _PLAIN_CELL = [
+        { r: 0.75, rest: false },  // 音: 短（入り）
+        { r: 1.50, rest: true  },  // 休: 中
+        { r: 0.75, rest: false },  // 音: 短（シンコペーション）
+        { r: 1.25, rest: false },  // 音: 付点気味（タメ）
+        { r: 2.50, rest: true  },  // 休: 長（呼吸）
+        { r: 1.00, rest: false },  // 音: 中
+        { r: 3.00, rest: true  },  // 休: 大きな沈黙（サティ的）
+        { r: 0.75, rest: false },  // 音: 短（次サイクルへの橋渡し）
       ];
+      const _CELL_LEN = _PLAIN_CELL.length;
 
-      const seqLen = _PLAIN_SEQ.length;
-      const step = _PLAIN_SEQ[ps.plainIntervalIdx % seqLen];
-
-      // ── SL値取得 ──
+      // SL値取得
       const _strangeVal = sv ? sv('strange') : 0;
       const _movingVal  = sv ? sv('moving')  : 0;
 
-      // ── 波サイクル: ずれが増減して法則的に戻る ──
-      // wavePhaseが0→2πで1サイクル。sinで±waveDepthの偏差を作る。
-      // strangeが高いほどずれ幅が大きく、movingが高いほどサイクルが速い
-      const _waveDepth = 0.18 + Math.max(0, _strangeVal) * 0.22; // 0.18〜0.40
-      const _waveSpeed = 0.28 + Math.max(0, _movingVal)  * 0.20; // 0.28〜0.48 rad/step
-      const _waveMod   = 1.0 + Math.sin(ps.plainWavePhase) * _waveDepth;
-      ps.plainWavePhase = (ps.plainWavePhase + _waveSpeed) % (Math.PI * 2);
-
-      // ── SL:strange → 跳躍フラグ ──
-      const _leapProb = Math.max(0, _strangeVal * 0.45);
-      if(!step.rest && Math.random() < _leapProb){
-        ps.plainLeapNext = true;
+      // 旋律シーケンスを初回または変容タイミングで（再）構築
+      if(!ps.plainNoteSeq || ps.plainNoteSeq.length === 0){
+        ps.plainNoteSeq = _plainBuildNoteSeq(notes, ps.plainCycleCount);
       }
 
-      // ── SL:moving → 沈黙を短縮（密度が上がる） ──
+      // セル内の現在位置（位相シフト込み）
+      const cellIdx = (ps.plainCellPos + ps.plainCellPhase) % _CELL_LEN;
+      const step = _PLAIN_CELL[cellIdx];
+
+      // SL:moving → 沈黙を短縮（密度が上がる）
       const _restMul = step.rest
-        ? Math.max(0.5, 1.0 - Math.max(0, _movingVal) * 0.40)
+        ? Math.max(0.45, 1.0 - Math.max(0, _movingVal) * 0.45)
         : 1.0;
 
-      // stepRatioに波サイクル + jitter ±5% を適用
-      const jitter = 0.95 + Math.random() * 0.10;
-      const stepRatio = step.r * _waveMod * _restMul * jitter * densityMul;
+      // jitter ±4%（タイミングの精度を保つ）
+      const jitter = 0.96 + Math.random() * 0.08;
+      const stepRatio = step.r * _restMul * jitter * densityMul;
 
-      ps.plainIntervalIdx++;
+      ps.plainCellPos++;
+
+      // セル1周完了
+      if(ps.plainCellPos >= _CELL_LEN){
+        ps.plainCellPos = 0;
+        ps.plainCycleCount++;
+
+        // 5サイクルに1回: 旋律シーケンスを再構築（スケール音混入による変容）
+        if(ps.plainCycleCount % 5 === 0){
+          ps.plainNoteSeq = _plainBuildNoteSeq(notes, ps.plainCycleCount);
+          ps.plainArcPos = 0; // 弧の位置もリセット
+        }
+
+        // 16サイクルに1回: ポリリズム的位相シフト（起点が1ずれる）
+        // SL:strangeが高いと8サイクルに1回に早まる
+        const _shiftInterval = _strangeVal > 0.5 ? 8 : 16;
+        if(ps.plainCycleCount % _shiftInterval === 0){
+          ps.plainCellPhase = (ps.plainCellPhase + 1) % _CELL_LEN;
+        }
+      }
 
       if(step.rest){
-        // ── 2連続音: 沈黙の代わりに稀に短い音を2つ続ける（12%） ──
-        // strangeが高いと確率が上がる（最大25%）
-        const _doubleProb = 0.12 + Math.max(0, _strangeVal) * 0.13;
-        if(Math.random() < _doubleProb && ps.lastMidi !== null){
-          ps.plainDoublNext = true;
-          // 短い音として発音（次も同じ処理で来る）
-          const midi2 = _plainNextMidi(notes, ps.lastMidi, ps.plainDir, false);
-          ps.lastMidi = midi2;
-          ps.phraseCount++;
-          return { midi: midi2, stepRatio: 0.40 * jitter * densityMul };
-        }
         return { midi: null, stepRatio };
       }
 
-      // ── 音の選択: 旋律的な声部進行 ──
-      // 方向転換: 3〜5音ごとに方向が変わる
-      ps.plainDirCount++;
-      const _dirChangeAt = 3 + Math.floor(Math.random() * 3);
-      if(ps.plainDirCount >= _dirChangeAt){
-        ps.plainDir *= -1;
-        ps.plainDirCount = 0;
-      }
+      // 旋律シーケンスから次の音を取得（弧の位置で決まる）
+      const seqLen = ps.plainNoteSeq.length;
+      const noteIdx = ps.plainArcPos % seqLen;
+      const midi = ps.plainNoteSeq[noteIdx];
 
-      const midi = _plainNextMidi(notes, ps.lastMidi, ps.plainDir, ps.plainLeapNext);
-      ps.plainLeapNext = false;
-      ps.plainDoublNext = false;
+      ps.plainArcPos++;
       ps.lastMidi = midi;
       ps.phraseCount++;
 
