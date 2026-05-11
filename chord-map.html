@@ -10505,8 +10505,8 @@ function _playSceneArpNote(actx, midi, startTime, dest){
     // PLAIN専用エンベロープ: ギター弦・ピアノ高音域の自然減衰
     // attack極短 → decay（倍音が自然に消える）→ sustain 0 → release（余韻）
     // フィルターは動かさない。エンベロープの減衰だけで音色変化を作る。
-    const plainDecay = sc.arpDecay || 0.28;
-    const plainRelease = sc.arpRelease || 0.38;
+    const plainDecay = sc.arpDecay || 0.14;
+    const plainRelease = sc.arpRelease || 0.35;
     env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.015, 0.001), startTime + atk + plainDecay);
     env.gain.exponentialRampToValueAtTime(0.001, startTime + atk + plainDecay + plainRelease);
   } else {
@@ -10599,11 +10599,13 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   if(arpEnvOut !== null && sceneCurrentName === 'plain'){
     const _plainWarm = sv ? sv('warm') : 0;
     const plainDly = actx.createDelay(1.0);
-    plainDly.delayTime.value = 0.24; // 240ms固定（BPM72で付点8分相当）
+    // BPM連動: 付点8分（beat * 0.75）でリズムに乗る余韻
+    const _plainBeat = 60 / (autoBpm || 72);
+    plainDly.delayTime.value = _plainBeat * 0.75;
     const plainDlyFb = actx.createGain();
-    plainDlyFb.gain.value = 0.22 + _plainWarm * 0.14; // warm連動: 0.08〜0.36
+    plainDlyFb.gain.value = 0.32 + _plainWarm * 0.13; // warm連動: 0.32〜0.45
     const plainDlyG = actx.createGain();
-    plainDlyG.gain.value = 0.22; // ディレイwet量（控えめ・曇り防止）
+    plainDlyG.gain.value = 0.30; // ディレイwet量（余韻をしっかり出す）
     arpEnvOut.connect(plainDly);
     plainDly.connect(plainDlyFb);
     plainDlyFb.connect(plainDly);
@@ -10730,6 +10732,8 @@ const _phraseState = {
   plainDir: 1,           // 現在の旋律方向（+1上行/-1下行）
   plainDirCount: 0,      // 同方向継続カウント
   plainLeapNext: false,  // 次の音を跳躍させるフラグ（SL:strange連動）
+  plainWavePhase: 0,     // ずれの波位相（0〜2πで1サイクル）
+  plainDoublNext: false, // 次ステップに2連続音を入れるフラグ
 
   // VELVET固有
   velvetDir: 1,          // 現在の進行方向（+1/-1）
@@ -10758,6 +10762,8 @@ function _resetPhraseState(){
   // PLAINは旋律の流れを保持（コードをまたいでlastMidiが継続）
   // intervalIdxとdirはリセットしない（呼吸が続く）
   _phraseState.plainLeapNext = false;
+  _phraseState.plainWavePhase = 0;
+  _phraseState.plainDoublNext = false;
   // GLASSの対話感は保持（intervalIdxはリセット）
   _phraseState.glassIntervalIdx = 0;
   // PLUCKの細胞はコードチェンジで再生成
@@ -10923,27 +10929,54 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const seqLen = _PLAIN_SEQ.length;
       const step = _PLAIN_SEQ[ps.plainIntervalIdx % seqLen];
 
-      // SL:strange → 跳躍フラグ（strangeが高いと次の音が跳躍しやすい）
+      // ── SL値取得 ──
       const _strangeVal = sv ? sv('strange') : 0;
-      const _leapProb = Math.max(0, _strangeVal * 0.5); // 0〜0.5
+      const _movingVal  = sv ? sv('moving')  : 0;
+
+      // ── 波サイクル: ずれが増減して法則的に戻る ──
+      // wavePhaseが0→2πで1サイクル。sinで±waveDepthの偏差を作る。
+      // strangeが高いほどずれ幅が大きく、movingが高いほどサイクルが速い
+      const _waveDepth = 0.18 + Math.max(0, _strangeVal) * 0.22; // 0.18〜0.40
+      const _waveSpeed = 0.28 + Math.max(0, _movingVal)  * 0.20; // 0.28〜0.48 rad/step
+      const _waveMod   = 1.0 + Math.sin(ps.plainWavePhase) * _waveDepth;
+      ps.plainWavePhase = (ps.plainWavePhase + _waveSpeed) % (Math.PI * 2);
+
+      // ── SL:strange → 跳躍フラグ ──
+      const _leapProb = Math.max(0, _strangeVal * 0.45);
       if(!step.rest && Math.random() < _leapProb){
         ps.plainLeapNext = true;
       }
 
-      // stepRatioにjitter ±8%
-      const jitter = 0.92 + Math.random() * 0.16;
-      const stepRatio = step.r * jitter * densityMul;
+      // ── SL:moving → 沈黙を短縮（密度が上がる） ──
+      const _restMul = step.rest
+        ? Math.max(0.5, 1.0 - Math.max(0, _movingVal) * 0.40)
+        : 1.0;
+
+      // stepRatioに波サイクル + jitter ±5% を適用
+      const jitter = 0.95 + Math.random() * 0.10;
+      const stepRatio = step.r * _waveMod * _restMul * jitter * densityMul;
 
       ps.plainIntervalIdx++;
 
       if(step.rest){
+        // ── 2連続音: 沈黙の代わりに稀に短い音を2つ続ける（12%） ──
+        // strangeが高いと確率が上がる（最大25%）
+        const _doubleProb = 0.12 + Math.max(0, _strangeVal) * 0.13;
+        if(Math.random() < _doubleProb && ps.lastMidi !== null){
+          ps.plainDoublNext = true;
+          // 短い音として発音（次も同じ処理で来る）
+          const midi2 = _plainNextMidi(notes, ps.lastMidi, ps.plainDir, false);
+          ps.lastMidi = midi2;
+          ps.phraseCount++;
+          return { midi: midi2, stepRatio: 0.40 * jitter * densityMul };
+        }
         return { midi: null, stepRatio };
       }
 
-      // 音の選択: 旋律的な声部進行
-      // 方向転換: 4〜6音ごとに方向が変わる（単調な上行・下行にならない）
+      // ── 音の選択: 旋律的な声部進行 ──
+      // 方向転換: 3〜5音ごとに方向が変わる
       ps.plainDirCount++;
-      const _dirChangeAt = 3 + Math.floor(Math.random() * 3); // 3〜5音で方向転換
+      const _dirChangeAt = 3 + Math.floor(Math.random() * 3);
       if(ps.plainDirCount >= _dirChangeAt){
         ps.plainDir *= -1;
         ps.plainDirCount = 0;
@@ -10951,6 +10984,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 
       const midi = _plainNextMidi(notes, ps.lastMidi, ps.plainDir, ps.plainLeapNext);
       ps.plainLeapNext = false;
+      ps.plainDoublNext = false;
       ps.lastMidi = midi;
       ps.phraseCount++;
 
@@ -11421,8 +11455,8 @@ const SCENE_PRESETS = {
     // triangle(基音の芯) + sawtooth(弦の倍音)を固定比率で混ぜる
     // フィルターenvは使わない。倍音の自然減衰だけで音色を作る。
     arpOsc:'triangle', arpOsc2:'sawtooth', arpCutoff:5500, arpRes:0.12, arpEnvMod:0.0,
-    arpAttack:0.002, arpDecay:0.28, arpSustain:0.0, arpRelease:0.38,
-    arpGate:140, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
+    arpAttack:0.002, arpDecay:0.14, arpSustain:0.0, arpRelease:0.35,
+    arpGate:100, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
     arpOctRange:2,
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
