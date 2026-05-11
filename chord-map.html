@@ -10485,6 +10485,17 @@ function _playSceneArpNote(actx, midi, startTime, dest){
   // LOVE: osc2はデチューンのみ・薄く
   osc2g.gain.value = _slOsc2Mix !== null ? _slOsc2Mix : (sceneCurrentName === 'love') ? 0.20 : 0.75;
 
+  // ── PLAIN専用: osc2をアタック直後に急速フェードアウト（ティーン感） ──
+  // sine（osc1）が透明な基音、triangle（osc2）がアタック瞬間の金属倍音を担う。
+  // osc2はattk後すぐ消え、sineの透明感だけ残る → 「ティーン」の自然な減衰。
+  if(sceneCurrentName === 'plain'){
+    const _plainAtkPeak = 0.85; // アタック瞬間のosc2 gain（倍音の金属感）
+    osc2g.gain.setValueAtTime(0.001, startTime);
+    osc2g.gain.linearRampToValueAtTime(_plainAtkPeak, startTime + atk);
+    // atk後すぐ急速フェードアウト（金属感が消えてsineの透明感へ）
+    osc2g.gain.exponentialRampToValueAtTime(0.001, startTime + atk + 0.06);
+  }
+
   // ── ルーティング ──
   // LOVEはosc1_morphをlpfに接続・osc1本体は使わない
   if(_loveOsc1Morph) _loveOsc1Morph.connect(lpf);
@@ -10685,6 +10696,8 @@ const _phraseState = {
   // PLAIN固有
   plainMotifType: 0,     // 0:収束 1:拡散 2:落下 3:跳躍（エモーショナル）
   plainSilenceNext: false, // 次ステップを強制休符にする
+  plainInRestNext: false,  // 動機内部の休符フラグ（シンコペーション間）
+  plainInRestVal: 0,       // 動機内部の休符長さ（stepRatio）
 
   // VELVET固有
   velvetDir: 1,          // 現在の進行方向（+1/-1）
@@ -10712,6 +10725,8 @@ function _resetPhraseState(){
   _phraseState.phraseCount = 0;
   // PLAINはmotifTypeとsilenceを保持（コードをまたいで動機が継続）
   _phraseState.plainSilenceNext = false;
+  _phraseState.plainInRestNext = false;
+  _phraseState.plainInRestVal = 0;
   // GLASSの対話感は保持（intervalIdxはリセット）
   _phraseState.glassIntervalIdx = 0;
   // PLUCKの細胞はコードチェンジで再生成
@@ -10885,57 +10900,77 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       // 沈黙はフレーズの後のみ（動機内には基本入れない。type1のみ内部に休がある）
       // ────────────────────────────────────────────
 
-      // 動機タイプ別リズム型定義（stepRatio値・baseSec=1拍基準）
+      // ── PLAIN フレーズ文法 (サティ × ラテン) ──
+      //
+      // 設計思想:
+      //   沈黙が主役。音より間の方が長い。
+      //   動機は耳に残る「型」として繰り返す（完全な反復ではなく微妙にずれる）。
+      //   ラテンのシンコペーション = 拍の頭を外す・食い込む動き。
+      //   jitter ±6% で機械感を消す。
+      //
+      // motifType別リズム型（baseSec = 1拍）:
+      //   0: ター・ンタッ  [1.5, 休0.5, 0.75]  長→食い込み短。拍頭を外す
+      //   1: タッ・ン・ター [0.38, 休0.62, 1.5]  短→大休→長。サティ的呼吸
+      //   2: ター・タッ・ン [1.25, 0.5, 休0.75]  付点気味→短→休。スパニッシュ感
+      //   3: タッ・―――    [0.35, 沈黙大]        跳躍後の大きな空白（6フレーズに1回）
+      //
+      // 動機内の休符はstepRatioをnullでなく間隔として表現（音はnull・間隔は正の値）
+
+      // [音ratio, 内部休ratio（0=なし）, 次音ratio]  ※最後まで鳴らして後続の沈黙へ
       const _plainRhythms = [
-        [0.38, 0.65, 0.0],   // 0 収束: 短・中・(沈黙へ)。最終音はnull返して沈黙に委ねる
-        [0.55, 0.30, 0.55],  // 1 拡散: 中・短・中。食い込み感
-        [0.80, 0.35, 0.0],   // 2 落下: 長・短・(沈黙へ)
-        [0.30, 0.0,  0.0],   // 3 跳躍: 短・(大沈黙)・(着地は沈黙後)
+        { notes:[1.5, 0.75],    inRest:[0, 0.5],   count:2 }, // 0: ター・ン・タッ
+        { notes:[0.38, 1.5],    inRest:[0.62, 0],  count:2 }, // 1: タッ・ン・ター
+        { notes:[1.25, 0.50],   inRest:[0, 0.75],  count:2 }, // 2: ター・タッ・ン
+        { notes:[0.35],         inRest:[0],        count:1 }, // 3: タッ・―――（跳躍）
       ];
-      // 跳躍(3)は2音構成にする（低→着地）
-      const _plainMotifs3Notes = [3, 3, 3, 2]; // 各タイプの実音数
+      const _silDefs = [2.2, 3.0, 2.5, 4.0]; // 動機後の沈黙基準値
 
       const mType = ps.plainMotifType % 4;
-      const rhythm = _plainRhythms[mType];
-      const motifNoteCount = _plainMotifs3Notes[mType]; // 実際に鳴らす音数
+      const rDef = _plainRhythms[mType];
 
-      // 強制休符フラグ（動機完了後の沈黙）
+      // ── 強制休符フラグ（動機完了後の沈黙）──
       if(ps.plainSilenceNext){
         ps.plainSilenceNext = false;
-        // 沈黙の長さ: タイプで変化
-        // 跳躍(3)の後: 大きな空白 / 落下(2)の後: 中程度 / その他: 短め
-        const silDefs = [1.8, 2.2, 2.8, 3.5];
-        const silBase = silDefs[mType];
-        const silRatio = (silBase + Math.random() * 1.0) * densityMul;
+        const silRatio = (_silDefs[mType] + Math.random() * 1.2) * densityMul;
         return { midi: null, stepRatio: silRatio };
       }
 
-      // 動機の音を取得
-      const motif = _buildPlainMotif(notes, mType, ps.lastMidi);
-      const noteIdx = ps.phrasePos % motif.length;
-      const midi = motif[noteIdx];
+      // ── 内部休符フラグ（動機内のシンコペーション的な間）──
+      if(ps.plainInRestNext){
+        ps.plainInRestNext = false;
+        const inRestRatio = ps.plainInRestVal * (0.94 + Math.random() * 0.12) * densityMul;
+        return { midi: null, stepRatio: inRestRatio };
+      }
 
-      // このステップのリズム値（jitter ±6%で人間味）
-      const rVal = rhythm[noteIdx] || 0.45;
+      // ── 音を発音 ──
+      const motif = _buildPlainMotif(notes, mType, ps.lastMidi);
+      const noteIdx = ps.phrasePos % rDef.count;
+      const midi = motif[Math.min(noteIdx, motif.length - 1)];
+
+      const rVal = rDef.notes[noteIdx] || 0.5;
       const jitter = 0.94 + Math.random() * 0.12;
       const noteRatio = rVal * jitter * densityMul;
+
+      // 内部休符があれば次ステップにセット
+      const inRest = rDef.inRest[noteIdx] || 0;
+      if(inRest > 0){
+        ps.plainInRestNext = true;
+        ps.plainInRestVal = inRest;
+      }
 
       ps.phrasePos++;
       ps.lastMidi = midi;
 
-      if(ps.phrasePos >= motifNoteCount){
-        // 動機完了 → 次は必ず沈黙
+      if(ps.phrasePos >= rDef.count){
         ps.phrasePos = 0;
         ps.phraseCount++;
         ps.plainSilenceNext = true;
-        // 3フレーズに1回、動機タイプを変える（4種類をローテーション）
-        // 跳躍(3)は6フレーズに1回だけ出現（出すぎない）
+        // 3フレーズに1回タイプ変更。跳躍(3)は6フレーズに1回
         if(ps.phraseCount % 6 === 5){
           ps.plainMotifType = 3;
         } else if(ps.phraseCount % 3 === 0){
           ps.plainMotifType = (ps.plainMotifType < 3)
-            ? (ps.plainMotifType + 1) % 3
-            : 0;
+            ? (ps.plainMotifType + 1) % 3 : 0;
         }
       }
 
@@ -11397,15 +11432,15 @@ const SCENE_PRESETS = {
     vol:0.40, chorus:0.06, wet:0.48, strum:12,
     trailSec:1.8, width:0.55, feltAttack:0.10, ghost:0.0, filterDrift:0.12,
     voicingFlavor:'plain',
-    // ARP: 水の粒感。短い動機 + 長い沈黙。一定のテンポ感はあるが機械的でない。
-    // triangle → sineに近づけてぼやけを減らす（sineよりわずかに芯がある）
-    // filterDriftを下げて輪郭を立てる
-    // envModを上げてアタックの粒感を明確にする
+    // ARP: ティーン感。金属弦的な瞬間的立ち上がり→自然減衰→透明な余韻。
+    // osc1:sine（透明感・基音）+ osc2:triangle（アタック瞬間の金属倍音）
+    // cutoff高め・envMod強め → アタックでパッと開いてすぐ閉じる
+    // attack極短・decay短・sustain0・release中程度 → ティーンの自然な消え方
     // フレーズ文法エンジンがリズムを担うためarpRhythmは参照されない
-    arpOsc:'triangle', arpCutoff:2200, arpRes:0.35, arpEnvMod:0.42,
-    arpAttack:0.007, arpDecay:0.10, arpSustain:0.0, arpRelease:0.55,
-    arpGate:180, arpVol:0.20, arpWet:0.44, arpGhost:0.22,
-    arpOctRange:2, // 2オクターブ: 跳躍感・エモーショナルな動き
+    arpOsc:'sine', arpCutoff:3500, arpRes:0.28, arpEnvMod:0.72,
+    arpAttack:0.004, arpDecay:0.08, arpSustain:0.0, arpRelease:0.50,
+    arpGate:160, arpVol:0.22, arpWet:0.44, arpGhost:0.18,
+    arpOctRange:2,
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
 
