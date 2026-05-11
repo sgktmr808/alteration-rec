@@ -10590,7 +10590,7 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul){
     const loveDryG = actx.createGain(); loveDryG.gain.value = 0.85;
     const loveRvbG = actx.createGain(); loveRvbG.gain.value = 0.50;
     hiShelf.connect(loveDryG);
-    loveDryG.connect(actx.destination);  // 直接出力（共有ディレイをバイパス）
+    loveDryG.connect(dlyTarget);  // 直接出力（音量を確保）
     hiShelf.connect(loveRvbG);
     loveRvbG.connect(rvbTarget);  // reverb送り
     loveDlyG.connect(rvbTarget);  // ディレイ → reverb
