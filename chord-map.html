@@ -10621,11 +10621,11 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     const _warmVal = sv ? sv('warm') : 0;
 
     // Scene別: 音色的ディレイ（gate長めのScene）
-    if(sceneCurrentName === 'velvet' || sceneCurrentName === 'strings' || sceneCurrentName === 'plain'){
-      // VELVET/STRINGS: gate 420〜440msに対して200ms前後で音色的に溶け合う
+    // VELVETは共有ディレイのみ使用（音色的ディレイを除外）
+    if(sceneCurrentName === 'strings' || sceneCurrentName === 'plain'){
+      // STRINGS: gate 440msに対して220msで音色的に溶け合う
       // PLAIN: gate 140ms + decay/releaseの余韻に対して160msで溶け合う
       const _colorDlyTime = {
-        velvet:  0.200,  // 200ms: gate420msの約半分
         strings: 0.220,  // 220ms: gate440msの約半分
         plain:   0.160,  // 160ms: gate140ms + 余韻に対して自然に溶ける
       }[sceneCurrentName] || 0.200;
@@ -11123,26 +11123,60 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         return p[Math.floor(Math.random() * Math.min(p.length, 2))];
       };
 
-      // ── 3音セル構築 ──
-      // [軸音 → 経過音(近接) → 解決音]
-      // リズムは4種のパターンから選ぶ（8分音符基準倍率）
-      // パターンはディレイ(1/8D)との共鳴を意識した配置
-      const _VELVET_RHYTHMS = [
-        [2.0, 1.0, 1.0],   // A: 4分・8分・8分（落ち着いた流れ）
-        [1.0, 2.0, 1.0],   // B: 8分・4分・8分（中間にタメ）
-        [1.5, 0.5, 2.0],   // C: 付点8分・16分・4分（跳ねてタメ）
-        [1.0, 1.0, 2.0],   // D: 8分・8分・4分（流れて着地）
-      ];
+      // ── セル構築 ──
+      // 基本3音 [軸音 → 経過音 → 解決音]
+      // moving↑で4〜5音に拡張（密度増）
+      // moving↓で2音（疎・呼吸感増）
+      // リズムは音数に応じたパターンから選択（8分音符基準倍率）
+      const _VELVET_RHYTHMS = {
+        2: [
+          [2.0, 2.0],       // 4分・4分（ゆったり）
+          [1.5, 2.5],       // 付点8分・付点4分
+        ],
+        3: [
+          [2.0, 1.0, 1.0],  // A: 4分・8分・8分
+          [1.0, 2.0, 1.0],  // B: 8分・4分・8分
+          [1.5, 0.5, 2.0],  // C: 付点8分・16分・4分
+          [1.0, 1.0, 2.0],  // D: 8分・8分・4分
+        ],
+        4: [
+          [1.0, 1.0, 1.0, 1.0],   // 8分×4（均等・シーケンサー的）
+          [1.5, 0.5, 1.0, 1.0],   // 付点・16分・8分・8分
+          [1.0, 0.5, 1.5, 1.0],   // 8分・16分・付点・8分
+          [2.0, 0.5, 0.5, 1.0],   // 4分・16分・16分・8分
+        ],
+        5: [
+          [1.0, 0.5, 0.5, 1.0, 1.0],  // 8分・16分・16分・8分・8分
+          [1.5, 0.5, 1.0, 0.5, 0.5],  // 付点・16分・8分・16分・16分
+        ],
+      };
+
+      // moving値に応じたセル音数を決定
+      // moving=-1: 2音 / moving=0: 3音 / moving=+1: 4〜5音
+      const _cellLen = () => {
+        if(_movingVal < -0.4) return 2;
+        if(_movingVal < 0.3)  return 3;
+        if(_movingVal < 0.7)  return 4;
+        return 5;
+      };
 
       const buildCell = (startMidi) => {
-        const mid = moveClose(startMidi, false); // 上昇
-        const end = pickResolve();               // 解決
-        const rIdx = Math.floor(Math.random() * _VELVET_RHYTHMS.length);
-        return {
-          notes: [startMidi, mid, end],
-          rhythm: _VELVET_RHYTHMS[rIdx],
-          rIdx,
-        };
+        const len = _cellLen();
+        const motif = [startMidi];
+        let prev = startMidi;
+        // 中間音: 近接移動（上昇 → 下降で自然な弧）
+        for(let i = 1; i < len - 1; i++){
+          const down = i >= Math.ceil((len-1) / 2);
+          motif.push(moveClose(prev, down));
+          prev = motif[motif.length - 1];
+        }
+        // 末尾: 解決音
+        motif.push(pickResolve());
+
+        // リズム選択
+        const rhythmSet = _VELVET_RHYTHMS[len] || _VELVET_RHYTHMS[3];
+        const rhythm = rhythmSet[Math.floor(Math.random() * rhythmSet.length)];
+        return { notes: motif, rhythm };
       };
 
       // ── セル初期化 ──
