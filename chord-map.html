@@ -10369,7 +10369,7 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 }
 
 // ── Scene別ARPノート発音（Arp Ghost対応）──
-function _playSceneArpNote(actx, midi, startTime, dest, velMul){
+function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   velMul = (velMul !== undefined) ? velMul : 1.0;
   // Pattern GrammarのARP系パターン選択中はそのパラメーターで上書き
   const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
@@ -10377,7 +10377,10 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul){
   const arpGateMs = _slArpGate !== null ? _slArpGate : (sc.arpGate || 280);
   // gateMul: loveは音を重ねてさざ波感を出す（1.15）、それ以外は0.78で短く切る
   const _gateMul = (sceneCurrentName === 'love') ? 1.15 : 0.78;
-  const gateSec = (arpGateMs / 1000) * _gateMul;
+  // gateOverride: VELVETのテクノ反復時など、呼び出し元が比率で上書き（0.0〜1.0）
+  const gateSec = gateOverride !== null && gateOverride !== undefined
+    ? (arpGateMs / 1000) * _gateMul * gateOverride
+    : (arpGateMs / 1000) * _gateMul;
   const nyq = actx.sampleRate / 2 - 100;
 
   // velocity humanize: 音ごとに音量を微妙にばらかす（0.78〜1.18の範囲）
@@ -10765,6 +10768,13 @@ const _phraseState = {
   // VELVET固有
   velvetDir: 1,          // 現在の進行方向（+1/-1）
   velvetDirCount: 0,     // 同方向継続カウント（2で反転）
+  velvetPhase: 0,        // 4小節サイクル内フェーズ（0=上昇/1=変容/2=着地）
+  velvetCycleCount: 0,   // 4小節サイクル完了数
+  velvetMotif: null,     // 現在のモチーフ音配列（3音）
+  velvetMotifPos: 0,     // モチーフ内の位置
+  velvetInRepeat: false, // 反復中フラグ（テクノ的スタッカート）
+  velvetRepeatCount: 0,  // 反復カウント
+  velvetRestRemain: 0,   // 残り休符ステップ
 
   // GLASS固有
   glassIntervalIdx: 0,   // 間隔パターンのインデックス
@@ -10794,6 +10804,13 @@ function _resetPhraseState(){
   _phraseState.plainLeapNext = false;
   // GLASSの対話感は保持（intervalIdxはリセット）
   _phraseState.glassIntervalIdx = 0;
+  // VELVETはコードチェンジで4小節サイクルをリセット
+  _phraseState.velvetPhase = 0;
+  _phraseState.velvetMotif = null;
+  _phraseState.velvetMotifPos = 0;
+  _phraseState.velvetInRepeat = false;
+  _phraseState.velvetRepeatCount = 0;
+  _phraseState.velvetRestRemain = 0;
   // PLUCKの細胞はコードチェンジで再生成
   _phraseState.pluckCell = null;
   _phraseState.pluckCellPos = 0;
@@ -11045,56 +11062,221 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     }
 
     // ────────────────────────────────────────────
-    // VELVET: 付点リズムの3音フレーズ・前音から近い音へ
+    // VELVET: Blue in Green × Octave One的設計
+    //
+    // 【設計思想】
+    //   4小節サイクル（BPM100=約9.6秒）で1つの弧を描く。
+    //   Phase0(小節1-2): モチーフ提示（下降解決・エヴァンス的）
+    //   Phase1(小節3):   変容・反復（テクノ的執着・ゲート短め）
+    //   Phase2(小節4):   着地→長い休符（次サイクルへの間）
+    //
+    // 【音の選び方】
+    //   軸音: 7th > 9th > 3rd（rootlessと対応）
+    //   移動: 半音〜長3度以内。大跳躍禁止。
+    //   解決: フレーズ末尾は必ず3rdか7thへ着地
+    //   変容: 2サイクル目以降、中間音1つだけ変える
+    //   strange↑: 13th/#11thへの経過音が混入
+    //
+    // 【リズム】
+    //   付点4分 → 8分 → 4分 → 長休符（エヴァンス的呼吸）
+    //   反復時はゲート短め（テクノ的）
+    //   moving↑: 休符短縮 / moving↓: 休符延長（瞑想的）
+    //   warm↑: タイミングjitter増（人間的揺れ）
     // ────────────────────────────────────────────
     case 'velvet': {
-      // 付点リズム: 長・短・中 のパターン
-      const velvetRhythm = [1.5, 0.5, 1.0];
-      const rIdx = ps.phrasePos % velvetRhythm.length;
-      const stepRatio = velvetRhythm[rIdx] * densityMul;
+      const _strangeVal = sv ? sv('strange') : 0;
+      const _movingVal  = sv ? sv('moving')  : 0;
+      const _warmVal    = sv ? sv('warm')    : 0;
 
-      // 確率的な休符（Calmほど多い）
-      if(restProb > 0 && Math.random() < restProb && rIdx === 0){
-        // フレーズの先頭のみ休符可能
-        const restRatio = (1.0 + Math.random() * 1.0) * densityMul;
-        return { midi: null, stepRatio: restRatio };
+      // ── 休符消化中 ──
+      if(ps.velvetRestRemain > 0){
+        ps.velvetRestRemain--;
+        const restStep = (2.0 + Math.random() * 0.5) * densityMul;
+        return { midi: null, stepRatio: restStep };
       }
 
-      // 音選択: 前の音から近い音へ（ボイスリーディング的）
-      let midi;
-      if(ps.lastMidi === null){
-        midi = notes[Math.floor(notes.length / 2)]; // 初回は中央
-      } else {
-        // 方向を考慮しながら近い音を選ぶ
-        const dir = ps.velvetDir;
-        const candidates = notes.filter(m => dir > 0 ? m > ps.lastMidi : m < ps.lastMidi);
-        if(candidates.length > 0){
-          // 方向に沿った最も近い音
-          midi = dir > 0
-            ? candidates.reduce((a,b) => Math.abs(a-ps.lastMidi) < Math.abs(b-ps.lastMidi) ? a : b)
-            : candidates.reduce((a,b) => Math.abs(a-ps.lastMidi) < Math.abs(b-ps.lastMidi) ? a : b);
+      // ── 軸音特定（コードトーンから7th・9th・3rdを抽出）──
+      // notesはarpSeqからのMIDI配列。コードのインターバルから逆算。
+      const _root = S ? ni(S.root) : 0;
+      const _rootMidi = 12 * 4 + _root; // オクターブ4基準
+      const _ivs = S && S.type ? (CT[S.type]?.iv ?? [0,4,7]) : [0,4,7];
+
+      // 各notesをコードトーンとして分類（インターバル mod 12）
+      const _classify = (m) => {
+        const iv = ((m - _rootMidi) % 12 + 12) % 12;
+        // 3rd: 3,4 / 7th: 10,11 / 9th: 2,14→2 / 13th: 9 / #11th: 6
+        if(iv === 3 || iv === 4)  return '3rd';
+        if(iv === 10 || iv === 11) return '7th';
+        if(iv === 2)               return '9th';
+        if(iv === 9)               return '13th';
+        if(iv === 6)               return 'sharp11';
+        return 'other';
+      };
+
+      const _axisNotes = {
+        '7th':    notes.filter(m => _classify(m) === '7th'),
+        '9th':    notes.filter(m => _classify(m) === '9th'),
+        '3rd':    notes.filter(m => _classify(m) === '3rd'),
+        '13th':   notes.filter(m => _classify(m) === '13th'),
+        'sharp11':notes.filter(m => _classify(m) === 'sharp11'),
+      };
+
+      // 軸音から1つ選ぶ（7th > 9th > 3rd > other）
+      const _pickAxis = () => {
+        const pool = _axisNotes['7th'].length > 0 ? _axisNotes['7th']
+                   : _axisNotes['9th'].length > 0 ? _axisNotes['9th']
+                   : _axisNotes['3rd'].length > 0 ? _axisNotes['3rd']
+                   : notes;
+        return pool[Math.floor(Math.random() * pool.length)];
+      };
+
+      // 解決音（3rdか7th）から1つ選ぶ
+      const _pickResolve = () => {
+        const pool = [
+          ..._axisNotes['7th'],
+          ..._axisNotes['3rd'],
+        ];
+        if(pool.length === 0) return notes[Math.floor(notes.length / 2)];
+        return pool[Math.floor(Math.random() * pool.length)];
+      };
+
+      // 現在の音から近い音へ移動（半音〜長3度=4半音以内）
+      const _moveClose = (from, preferDown) => {
+        const maxInterval = 5; // 長3度+1半音以内
+        let candidates = notes.filter(m => {
+          const dist = Math.abs(m - from);
+          return dist > 0 && dist <= maxInterval;
+        });
+        // strange↑: 13th/#11thへの経過音を候補に加える
+        if(_strangeVal > 0.4 && Math.random() < _strangeVal * 0.5){
+          const tension = [
+            ..._axisNotes['13th'],
+            ..._axisNotes['sharp11'],
+          ];
+          candidates = [...candidates, ...tension];
+        }
+        if(candidates.length === 0) candidates = notes;
+        // 下降優先 or 上昇優先
+        const sorted = preferDown
+          ? candidates.sort((a,b) => a - b).filter(m => m <= from + 2) // 主に下
+          : candidates.sort((a,b) => b - a).filter(m => m >= from - 2); // 主に上
+        const pool = sorted.length > 0 ? sorted : candidates;
+        return pool[Math.floor(Math.random() * Math.min(pool.length, 3))];
+      };
+
+      // ── モチーフ構築 ──
+      // Phase0: [軸音(高め), 経過音(下降), 解決音(3rdか7th)]
+      // Phase1: モチーフ変容（中間音1つ変える）
+      // Phase2: [解決音, 反復×2]
+      if(ps.velvetMotif === null){
+        const _start = _pickAxis();
+        const _mid   = _moveClose(_start, true); // 下方向
+        const _end   = _pickResolve();
+        ps.velvetMotif = [_start, _mid, _end];
+        ps.velvetMotifPos = 0;
+        ps.velvetPhase = 0;
+      }
+
+      // ── フレーズ構造 ──
+      // Phase0: 3音モチーフ → 長休符（小節1-2）
+      // Phase1: 変容モチーフ2音 → 短休符（小節3）
+      // Phase2: 解決音 + テクノ反復2回 → 長休符（小節4）
+      let midi = null;
+      let stepRatio = 1.0;
+      let velMul = 1.0;
+      let gateOverride = null; // nullなら通常gate
+
+      const phase = ps.velvetPhase;
+
+      if(phase === 0){
+        // 小節1-2: モチーフ提示
+        // pos=0: 付点4分(1.5) 強
+        // pos=1: 8分(0.5)    弱
+        // pos=2: 4分(1.0)    中（解決）→ 長休符へ
+        const _rhythmP0 = [1.5, 0.5, 1.0];
+        const _velP0    = [1.2, 0.7, 0.9];
+        const mpos = ps.velvetMotifPos;
+        if(mpos < ps.velvetMotif.length){
+          midi = ps.velvetMotif[mpos];
+          stepRatio = _rhythmP0[mpos] * densityMul;
+          velMul = _velP0[mpos];
+          ps.velvetMotifPos++;
         } else {
-          // 端に達したら方向反転
-          ps.velvetDir *= -1;
-          midi = notes[dir > 0 ? 0 : notes.length-1];
+          // モチーフ完了 → 長休符 → Phase1へ
+          const restLen = Math.max(1.5, 2.5 - _movingVal * 1.0);
+          ps.velvetRestRemain = Math.floor(restLen);
+          ps.velvetPhase = 1;
+          // 変容モチーフ生成（中間音だけ変える）
+          const _mutMid = _moveClose(ps.velvetMotif[0], true);
+          ps.velvetMotif = [ps.velvetMotif[0], _mutMid, ps.velvetMotif[2]];
+          ps.velvetMotifPos = 0;
+          stepRatio = (restLen - Math.floor(restLen) + 1.0) * densityMul;
+          return { midi: null, stepRatio };
+        }
+      } else if(phase === 1){
+        // 小節3: 変容フレーズ（2音のみ・短め）
+        // pos=0: 付点4分(1.5) 中強
+        // pos=1: 8分(0.5)    弱 → 短休符 → Phase2へ
+        const _rhythmP1 = [1.5, 0.5];
+        const _velP1    = [1.1, 0.65];
+        const mpos = ps.velvetMotifPos;
+        if(mpos < 2){
+          midi = ps.velvetMotif[mpos];
+          stepRatio = _rhythmP1[mpos] * densityMul;
+          velMul = _velP1[mpos];
+          ps.velvetMotifPos++;
+        } else {
+          // 短休符 → Phase2へ
+          const restLen = Math.max(0.5, 1.5 - _movingVal * 0.5);
+          ps.velvetRestRemain = Math.floor(restLen);
+          ps.velvetPhase = 2;
+          ps.velvetInRepeat = false;
+          ps.velvetRepeatCount = 0;
+          stepRatio = 1.0 * densityMul;
+          return { midi: null, stepRatio };
+        }
+      } else {
+        // 小節4: 解決音 + テクノ反復 → 長休符 → サイクル完了
+        if(!ps.velvetInRepeat){
+          // 解決音（4分）
+          midi = _pickResolve();
+          stepRatio = 1.0 * densityMul;
+          velMul = 1.1;
+          ps.velvetInRepeat = true;
+          ps.velvetRepeatCount = 0;
+          ps.lastMidi = midi;
+        } else {
+          // テクノ反復（同音を2回・ゲート短め・8分）
+          const repeatMax = 2 + (_strangeVal > 0.3 ? 1 : 0);
+          if(ps.velvetRepeatCount < repeatMax){
+            midi = ps.lastMidi; // 同音反復
+            stepRatio = 0.5 * densityMul;
+            velMul = 0.7 - ps.velvetRepeatCount * 0.1; // だんだん弱く
+            gateOverride = 0.40; // ゲートを40%に（スタッカート）
+            ps.velvetRepeatCount++;
+          } else {
+            // 反復完了 → 長休符 → サイクルリセット
+            const restLen = Math.max(2.0, 3.5 - _movingVal * 1.5 + Math.random() * 0.5);
+            ps.velvetRestRemain = Math.floor(restLen);
+            ps.velvetPhase = 0;
+            ps.velvetCycleCount++;
+            ps.velvetMotif = null; // 次サイクルで再生成
+            ps.velvetMotifPos = 0;
+            ps.velvetInRepeat = false;
+            stepRatio = (restLen - Math.floor(restLen) + 1.0) * densityMul;
+            return { midi: null, stepRatio };
+          }
         }
       }
 
-      ps.lastMidi = midi;
-      ps.phrasePos++;
+      // jitter（warm↑で揺れ増）
+      const jitterRange = 0.03 + _warmVal * 0.09;
+      const jitter = 1.0 + (Math.random() - 0.5) * jitterRange;
+      stepRatio *= jitter;
 
-      if(ps.phrasePos >= velvetRhythm.length){
-        ps.phrasePos = 0;
-        ps.phraseCount++;
-        ps.velvetDirCount++;
-        // 2フレーズ同方向で反転
-        if(ps.velvetDirCount >= 2){
-          ps.velvetDir *= -1;
-          ps.velvetDirCount = 0;
-        }
-      }
+      if(midi !== null) ps.lastMidi = midi;
 
-      return { midi, stepRatio };
+      return { midi, stepRatio, velMul, gateOverride };
     }
 
     // ────────────────────────────────────────────
@@ -11289,7 +11471,7 @@ function scheduleArpNotes(){
         const stepSec = Math.max(baseSec * 0.2, baseSec * result.stepRatio);
         if(result.midi !== null){
           _phraseState.notesSinceChord++;
-          _playSceneArpNote(actx, result.midi, t, dest, result.velMul);
+          _playSceneArpNote(actx, result.midi, t, dest, result.velMul, result.gateOverride);
         }
         arpNextBeat += stepSec;
         continue;
@@ -11514,24 +11696,22 @@ const SCENE_PRESETS = {
     arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
   },
 
-  // 2. VELVET ROOTLESS — ビル・エヴァンス的。中域、内声、柔らかいテンション
+  // 2. VELVET ROOTLESS — ビル・エヴァンス × Octave One的。中域、内声、柔らかいテンション
   velvet: {
     label:'VELVET ROOTLESS',
     osc1:'sawtooth', osc2:'triangle', detune:8,
-    cutoff:1800, res:0.7, envMod:0.50,
-    attack:0.09, decay:0.65, sustain:0.62, release:2.4,
+    cutoff:1400, res:0.45, envMod:0.50,   // 暗く・滑らかに（cutoff1800→1400, res0.7→0.45）
+    attack:0.09, decay:0.65, sustain:0.62, release:3.8,  // 溶け合う（release2.4→3.8）
     vol:0.44, chorus:0.16, wet:0.44, strum:7,
-    trailSec:1.4, width:0.65, feltAttack:0.14, ghost:0.0, filterDrift:0.20,
+    trailSec:2.0, width:0.65, feltAttack:0.14, ghost:0.0, filterDrift:0.20,
     voicingFlavor:'rootless',
-    // ARP: ビル・エヴァンス的。内声が歌う。付点リズム・中域・柔らかい
-    // triangle・中域cutoff・長めgate・ベロシティに揺らぎ
+    // ARP: Blue in Green × Black Water的設計。4小節サイクル。
+    // 7th/9th/3rdを軸に下降解決。テクノ的同音反復。長い休符。
     arpOsc:'triangle', arpCutoff:1100, arpRes:0.55, arpEnvMod:0.35,
-    arpAttack:0.014, arpDecay:0.50, arpSustain:0.06,
+    arpAttack:0.004, arpDecay:0.50, arpSustain:0.06,  // アタック明確に（0.014→0.004）
     arpGate:420, arpVol:0.22, arpWet:0.40, arpGhost:0.24,
-    arpOctRange:2, // 内声が上下に歌う
-    // リズム: 付点が主役・短連打で人間味・長い休符で呼吸
-    // 「歌っている」感覚
-    arpRhythm:[1.5, 0.5, 2.0, 1.5, 0.5, 1.0, 2.5], arpRestProb:0.20,
+    arpOctRange:2,
+    arpRhythm:[1.5, 0.5, 1.0], arpRestProb:0.20,
   },
 
   // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
@@ -11696,21 +11876,19 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
 
   if(flavor === 'rootless'){
     // ── VELVET ROOTLESS ──
-    // ベース: ルートを抜き3rd/7th優先・中域中心
+    // ベース: ルートを抜き3rd/7th優先・中域中心（最低音の+12を削除して音域を下げる）
     if(notes.length >= 3) notes = notes.slice(1);
-    notes = notes.map((n,i) => n + (i===0?12:0));
     const has9v = ivs.some(iv => (iv%12)===2);
     if(!has9v && notes.length <= 4) notes.push(rootMidi + 14);
     notes = notes.sort((a,b)=>a-b).slice(0,5);
 
-    // warm: +→内声を中域に集める / -→上下に広げる
+    // warm: +→全体を1oct下げて中域に落ち着かせる / -→上方向に広げる
     if(_slW > 0.3){
-      // 上下の音を中域に寄せる（最低音+12、最高音-12）
-      if(notes[0] < rootMidi - 2) notes[0] += 12;
+      // 最高音を1oct下げて音域を中域に収める
+      notes = notes.map((n,i) => i === notes.length-1 ? n - 12 : n);
     } else if(_slW < -0.3){
-      // 上下に広げる
+      // 上下に広げる（最高音+12）
       notes[notes.length-1] += 12;
-      if(notes.length >= 2) notes[0] -= 12;
     }
 
     // strange: +→13th・#11追加（ジャズ的緊張） / -→ルートを戻す（安定）
