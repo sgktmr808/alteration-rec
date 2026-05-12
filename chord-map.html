@@ -11880,7 +11880,10 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
 
   const driftDepth = sc.filterDrift || 0;
   if(driftDepth > 0.01){
-    const driftRate = 0.02 + Math.random() * 0.12; // 0.02〜0.14Hz（ゆっくり）
+    const _movingVal = (typeof sv === 'function') ? (sv('moving') || 0) : 0;
+    const driftRate = sceneCurrentName === 'velvet'
+      ? Math.max(0.02, 0.02 + _movingVal * 0.10 + Math.random() * 0.04) // VELVET: moving=-1→0.02Hz / 0→0.02〜0.06Hz / +1→0.12Hz
+      : 0.02 + Math.random() * 0.12; // 他Scene: 0.02〜0.14Hz（ランダム固定）
     const driftLfo = actx.createOscillator();
     const driftG = actx.createGain();
     // 揺れ幅: cutoffの±driftDepth倍（0〜0.4程度）
@@ -12019,7 +12022,7 @@ function playSceneChord(actx, root, type){
       chordDetune = _sc.detune + warm * 10;
       chordChorus = Math.max(0, Math.min(0.5, _sc.chorus + warm * 0.12));
       chordWet    = Math.max(0, Math.min(1, _sc.wet + strange * 0.25));
-      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.1) + strange * 0.22));
+      chordDrift  = Math.max(0, Math.min(0.5, (_sc.filterDrift || 0.1) + strange * 0.22 + warm * 0.10));
       chordTrail  = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.75));
       break;
     case 'glass':
