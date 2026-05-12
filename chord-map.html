@@ -11064,146 +11064,96 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     // ────────────────────────────────────────────
     // VELVET: Evans × Octave One的設計
     //
-    // 【設計思想】
-    //   8分音符ベースで流れる。休符は短め（0.5〜1.5拍）。
-    //   2〜5音のモチーフが変容しながら続く（音楽的に）。
-    //   軸音（7th/9th/3rd）から出発し近接移動・下降解決。
-    //   モチーフ末尾は3rdか7thへ着地。次モチーフで変容。
-    //   テクノ的同音反復を要所に挟む。
+    // 【優先順位】
+    //   1. 音数と密度: CHORDの余韻を潰さない・適度な存在感
+    //   2. 音の選択: 7th/9th/3rdに忠実・コードを濁らせない
+    //   3. リズム: グルーヴが生まれる音符の位置
+    //   4. ディレイとの共鳴: 反響を含めた空間設計
+    //   5. 変容: ループしても飽きない微細な変化
     //
-    // 【音色】
-    //   sawtooth（芯）+ sine（丸み）の混合 → _playSceneArpNoteのosc2で対応
-    //
-    // 【リズム】
-    //   8分(1.0)ベース + 付点8分(1.5)・16分(0.5)で揺れ
-    //   moving↑: モチーフ長くなる・休符短縮
-    //   moving↓: モチーフ短め・休符やや長め
-    //   warm↑: jitter増（人間的揺れ）
-    //   strange↑: テンション音（9th/13th/#11）混入
+    // 【具体的な設計】
+    //   3音セルを基本単位とする。
+    //   セルは固定リズムパターンの中からランダムに選ぶ。
+    //   セル間に呼吸（1〜2拍の休符）を置く。
+    //   セルが4回繰り返されたら1音だけ変容させる。
+    //   moving↑: 休符短縮 / strange↑: テンション音混入
+    //   warm↑: ベロシティの揺らぎ増
     // ────────────────────────────────────────────
     case 'velvet': {
       const _strangeVal = sv ? sv('strange') : 0;
       const _movingVal  = sv ? sv('moving')  : 0;
       const _warmVal    = sv ? sv('warm')    : 0;
 
-      // ── 軸音特定（コードトーンから7th・9th・3rdを抽出）──
+      // ── コードトーン分類 ──
       const _root = S ? ni(S.root) : 0;
       const _rootMidi = 12 * 4 + _root;
+      const _iv = (m) => ((m - _rootMidi) % 12 + 12) % 12;
+      const _is3rd = (m) => { const v = _iv(m); return v===3||v===4; };
+      const _is7th = (m) => { const v = _iv(m); return v===10||v===11; };
+      const _is9th = (m) => _iv(m) === 2;
+      const _isTension = (m) => { const v = _iv(m); return v===9||v===6; }; // 13th/#11
 
-      const _classify = (m) => {
-        const iv = ((m - _rootMidi) % 12 + 12) % 12;
-        if(iv === 3 || iv === 4)   return '3rd';
-        if(iv === 10 || iv === 11) return '7th';
-        if(iv === 2)               return '9th';
-        if(iv === 9)               return '13th';
-        if(iv === 6)               return 'sharp11';
-        return 'other';
+      const pool3rd = notes.filter(_is3rd);
+      const pool7th = notes.filter(_is7th);
+      const pool9th = notes.filter(_is9th);
+      const poolTension = notes.filter(_isTension);
+
+      // 軸音プール（7th優先 > 9th > 3rd）
+      const axisPool = pool7th.length > 0 ? pool7th
+                     : pool9th.length > 0 ? pool9th
+                     : pool3rd.length > 0 ? pool3rd : notes;
+
+      // 解決音（3rd + 7th）
+      const resolvePool = [...pool7th, ...pool3rd];
+      const pickResolve = () => {
+        const p = resolvePool.length > 0 ? resolvePool : notes;
+        return p[Math.floor(Math.random() * p.length)];
       };
 
-      const _an = {
-        '7th':     notes.filter(m => _classify(m) === '7th'),
-        '9th':     notes.filter(m => _classify(m) === '9th'),
-        '3rd':     notes.filter(m => _classify(m) === '3rd'),
-        '13th':    notes.filter(m => _classify(m) === '13th'),
-        'sharp11': notes.filter(m => _classify(m) === 'sharp11'),
+      // 近接移動（5半音以内・方向考慮）
+      const moveClose = (from, down) => {
+        let c = notes.filter(m => { const d = Math.abs(m-from); return d>0 && d<=5; });
+        if(_strangeVal > 0.4 && Math.random() < _strangeVal * 0.4) c = [...c, ...poolTension];
+        if(c.length === 0) c = notes.filter(m => m !== from);
+        if(c.length === 0) return from;
+        const sorted = down
+          ? c.sort((a,b) => a-b).filter(m => m <= from)
+          : c.sort((a,b) => b-a).filter(m => m >= from);
+        const p = sorted.length > 0 ? sorted : c;
+        return p[Math.floor(Math.random() * Math.min(p.length, 2))];
       };
 
-      // 軸音プール（7th > 9th > 3rd）
-      const _axisPool = _an['7th'].length > 0 ? _an['7th']
-                      : _an['9th'].length > 0 ? _an['9th']
-                      : _an['3rd'].length > 0 ? _an['3rd']
-                      : notes;
+      // ── 3音セル構築 ──
+      // [軸音 → 経過音(近接) → 解決音]
+      // リズムは4種のパターンから選ぶ（8分音符基準倍率）
+      // パターンはディレイ(1/8D)との共鳴を意識した配置
+      const _VELVET_RHYTHMS = [
+        [2.0, 1.0, 1.0],   // A: 4分・8分・8分（落ち着いた流れ）
+        [1.0, 2.0, 1.0],   // B: 8分・4分・8分（中間にタメ）
+        [1.5, 0.5, 2.0],   // C: 付点8分・16分・4分（跳ねてタメ）
+        [1.0, 1.0, 2.0],   // D: 8分・8分・4分（流れて着地）
+      ];
 
-      // 解決音プール（3rd + 7th）
-      const _resolvePool = [..._an['7th'], ..._an['3rd']];
-      const _pickResolve = () => {
-        const pool = _resolvePool.length > 0 ? _resolvePool : notes;
-        return pool[Math.floor(Math.random() * pool.length)];
+      const buildCell = (startMidi) => {
+        const mid = moveClose(startMidi, false); // 上昇
+        const end = pickResolve();               // 解決
+        const rIdx = Math.floor(Math.random() * _VELVET_RHYTHMS.length);
+        return {
+          notes: [startMidi, mid, end],
+          rhythm: _VELVET_RHYTHMS[rIdx],
+          rIdx,
+        };
       };
 
-      // 近接移動（半音〜完全4度=5半音以内・方向考慮）
-      // preferDown=true: 下降優先 / false: 上昇優先
-      const _moveClose = (from, preferDown) => {
-        let cands = notes.filter(m => {
-          const d = Math.abs(m - from);
-          return d > 0 && d <= 5;
-        });
-        // strange↑: テンション音を候補に追加
-        if(_strangeVal > 0.35 && Math.random() < _strangeVal * 0.45){
-          cands = [...cands, ..._an['13th'], ..._an['sharp11']];
-        }
-        if(cands.length === 0) cands = notes.filter(m => m !== from);
-        if(cands.length === 0) return from;
-        // 方向優先でソート・上位3候補からランダム選択
-        const sorted = preferDown
-          ? cands.sort((a,b) => b - a).filter(m => m < from + 3)
-          : cands.sort((a,b) => a - b).filter(m => m > from - 3);
-        const pool = sorted.length > 0 ? sorted : cands;
-        return pool[Math.floor(Math.random() * Math.min(pool.length, 3))];
-      };
-
-      // ── モチーフ生成 ──
-      // モチーフ長: 2〜5音（音楽的判断）
-      //   軸音から始まる → 長め(4〜5音)
-      //   経過音から始まる → 短め(2〜3音)
-      //   前モチーフが長かった → 短く（コントラスト）
-      //   moving↑ → 長め傾向
-      const _buildMotif = (startMidi) => {
-        const isAxis = _axisPool.includes(startMidi);
-        const prevLen = ps.velvetMotif ? ps.velvetMotif.length : 3;
-        // 長さ決定
-        const baseLenMin = isAxis ? 3 : 2;
-        const baseLenMax = isAxis ? 5 : 3;
-        const movingBonus = Math.round(_movingVal * 1.0);
-        const contrastPenalty = prevLen >= 4 ? -1 : 0;
-        const len = Math.max(2, Math.min(5,
-          baseLenMin + Math.floor(Math.random() * (baseLenMax - baseLenMin + 1))
-          + movingBonus + contrastPenalty
-        ));
-
-        const motif = [startMidi];
-        let prev = startMidi;
-        // 方向: 最初は上昇傾向（7th/9thから上がって9th/13thへ）→ 後半下降解決
-        for(let i = 1; i < len; i++){
-          const preferDown = i >= Math.floor(len / 2); // 後半は下降
-          const next = _moveClose(prev, preferDown);
-          motif.push(next);
-          prev = next;
-        }
-        // 末尾を解決音（3rd or 7th）に差し替え
-        const resolve = _pickResolve();
-        if(resolve !== undefined) motif[motif.length - 1] = resolve;
-        return motif;
-      };
-
-      // ── リズムセル生成 ──
-      // 8分(1.0)ベース + 付点8分(1.5)・16分(0.5)で揺れ
-      // モチーフ長に応じてリズムパターンを選択
-      const _buildRhythm = (len) => {
-        // リズムパターン候補（8分音符基準倍率）
-        const _cells = [
-          [1.0, 0.5, 1.0, 1.5],             // 4音: 8分・16分・8分・付点8分
-          [1.5, 1.0, 0.5, 1.0, 1.0],        // 5音: 付点・8分・16分・8分・8分
-          [1.0, 1.0, 1.5],                   // 3音: 8分・8分・付点
-          [0.5, 1.5],                        // 2音: 16分・付点（短くスッと）
-          [1.0, 0.5, 1.5, 1.0, 0.5],        // 5音: 8分・16分・付点・8分・16分
-        ];
-        const idx = len <= 2 ? 3 : len === 3 ? 2 : len === 4 ? 0 : (Math.random() < 0.5 ? 1 : 4);
-        const cell = _cells[idx];
-        // セルをlen音に合わせる
-        while(cell.length < len) cell.push(1.0);
-        return cell.slice(0, len);
-      };
-
-      // ── モチーフ初期化・更新 ──
+      // ── セル初期化 ──
       if(ps.velvetMotif === null){
-        // 初回: 軸音から開始
-        const start = _axisPool[Math.floor(Math.random() * _axisPool.length)];
-        ps.velvetMotif = _buildMotif(start);
+        const start = axisPool[Math.floor(Math.random() * axisPool.length)];
+        const cell = buildCell(start);
+        ps.velvetMotif = cell.notes;
+        ps.velvetMotifRhythm = cell.rhythm;
         ps.velvetMotifPos = 0;
-        ps.velvetMotifRhythm = _buildRhythm(ps.velvetMotif.length);
         ps.velvetInRepeat = false;
-        ps.velvetRepeatCount = 0;
+        ps.velvetRepeatCount = 0; // セル繰り返し回数
       }
 
       let midi = null;
@@ -11212,67 +11162,59 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       let gateOverride = null;
 
       const mpos = ps.velvetMotifPos;
-      const motifLen = ps.velvetMotif.length;
+      const mlen = ps.velvetMotif.length;
 
-      if(mpos < motifLen){
-        // ── モチーフ内音符を発音 ──
+      if(mpos < mlen){
+        // ── セル内音符を発音 ──
         midi = ps.velvetMotif[mpos];
-        const rhythm = ps.velvetMotifRhythm || [1.0];
-        stepRatio = (rhythm[mpos] || 1.0) * densityMul;
+        stepRatio = (ps.velvetMotifRhythm[mpos] || 1.0) * densityMul;
 
-        // ベロシティ: 先頭強・末尾やや強（解決感）・中間弱
-        if(mpos === 0)               velMul = 1.15 + Math.random() * 0.1;
-        else if(mpos === motifLen-1) velMul = 0.95 + Math.random() * 0.1;
-        else                         velMul = 0.65 + Math.random() * 0.15;
+        // ベロシティ設計: 先頭強・中弱・末尾やや強（解決感）
+        // warm↑で揺らぎ増
+        const velBase = mpos === 0 ? 1.10 : mpos === mlen-1 ? 0.90 : 0.65;
+        const velJitter = _warmVal * 0.12;
+        velMul = velBase + (Math.random() - 0.5) * velJitter;
 
         ps.velvetMotifPos++;
 
-      } else if(!ps.velvetInRepeat && Math.random() < 0.38 + _strangeVal * 0.2){
-        // ── テクノ的同音反復（モチーフ末尾音を1〜2回反復）──
-        // strange↑で反復確率増
-        ps.velvetInRepeat = true;
-        ps.velvetRepeatCount = 0;
-        midi = ps.velvetMotif[motifLen - 1]; // 末尾音（解決音）を反復
-        stepRatio = 0.5 * densityMul;
-        velMul = 0.70;
-        gateOverride = 0.42; // スタッカート気味
-        ps.velvetRepeatCount++;
-
-      } else if(ps.velvetInRepeat && ps.velvetRepeatCount < (1 + (_strangeVal > 0.5 ? 1 : 0))){
-        // ── 反復継続 ──
-        midi = ps.velvetMotif[motifLen - 1];
-        stepRatio = 0.5 * densityMul;
-        velMul = 0.55;
-        gateOverride = 0.38;
-        ps.velvetRepeatCount++;
-
       } else {
-        // ── モチーフ完了 → 短い休符 → 次モチーフへ ──
-        // 休符長: 0.5〜1.5拍（moving↑で短縮）
-        const restBeats = Math.max(0.5, 1.2 - _movingVal * 0.5 + Math.random() * 0.4);
+        // ── セル完了 → 休符 → 次セルへ ──
+        // 休符長: 1.5〜3.0拍。moving↑で短縮。
+        // この休符がCHORDの余韻を活かし、ディレイが空間を満たす時間。
+        const restBase = 2.0 - _movingVal * 0.8;
+        const restBeats = Math.max(1.0, restBase + (Math.random() - 0.5) * 0.5);
         stepRatio = restBeats * densityMul;
 
-        // 次モチーフを準備（変容: 前モチーフの解決音から出発）
-        const prevResolve = ps.velvetMotif[motifLen - 1];
-        // 次の起点: 前の解決音から近い軸音へ
-        const nextAxisCands = _axisPool.filter(m => Math.abs(m - prevResolve) <= 5);
-        const nextStart = nextAxisCands.length > 0
-          ? nextAxisCands[Math.floor(Math.random() * nextAxisCands.length)]
-          : _axisPool[Math.floor(Math.random() * _axisPool.length)];
+        // 次セル構築
+        ps.velvetRepeatCount++;
+        const prevEnd = ps.velvetMotif[mlen - 1];
 
-        ps.velvetMotif = _buildMotif(nextStart);
+        // 4回繰り返したら変容（起点を変える）
+        // それ以外は前セルの解決音から近い軸音へ
+        let nextStart;
+        if(ps.velvetRepeatCount % 4 === 0){
+          // 変容: 軸音プールから新しい起点
+          nextStart = axisPool[Math.floor(Math.random() * axisPool.length)];
+        } else {
+          // 継続: 前の解決音から近い軸音
+          const near = axisPool.filter(m => Math.abs(m - prevEnd) <= 7);
+          nextStart = near.length > 0
+            ? near[Math.floor(Math.random() * near.length)]
+            : axisPool[Math.floor(Math.random() * axisPool.length)];
+        }
+
+        const cell = buildCell(nextStart);
+        ps.velvetMotif = cell.notes;
+        ps.velvetMotifRhythm = cell.rhythm;
         ps.velvetMotifPos = 0;
-        ps.velvetMotifRhythm = _buildRhythm(ps.velvetMotif.length);
         ps.velvetInRepeat = false;
-        ps.velvetRepeatCount = 0;
-        ps.velvetCycleCount++;
 
         return { midi: null, stepRatio };
       }
 
       // jitter（warm↑で揺れ増）
-      const jitterRange = 0.025 + _warmVal * 0.07;
-      stepRatio *= (1.0 + (Math.random() - 0.5) * jitterRange);
+      const jitter = 1.0 + (Math.random() - 0.5) * (0.02 + _warmVal * 0.06);
+      stepRatio *= jitter;
 
       if(midi !== null) ps.lastMidi = midi;
       return { midi, stepRatio, velMul, gateOverride };
