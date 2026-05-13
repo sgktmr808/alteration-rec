@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260513121927 -->
+<!-- build: 20260513123153 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -6269,7 +6269,15 @@ function startGroove(mode){
   const audioCtx = safeGetCtx();
   if(audioCtx){
     safeResume(audioCtx, ()=>{
-      _grooveNextBeat = audioCtx.currentTime + 0.05;
+      // マスタークロック: 未設定ならここで起点を設定
+      if(_masterClockOrigin === null){
+        _masterClockOrigin = audioCtx.currentTime;
+      }
+      // マスタークロックから次の16分音符グリッドにスナップ
+      const _sixteenth = (60 / autoBpm) / 4;
+      const _elapsed = audioCtx.currentTime - _masterClockOrigin;
+      const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+      _grooveNextBeat = _masterClockOrigin + _gridPos;
       _grooveSchedule();
     });
   } else {
@@ -9679,6 +9687,7 @@ let arpTimer=null;
 let arpStep=0;
 let arpSeq=[];             // 現在のアルペジオノート列（MIDI）
 let arpNextBeat=0;         // 次の発音予定AudioContext時刻
+let _masterClockOrigin=null; // マスタークロック起点（ファーストタップ時に一度だけ設定）
 let arpScheduleTimer=null;
 
 // DELAY用AudioNodeキャッシュ
@@ -10721,8 +10730,15 @@ function startArpScheduler(){
   if(!actx) return;
   safeResume(actx, ()=>{
     buildDelayNodes(actx);
-    // 次の発音を少し先から開始
-    arpNextBeat=actx.currentTime+0.05;
+    // マスタークロック: ファーストタップ時のみ起点を設定（以後リセットしない）
+    if(_masterClockOrigin === null){
+      _masterClockOrigin = actx.currentTime;
+    }
+    // 現在のマスタークロック位置から次の16分音符グリッドにスナップ
+    const _sixteenth = (60 / autoBpm) / 4;
+    const _elapsed = actx.currentTime - _masterClockOrigin;
+    const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+    arpNextBeat = _masterClockOrigin + _gridPos;
     arpScheduleTimer=setInterval(()=>scheduleArpNotes(), arpScheduleMs);
   });
 }
@@ -11402,7 +11418,10 @@ function scheduleArpNotes(){
     if(_usePhraseGrammar && arpSeq.length > 0){
       const result = _phraseNext(arpSeq, baseSec, sc, densityMul);
       if(result !== null){
-        const stepSec = Math.max(baseSec * 0.2, baseSec * result.stepRatio);
+        // VELVETは16分音符絶対秒数を基準（arpRateに依存しない）
+        const _sixteenth = (60 / autoBpm) / 4;
+        const _stepBase = sceneCurrentName === 'velvet' ? _sixteenth : baseSec;
+        const stepSec = Math.max(_stepBase * 0.2, _stepBase * result.stepRatio);
         if(result.midi !== null){
           _phraseState.notesSinceChord++;
           _playSceneArpNote(actx, result.midi, t, dest, result.velMul, result.gateOverride);
@@ -14984,7 +15003,14 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
       const actx=safeGetCtx();
       if(actx){
         safeResume(actx, ()=>buildDelayNodes(actx));
-        arpNextBeat=actx.currentTime+0.05;
+        // BPM変更時はarpNextBeatをリセットしない（マスタークロックを維持）
+        // arpNextBeatが過去になっていた場合のみ補正
+        if(arpNextBeat < actx.currentTime){
+          const _sixteenth = (60 / autoBpm) / 4;
+          const _elapsed = actx.currentTime - (_masterClockOrigin || actx.currentTime);
+          const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+          arpNextBeat = (_masterClockOrigin || actx.currentTime) + _gridPos;
+        }
       }
     }
   }
