@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260513133606 -->
+<!-- build: 20260513134258 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11595,21 +11595,24 @@ const SCENE_PRESETS = {
   // 2. VELVET ROOTLESS — ビル・エヴァンス × Octave One的。中域、内声、柔らかいテンション
   velvet: {
     label:'VELVET ROOTLESS',
-    // ローズピアノ的サウンド:
-    //   osc1:sawtooth(芯) + osc2:triangle(丸み)
-    //   cutoff低め・envMod高め（アタック時にフィルターが開く→金属的クリック感）
-    //   filterDrift深め・LFO遅め（フェイザー的うねり）
-    //   chorus増（コーラス感・広がり）
-    osc1:'sawtooth', osc2:'triangle', detune:6,
-    cutoff:700, res:0.35, envMod:0.75,   // cutoff低く・envMod高め（クリック感）
-    attack:0.006, decay:0.55, sustain:0.45, release:3.8,  // アタック短め（ピアノ的）
-    vol:0.32, chorus:0.28, wet:0.44, strum:6,
-    trailSec:2.0, width:0.70, feltAttack:0.10, ghost:0.0, filterDrift:0.35, // drift深め
+    // ローズピアノ的サウンド（70s コズミックジャズファンク・ロニーリストンスミス的）:
+    //   osc1:triangle（高域が丸い・倍音控えめ）
+    //   osc2:sawtooth（薄く混ぜて芯と倍音を補う）
+    //   cutoff低め・envMod中程度（アタック時に少し開く・クリック感）
+    //   detuneやや広め（ビンテージの調律の揺れ）
+    //   chorus深め（うねり・広がり）
+    //   filterDrift深め（フェイザー的うねり）
+    //   vol低め（ARPが聞こえるように）
+    osc1:'triangle', osc2:'sawtooth', detune:12,
+    cutoff:650, res:0.30, envMod:0.60,
+    attack:0.008, decay:0.60, sustain:0.50, release:4.0,
+    vol:0.26, chorus:0.34, wet:0.46, strum:8,
+    trailSec:2.2, width:0.72, feltAttack:0.08, ghost:0.0, filterDrift:0.38,
     voicingFlavor:'rootless',
     // ARP: CHORDの倍音として機能する設計
     arpOsc:'sine', arpOsc2:'sine', arpCutoff:900, arpRes:0.30, arpEnvMod:0.15,
     arpAttack:0.08, arpDecay:0.80, arpSustain:0.40,
-    arpGate:800, arpVol:0.16, arpWet:0.50, arpGhost:0.10,
+    arpGate:800, arpVol:0.28, arpWet:0.50, arpGhost:0.10,
     arpOctRange:2,
     arpRhythm:[1.0, 0.5, 1.0, 1.5], arpRestProb:0.12,
   },
