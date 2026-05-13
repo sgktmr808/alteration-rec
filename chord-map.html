@@ -11089,106 +11089,86 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const _movingVal  = sv ? sv('moving')  : 0;
       const _warmVal    = sv ? sv('warm')    : 0;
 
-      // ── 固定リズムテンプレート（beat位置・16小節=64beatで1サイクル）──
-      // 単位: 8分音符基準（1beat = 8分音符1個分）
-      // BPM100では1beat = 0.3秒
-      //
-      // テンプレートA: 密め。グルーヴ感あり。
-      // テンプレートB: 疎。呼吸感・余白。
-      // moving↑→A / moving↓→B / 中間→ミックス
-      const _TMPL_A = [
-        // beat位置からstepRatioへ変換済み（前音との間隔）
-        // [stepRatio, velMul]
-        [2.0, 1.1],  // 1拍目頭（強）
-        [1.5, 0.7],  // 2.5拍目（弱・裏）
-        [2.0, 0.9],  // 4拍目（中）
-        [3.0, 0.6],  // 6拍目（弱・間）
-        [1.5, 0.8],  // 7.5拍目（中弱）
-        [3.5, 1.0],  // 10拍目（中強）→ここに向かう感
-        [2.0, 0.7],  // 12拍目（弱）
-        [3.5, 0.9],  // 14.5拍目（中）→次サイクルへ
-        // 次サイクル先頭までの間隔
-        [1.5, 0.0],  // 休符（テンプレートの区切り）
+      // ── 1小節パターン（8beat = BPM100で2.4秒）──
+      // 各エントリ: [stepRatio, velMul]
+      // velMul=0.0 は休符
+      // パターンA: グループ感・流れがある
+      //   beat1: 音（強）→ beat2.5: 音（弱）→ beat3: 音（中）→ beat4.5: 休→ beat5: 音（中強）→ beat6.5: 音（弱）→ beat8: 休
+      // パターンB: 少し疎・呼吸感
+      //   beat1: 音（強）→ beat3: 音（中）→ beat4.5: 音（弱）→ beat7: 音（中）→ beat8.5: 休
+      const _VELVET_PAT_A = [
+        [1.5, 1.10],  // beat1:   強・フレーズ頭
+        [0.5, 0.65],  // beat2.5: 弱・流れ
+        [1.5, 0.85],  // beat3:   中
+        [1.5, 0.00],  // beat4.5: 休符
+        [1.5, 1.00],  // beat6:   中強・再出発
+        [1.5, 0.70],  // beat7.5: 弱
+        [1.0, 0.00],  // beat9:   休符（次小節頭まで）
+      ];
+      const _VELVET_PAT_B = [
+        [2.0, 1.10],  // beat1:   強
+        [1.5, 0.80],  // beat3:   中
+        [2.5, 0.70],  // beat4.5: 弱
+        [2.0, 0.90],  // beat7:   中
+        [2.0, 0.00],  // beat9:   休符
       ];
 
-      const _TMPL_B = [
-        [3.0, 1.1],  // 1拍目頭（強）
-        [3.5, 0.8],  // 4.5拍目（中）
-        [3.0, 0.7],  // 8拍目（弱）
-        [4.0, 0.9],  // 12拍目（中強）
-        [3.5, 0.8],  // 15.5拍目（中）
-        [5.0, 0.0],  // 休符（次サイクルへ）
-      ];
+      // moving↑→A / moving↓→B
+      const pat = _movingVal >= 0 ? _VELVET_PAT_A : _VELVET_PAT_B;
 
-      // moving値でテンプレートを選択
-      // moving > 0.3 → A / moving < -0.3 → B / 中間 → Aを基本にBの間隔をブレンド
-      const useA = _movingVal > -0.3;
-      const tmpl = useA ? _TMPL_A : _TMPL_B;
-
-      // ── テンプレート初期化 ──
+      // ── 初期化 ──
       if(ps.velvetMotif === null){
-        ps.velvetMotif = [];        // dummy（初期化フラグ代わり）
-        ps.velvetMotifPos = 0;      // テンプレート内位置
-        ps.velvetRepeatCount = 0;   // サイクル完了数
+        ps.velvetMotif = [];
+        ps.velvetMotifPos = 0;
+        ps.velvetRepeatCount = 0;
       }
 
-      const tPos = ps.velvetMotifPos % tmpl.length;
-      const [stepBase, vMul] = tmpl[tPos];
+      const pPos = ps.velvetMotifPos % pat.length;
+      const [stepBase, vMul] = pat[pPos];
       ps.velvetMotifPos++;
 
-      // velMul=0.0 は休符
+      // 休符
       if(vMul === 0.0){
-        const stepRatio = stepBase * densityMul;
-        return { midi: null, stepRatio };
+        return { midi: null, stepRatio: stepBase * densityMul };
       }
 
-      // ── 音選択 ──
-      // コードトーン分類
+      // ── コードトーン分類 ──
       const _root = S ? ni(S.root) : 0;
       const _rootMidi = 12 * 4 + _root;
       const _iv = (m) => ((m - _rootMidi) % 12 + 12) % 12;
-      const _is3rd = (m) => { const v = _iv(m); return v===3||v===4; };
-      const _is7th = (m) => { const v = _iv(m); return v===10||v===11; };
-      const _is9th = (m) => _iv(m) === 2;
-      const _isTension = (m) => { const v = _iv(m); return v===9||v===6; };
+      const p7  = notes.filter(m => { const v=_iv(m); return v===10||v===11; });
+      const p9  = notes.filter(m => _iv(m)===2);
+      const p3  = notes.filter(m => { const v=_iv(m); return v===3||v===4; });
+      const pT  = notes.filter(m => { const v=_iv(m); return v===9||v===6; });
 
-      const p3  = notes.filter(_is3rd);
-      const p7  = notes.filter(_is7th);
-      const p9  = notes.filter(_is9th);
-      const pT  = notes.filter(_isTension);
-
-      // テンプレート位置による音域の使い分け
-      // 先頭・中盤の強拍→7th/9th（浮遊感）
-      // 解決位置（後半）→3rd/7th（着地感）
-      // strange↑→テンション音を混入
-      const isResolvePos = tPos >= Math.floor(tmpl.length * 0.6) && vMul >= 0.9;
-      const useTension = _strangeVal > 0.35 && Math.random() < _strangeVal * 0.4;
+      // ── 音選択 ──
+      // フレーズ頭（強拍）→ 7th/9th（浮遊感）
+      // フレーズ中盤 → 前音と異なる音
+      // 小節後半 → 3rd/7th（解決感）
+      const isHead    = pPos === 0;
+      const isResolve = pPos >= Math.floor(pat.length * 0.55) && vMul >= 0.85;
+      const useTension = _strangeVal > 0.4 && Math.random() < _strangeVal * 0.35;
 
       let pool;
       if(useTension && pT.length > 0){
         pool = pT;
-      } else if(isResolvePos){
-        pool = [...p7, ...p3].length > 0 ? [...p7, ...p3] : notes;
+      } else if(isHead || (!isResolve)){
+        pool = [...p7, ...p9].length > 0 ? [...p7, ...p9] : [...p3, ...notes];
       } else {
-        pool = [...p7, ...p9].length > 0 ? [...p7, ...p9]
-             : p3.length > 0 ? p3 : notes;
+        pool = [...p7, ...p3].length > 0 ? [...p7, ...p3] : notes;
       }
+      if(pool.length === 0) pool = notes;
 
-      // 音選択: 前音と同じ音を避ける。pool全体から選ぶ。
-      // 近接優先は行わない（pool自体がコードトーン限定のため同音連続になりやすい）
-      let midi;
-      const poolExcludeLast = pool.filter(m => m !== ps.lastMidi);
-      const src = poolExcludeLast.length > 0 ? poolExcludeLast : pool;
-      midi = src[Math.floor(Math.random() * src.length)];
+      // 前音と同じ音を避ける
+      const poolEx = pool.filter(m => m !== ps.lastMidi);
+      const src = poolEx.length > 0 ? poolEx : pool;
+      const midi = src[Math.floor(Math.random() * src.length)];
 
-      // ベロシティ（warm↑で揺らぎ増）
-      const velJitter = _warmVal * 0.10;
-      const velMul = vMul + (Math.random() - 0.5) * velJitter;
-
-      const stepRatio = stepBase * densityMul;
+      // ベロシティ揺らぎ（warm↑で増）
+      const velMul = Math.max(0.4, vMul + (Math.random() - 0.5) * _warmVal * 0.12);
 
       if(midi !== null) ps.lastMidi = midi;
-      return { midi, stepRatio, velMul, gateOverride: null };
+      return { midi, stepRatio: stepBase * densityMul, velMul, gateOverride: null };
     }
 
 
