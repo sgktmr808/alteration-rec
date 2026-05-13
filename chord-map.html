@@ -2,6 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- build: 20260513121927 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11089,32 +11093,53 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const _movingVal  = sv ? sv('moving')  : 0;
       const _warmVal    = sv ? sv('warm')    : 0;
 
-      // ── 1小節パターン（8beat = BPM100で2.4秒）──
-      // 各エントリ: [stepRatio, velMul]
-      // velMul=0.0 は休符
-      // パターンA: グループ感・流れがある
-      //   beat1: 音（強）→ beat2.5: 音（弱）→ beat3: 音（中）→ beat4.5: 休→ beat5: 音（中強）→ beat6.5: 音（弱）→ beat8: 休
-      // パターンB: 少し疎・呼吸感
-      //   beat1: 音（強）→ beat3: 音（中）→ beat4.5: 音（弱）→ beat7: 音（中）→ beat8.5: 休
-      const _VELVET_PAT_A = [
-        [1.5, 1.10],  // beat1:   強・フレーズ頭
-        [0.5, 0.65],  // beat2.5: 弱・流れ
-        [1.5, 0.85],  // beat3:   中
-        [1.5, 0.00],  // beat4.5: 休符
-        [1.5, 1.00],  // beat6:   中強・再出発
-        [1.5, 0.70],  // beat7.5: 弱
-        [1.0, 0.00],  // beat9:   休符（次小節頭まで）
+      // ── 2小節パターン（32ステップ・16分音符単位）──
+      // ユーザー指定リズム: |1x11|x1x1|11x1|x1x1|x1x1|x1x1|x11x|11x1|
+      // 1=発音 x=休符。16分音符=stepRatio 0.5
+      // stepRatioは「前のイベントからの間隔」
+      // [stepRatio, 発音するか]
+      const _VELVET_SEQ = [
+        // 拍1: 1x11
+        [0.5, true ],  // 1:  発音
+        [0.5, false],  // 2:  休
+        [0.5, true ],  // 3:  発音
+        [0.5, true ],  // 4:  発音
+        // 拍2: x1x1
+        [0.5, false],  // 5:  休
+        [0.5, true ],  // 6:  発音
+        [0.5, false],  // 7:  休
+        [0.5, true ],  // 8:  発音
+        // 拍3: 11x1
+        [0.5, true ],  // 9:  発音
+        [0.5, true ],  // 10: 発音
+        [0.5, false],  // 11: 休
+        [0.5, true ],  // 12: 発音
+        // 拍4: x1x1
+        [0.5, false],  // 13: 休
+        [0.5, true ],  // 14: 発音
+        [0.5, false],  // 15: 休
+        [0.5, true ],  // 16: 発音
+        // 拍5: x1x1
+        [0.5, false],  // 17: 休
+        [0.5, true ],  // 18: 発音
+        [0.5, false],  // 19: 休
+        [0.5, true ],  // 20: 発音
+        // 拍6: x1x1
+        [0.5, false],  // 21: 休
+        [0.5, true ],  // 22: 発音
+        [0.5, false],  // 23: 休
+        [0.5, true ],  // 24: 発音
+        // 拍7: x11x
+        [0.5, false],  // 25: 休
+        [0.5, true ],  // 26: 発音
+        [0.5, true ],  // 27: 発音
+        [0.5, false],  // 28: 休
+        // 拍8: 11x1
+        [0.5, true ],  // 29: 発音
+        [0.5, true ],  // 30: 発音
+        [0.5, false],  // 31: 休
+        [0.5, true ],  // 32: 発音
       ];
-      const _VELVET_PAT_B = [
-        [2.0, 1.10],  // beat1:   強
-        [1.5, 0.80],  // beat3:   中
-        [2.5, 0.70],  // beat4.5: 弱
-        [2.0, 0.90],  // beat7:   中
-        [2.0, 0.00],  // beat9:   休符
-      ];
-
-      // moving↑→A / moving↓→B
-      const pat = _movingVal >= 0 ? _VELVET_PAT_A : _VELVET_PAT_B;
 
       // ── 初期化 ──
       if(ps.velvetMotif === null){
@@ -11123,49 +11148,65 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         ps.velvetRepeatCount = 0;
       }
 
-      const pPos = ps.velvetMotifPos % pat.length;
-      const [stepBase, vMul] = pat[pPos];
+      const sPos = ps.velvetMotifPos % _VELVET_SEQ.length;
+      const [stepBase, doPlay] = _VELVET_SEQ[sPos];
       ps.velvetMotifPos++;
 
-      // 休符
-      if(vMul === 0.0){
+      if(!doPlay){
         return { midi: null, stepRatio: stepBase * densityMul };
       }
+
+      // ── コードタイプ判定（メジャー/マイナー）──
+      const _typeStr = S ? (S.type || '') : '';
+      const _isMinor = /min|m7|m9|m11|dorian|phrygian/i.test(_typeStr);
 
       // ── コードトーン分類 ──
       const _root = S ? ni(S.root) : 0;
       const _rootMidi = 12 * 4 + _root;
       const _iv = (m) => ((m - _rootMidi) % 12 + 12) % 12;
-      const p7  = notes.filter(m => { const v=_iv(m); return v===10||v===11; });
-      const p9  = notes.filter(m => _iv(m)===2);
-      const p3  = notes.filter(m => { const v=_iv(m); return v===3||v===4; });
-      const pT  = notes.filter(m => { const v=_iv(m); return v===9||v===6; });
+
+      const p3    = notes.filter(m => { const v=_iv(m); return v===4; });           // メジャー3rd
+      const pm3   = notes.filter(m => { const v=_iv(m); return v===3; });           // マイナー3rd
+      const p5    = notes.filter(m => { const v=_iv(m); return v===7; });           // 5th
+      const p7    = notes.filter(m => { const v=_iv(m); return v===10||v===11; }); // 7th
+      const p9    = notes.filter(m => { const v=_iv(m); return v===2; });           // 9th
+      const pT    = notes.filter(m => { const v=_iv(m); return v===9||v===6; });   // 13th/#11
 
       // ── 音選択 ──
-      // フレーズ頭（強拍）→ 7th/9th（浮遊感）
-      // フレーズ中盤 → 前音と異なる音
-      // 小節後半 → 3rd/7th（解決感）
-      const isHead    = pPos === 0;
-      const isResolve = pPos >= Math.floor(pat.length * 0.55) && vMul >= 0.85;
+      // 基本プール: メジャー→7th/9th/3rd / マイナー→7th/9th/m3rd
+      const basePool = _isMinor
+        ? [...p7, ...p9, ...pm3].filter(Boolean)
+        : [...p7, ...p9, ...p3].filter(Boolean);
+      const pool = basePool.length > 0 ? basePool : notes;
+
+      // 跳躍プール（5〜6回に1回）: メジャー→5th追加 / マイナー→m3rd追加
+      const jumpPool = _isMinor
+        ? [...pool, ...pm3, ...p7]
+        : [...pool, ...p5, ...p7];
+
+      const useJump = Math.random() < 0.18; // 約5〜6回に1回
       const useTension = _strangeVal > 0.4 && Math.random() < _strangeVal * 0.35;
 
-      let pool;
+      let src;
       if(useTension && pT.length > 0){
-        pool = pT;
-      } else if(isHead || (!isResolve)){
-        pool = [...p7, ...p9].length > 0 ? [...p7, ...p9] : [...p3, ...notes];
+        src = pT;
+      } else if(useJump && jumpPool.length > 0){
+        src = jumpPool;
       } else {
-        pool = [...p7, ...p3].length > 0 ? [...p7, ...p3] : notes;
+        src = pool;
       }
-      if(pool.length === 0) pool = notes;
 
       // 前音と同じ音を避ける
-      const poolEx = pool.filter(m => m !== ps.lastMidi);
-      const src = poolEx.length > 0 ? poolEx : pool;
-      const midi = src[Math.floor(Math.random() * src.length)];
+      const srcEx = src.filter(m => m !== ps.lastMidi);
+      const finalSrc = srcEx.length > 0 ? srcEx : src;
+      const midi = finalSrc[Math.floor(Math.random() * finalSrc.length)];
 
-      // ベロシティ揺らぎ（warm↑で増）
-      const velMul = Math.max(0.4, vMul + (Math.random() - 0.5) * _warmVal * 0.12);
+      // ベロシティ: 発音位置で強弱をつける
+      // 拍頭(sPos%4===0)→強 / 連打の2音目→弱 / それ以外→中
+      const isDownbeat = sPos % 8 === 0;
+      const isUpbeat   = sPos % 2 === 1;
+      const baseVel = isDownbeat ? 1.10 : isUpbeat ? 0.68 : 0.85;
+      const velMul = Math.max(0.4, baseVel + (Math.random() - 0.5) * _warmVal * 0.12);
 
       if(midi !== null) ps.lastMidi = midi;
       return { midi, stepRatio: stepBase * densityMul, velMul, gateOverride: null };
