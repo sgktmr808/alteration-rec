@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260513131804 -->
+<!-- build: 20260513132954 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11088,152 +11088,87 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const _warmVal    = sv ? sv('warm')    : 0;
 
       // ────────────────────────────────────────────
-      // VELVET ARP設計:
+      // VELVET ARP: CHORDの倍音として機能する
       //
-      // 【山パターン（2拍単位）】
-      //   小山(2拍)→中山(2拍)→小山(2拍)→中高山(2拍) = 8拍1サイクル
-      //   各山の中: デフォルトはUp&Down（低→高→低）
-      //   strange↑: Low&Up要素が混入（上昇方向が強くなる）
-      //   strange↓: Low&Down要素が混入（下降方向が強くなる）
+      // 【思想】
+      //   ARPはCHORDの余韻の一部として聞こえる。
+      //   音数を絞り、ゲートを長く、タイミングを疎に。
+      //   ディレイが残響として空間を満たす。
       //
-      // 【音域ゾーン（notes配列の範囲内）】
-      //   小:   notes[0] 〜 notes[0]+14
-      //   中:   notes[0] 〜 notes[0]+26
-      //   中高: notes[0] 〜 notes[0]+38
+      // 【設計】
+      //   1〜2音のみ。長いゲート（800ms）。
+      //   CHORDが鳴った後、2〜4拍遅れてから入る。
+      //   次の音まで3〜6拍の間隔。
+      //   音は7th/9th/3rdから選ぶ（コードの内声）。
       //
-      // 【シフト変容】
-      //   デフォルトで毎サイクル+1ずつ自動シフト（32ステップでループ）
-      //   strange値が「落ち着く位置」を決める
-      //   落ち着いた後は静止。strangeが変わると再び動き出す。
-      //   moving↑: シフト速度上昇（1〜3ステップ）
-      //   warm↑: ノートレングス伸長
+      // 【SLスライダー】
+      //   strange↑: 音域が上がる・テンション音混入
+      //   strange↓: 音域が下がる・安定したコードトーン
+      //   moving↑:  間隔が短くなる（少し密に）
+      //   moving↓:  間隔が長くなる（より疎に）
+      //   warm↑:    ゲート伸長・ベロシティ揺らぎ増
       // ────────────────────────────────────────────
+
+      // ── コードトーン分類 ──
+      const _root = S ? ni(S.root) : 0;
+      const _rootMidi = 12 * (arpOctCenter + 1) + _root;
+      const _iv = (m) => ((m - _rootMidi) % 12 + 12) % 12;
+
+      const p7   = notes.filter(m => { const v=_iv(m); return v===10||v===11; });
+      const p9   = notes.filter(m => _iv(m)===2);
+      const p3   = notes.filter(m => { const v=_iv(m); return v===3||v===4; });
+      const pT   = notes.filter(m => { const v=_iv(m); return v===9||v===6; });
 
       // ── 初期化 ──
       if(ps.velvetMotif === null){
-        ps.velvetMotif       = [];    // dummy（初期化フラグ）
-        ps.velvetMotifPos    = 0;     // シーケンス内位置
-        ps.velvetRepeatCount = 0;     // サイクル完了数
-        ps.velvetPhase       = 0;     // 現在のシフト量（0〜31）
-        ps.velvetMotifRhythm = null;  // キャッシュされたフルシーケンス
-      }
-
-      // ── シーケンス生成（サイクル完了時のみ再生成）──
-      if(!ps.velvetMotifRhythm){
-
-        // 音域フィルタ: notes[0]を下限としてspan半音以内
-        const _lo = notes.length > 0 ? notes[0] : 48;
-        const _filterZone = (span) => {
-          const f = notes.filter(m => m >= _lo && m <= _lo + span);
-          return f.length >= 2 ? f : notes;
-        };
-
-        const _zoneS  = _filterZone(14);  // 小
-        const _zoneM  = _filterZone(26);  // 中
-        const _zoneMH = _filterZone(38);  // 中高
-
-        // 山シーケンス生成
-        const _buildMountain = (zone) => {
-          const sorted = [...zone].sort((a,b) => a-b);
-
-          if(_strangeVal > 0.15){
-            // strange↑: Up&DownからLow&Upへグラデーション
-            const blend = Math.min(1.0, (_strangeVal - 0.15) / 0.85);
-            const updown = [...sorted, ...[...sorted].reverse().slice(1, -1)];
-            const upOnly = [...sorted];
-            const seq = [];
-            const len = Math.max(2, updown.length);
-            for(let i = 0; i < len; i++){
-              // blendが高いほどupOnlyから選ぶ
-              seq.push(Math.random() < blend
-                ? upOnly[i % upOnly.length]
-                : updown[i % updown.length]);
-            }
-            return seq;
-          } else if(_strangeVal < -0.15){
-            // strange↓: Up&DownからLow&Downへグラデーション
-            const blend = Math.min(1.0, (Math.abs(_strangeVal) - 0.15) / 0.85);
-            const updown = [...sorted, ...[...sorted].reverse().slice(1, -1)];
-            const downOnly = [...sorted].reverse();
-            const seq = [];
-            const len = Math.max(2, updown.length);
-            for(let i = 0; i < len; i++){
-              seq.push(Math.random() < blend
-                ? downOnly[i % downOnly.length]
-                : updown[i % updown.length]);
-            }
-            return seq;
-          }
-          // デフォルト: Up&Down
-          return [...sorted, ...[...sorted].reverse().slice(1, -1)];
-        };
-
-        // 各山を8ステップ（16分音符×8=2拍）に正規化
-        const _normalizeTo8 = (mountain) => {
-          const seq = [];
-          for(let i = 0; i < 8; i++) seq.push(mountain[i % mountain.length]);
-          return seq;
-        };
-
-        // 小→中→小→中高の順で32ステップ生成
-        let full = [
-          ..._normalizeTo8(_buildMountain(_zoneS)),
-          ..._normalizeTo8(_buildMountain(_zoneM)),
-          ..._normalizeTo8(_buildMountain(_zoneS)),
-          ..._normalizeTo8(_buildMountain(_zoneMH)),
-        ];
-
-        // シフト適用
-        const s = ((ps.velvetPhase % full.length) + full.length) % full.length;
-        ps.velvetMotifRhythm = [...full.slice(s), ...full.slice(0, s)];
-      }
-
-      // ── 発音 ──
-      const seqLen = ps.velvetMotifRhythm.length; // 32
-      const sPos   = ps.velvetMotifPos % seqLen;
-      const midi   = ps.velvetMotifRhythm[sPos];
-      ps.velvetMotifPos++;
-
-      // ── サイクル完了時: シフト更新 ──
-      if(ps.velvetMotifPos % seqLen === 0){
-        ps.velvetRepeatCount++;
-
-        // 落ち着く位置: strange値で決まる（0〜31の範囲）
-        // strange=0 → 16（中央）/ strange↑ → 24 / strange↓ → 8
-        const _targetShift = Math.round(16 + _strangeVal * 8);
-
-        // 現在位置から目標へ1ずつ近づく（moving↑で速度増）
-        const shiftSpeed = Math.max(1, Math.round(1 + Math.max(0, _movingVal) * 2));
-        const diff = _targetShift - ps.velvetPhase;
-
-        if(diff !== 0){
-          // 目標に向かって進む
-          ps.velvetPhase += Math.sign(diff) * Math.min(shiftSpeed, Math.abs(diff));
-        } else {
-          // 落ち着いている場合でも、deault(strange=0)なら常に+1でループ
-          if(Math.abs(_strangeVal) < 0.1){
-            ps.velvetPhase = (ps.velvetPhase + 1) % 32;
-          }
-        }
-
-        // 新シフトでシーケンスを再生成
+        ps.velvetMotif       = [];
+        ps.velvetMotifPos    = 0;   // 0=待機中（休符消化）/ 1=発音済み
+        ps.velvetRepeatCount = 0;   // 発音回数
+        ps.velvetPhase       = 0;   // 休符カウント残り
         ps.velvetMotifRhythm = null;
       }
 
-      // ベロシティ: 山の頂点付近（sPos%8の3〜5）で強く
-      const _zonePos = sPos % 8;
-      const _isApex  = _zonePos >= 3 && _zonePos <= 5;
-      const baseVel  = _isApex ? 1.05 : 0.78;
-      const velMul   = Math.max(0.4, baseVel + (Math.random() - 0.5) * _warmVal * 0.15);
+      // ── 休符消化中 ──
+      if(ps.velvetPhase > 0){
+        ps.velvetPhase--;
+        // 休符1ステップ = 2拍（16分音符×8）
+        return { midi: null, stepRatio: 8.0 * densityMul };
+      }
 
-      // ノートレングス: warm↑で伸びる
-      const gateOverride = 0.8 + _warmVal * 0.5;
+      // ── 音選択 ──
+      // strange↑: テンション音・高域 / strange↓: 安定コードトーン・低域
+      let pool;
+      if(_strangeVal > 0.35 && pT.length > 0){
+        pool = [...pT, ...p7];
+      } else if(_strangeVal < -0.35){
+        pool = [...p3, ...p7].length > 0 ? [...p3, ...p7] : notes;
+      } else {
+        pool = [...p7, ...p9].length > 0 ? [...p7, ...p9] : [...p3, ...notes];
+      }
+      if(pool.length === 0) pool = notes;
 
-      // 16分音符固定（マスタークロック基準）
-      const stepRatio = 1.0 * densityMul;
+      // 前音と同じ音を避ける
+      const poolEx = pool.filter(m => m !== ps.lastMidi);
+      const src = poolEx.length > 0 ? poolEx : pool;
+      const midi = src[Math.floor(Math.random() * src.length)];
+
+      // ── 次の休符長を決める ──
+      // 基本: 2〜4拍分の休符ステップ
+      // moving↑: 短く（1〜2）/ moving↓: 長く（3〜5）
+      const restSteps = Math.max(1, Math.round(
+        2.5 - _movingVal * 1.5 + (Math.random() - 0.5) * 1.0
+      ));
+      ps.velvetPhase = restSteps;
+      ps.velvetRepeatCount++;
+
+      // ベロシティ（warm↑で揺らぎ）
+      const velMul = Math.max(0.5, 0.85 + (Math.random() - 0.5) * _warmVal * 0.2);
+
+      // ノートレングス（warm↑で伸びる）
+      const gateOverride = 0.9 + _warmVal * 0.6;
 
       if(midi != null) ps.lastMidi = midi;
-      return { midi, stepRatio, velMul, gateOverride };
+      return { midi, stepRatio: 1.0 * densityMul, velMul, gateOverride };
     }
 
 
@@ -11661,16 +11596,16 @@ const SCENE_PRESETS = {
   velvet: {
     label:'VELVET ROOTLESS',
     osc1:'sawtooth', osc2:'triangle', detune:8,
-    cutoff:1100, res:0.40, envMod:0.45,   // さらに暗く・こもらせる（ARPの高域と住み分け）
-    attack:0.09, decay:0.65, sustain:0.62, release:3.8,  // 溶け合う（release2.4→3.8）
-    vol:0.44, chorus:0.16, wet:0.44, strum:7,
+    cutoff:1100, res:0.40, envMod:0.45,
+    attack:0.09, decay:0.65, sustain:0.62, release:3.8,
+    vol:0.34, chorus:0.16, wet:0.44, strum:7,  // vol下げ（0.44→0.34）
     trailSec:2.0, width:0.65, feltAttack:0.14, ghost:0.0, filterDrift:0.20,
     voicingFlavor:'rootless',
-    // ARP: Blue in Green × Black Water的設計。4小節サイクル。
-    // 7th/9th/3rdを軸に下降解決。テクノ的同音反復。長い休符。
-    arpOsc:'sawtooth', arpOsc2:'sine', arpCutoff:1800, arpRes:0.50, arpEnvMod:0.38,
-    arpAttack:0.004, arpDecay:0.42, arpSustain:0.08,
-    arpGate:320, arpVol:0.20, arpWet:0.40, arpGhost:0.20,
+    // ARP: CHORDの倍音として機能する設計
+    // sineの柔らかい音・長いゲート・疎なタイミング・CHORDの余韻の一部
+    arpOsc:'sine', arpOsc2:'sine', arpCutoff:900, arpRes:0.30, arpEnvMod:0.15,
+    arpAttack:0.08, arpDecay:0.80, arpSustain:0.40,  // ゆっくり立ち上がり・長い余韻
+    arpGate:800, arpVol:0.16, arpWet:0.50, arpGhost:0.10,  // 長いゲート・控えめな音量
     arpOctRange:2,
     arpRhythm:[1.0, 0.5, 1.0, 1.5], arpRestProb:0.12,
   },
@@ -11862,7 +11797,10 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
     }
 
     notes = _applyComplex(notes);
-    return notes.sort((a,b)=>a-b).slice(0,5);
+    // 音数を3音に絞る（密度を下げる・CHORDをうるさくしない）
+    // 7th・3rd・9thを優先して残す
+    const _keep = notes.sort((a,b)=>a-b);
+    return _keep.slice(0,3);
   }
 
   if(flavor === 'glass'){
