@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260513132954 -->
+<!-- build: 20260513133606 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11595,17 +11595,21 @@ const SCENE_PRESETS = {
   // 2. VELVET ROOTLESS — ビル・エヴァンス × Octave One的。中域、内声、柔らかいテンション
   velvet: {
     label:'VELVET ROOTLESS',
-    osc1:'sawtooth', osc2:'triangle', detune:8,
-    cutoff:1100, res:0.40, envMod:0.45,
-    attack:0.09, decay:0.65, sustain:0.62, release:3.8,
-    vol:0.34, chorus:0.16, wet:0.44, strum:7,  // vol下げ（0.44→0.34）
-    trailSec:2.0, width:0.65, feltAttack:0.14, ghost:0.0, filterDrift:0.20,
+    // ローズピアノ的サウンド:
+    //   osc1:sawtooth(芯) + osc2:triangle(丸み)
+    //   cutoff低め・envMod高め（アタック時にフィルターが開く→金属的クリック感）
+    //   filterDrift深め・LFO遅め（フェイザー的うねり）
+    //   chorus増（コーラス感・広がり）
+    osc1:'sawtooth', osc2:'triangle', detune:6,
+    cutoff:700, res:0.35, envMod:0.75,   // cutoff低く・envMod高め（クリック感）
+    attack:0.006, decay:0.55, sustain:0.45, release:3.8,  // アタック短め（ピアノ的）
+    vol:0.32, chorus:0.28, wet:0.44, strum:6,
+    trailSec:2.0, width:0.70, feltAttack:0.10, ghost:0.0, filterDrift:0.35, // drift深め
     voicingFlavor:'rootless',
     // ARP: CHORDの倍音として機能する設計
-    // sineの柔らかい音・長いゲート・疎なタイミング・CHORDの余韻の一部
     arpOsc:'sine', arpOsc2:'sine', arpCutoff:900, arpRes:0.30, arpEnvMod:0.15,
-    arpAttack:0.08, arpDecay:0.80, arpSustain:0.40,  // ゆっくり立ち上がり・長い余韻
-    arpGate:800, arpVol:0.16, arpWet:0.50, arpGhost:0.10,  // 長いゲート・控えめな音量
+    arpAttack:0.08, arpDecay:0.80, arpSustain:0.40,
+    arpGate:800, arpVol:0.16, arpWet:0.50, arpGhost:0.10,
     arpOctRange:2,
     arpRhythm:[1.0, 0.5, 1.0, 1.5], arpRestProb:0.12,
   },
