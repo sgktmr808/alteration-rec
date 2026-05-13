@@ -11174,15 +11174,12 @@ function _phraseNext(notes, baseSec, sc, densityMul){
              : p3.length > 0 ? p3 : notes;
       }
 
-      // 前音から近い音を優先（5半音以内）
+      // 音選択: 前音と同じ音を避ける。pool全体から選ぶ。
+      // 近接優先は行わない（pool自体がコードトーン限定のため同音連続になりやすい）
       let midi;
-      if(ps.lastMidi !== null){
-        const near = pool.filter(m => Math.abs(m - ps.lastMidi) <= 5);
-        const src = near.length > 0 ? near : pool;
-        midi = src[Math.floor(Math.random() * src.length)];
-      } else {
-        midi = pool[Math.floor(Math.random() * pool.length)];
-      }
+      const poolExcludeLast = pool.filter(m => m !== ps.lastMidi);
+      const src = poolExcludeLast.length > 0 ? poolExcludeLast : pool;
+      midi = src[Math.floor(Math.random() * src.length)];
 
       // ベロシティ（warm↑で揺らぎ増）
       const velJitter = _warmVal * 0.10;
