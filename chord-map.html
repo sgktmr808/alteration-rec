@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260513125603 -->
+<!-- build: 20260513131804 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11082,28 +11082,6 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     }
 
     // ────────────────────────────────────────────
-    // VELVET: 固定リズムテンプレート × コードトーン選択
-    //
-    // 【アプローチ】
-    //   4小節分の「音を置く位置」を固定テンプレートで定義。
-    //   テンプレートはbeat位置の配列。
-    //   各位置にどの音を置くかだけが変わる。
-    //   グリッドを意識した上で、音の選択に必然性を持たせる。
-    //
-    //   テンプレートA（基本）:
-    //     beat: 1, 2.5, 4, 6, 7.5, 10, 12, 14.5
-    //     （拍頭・裏拍・3拍目前後・をバランスよく配置）
-    //
-    //   テンプレートB（疎・呼吸感）:
-    //     beat: 1, 3.5, 6, 9, 11.5, 14
-    //
-    //   各beat位置の間隔がstepRatioになる。
-    //   音選択: 7th/9th/3rdの順で優先。前音から近い音。
-    //   moving↑: テンプレートAに近づく（密）
-    //   moving↓: テンプレートBに近づく（疎）
-    //   strange↑: テンション音が混入
-    //   warm↑: ベロシティの揺らぎ増
-    // ────────────────────────────────────────────
     case 'velvet': {
       const _strangeVal = sv ? sv('strange') : 0;
       const _movingVal  = sv ? sv('moving')  : 0;
@@ -11115,158 +11093,146 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       // 【山パターン（2拍単位）】
       //   小山(2拍)→中山(2拍)→小山(2拍)→中高山(2拍) = 8拍1サイクル
       //   各山の中: デフォルトはUp&Down（低→高→低）
-      //   strange↑: Low&Up要素混入（上昇方向が強くなる）
-      //   strange↓: Low&Down要素混入（下降方向が強くなる）
+      //   strange↑: Low&Up要素が混入（上昇方向が強くなる）
+      //   strange↓: Low&Down要素が混入（下降方向が強くなる）
       //
-      // 【音域ゾーン（ルートMIDI基準）】
-      //   小:   ±14半音（約1オクターブ）
-      //   中:   ±26半音（約2オクターブ）
-      //   中高: ±38半音（約3オクターブ弱）
+      // 【音域ゾーン（notes配列の範囲内）】
+      //   小:   notes[0] 〜 notes[0]+14
+      //   中:   notes[0] 〜 notes[0]+26
+      //   中高: notes[0] 〜 notes[0]+38
       //
       // 【シフト変容】
-      //   毎サイクル、パターン開始位置を±1ずつシフト
-      //   strange値が落ち着く位置を決める
-      //   moving↑: シフト速度上昇 / warm↑: ノートレングス伸長
+      //   デフォルトで毎サイクル+1ずつ自動シフト（32ステップでループ）
+      //   strange値が「落ち着く位置」を決める
+      //   落ち着いた後は静止。strangeが変わると再び動き出す。
+      //   moving↑: シフト速度上昇（1〜3ステップ）
+      //   warm↑: ノートレングス伸長
       // ────────────────────────────────────────────
 
-      // ── 音域フィルタ ──
-      // notesからMIDI範囲でフィルタして各ゾーンの音を取得
-      const _root = S ? ni(S.root) : 0;
-      const _rootMidi = 12 * (arpOctCenter + 1) + _root;
+      // ── 初期化 ──
+      if(ps.velvetMotif === null){
+        ps.velvetMotif       = [];    // dummy（初期化フラグ）
+        ps.velvetMotifPos    = 0;     // シーケンス内位置
+        ps.velvetRepeatCount = 0;     // サイクル完了数
+        ps.velvetPhase       = 0;     // 現在のシフト量（0〜31）
+        ps.velvetMotifRhythm = null;  // キャッシュされたフルシーケンス
+      }
 
-      // ゾーン別に音をフィルタ（notesは既にbuildArpSeqで生成済み）
-      const _filterZone = (span) => {
-        const lo = _rootMidi - 2;
-        const hi = _rootMidi + span;
-        const f = notes.filter(m => m >= lo && m <= hi);
-        return f.length >= 2 ? f : notes; // フォールバック
-      };
+      // ── シーケンス生成（サイクル完了時のみ再生成）──
+      if(!ps.velvetMotifRhythm){
 
-      const _zoneS  = _filterZone(14);  // 小: ±1oct
-      const _zoneM  = _filterZone(26);  // 中: ±2oct
-      const _zoneMH = _filterZone(38);  // 中高: ±3oct弱
+        // 音域フィルタ: notes[0]を下限としてspan半音以内
+        const _lo = notes.length > 0 ? notes[0] : 48;
+        const _filterZone = (span) => {
+          const f = notes.filter(m => m >= _lo && m <= _lo + span);
+          return f.length >= 2 ? f : notes;
+        };
 
-      // ── 山シーケンス生成 ──
-      // 各山: ゾーン内の音でUp&Down / strange↑→Up寄り / strange↓→Down寄り
-      const _buildMountain = (zone) => {
-        if(zone.length === 0) return [notes[0]];
-        const sorted = [...zone].sort((a,b) => a-b);
-        const lo = sorted[0];
-        const hi = sorted[sorted.length-1];
+        const _zoneS  = _filterZone(14);  // 小
+        const _zoneM  = _filterZone(26);  // 中
+        const _zoneMH = _filterZone(38);  // 中高
 
-        // Up&Down（デフォルト）: 低→高→低
-        const updown = [...sorted, ...[...sorted].reverse().slice(1)];
+        // 山シーケンス生成
+        const _buildMountain = (zone) => {
+          const sorted = [...zone].sort((a,b) => a-b);
 
-        if(_strangeVal > 0.15){
-          // strange↑: Low&Up（下から上へ一方向）
-          const blend = Math.min(1.0, _strangeVal * 1.5);
-          const upOnly = [...sorted];
-          // blendに応じてupdownとupOnlyを混ぜる
-          const len = Math.round(updown.length * (1 - blend) + upOnly.length * blend);
-          const seq = [];
-          for(let i = 0; i < Math.max(2, len); i++){
-            const t = blend;
-            const fromUp = upOnly[i % upOnly.length];
-            const fromUD = updown[i % updown.length];
-            seq.push(t > 0.5 ? fromUp : fromUD);
+          if(_strangeVal > 0.15){
+            // strange↑: Up&DownからLow&Upへグラデーション
+            const blend = Math.min(1.0, (_strangeVal - 0.15) / 0.85);
+            const updown = [...sorted, ...[...sorted].reverse().slice(1, -1)];
+            const upOnly = [...sorted];
+            const seq = [];
+            const len = Math.max(2, updown.length);
+            for(let i = 0; i < len; i++){
+              // blendが高いほどupOnlyから選ぶ
+              seq.push(Math.random() < blend
+                ? upOnly[i % upOnly.length]
+                : updown[i % updown.length]);
+            }
+            return seq;
+          } else if(_strangeVal < -0.15){
+            // strange↓: Up&DownからLow&Downへグラデーション
+            const blend = Math.min(1.0, (Math.abs(_strangeVal) - 0.15) / 0.85);
+            const updown = [...sorted, ...[...sorted].reverse().slice(1, -1)];
+            const downOnly = [...sorted].reverse();
+            const seq = [];
+            const len = Math.max(2, updown.length);
+            for(let i = 0; i < len; i++){
+              seq.push(Math.random() < blend
+                ? downOnly[i % downOnly.length]
+                : updown[i % updown.length]);
+            }
+            return seq;
           }
-          return seq;
-        } else if(_strangeVal < -0.15){
-          // strange↓: Low&Down（高から下へ一方向）
-          const blend = Math.min(1.0, Math.abs(_strangeVal) * 1.5);
-          const downOnly = [...sorted].reverse();
-          const len = Math.max(2, downOnly.length);
-          const seq = [];
-          for(let i = 0; i < len; i++){
-            seq.push(downOnly[i % downOnly.length]);
-          }
-          return seq;
-        }
-        return updown;
-      };
-
-      // ── 8拍サイクルのフルシーケンス構築 ──
-      // 小(2拍)→中(2拍)→小(2拍)→中高(2拍)
-      // 各山を2拍（16分音符×8）に収める
-      const _buildFullSeq = (shift) => {
-        const mountains = [
-          _buildMountain(_zoneS),   // 小
-          _buildMountain(_zoneM),   // 中
-          _buildMountain(_zoneS),   // 小
-          _buildMountain(_zoneMH),  // 中高
-        ];
+          // デフォルト: Up&Down
+          return [...sorted, ...[...sorted].reverse().slice(1, -1)];
+        };
 
         // 各山を8ステップ（16分音符×8=2拍）に正規化
         const _normalizeTo8 = (mountain) => {
           const seq = [];
-          for(let i = 0; i < 8; i++){
-            seq.push(mountain[i % mountain.length]);
-          }
+          for(let i = 0; i < 8; i++) seq.push(mountain[i % mountain.length]);
           return seq;
         };
 
-        let full = [];
-        mountains.forEach(m => full = full.concat(_normalizeTo8(m)));
-        // full = 32ステップ（8拍=2小節）
+        // 小→中→小→中高の順で32ステップ生成
+        let full = [
+          ..._normalizeTo8(_buildMountain(_zoneS)),
+          ..._normalizeTo8(_buildMountain(_zoneM)),
+          ..._normalizeTo8(_buildMountain(_zoneS)),
+          ..._normalizeTo8(_buildMountain(_zoneMH)),
+        ];
 
         // シフト適用
-        const s = ((shift % full.length) + full.length) % full.length;
-        return [...full.slice(s), ...full.slice(0, s)];
-      };
-
-      // ── 落ち着く位置（strange値で決まる）──
-      // strange=0 → シフト0（中央）
-      // strange↑ → 後ろ寄り（+8: 中高山から始まる位置）
-      // strange↓ → 前寄り（-8: 中山から始まる位置）
-      const _targetShift = Math.round(_strangeVal * 8);
-
-      // ── 初期化 ──
-      if(ps.velvetMotif === null){
-        ps.velvetMotif = [];           // dummy
-        ps.velvetMotifPos = 0;         // シーケンス内位置
-        ps.velvetRepeatCount = 0;      // サイクル完了数
-        ps.velvetPhase = 0;            // 現在のシフト量
-        ps.velvetMotifRhythm = null;   // 現在のフルシーケンス
+        const s = ((ps.velvetPhase % full.length) + full.length) % full.length;
+        ps.velvetMotifRhythm = [...full.slice(s), ...full.slice(0, s)];
       }
 
-      // シーケンスが未生成なら生成
-      if(!ps.velvetMotifRhythm){
-        ps.velvetMotifRhythm = _buildFullSeq(ps.velvetPhase);
-      }
-
+      // ── 発音 ──
       const seqLen = ps.velvetMotifRhythm.length; // 32
-      const sPos = ps.velvetMotifPos % seqLen;
-      const midi = ps.velvetMotifRhythm[sPos];
+      const sPos   = ps.velvetMotifPos % seqLen;
+      const midi   = ps.velvetMotifRhythm[sPos];
       ps.velvetMotifPos++;
 
-      // サイクル完了時: シフトを目標値に1ずつ近づける
+      // ── サイクル完了時: シフト更新 ──
       if(ps.velvetMotifPos % seqLen === 0){
         ps.velvetRepeatCount++;
-        // moving↑でシフト速度上昇（1〜3ステップ）
+
+        // 落ち着く位置: strange値で決まる（0〜31の範囲）
+        // strange=0 → 16（中央）/ strange↑ → 24 / strange↓ → 8
+        const _targetShift = Math.round(16 + _strangeVal * 8);
+
+        // 現在位置から目標へ1ずつ近づく（moving↑で速度増）
         const shiftSpeed = Math.max(1, Math.round(1 + Math.max(0, _movingVal) * 2));
-        const currentShift = ps.velvetPhase;
-        const diff = _targetShift - currentShift;
+        const diff = _targetShift - ps.velvetPhase;
+
         if(diff !== 0){
+          // 目標に向かって進む
           ps.velvetPhase += Math.sign(diff) * Math.min(shiftSpeed, Math.abs(diff));
+        } else {
+          // 落ち着いている場合でも、deault(strange=0)なら常に+1でループ
+          if(Math.abs(_strangeVal) < 0.1){
+            ps.velvetPhase = (ps.velvetPhase + 1) % 32;
+          }
         }
-        // 新しいシフトでシーケンスを再生成
-        ps.velvetMotifRhythm = _buildFullSeq(ps.velvetPhase);
+
+        // 新シフトでシーケンスを再生成
+        ps.velvetMotifRhythm = null;
       }
 
-      // ステップRatio: 16分音符固定（マスタークロック基準）
-      const stepRatio = 1.0 * densityMul;
+      // ベロシティ: 山の頂点付近（sPos%8の3〜5）で強く
+      const _zonePos = sPos % 8;
+      const _isApex  = _zonePos >= 3 && _zonePos <= 5;
+      const baseVel  = _isApex ? 1.05 : 0.78;
+      const velMul   = Math.max(0.4, baseVel + (Math.random() - 0.5) * _warmVal * 0.15);
 
-      // ベロシティ: 山の頂点付近で強く・低音で中程度
-      const _zonePos = sPos % 8; // 各山内の位置（0〜7）
-      const _isApex = _zonePos >= 3 && _zonePos <= 5;
-      const baseVel = _isApex ? 1.05 : 0.78;
-      const velMul = Math.max(0.4, baseVel + (Math.random() - 0.5) * _warmVal * 0.15);
-
-      // ノートレングス: warm↑で伸びる（gateOverrideで制御）
-      // warm=-1: 0.5（短め）/ warm=0: 0.8 / warm=+1: 1.3（長め）
+      // ノートレングス: warm↑で伸びる
       const gateOverride = 0.8 + _warmVal * 0.5;
 
-      if(midi !== null) ps.lastMidi = midi;
+      // 16分音符固定（マスタークロック基準）
+      const stepRatio = 1.0 * densityMul;
+
+      if(midi != null) ps.lastMidi = midi;
       return { midi, stepRatio, velMul, gateOverride };
     }
 
