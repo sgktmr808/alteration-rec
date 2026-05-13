@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260513142154 -->
+<!-- build: 20260513143629 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11391,10 +11391,9 @@ function scheduleArpNotes(){
     if(_usePhraseGrammar && arpSeq.length > 0){
       const result = _phraseNext(arpSeq, baseSec, sc, densityMul);
       if(result !== null){
-        // VELVETは16分音符絶対秒数を基準（arpRateに依存しない）
+        // 全Scene共通: 16分音符絶対秒数を基準（arpRateに依存しない・マスタークロック同期）
         const _sixteenth = (60 / autoBpm) / 4;
-        const _stepBase = sceneCurrentName === 'velvet' ? _sixteenth : baseSec;
-        const stepSec = Math.max(_stepBase * 0.2, _stepBase * result.stepRatio);
+        const stepSec = Math.max(_sixteenth * 0.2, _sixteenth * result.stepRatio);
         if(result.midi !== null){
           _phraseState.notesSinceChord++;
           _playSceneArpNote(actx, result.midi, t, dest, result.velMul, result.gateOverride);
@@ -11434,7 +11433,9 @@ function scheduleArpNotes(){
       }
       _arpRhythmStep++;
     }
-    const stepSec = Math.max(baseSec * 0.25, baseSec * stepRatio);
+    // 全Scene共通: 16分音符絶対秒数を基準（arpRateに依存しない）
+    const _sixteenth = (60 / autoBpm) / 4;
+    const stepSec = Math.max(_sixteenth * 0.25, _sixteenth * stepRatio);
 
     if(arpSeq.length > 0){
       const isRest = restProb > 0 && Math.random() < restProb;
