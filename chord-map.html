@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514135204 -->
+<!-- build: 20260514135656 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10450,6 +10450,76 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
   osc.start(startTime); osc.stop(startTime+gateSec+0.05);
 }
 
+// ── Ring Modulation ホットスポット探索 ──
+// コードトーンに対して「5〜15セントのズレ」をピークとするベル曲線でスコアリング
+// コードチェンジ時に1回計算してキャッシュ
+
+let _rmHotspotCache = null; // { modHz, score, complex }
+let _rmHotspotChord = null; // キャッシュ対象のコード識別子
+
+function _findRMHotspot(root, type, complexVal){
+  const _cacheKey = root + '_' + type + '_' + Math.round(complexVal * 10);
+  if(_rmHotspotCache && _rmHotspotChord === _cacheKey){
+    return _rmHotspotCache.modHz;
+  }
+
+  // コードトーンのHz一覧
+  const _ri = (typeof ni === 'function') ? ni(root) : 0;
+  const _rootMidi = 48 + (_ri % 12);
+  const _ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
+  const chordHzList = _ivs.map(iv => {
+    const m = _rootMidi + (iv % 12);
+    return midi2hz(m);
+  });
+
+  // complex値で探索レンジを決定
+  // complex < 0: 低域モジュレーター（50〜400Hz・暗い金属感）
+  // complex > 0: 高域モジュレーター（400〜2000Hz・明るい金属感）
+  const _isNeg = complexVal < 0;
+  const _freqMin = _isNeg ? 50  : 400;
+  const _freqMax = _isNeg ? 400 : 2000;
+  const _step    = _isNeg ? 2   : 8; // 探索ステップ（Hz）
+
+  // スコアリング: 差音・和音がコードトーンから5〜15セント外れているほど高スコア
+  const _centDiff = (f1, f2) => Math.abs(1200 * Math.log2(f1 / f2));
+
+  let bestHz = _freqMin, bestScore = -1;
+
+  for(let modHz = _freqMin; modHz <= _freqMax; modHz += _step){
+    let score = 0;
+    for(const carrHz of chordHzList){
+      const diffHz = Math.abs(carrHz - modHz);
+      const sumHz  = carrHz + modHz;
+
+      // 差音・和音それぞれのスコア
+      for(const targetHz of chordHzList){
+        // 差音とコードトーンの比較
+        const centsDiff = _centDiff(diffHz, targetHz);
+        // 5〜15セントのズレが最高スコア（ベル曲線）
+        if(centsDiff > 2 && centsDiff < 80){
+          const peak = Math.exp(-Math.pow((centsDiff - 10) / 12, 2));
+          score += peak;
+        }
+        // 和音とコードトーンの比較（差音より重みを下げる）
+        const centsSumDiff = _centDiff(sumHz % 1200, targetHz % 1200);
+        if(centsSumDiff > 2 && centsSumDiff < 80){
+          const peakSum = Math.exp(-Math.pow((centsSumDiff - 10) / 12, 2)) * 0.5;
+          score += peakSum;
+        }
+      }
+    }
+    if(score > bestScore){
+      bestScore = score;
+      bestHz = modHz;
+    }
+  }
+
+  _rmHotspotCache = { modHz: bestHz, score: bestScore, complex: complexVal };
+  _rmHotspotChord = _cacheKey;
+  return bestHz;
+}
+
+
 // ── Scene別ARPノート発音（Arp Ghost対応）──
 function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   velMul = (velMul !== undefined) ? velMul : 1.0;
@@ -10861,74 +10931,6 @@ function stopArpScheduler(){
 }
 
 /* ── CHORDストローク発音・スケジューラー（共通機能・一時無効化）──
-// ── Ring Modulation ホットスポット探索 ──
-// コードトーンに対して「5〜15セントのズレ」をピークとするベル曲線でスコアリング
-// コードチェンジ時に1回計算してキャッシュ
-
-let _rmHotspotCache = null; // { modHz, score, complex }
-let _rmHotspotChord = null; // キャッシュ対象のコード識別子
-
-function _findRMHotspot(root, type, complexVal){
-  const _cacheKey = root + '_' + type + '_' + Math.round(complexVal * 10);
-  if(_rmHotspotCache && _rmHotspotChord === _cacheKey){
-    return _rmHotspotCache.modHz;
-  }
-
-  // コードトーンのHz一覧
-  const _ri = (typeof ni === 'function') ? ni(root) : 0;
-  const _rootMidi = 48 + (_ri % 12);
-  const _ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
-  const chordHzList = _ivs.map(iv => {
-    const m = _rootMidi + (iv % 12);
-    return midi2hz(m);
-  });
-
-  // complex値で探索レンジを決定
-  // complex < 0: 低域モジュレーター（50〜400Hz・暗い金属感）
-  // complex > 0: 高域モジュレーター（400〜2000Hz・明るい金属感）
-  const _isNeg = complexVal < 0;
-  const _freqMin = _isNeg ? 50  : 400;
-  const _freqMax = _isNeg ? 400 : 2000;
-  const _step    = _isNeg ? 2   : 8; // 探索ステップ（Hz）
-
-  // スコアリング: 差音・和音がコードトーンから5〜15セント外れているほど高スコア
-  const _centDiff = (f1, f2) => Math.abs(1200 * Math.log2(f1 / f2));
-
-  let bestHz = _freqMin, bestScore = -1;
-
-  for(let modHz = _freqMin; modHz <= _freqMax; modHz += _step){
-    let score = 0;
-    for(const carrHz of chordHzList){
-      const diffHz = Math.abs(carrHz - modHz);
-      const sumHz  = carrHz + modHz;
-
-      // 差音・和音それぞれのスコア
-      for(const targetHz of chordHzList){
-        // 差音とコードトーンの比較
-        const centsDiff = _centDiff(diffHz, targetHz);
-        // 5〜15セントのズレが最高スコア（ベル曲線）
-        if(centsDiff > 2 && centsDiff < 80){
-          const peak = Math.exp(-Math.pow((centsDiff - 10) / 12, 2));
-          score += peak;
-        }
-        // 和音とコードトーンの比較（差音より重みを下げる）
-        const centsSumDiff = _centDiff(sumHz % 1200, targetHz % 1200);
-        if(centsSumDiff > 2 && centsSumDiff < 80){
-          const peakSum = Math.exp(-Math.pow((centsSumDiff - 10) / 12, 2)) * 0.5;
-          score += peakSum;
-        }
-      }
-    }
-    if(score > bestScore){
-      bestScore = score;
-      bestHz = modHz;
-    }
-  }
-
-  _rmHotspotCache = { modHz: bestHz, score: bestScore, complex: complexVal };
-  _rmHotspotChord = _cacheKey;
-  return bestHz;
-}
 
 // ── PLUCK専用CHORDストローク発音 ──
 // _sceneVoicesに一切触れない・PLUCK専用ボイスプール
