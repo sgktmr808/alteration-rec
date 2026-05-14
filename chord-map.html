@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514135656 -->
+<!-- build: 20260514140615 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -2167,7 +2167,7 @@ const SL=[
   {id:'bright', cDeg:0,   lL:'Dark',     lR:'Bright',  col:'#e8d060', val:0, disp:0},
   {id:'tense',  cDeg:60,  lL:'Calm',     lR:'Tense',   col:'#d44a6a', val:0, disp:0},
   {id:'warm',   cDeg:120, lL:'Cold',     lR:'Warm',    col:'#d4823a', val:0, disp:0},
-  {id:'complex',cDeg:180, lL:'7th·RM',   lR:'13th·RM', col:'#9a6ad4', val:0, disp:0},
+  {id:'complex',cDeg:180, lL:'7th·RM',   lR:'13th·RM', col:'#9a6ad4', val:0, disp:0, maxVal:10},
   {id:'moving', cDeg:240, lL:'Static',   lR:'Moving',  col:'#4a90d4', val:0, disp:0},
   {id:'strange',cDeg:300, lL:'Familiar', lR:'Strange', col:'#4aaa72', val:0, disp:0},
 ];
@@ -3323,7 +3323,8 @@ function initCanvas(){
     const angle=angleFromCenter(x,y);
     let delta=angle-drag.startAngle;
     if(delta>180)delta-=360;if(delta<-180)delta+=360;
-    const nv=Math.max(-1,Math.min(1,drag.startVal+delta/ARC_HALF));
+    const _slMax = SL[drag.idx].maxVal || 1;
+    const nv=Math.max(-_slMax,Math.min(_slMax,drag.startVal+delta/ARC_HALF*_slMax));
     SL[drag.idx].val=Math.abs(nv)<0.04?0:nv;
     const now=Date.now();
     if(!drag.lastRel||now-drag.lastRel>80){
@@ -10457,66 +10458,93 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 let _rmHotspotCache = null; // { modHz, score, complex }
 let _rmHotspotChord = null; // キャッシュ対象のコード識別子
 
-function _findRMHotspot(root, type, complexVal){
-  const _cacheKey = root + '_' + type + '_' + Math.round(complexVal * 10);
+// RM設定を返す: { modHz, depth, oscType, feedbackRatio }
+// absC = |complexVal| (0〜1)
+// zone A (0〜0.3): ホットスポット・sine・subtle
+// zone B (0.3〜0.7): 非整数比シフト・triangle・メタリック
+// zone C (0.7〜1.0): 高次非整数比・sawtooth・サイバネティック
+function _getRMParams(root, type, complexVal){
+  const _cacheKey = root + '_' + type + '_' + Math.round(complexVal * 100);
   if(_rmHotspotCache && _rmHotspotChord === _cacheKey){
-    return _rmHotspotCache.modHz;
+    return _rmHotspotCache;
   }
+
+  const absC   = Math.abs(complexVal);
+  const _isNeg = complexVal < 0;
 
   // コードトーンのHz一覧
   const _ri = (typeof ni === 'function') ? ni(root) : 0;
   const _rootMidi = 48 + (_ri % 12);
   const _ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
-  const chordHzList = _ivs.map(iv => {
-    const m = _rootMidi + (iv % 12);
-    return midi2hz(m);
-  });
+  const chordHzList = _ivs.map(iv => midi2hz(_rootMidi + (iv % 12)));
+  const rootHz = chordHzList[0];
 
-  // complex値で探索レンジを決定
-  // complex < 0: 低域モジュレーター（50〜400Hz・暗い金属感）
-  // complex > 0: 高域モジュレーター（400〜2000Hz・明るい金属感）
-  const _isNeg = complexVal < 0;
-  const _freqMin = _isNeg ? 50  : 400;
-  const _freqMax = _isNeg ? 400 : 2000;
-  const _step    = _isNeg ? 2   : 8; // 探索ステップ（Hz）
+  // ── Zone判定 ──
+  const zoneB = Math.max(0, Math.min(1, (absC - 0.3) / 0.4)); // 0.3〜0.7でA→B
+  const zoneC = Math.max(0, Math.min(1, (absC - 0.7) / 0.3)); // 0.7〜1.0でB→C
 
-  // スコアリング: 差音・和音がコードトーンから5〜15セント外れているほど高スコア
-  const _centDiff = (f1, f2) => Math.abs(1200 * Math.log2(f1 / f2));
-
-  let bestHz = _freqMin, bestScore = -1;
-
-  for(let modHz = _freqMin; modHz <= _freqMax; modHz += _step){
+  // ── Zone A: ホットスポット探索 ──
+  const _centDiff = (f1, f2) => {
+    if(f1 <= 0 || f2 <= 0) return 9999;
+    return Math.abs(1200 * Math.log2(f1 / f2));
+  };
+  const _freqMin = _isNeg ? 50  : 200;
+  const _freqMax = _isNeg ? 500 : 1800;
+  const _step    = _isNeg ? 2   : 6;
+  let hotHz = _freqMin, bestScore = -1;
+  for(let mHz = _freqMin; mHz <= _freqMax; mHz += _step){
     let score = 0;
-    for(const carrHz of chordHzList){
-      const diffHz = Math.abs(carrHz - modHz);
-      const sumHz  = carrHz + modHz;
-
-      // 差音・和音それぞれのスコア
-      for(const targetHz of chordHzList){
-        // 差音とコードトーンの比較
-        const centsDiff = _centDiff(diffHz, targetHz);
-        // 5〜15セントのズレが最高スコア（ベル曲線）
-        if(centsDiff > 2 && centsDiff < 80){
-          const peak = Math.exp(-Math.pow((centsDiff - 10) / 12, 2));
-          score += peak;
-        }
-        // 和音とコードトーンの比較（差音より重みを下げる）
-        const centsSumDiff = _centDiff(sumHz % 1200, targetHz % 1200);
-        if(centsSumDiff > 2 && centsSumDiff < 80){
-          const peakSum = Math.exp(-Math.pow((centsSumDiff - 10) / 12, 2)) * 0.5;
-          score += peakSum;
-        }
+    for(const cHz of chordHzList){
+      const dHz = Math.abs(cHz - mHz);
+      for(const tHz of chordHzList){
+        const cd = _centDiff(dHz, tHz);
+        if(cd > 2 && cd < 80) score += Math.exp(-Math.pow((cd - 10) / 12, 2));
+        const cs = _centDiff((cHz + mHz) % 2000, tHz);
+        if(cs > 2 && cs < 80) score += Math.exp(-Math.pow((cs - 10) / 12, 2)) * 0.4;
       }
     }
-    if(score > bestScore){
-      bestScore = score;
-      bestHz = modHz;
-    }
+    if(score > bestScore){ bestScore = score; hotHz = mHz; }
   }
 
-  _rmHotspotCache = { modHz: bestHz, score: bestScore, complex: complexVal };
+  // ── Zone B: 非整数比シフト ──
+  // 黄金比・φ（1.618）やπ（3.14）倍で非整数的な倍音を生成
+  const _phiRatios = _isNeg
+    ? [1/1.618, 1/Math.PI, 0.618, 1/2.718] // 暗い側: 低い非整数比
+    : [1.618,   Math.PI,   2.718, 4.236];   // 明るい側: 高い非整数比
+  const _phiIdx = Math.floor(zoneB * (_phiRatios.length - 1));
+  const _phiHz  = rootHz * _phiRatios[_phiIdx];
+
+  // ── Zone C: 高次非整数比（サイバネティック）──
+  // さらに高い非整数比でスペイシーな倍音
+  const _cyberRatios = _isNeg
+    ? [0.309, 0.191, 0.118] // フィボナッチ逆数系
+    : [5.236, 8.472, 13.708]; // フィボナッチ高次系
+  const _cyberIdx = Math.floor(zoneC * (_cyberRatios.length - 1));
+  const _cyberHz  = rootHz * _cyberRatios[_cyberIdx];
+
+  // ── パラメーターのブレンド ──
+  // modHz: A→B→Cへ滑らかにモーフ
+  const modHz = hotHz * (1 - zoneB) + _phiHz * Math.min(zoneB, 1 - zoneC) + _cyberHz * zoneC;
+
+  // depth: 非線形カーブ（0付近は緩やか・0.7以降は急増）
+  // 0→0: 0 / 0.3→0.25 / 0.7→0.55 / 1.0→0.95
+  const depth = absC < 0.001 ? 0
+    : absC < 0.3 ? absC * 0.83          // zone A: 緩やか
+    : absC < 0.7 ? 0.25 + (absC - 0.3) * 0.75  // zone B: 中程度
+    : 0.55 + (absC - 0.7) * 1.33;       // zone C: 急増
+
+  // oscType: A=sine / B=triangle / C=sawtooth
+  const oscType = zoneC > 0.3 ? 'sawtooth' : zoneB > 0.3 ? 'triangle' : 'sine';
+
+  const params = { modHz: Math.max(10, modHz), depth, oscType };
+  _rmHotspotCache = params;
   _rmHotspotChord = _cacheKey;
-  return bestHz;
+  return params;
+}
+
+// 後方互換のためのラッパー
+function _findRMHotspot(root, type, complexVal){
+  return _getRMParams(root, type, complexVal).modHz;
 }
 
 
@@ -10782,34 +10810,33 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     const _warmVal = sv ? sv('warm') : 0;
 
     // ── Ring Modulation（complex連動・ARP用）──
-    // CHORDと同じホットスポット周波数を使用（キャッシュ済み）
-    // depthはCHORDの半分（subtleに・ARPは繊細に）
+    // CHORDと同じ_getRMParamsを使用（キャッシュ済み）
+    // depthはCHORDの半分（ARPは繊細に）
     const _rmComplexArp = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
-    const _rmDepthArp   = Math.abs(_rmComplexArp);
-    if(_rmDepthArp > 0.05){
-      const _S = (typeof S !== 'undefined') ? S : null;
-      const _rmHzArp = _S
-        ? _findRMHotspot(_S.root, _S.type, _rmComplexArp)
-        : hz * 1.5;
+    if(Math.abs(_rmComplexArp) > 0.02){
+      const _SA = (typeof S !== 'undefined') ? S : null;
+      const _rmPA = _SA
+        ? _getRMParams(_SA.root, _SA.type, _rmComplexArp)
+        : { modHz: hz * 1.618, depth: Math.abs(_rmComplexArp) * 0.25, oscType: 'sine' };
 
-      const _rmWetA = actx.createGain();
       const _rmDryA = actx.createGain();
-      const _rmOutA = actx.createGain();
       const _rmModA = actx.createGain();
+      const _rmWetA = actx.createGain();
+      const _rmOutA = actx.createGain();
 
-      // ARPはdepthを半分に（CHORDより控えめ）
-      _rmDryA.gain.value = 1.0 - _rmDepthArp * 0.35;
-      _rmWetA.gain.value = _rmDepthArp * 0.35;
+      // ARPはdepthを半分に
+      _rmDryA.gain.value = 1.0 - _rmPA.depth * 0.42;
+      _rmWetA.gain.value = _rmPA.depth * 0.42;
       _rmModA.gain.value = 1.0;
 
       const _rmOscArp = actx.createOscillator();
-      _rmOscArp.type = 'sine';
-      _rmOscArp.frequency.value = _rmHzArp;
+      _rmOscArp.type = _rmPA.oscType;
+      _rmOscArp.frequency.value = _rmPA.modHz;
       _rmOscArp.connect(_rmModA.gain);
 
       env.connect(_rmDryA); _rmDryA.connect(_rmOutA);
       env.connect(_rmModA); _rmModA.connect(_rmWetA); _rmWetA.connect(_rmOutA);
-      arpEnvOut = _rmOutA; // 以降の接続先を更新
+      arpEnvOut = _rmOutA;
 
       _rmOscArp.start(startTime);
       _rmOscArp.stop(startTime + gateSec + 0.3);
@@ -12560,45 +12587,34 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
 
-  // ── Ring Modulation（complex連動・ホットスポット周波数）──
-  // complex = 0: 効果なし / < 0: 低域RM / > 0: 高域RM
-  // ホットスポット: コードトーンに対して5〜15セント外れた差音を生成
+  // ── Ring Modulation（complex連動・3ゾーン非線形設計）──
+  // Zone A(0〜0.3): ホットスポット・sine・subtle揺らぎ
+  // Zone B(0.3〜0.7): 黄金比/π系非整数比・triangle・メタリック
+  // Zone C(0.7〜1.0): フィボナッチ高次系・sawtooth・サイバネティック
   const _complex = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
-  const _rmDepth = Math.abs(_complex);
-  if(_rmDepth > 0.05){
-    // ホットスポット周波数を取得（Sグローバルからroot/typeを参照）
+  if(Math.abs(_complex) > 0.02){
     const _rmS = (typeof S !== 'undefined') ? S : null;
-    const _rmHz = _rmS
-      ? _findRMHotspot(_rmS.root, _rmS.type, _complex)
-      : hz * 1.5; // フォールバック
+    const _rmP = _rmS
+      ? _getRMParams(_rmS.root, _rmS.type, _complex)
+      : { modHz: hz * 1.618, depth: Math.abs(_complex) * 0.5, oscType: 'sine' };
 
-    // 正しいリングモジュレーション実装:
-    // gain.value = 1.0（通過）にしてmodOscで±変調
-    // dry/wet mixで音量を保つ
-    const _rmWet  = actx.createGain();
-    const _rmDry  = actx.createGain();
-    const _rmOut  = actx.createGain();
-    const _rmMod  = actx.createGain(); // モジュレーターのgain（変調量）
+    const _rmDry = actx.createGain();
+    const _rmMod = actx.createGain();
+    const _rmWet = actx.createGain();
+    const _rmOut = actx.createGain();
 
-    // depth: 0→dry100% / 1→wet100%
-    _rmDry.gain.value  = 1.0 - _rmDepth * 0.7;
-    _rmWet.gain.value  = _rmDepth * 0.7;
-    _rmMod.gain.value  = 1.0; // キャリアを通過させる
+    _rmDry.gain.value = 1.0 - _rmP.depth * 0.85;
+    _rmWet.gain.value = _rmP.depth * 0.85;
+    _rmMod.gain.value = 1.0;
 
     const _rmOsc = actx.createOscillator();
-    _rmOsc.type = 'sine';
-    _rmOsc.frequency.value = _rmHz;
-
-    // modOsc → _rmMod.gain（gainパラメーターへの変調）
+    _rmOsc.type = _rmP.oscType;
+    _rmOsc.frequency.value = _rmP.modHz;
     _rmOsc.connect(_rmMod.gain);
 
-    // 信号パス:
-    // vca → _rmDry → _rmOut（dry）
-    // vca → _rmMod → _rmWet → _rmOut（wet・変調あり）
-    // _rmOut → panner
     vca.disconnect(panner);
-    vca.connect(_rmDry);   _rmDry.connect(_rmOut);
-    vca.connect(_rmMod);   _rmMod.connect(_rmWet); _rmWet.connect(_rmOut);
+    vca.connect(_rmDry);  _rmDry.connect(_rmOut);
+    vca.connect(_rmMod);  _rmMod.connect(_rmWet); _rmWet.connect(_rmOut);
     _rmOut.connect(panner);
 
     _rmOsc.start(t);
