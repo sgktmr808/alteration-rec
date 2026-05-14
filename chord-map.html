@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514122247 -->
+<!-- build: 20260514123227 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10756,15 +10756,16 @@ function stopArpScheduler(){
   if(arpScheduleTimer){ clearInterval(arpScheduleTimer); arpScheduleTimer=null; }
 }
 
+/* ── CHORDストローク発音・スケジューラー（共通機能・一時無効化）──
 // ── PLUCK専用CHORDストローク発音 ──
 // _sceneVoicesに一切触れない・PLUCK専用ボイスプール
 // AudioContext時刻指定で発音（iOSスケジューリング対応）
 
-let _pluckChordVoices = []; // PLUCK専用ボイスプール
+let _chordStrokeVoices = []; // PLUCK専用ボイスプール
 
-function _releasePluckChordVoices(actx, relSec){
+function _releaseChordStrokeVoices(actx, relSec){
   const t = actx.currentTime;
-  _pluckChordVoices.forEach(v => {
+  _chordStrokeVoices.forEach(v => {
     if(!v || v.releasing) return;
     v.releasing = true;
     try{
@@ -10777,11 +10778,11 @@ function _releasePluckChordVoices(actx, relSec){
     try{ v.osc2.stop(t + relSec + 0.08); }catch(e){}
   });
   setTimeout(() => {
-    _pluckChordVoices = _pluckChordVoices.filter(v => !v.releasing);
+    _chordStrokeVoices = _chordStrokeVoices.filter(v => !v.releasing);
   }, (relSec + 0.15) * 1000);
 }
 
-function _playPluckChordStroke(actx, startTime, root, type, relOverride){
+function _playChordStroke(actx, startTime, root, type, relOverride){
   const sc = SCENE_PRESETS.pluck;
   if(!sc) return;
 
@@ -10818,8 +10819,8 @@ function _playPluckChordStroke(actx, startTime, root, type, relOverride){
   const dryOut  = actx.destination;
 
   // 前のストロークボイスをリリース（パーカッシブなので即時解放）
-  _releasePluckChordVoices(actx, release);
-  _pluckChordVoices = [];
+  _releaseChordStrokeVoices(actx, release);
+  _chordStrokeVoices = [];
 
   // 各midiを発音
   midis.forEach((midi, i) => {
@@ -10887,7 +10888,7 @@ function _playPluckChordStroke(actx, startTime, root, type, relOverride){
     osc1.stop(_stopTime);
     osc2.stop(_stopTime);
 
-    _pluckChordVoices.push({ midi, osc1, osc2, env, releasing: false });
+    _chordStrokeVoices.push({ midi, osc1, osc2, env, releasing: false });
   });
 }
 
@@ -10895,17 +10896,17 @@ function _playPluckChordStroke(actx, startTime, root, type, relOverride){
 // PLUCKのみ: コードをBPM同期のリズムパターンで自動ストローク
 // ARPスケジューラーと同じマスタークロック基準
 
-let _pluckChordNextBeat  = 0;
-let _pluckChordTimer     = null;
-let _pluckChordScheduleMs = 25;
-let _pluckChordSeq       = null;  // 現在のストロークシーケンス
-let _pluckChordSeqPos    = 0;
-let _pluckChordRepeat    = 0;     // シーケンス繰り返し回数
+let _chordStrokeNextBeat  = 0;
+let _chordStrokeTimer     = null;
+let _chordStrokeScheduleMs = 25;
+let _chordStrokeSeq       = null;  // 現在のストロークシーケンス
+let _chordStrokeSeqPos    = 0;
+let _chordStrokeRepeat    = 0;     // シーケンス繰り返し回数
 
 // 2小節リフパターン候補（16分音符単位・1=ストローク 0=休符）
 // 32ステップ = 2小節。コードをパーカッシブに刻む。
 // 80〜90sハウス的なシンコペーションリフ。
-const _PLUCK_CHORD_PATTERNS = [
+const _CHORD_STROKE_PATTERNS = [
   // A: 4つ打ちベースのハウスリフ（拍頭+裏拍シンコペ）
   [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,1,0,0,
    1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,0,0],
@@ -10923,58 +10924,58 @@ const _PLUCK_CHORD_PATTERNS = [
    0,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0],
 ];
 
-function _buildPluckChordSeq(){
-  return _PLUCK_CHORD_PATTERNS[
-    Math.floor(Math.random() * _PLUCK_CHORD_PATTERNS.length)
+function _buildChordStrokeSeq(){
+  return _CHORD_STROKE_PATTERNS[
+    Math.floor(Math.random() * _CHORD_STROKE_PATTERNS.length)
   ];
 }
 
-function _schedulePluckChord(){
-  if(sceneCurrentName !== 'pluck'){ stopPluckChordScheduler(); return; }
+function _scheduleChordStroke(){
+  if(sceneCurrentName !== 'pluck'){ stopChordStrokeScheduler(); return; }
   const actx = safeGetCtx();
-  if(!actx){ _pluckChordTimer = setTimeout(_schedulePluckChord, _pluckChordScheduleMs); return; }
+  if(!actx){ _chordStrokeTimer = setTimeout(_scheduleChordStroke, _chordStrokeScheduleMs); return; }
 
   const _sixteenth = (60 / autoBpm) / 4;
   const lookAhead  = actx.currentTime + 0.10;
 
-  while(_pluckChordNextBeat < lookAhead){
-    const t   = _pluckChordNextBeat;
-    const pos = _pluckChordSeqPos % _pluckChordSeq.length;
-    const hit = _pluckChordSeq[pos];
+  while(_chordStrokeNextBeat < lookAhead){
+    const t   = _chordStrokeNextBeat;
+    const pos = _chordStrokeSeqPos % _chordStrokeSeq.length;
+    const hit = _chordStrokeSeq[pos];
 
     if(hit === 1 && S && S.root !== undefined){
       // AudioContext時刻指定でPLUCK専用発音（iOSスケジューリング対応）
       // _sceneVoicesには一切触れない
       // 時々（約15%）releaseを長めに（効果的なアクセント）
       const _relOverride = Math.random() < 0.15 ? 1.2 : 0.25;
-      _playPluckChordStroke(actx, t, S.root, S.type, _relOverride);
+      _playChordStroke(actx, t, S.root, S.type, _relOverride);
     }
 
-    _pluckChordSeqPos++;
+    _chordStrokeSeqPos++;
 
     // シーケンス1周完了
-    if(_pluckChordSeqPos >= _pluckChordSeq.length){
-      _pluckChordSeqPos = 0;
-      _pluckChordRepeat++;
+    if(_chordStrokeSeqPos >= _chordStrokeSeq.length){
+      _chordStrokeSeqPos = 0;
+      _chordStrokeRepeat++;
       // 4〜8小節スパンで変容（ARPより大きいスパン）
       const mutateEvery = 4 + Math.floor(Math.random() * 5); // 4〜8回
-      if(_pluckChordRepeat % mutateEvery === 0){
-        _pluckChordSeq = _buildPluckChordSeq();
+      if(_chordStrokeRepeat % mutateEvery === 0){
+        _chordStrokeSeq = _buildChordStrokeSeq();
       }
     }
 
-    _pluckChordNextBeat += _sixteenth;
+    _chordStrokeNextBeat += _sixteenth;
   }
 
-  _pluckChordTimer = setTimeout(_schedulePluckChord, _pluckChordScheduleMs);
+  _chordStrokeTimer = setTimeout(_scheduleChordStroke, _chordStrokeScheduleMs);
 }
 
-function startPluckChordScheduler(){
-  stopPluckChordScheduler();
+function startChordStrokeScheduler(){
+  stopChordStrokeScheduler();
   if(sceneCurrentName !== 'pluck') return;
-  _pluckChordSeq    = _buildPluckChordSeq();
-  _pluckChordSeqPos = 0;
-  _pluckChordRepeat = 0;
+  _chordStrokeSeq    = _buildChordStrokeSeq();
+  _chordStrokeSeqPos = 0;
+  _chordStrokeRepeat = 0;
 
   const actx = safeGetCtx();
   if(!actx) return;
@@ -10984,14 +10985,15 @@ function startPluckChordScheduler(){
     const _sixteenth = (60 / autoBpm) / 4;
     const _elapsed   = actx.currentTime - _masterClockOrigin;
     const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-    _pluckChordNextBeat = _masterClockOrigin + _gridPos;
-    _schedulePluckChord();
+    _chordStrokeNextBeat = _masterClockOrigin + _gridPos;
+    _scheduleChordStroke();
   });
 }
 
-function stopPluckChordScheduler(){
-  if(_pluckChordTimer){ clearTimeout(_pluckChordTimer); _pluckChordTimer = null; }
+function stopChordStrokeScheduler(){
+  if(_chordStrokeTimer){ clearTimeout(_chordStrokeTimer); _chordStrokeTimer = null; }
 }
+*/
 
 // ARPリズムステップカウンター
 let _arpRhythmStep = 0;
@@ -12033,9 +12035,9 @@ const SCENE_PRESETS = {
     // attack短め（地を這う感）・sustain長め（持続感）
     osc1:'sawtooth', osc2:'sawtooth', detune:9,
     cutoff:480, res:1.4, envMod:0.55,
-    attack:0.004, decay:0.28, sustain:0.0, release:0.55,  // パーカッシブ（release短すぎるとクリックノイズ）
-    vol:0.40, chorus:0.08, wet:0.40, strum:4,
-    trailSec:0.2, width:0.58, feltAttack:0.0, ghost:0.0, filterDrift:0.28,
+    attack:0.10, decay:1.4, sustain:0.40, release:2.2,  // ロングトーン（元の設定に戻す）
+    vol:0.42, chorus:0.12, wet:0.42, strum:8,
+    trailSec:0.8, width:0.62, feltAttack:0.0, ghost:0.0, filterDrift:0.28,
     voicingFlavor:'detroit',
     // ARP: Mountain People的。金属的・催眠・16分グリッド・低域重心
     // sawtooth・高res・強いfilter env（金属的クリック）
@@ -13124,12 +13126,13 @@ function applyScene(name){
   // Scene切替バーの表示を更新
   _updateSceneSwitcher();
 
-  // PLUCKチョードスケジューラーの起動・停止
+  /* CHORDストロークスケジューラー（共通機能・一時無効化）
   if(name === 'pluck'){
-    startPluckChordScheduler();
+    startChordStrokeScheduler();
   } else {
-    stopPluckChordScheduler();
+    stopChordStrokeScheduler();
   }
+  */
 }
 
 // ── Source切替 ──
