@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514141516 -->
+<!-- build: 20260514162508 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10493,19 +10493,29 @@ function _getRMParams(root, type, complexVal){
   const zoneB = Math.max(0, Math.min(1, (absC - 0.3) / 0.4)); // 0.3→0.7でA→B
   const zoneC = Math.max(0, Math.min(1, (absC - 0.7) / 0.3)); // 0.7→1.0でB→C
 
-  // ── modHz: ルート音の分数倍音（常にスイートスポット）──
+  // ── modHz: ルート音の分数倍音＋微妙なデチューン ──
+  // 完全整数比からわずかにずらすことでビート・うねり・金属感を生む
+  // Zone C方向ほどずれ量が大きくなり変調感が深まる
   let modHz;
   if(_isNeg){
-    // -側: 低域うねり（2oct〜4oct下へ段階的に降りる）
-    const hzA = rootHz * 0.25;    // 2oct下（唸り）
-    const hzB = rootHz * 0.125;   // 3oct下（深い唸り）
-    const hzC = rootHz * 0.0625;  // 4oct下（超低域）
+    // -側: 低域うねり（2oct〜4oct下）
+    // デチューン: +12〜+36セント（ZoneA→C）
+    const _detuneA = 1.007;  // +12セント
+    const _detuneB = 1.013;  // +22セント
+    const _detuneC = 1.021;  // +36セント
+    const hzA = rootHz * 0.25   * _detuneA;
+    const hzB = rootHz * 0.125  * _detuneB;
+    const hzC = rootHz * 0.0625 * _detuneC;
     modHz = hzA * (1 - zoneB) + hzB * Math.min(zoneB, 1 - zoneC) + hzC * zoneC;
   } else {
-    // +側: 中域金属感（5度〜1oct下の倍音関係）
-    const hzA = rootHz * 0.5;     // 1oct下（中域金属感）
-    const hzB = rootHz * 0.75;    // 5度下（豊かな倍音）
-    const hzC = rootHz * 0.375;   // 5度+1oct下（複合金属感）
+    // +側: 中域金属感（1oct〜5度下）
+    // デチューン: +15〜+39セント（ZoneA→C）
+    const _detuneA = 1.009;  // +15セント
+    const _detuneB = 1.015;  // +26セント
+    const _detuneC = 1.023;  // +39セント
+    const hzA = rootHz * 0.5   * _detuneA;
+    const hzB = rootHz * 0.75  * _detuneB;
+    const hzC = rootHz * 0.375 * _detuneC;
     modHz = hzA * (1 - zoneB) + hzB * Math.min(zoneB, 1 - zoneC) + hzC * zoneC;
   }
 
