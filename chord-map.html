@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514131909 -->
+<!-- build: 20260514132706 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11878,6 +11878,10 @@ function updateArpChord(root, type){
   _plainPatternCycleCount = 0;
   // フレーズ文法状態をリセット（前コード記憶・lastMidi・hangingMidiは保持）
   _resetPhraseState();
+  // PLUCKはコードチェンジ時にセルを強制リセット（新コードのnotesで再生成）
+  _phraseState.pluckCell = null;
+  _phraseState.pluckCellPos = 0;
+  _phraseState.pluckRepeatCount = 0;
   // リズムパターンはリセットしない（コードチェンジをまたいでリズムが継続）
 }
 
@@ -14581,12 +14585,13 @@ function triggerPadWithModify(root, type){
 // updateArpChord MODIFY対応版（legacyPad保温）
 function updateArpChord(root, type){
   if(!FEATURES.legacyPad){ // legacyPad無効時は上のupdateArpChordを使う
-    if(!arpOn) return;
+    if(!arpOn && !arpSolo) return; // arpSoloがONの場合も構成音を更新
     arpSeq=buildArpSeq(root, type);
     arpStep=0;
+    _resetPhraseState(); // フレーズ状態もリセット
     return;
   }
-  if(!arpOn) return;
+  if(!arpOn && !arpSolo) return;
   arpSeq=(modifyTensions.size>0||modifyOnChordNote)
     ? buildArpSeqWithModify(root, type)
     : buildArpSeq(root, type);
