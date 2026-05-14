@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514120906 -->
+<!-- build: 20260514122247 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10390,10 +10390,19 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   const arpGateMs = _slArpGate !== null ? _slArpGate : (sc.arpGate || 280);
   // gateMul: loveは音を重ねてさざ波感を出す（1.15）、それ以外は0.78で短く切る
   const _gateMul = (sceneCurrentName === 'love') ? 1.15 : 0.78;
-  // gateOverride: VELVETのテクノ反復時など、呼び出し元が比率で上書き（0.0〜1.0）
-  const gateSec = gateOverride !== null && gateOverride !== undefined
-    ? (arpGateMs / 1000) * _gateMul * gateOverride
-    : (arpGateMs / 1000) * _gateMul;
+  // gateOverride:
+  //   1.0未満: 比率として_gateMulに掛ける（テクノ反復のスタッカート等）
+  //   1.0以上: 絶対秒数として使用（VELVETのwarm↑でgate伸長等）
+  let gateSec;
+  if(gateOverride !== null && gateOverride !== undefined){
+    if(gateOverride >= 1.0){
+      gateSec = gateOverride; // 絶対秒数
+    } else {
+      gateSec = (arpGateMs / 1000) * _gateMul * gateOverride; // 比率
+    }
+  } else {
+    gateSec = (arpGateMs / 1000) * _gateMul;
+  }
   const nyq = actx.sampleRate / 2 - 100;
 
   // velocity humanize: 音ごとに音量を微妙にばらかす（0.78〜1.18の範囲）
@@ -10760,19 +10769,19 @@ function _releasePluckChordVoices(actx, relSec){
     v.releasing = true;
     try{
       v.env.gain.cancelScheduledValues(t);
-      v.env.gain.setValueAtTime(v.env.gain.value, t);
-      v.env.gain.linearRampToValueAtTime(0.0001, t + relSec);
+      v.env.gain.setValueAtTime(Math.max(0.0001, v.env.gain.value), t);
+      // ExponentialRampでクリックノイズ防止
+      v.env.gain.exponentialRampToValueAtTime(0.0001, t + relSec);
     }catch(e){}
-    try{ v.osc1.stop(t + relSec + 0.05); }catch(e){}
-    try{ v.osc2.stop(t + relSec + 0.05); }catch(e){}
+    try{ v.osc1.stop(t + relSec + 0.08); }catch(e){}
+    try{ v.osc2.stop(t + relSec + 0.08); }catch(e){}
   });
-  // relSec後にプールをクリア
   setTimeout(() => {
     _pluckChordVoices = _pluckChordVoices.filter(v => !v.releasing);
-  }, (relSec + 0.1) * 1000);
+  }, (relSec + 0.15) * 1000);
 }
 
-function _playPluckChordStroke(actx, startTime, root, type){
+function _playPluckChordStroke(actx, startTime, root, type, relOverride){
   const sc = SCENE_PRESETS.pluck;
   if(!sc) return;
 
@@ -10780,17 +10789,21 @@ function _playPluckChordStroke(actx, startTime, root, type){
   const bright  = sv('bright');
   const tense   = sv('tense');
   const warm    = sv('warm');
+  const moving  = sv('moving');
   const complex = sv('complex');
 
-  // パラメーター計算（pluck caseのものを流用）
+  // パラメーター計算
   const cutoff  = Math.max(200, sc.cutoff * (1.0 + bright * 0.90));
   const res     = Math.max(0.5, sc.res * (1.0 + tense * 0.65));
   const detune  = sc.detune + warm * 8;
-  const vol     = sc.vol || 0.40;
+  const vol     = (sc.vol || 0.40) * 0.70; // 音量を下げる
   const attack  = sc.attack  || 0.004;
   const decay   = sc.decay   || 0.28;
   const sustain = sc.sustain || 0.0;
-  const release = sc.release || 0.35;
+  // release: relOverrideがあればそれを使う（パターン内で変化）
+  // moving↓でrelease延長（時々長めに鳴る効果）
+  const _baseRelease = relOverride !== undefined ? relOverride : (sc.release || 0.55);
+  const release = Math.max(0.15, _baseRelease * (1.0 - moving * 0.35));
   const envMod  = sc.envMod  || 0.55;
   const strum   = Math.max(2, (sc.strum || 4) * (1.0 + complex * 0.8));
   const wet     = sc.wet || 0.40;
@@ -10842,11 +10855,13 @@ function _playPluckChordStroke(actx, startTime, root, type){
     lpf.frequency.linearRampToValueAtTime(cutoff + envFDepth, t + attack);
     lpf.frequency.linearRampToValueAtTime(cutoff, t + attack + decay);
 
-    // アンプエンベロープ
+    // アンプエンベロープ（ExponentialRampでクリックノイズ防止）
+    const _voiceVol = vol / Math.max(1, midis.length * 0.65);
     const env = actx.createGain();
     env.gain.setValueAtTime(0.0001, t);
-    env.gain.linearRampToValueAtTime(vol / Math.max(1, midis.length * 0.7), t + attack);
-    env.gain.linearRampToValueAtTime(sustain * vol / Math.max(1, midis.length * 0.7), t + attack + decay);
+    env.gain.exponentialRampToValueAtTime(Math.max(0.001, _voiceVol), t + attack);
+    // sustain=0なのでdecay後は0.0001へ
+    env.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
 
     // リバーブsend
     const rvbG = actx.createGain();
@@ -10866,12 +10881,11 @@ function _playPluckChordStroke(actx, startTime, root, type){
     osc1.start(t);
     osc2.start(t);
 
-    // sustain後にリリース
-    const relStart = t + attack + decay + 0.01;
-    env.gain.setValueAtTime(env.gain.value, relStart);
-    env.gain.linearRampToValueAtTime(0.0001, relStart + release);
-    osc1.stop(relStart + release + 0.05);
-    osc2.stop(relStart + release + 0.05);
+    // decay終了後はすでに0.0001なのでそのままosc停止
+    // release時間後にoscを止める（decay後のテール）
+    const _stopTime = t + attack + decay + release;
+    osc1.stop(_stopTime);
+    osc2.stop(_stopTime);
 
     _pluckChordVoices.push({ midi, osc1, osc2, env, releasing: false });
   });
@@ -10931,7 +10945,9 @@ function _schedulePluckChord(){
     if(hit === 1 && S && S.root !== undefined){
       // AudioContext時刻指定でPLUCK専用発音（iOSスケジューリング対応）
       // _sceneVoicesには一切触れない
-      _playPluckChordStroke(actx, t, S.root, S.type);
+      // 時々（約15%）releaseを長めに（効果的なアクセント）
+      const _relOverride = Math.random() < 0.15 ? 1.2 : 0.25;
+      _playPluckChordStroke(actx, t, S.root, S.type, _relOverride);
     }
 
     _pluckChordSeqPos++;
@@ -11491,8 +11507,9 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const baseVel = nPos === 0 ? 1.05 : nPos === nLen2 - 1 ? 0.88 : 0.72;
       const velMul = Math.max(0.4, baseVel + (Math.random() - 0.5) * _warmVal * 0.15);
 
-      // ノートレングス: warm↑で伸びる
-      const gateOverride = 0.85 + _warmVal * 0.55;
+      // ノートレングス: warm↑で伸びる（絶対秒数・1.0以上で絶対値として扱われる）
+      // warm=-1: 0.5s / warm=0: 0.9s / warm=+1: 1.6s
+      const gateOverride = 0.9 + _warmVal * 0.7;
 
       if(midi != null) ps.lastMidi = midi;
       return { midi, stepRatio: 1.0 * densityMul, velMul, gateOverride };
