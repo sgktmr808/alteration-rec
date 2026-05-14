@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514120135 -->
+<!-- build: 20260514120906 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10747,6 +10747,136 @@ function stopArpScheduler(){
   if(arpScheduleTimer){ clearInterval(arpScheduleTimer); arpScheduleTimer=null; }
 }
 
+// ── PLUCK専用CHORDストローク発音 ──
+// _sceneVoicesに一切触れない・PLUCK専用ボイスプール
+// AudioContext時刻指定で発音（iOSスケジューリング対応）
+
+let _pluckChordVoices = []; // PLUCK専用ボイスプール
+
+function _releasePluckChordVoices(actx, relSec){
+  const t = actx.currentTime;
+  _pluckChordVoices.forEach(v => {
+    if(!v || v.releasing) return;
+    v.releasing = true;
+    try{
+      v.env.gain.cancelScheduledValues(t);
+      v.env.gain.setValueAtTime(v.env.gain.value, t);
+      v.env.gain.linearRampToValueAtTime(0.0001, t + relSec);
+    }catch(e){}
+    try{ v.osc1.stop(t + relSec + 0.05); }catch(e){}
+    try{ v.osc2.stop(t + relSec + 0.05); }catch(e){}
+  });
+  // relSec後にプールをクリア
+  setTimeout(() => {
+    _pluckChordVoices = _pluckChordVoices.filter(v => !v.releasing);
+  }, (relSec + 0.1) * 1000);
+}
+
+function _playPluckChordStroke(actx, startTime, root, type){
+  const sc = SCENE_PRESETS.pluck;
+  if(!sc) return;
+
+  // SLスライダー値を読み取り（読み取りのみ・他に影響なし）
+  const bright  = sv('bright');
+  const tense   = sv('tense');
+  const warm    = sv('warm');
+  const complex = sv('complex');
+
+  // パラメーター計算（pluck caseのものを流用）
+  const cutoff  = Math.max(200, sc.cutoff * (1.0 + bright * 0.90));
+  const res     = Math.max(0.5, sc.res * (1.0 + tense * 0.65));
+  const detune  = sc.detune + warm * 8;
+  const vol     = sc.vol || 0.40;
+  const attack  = sc.attack  || 0.004;
+  const decay   = sc.decay   || 0.28;
+  const sustain = sc.sustain || 0.0;
+  const release = sc.release || 0.35;
+  const envMod  = sc.envMod  || 0.55;
+  const strum   = Math.max(2, (sc.strum || 4) * (1.0 + complex * 0.8));
+  const wet     = sc.wet || 0.40;
+
+  // ボイシング取得
+  const midis = buildSceneVoicing(root, type, sc.voicingFlavor || 'detroit',
+    sv('complex'), sv('warm'), sv('strange'));
+  if(!midis || midis.length === 0) return;
+
+  // 出力先: リバーブバス経由
+  const rvbSend = getSpaceReverbSend();
+  const dryOut  = actx.destination;
+
+  // 前のストロークボイスをリリース（パーカッシブなので即時解放）
+  _releasePluckChordVoices(actx, release);
+  _pluckChordVoices = [];
+
+  // 各midiを発音
+  midis.forEach((midi, i) => {
+    const t = startTime + (i * strum / 1000);
+    const hz = midi2hz(Math.max(24, Math.min(108, midi)));
+
+    // osc1
+    const osc1 = actx.createOscillator();
+    osc1.type = sc.osc1 || 'sawtooth';
+    osc1.frequency.value = hz;
+    osc1.detune.value = detune * (i % 2 === 0 ? 1 : -1);
+
+    // osc2
+    const osc2 = actx.createOscillator();
+    osc2.type = sc.osc2 || 'sawtooth';
+    osc2.frequency.value = hz;
+    osc2.detune.value = -detune * (i % 2 === 0 ? 1 : -1);
+
+    const osc2g = actx.createGain();
+    osc2g.gain.value = 0.65 + warm * 0.25;
+
+    // フィルター
+    const lpf = actx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = cutoff;
+    lpf.Q.value = res;
+
+    // フィルターエンベロープ（envMod）
+    const envF = actx.createGain();
+    envF.gain.value = 1.0;
+    const envFDepth = cutoff * envMod * 2.0;
+    lpf.frequency.setValueAtTime(cutoff * 0.3, t);
+    lpf.frequency.linearRampToValueAtTime(cutoff + envFDepth, t + attack);
+    lpf.frequency.linearRampToValueAtTime(cutoff, t + attack + decay);
+
+    // アンプエンベロープ
+    const env = actx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(vol / Math.max(1, midis.length * 0.7), t + attack);
+    env.gain.linearRampToValueAtTime(sustain * vol / Math.max(1, midis.length * 0.7), t + attack + decay);
+
+    // リバーブsend
+    const rvbG = actx.createGain();
+    rvbG.gain.value = wet;
+    const dryG = actx.createGain();
+    dryG.gain.value = 1.0 - wet * 0.5;
+
+    // 接続
+    osc1.connect(osc2g);
+    osc2.connect(osc2g);
+    osc2g.connect(lpf);
+    lpf.connect(env);
+    env.connect(dryG);
+    dryG.connect(dryOut);
+    if(rvbSend){ env.connect(rvbG); rvbG.connect(rvbSend); }
+
+    osc1.start(t);
+    osc2.start(t);
+
+    // sustain後にリリース
+    const relStart = t + attack + decay + 0.01;
+    env.gain.setValueAtTime(env.gain.value, relStart);
+    env.gain.linearRampToValueAtTime(0.0001, relStart + release);
+    osc1.stop(relStart + release + 0.05);
+    osc2.stop(relStart + release + 0.05);
+
+    _pluckChordVoices.push({ midi, osc1, osc2, env, releasing: false });
+  });
+}
+
 // ── PLUCKチョードストロークスケジューラー ──
 // PLUCKのみ: コードをBPM同期のリズムパターンで自動ストローク
 // ARPスケジューラーと同じマスタークロック基準
@@ -10799,16 +10929,9 @@ function _schedulePluckChord(){
     const hit = _pluckChordSeq[pos];
 
     if(hit === 1 && S && S.root !== undefined){
-      // 少し未来のtimeでCHORDを再トリガー
-      // strum量を少なめに（パーカッシブなシーケンス感）
-      const _sc = SCENE_PRESETS.pluck;
-      const _strumMs = Math.max(2, (_sc.strum || 6) * 0.4);
-      // playSceneChordを直接呼ばず、AudioContext時刻指定で発音
-      setTimeout(() => {
-        if(sceneCurrentName === 'pluck' && S && S.root !== undefined){
-          playSceneChord(actx, S.root, S.type);
-        }
-      }, Math.max(0, (t - actx.currentTime) * 1000));
+      // AudioContext時刻指定でPLUCK専用発音（iOSスケジューリング対応）
+      // _sceneVoicesには一切触れない
+      _playPluckChordStroke(actx, t, S.root, S.type);
     }
 
     _pluckChordSeqPos++;
@@ -11893,7 +12016,7 @@ const SCENE_PRESETS = {
     // attack短め（地を這う感）・sustain長め（持続感）
     osc1:'sawtooth', osc2:'sawtooth', detune:9,
     cutoff:480, res:1.4, envMod:0.55,
-    attack:0.004, decay:0.28, sustain:0.0, release:0.35,  // パーカッシブ
+    attack:0.004, decay:0.28, sustain:0.0, release:0.55,  // パーカッシブ（release短すぎるとクリックノイズ）
     vol:0.40, chorus:0.08, wet:0.40, strum:4,
     trailSec:0.2, width:0.58, feltAttack:0.0, ghost:0.0, filterDrift:0.28,
     voicingFlavor:'detroit',
