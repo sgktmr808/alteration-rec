@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514124603 -->
+<!-- build: 20260514130351 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -3010,56 +3010,109 @@ function drawFrame(){
 
   // ── Arc sliders — only in radial mode ──
   if(MAP_MODE==='radial'){
-  SL.forEach(sl=>{
-    const col=sl.col;
-    const sd=deg2r(sl.cDeg-ARC_HALF),ed=deg2r(sl.cDeg+ARC_HALF);
-    const thA=deg2r(sl.cDeg+sl.disp*ARC_HALF); // animated position
+  // ドラッグ中のスライダーindex
+  const _dragIdx = drag ? drag.idx : -1;
+
+  SL.forEach((sl, slIdx)=>{
+    const col = sl.col;
+    const sd  = deg2r(sl.cDeg - ARC_HALF);
+    const ed  = deg2r(sl.cDeg + ARC_HALF);
+    const thA = deg2r(sl.cDeg + sl.disp * ARC_HALF);
+
+    // D: ドラッグ中は操作対象以外を薄く表示
+    const isDragging   = _dragIdx === slIdx;
+    const otherDimmed  = _dragIdx >= 0 && !isDragging;
+    const dimAlpha     = otherDimmed ? 0.25 : 1.0;
 
     // Track
-    ctx.beginPath();ctx.arc(cx,cy,L.SR,sd,ed);
-    ctx.strokeStyle='rgba(255,255,255,0.09)';ctx.lineWidth=8;
-    ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, L.SR, sd, ed);
+    ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+    ctx.lineWidth   = isDragging ? 10 : 8; // B: ドラッグ中はtrack太く
+    ctx.lineCap     = 'round';
+    ctx.globalAlpha = dimAlpha;
+    ctx.stroke();
 
-    // Fill (uses disp for smooth sweep)
-    if(Math.abs(sl.disp)>0.005){
-      const fa=deg2r(sl.cDeg),fb=thA;
-      ctx.beginPath();ctx.arc(cx,cy,L.SR,Math.min(fa,fb),Math.max(fa,fb));
-      ctx.strokeStyle=col;ctx.lineWidth=8;ctx.globalAlpha=0.8;ctx.stroke();
-      ctx.globalAlpha=1;
+    // Fill
+    if(Math.abs(sl.disp) > 0.005){
+      const fa = deg2r(sl.cDeg), fb = thA;
+      ctx.beginPath(); ctx.arc(cx, cy, L.SR, Math.min(fa,fb), Math.max(fa,fb));
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = isDragging ? 10 : 8;
+      ctx.globalAlpha = otherDimmed ? 0.2 : 0.8;
+      ctx.stroke();
     }
+    ctx.globalAlpha = 1;
 
     // Center tick
-    const tr=deg2r(sl.cDeg);
-    ctx.beginPath();ctx.moveTo(cx+(L.SR-5)*Math.cos(tr),cy+(L.SR-5)*Math.sin(tr));
-    ctx.lineTo(cx+(L.SR+5)*Math.cos(tr),cy+(L.SR+5)*Math.sin(tr));
-    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.globalAlpha=0.4;ctx.stroke();ctx.globalAlpha=1;
+    const tr = deg2r(sl.cDeg);
+    ctx.beginPath();
+    ctx.moveTo(cx + (L.SR-5)*Math.cos(tr), cy + (L.SR-5)*Math.sin(tr));
+    ctx.lineTo(cx + (L.SR+5)*Math.cos(tr), cy + (L.SR+5)*Math.sin(tr));
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+    ctx.globalAlpha = otherDimmed ? 0.12 : 0.4;
+    ctx.stroke(); ctx.globalAlpha = 1;
 
-    // Thumb (follows disp)
-    const tx=cx+L.SR*Math.cos(thA),ty=cy+L.SR*Math.sin(thA);
-    const active=Math.abs(sl.val)>0.05;
-    ctx.beginPath();ctx.arc(tx,ty,active?7:5,0,Math.PI*2);
-    ctx.fillStyle=active?col:`rgba(255,255,255,0.07)`;ctx.fill();
-    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.globalAlpha=active?0.9:0.35;ctx.stroke();ctx.globalAlpha=1;
+    // B: Thumb — ドラッグ中は大きくハイライト
+    const tx      = cx + L.SR * Math.cos(thA);
+    const ty      = cy + L.SR * Math.sin(thA);
+    const active  = Math.abs(sl.val) > 0.05;
+    const tRadius = isDragging ? 13 : (active ? 7 : 5); // B: ドラッグ中は13px
+    ctx.beginPath(); ctx.arc(tx, ty, tRadius, 0, Math.PI*2);
+    ctx.fillStyle   = isDragging ? col : (active ? col : 'rgba(255,255,255,0.07)');
+    ctx.globalAlpha = isDragging ? 1.0 : (otherDimmed ? 0.2 : (active ? 0.9 : 0.35));
+    ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = isDragging ? 2.5 : 1.5;
+    ctx.globalAlpha = isDragging ? 1.0 : (otherDimmed ? 0.15 : (active ? 0.9 : 0.35));
+    ctx.stroke(); ctx.globalAlpha = 1;
 
     // Labels
-    ctx.font='7px DM Mono,monospace';ctx.textBaseline='middle';ctx.lineCap='butt';
-    [[sl.cDeg-ARC_HALF,sl.lL,sl.val<-0.05],[sl.cDeg+ARC_HALF,sl.lR,sl.val>0.05]].forEach(([deg,txt,act])=>{
-      const rad=deg2r(deg);ctx.textAlign='center';
-      ctx.fillStyle=col;ctx.globalAlpha=act?0.95:0.28;
-      ctx.fillText(txt,cx+(L.SR+14)*Math.cos(rad),cy+(L.SR+14)*Math.sin(rad));
+    ctx.font = '7px DM Mono,monospace'; ctx.textBaseline = 'middle'; ctx.lineCap = 'butt';
+    [[sl.cDeg-ARC_HALF, sl.lL, sl.val<-0.05],[sl.cDeg+ARC_HALF, sl.lR, sl.val>0.05]].forEach(([deg,txt,act])=>{
+      const rad = deg2r(deg); ctx.textAlign = 'center';
+      ctx.fillStyle   = col;
+      ctx.globalAlpha = otherDimmed ? 0.10 : (act ? 0.95 : 0.28);
+      ctx.fillText(txt, cx+(L.SR+14)*Math.cos(rad), cy+(L.SR+14)*Math.sin(rad));
     });
-    ctx.globalAlpha=1;
+    ctx.globalAlpha = 1;
 
     // Value near thumb
-    if(active){
-      const vr=deg2r(sl.cDeg+sl.disp*ARC_HALF);
-      ctx.font='bold 7.5px DM Mono,monospace';ctx.textAlign='center';
-      ctx.fillStyle=col;ctx.globalAlpha=0.9;
+    if(active && !isDragging){
+      const vr = deg2r(sl.cDeg + sl.disp * ARC_HALF);
+      ctx.font = 'bold 7.5px DM Mono,monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle   = col;
+      ctx.globalAlpha = otherDimmed ? 0.15 : 0.9;
       ctx.fillText((sl.val>0?'+':'')+Math.round(sl.val*10)/10,
-        cx+(L.SR-20)*Math.cos(vr),cy+(L.SR-20)*Math.sin(vr));
-      ctx.globalAlpha=1;
+        cx+(L.SR-20)*Math.cos(vr), cy+(L.SR-20)*Math.sin(vr));
+      ctx.globalAlpha = 1;
     }
   });
+
+  // A: ドラッグ中のスライダー名と値を中央に大きく表示
+  if(_dragIdx >= 0){
+    const _dsl = SL[_dragIdx];
+    const _valStr = (_dsl.val > 0 ? '+' : '') + Math.round(_dsl.val * 10) / 10;
+    const _label  = _dsl.val > 0.05 ? _dsl.lR : (_dsl.val < -0.05 ? _dsl.lL : _dsl.lL.split('/')[0]);
+
+    // スライダー名
+    ctx.font      = 'bold 11px DM Mono,monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle   = _dsl.col;
+    ctx.globalAlpha = 0.95;
+    ctx.fillText(_dsl.id.toUpperCase(), cx, cy - 14);
+
+    // 値
+    ctx.font      = 'bold 18px DM Mono,monospace';
+    ctx.fillStyle   = _dsl.col;
+    ctx.globalAlpha = 0.90;
+    ctx.fillText(_valStr, cx, cy + 6);
+
+    // ラベル（Dark/Bright等）
+    ctx.font      = '8px DM Mono,monospace';
+    ctx.fillStyle   = _dsl.col;
+    ctx.globalAlpha = 0.60;
+    ctx.fillText(_label, cx, cy + 24);
+    ctx.globalAlpha = 1;
+  }
   } // end radial-only sliders
 
   // ── Mode overlays ──
