@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514140615 -->
+<!-- build: 20260514141516 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -2167,7 +2167,7 @@ const SL=[
   {id:'bright', cDeg:0,   lL:'Dark',     lR:'Bright',  col:'#e8d060', val:0, disp:0},
   {id:'tense',  cDeg:60,  lL:'Calm',     lR:'Tense',   col:'#d44a6a', val:0, disp:0},
   {id:'warm',   cDeg:120, lL:'Cold',     lR:'Warm',    col:'#d4823a', val:0, disp:0},
-  {id:'complex',cDeg:180, lL:'7th·RM',   lR:'13th·RM', col:'#9a6ad4', val:0, disp:0, maxVal:10},
+  {id:'complex',cDeg:180, lL:'7th·RM',   lR:'13th·RM', col:'#9a6ad4', val:0, disp:0},
   {id:'moving', cDeg:240, lL:'Static',   lR:'Moving',  col:'#4a90d4', val:0, disp:0},
   {id:'strange',cDeg:300, lL:'Familiar', lR:'Strange', col:'#4aaa72', val:0, disp:0},
 ];
@@ -3323,8 +3323,7 @@ function initCanvas(){
     const angle=angleFromCenter(x,y);
     let delta=angle-drag.startAngle;
     if(delta>180)delta-=360;if(delta<-180)delta+=360;
-    const _slMax = SL[drag.idx].maxVal || 1;
-    const nv=Math.max(-_slMax,Math.min(_slMax,drag.startVal+delta/ARC_HALF*_slMax));
+    const nv=Math.max(-1,Math.min(1,drag.startVal+delta/ARC_HALF));
     SL[drag.idx].val=Math.abs(nv)<0.04?0:nv;
     const now=Date.now();
     if(!drag.lastRel||now-drag.lastRel>80){
@@ -10458,11 +10457,24 @@ function synthSH101Note(actx, midi, startTime, gateMs, vol, dest){
 let _rmHotspotCache = null; // { modHz, score, complex }
 let _rmHotspotChord = null; // キャッシュ対象のコード識別子
 
-// RM設定を返す: { modHz, depth, oscType, feedbackRatio }
-// absC = |complexVal| (0〜1)
-// zone A (0〜0.3): ホットスポット・sine・subtle
-// zone B (0.3〜0.7): 非整数比シフト・triangle・メタリック
-// zone C (0.7〜1.0): 高次非整数比・sawtooth・サイバネティック
+// RM設定を返す: { modHz, depth, oscType }
+//
+// 【設計思想】
+// モジュレーター周波数をルート音の分数倍音に固定追従させる。
+// これによりコードが変わっても常にスイートスポットが保たれる。
+//
+// -側（暗い低域うねり）: rootHz × 低い分数比
+//   Zone A(0〜0.3): × 0.25（2oct下・深い唸り）
+//   Zone B(0.3〜0.7): × 0.125（3oct下・さらに低い唸り）
+//   Zone C(0.7〜1.0): × 0.0625（4oct下・超低域うねり）
+//
+// +側（中域金属感）: rootHz × 高い分数比
+//   Zone A(0〜0.3): × 0.5（1oct下・中域金属感）
+//   Zone B(0.3〜0.7): × 0.75（5度下・豊かな倍音）
+//   Zone C(0.7〜1.0): × 0.375（5度+1oct下・複合金属感）
+//
+// depth: 非線形カーブで0付近は繊細・端に向かって深くなる
+// oscType: A=sine / B=triangle / C=sawtooth（倍音が豊かになる）
 function _getRMParams(root, type, complexVal){
   const _cacheKey = root + '_' + type + '_' + Math.round(complexVal * 100);
   if(_rmHotspotCache && _rmHotspotChord === _cacheKey){
@@ -10472,71 +10484,45 @@ function _getRMParams(root, type, complexVal){
   const absC   = Math.abs(complexVal);
   const _isNeg = complexVal < 0;
 
-  // コードトーンのHz一覧
+  // ルート音Hz（oct4基準）
   const _ri = (typeof ni === 'function') ? ni(root) : 0;
   const _rootMidi = 48 + (_ri % 12);
-  const _ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
-  const chordHzList = _ivs.map(iv => midi2hz(_rootMidi + (iv % 12)));
-  const rootHz = chordHzList[0];
+  const rootHz = midi2hz(_rootMidi);
 
-  // ── Zone判定 ──
-  const zoneB = Math.max(0, Math.min(1, (absC - 0.3) / 0.4)); // 0.3〜0.7でA→B
-  const zoneC = Math.max(0, Math.min(1, (absC - 0.7) / 0.3)); // 0.7〜1.0でB→C
+  // ── Zone判定（滑らかなブレンド）──
+  const zoneB = Math.max(0, Math.min(1, (absC - 0.3) / 0.4)); // 0.3→0.7でA→B
+  const zoneC = Math.max(0, Math.min(1, (absC - 0.7) / 0.3)); // 0.7→1.0でB→C
 
-  // ── Zone A: ホットスポット探索 ──
-  const _centDiff = (f1, f2) => {
-    if(f1 <= 0 || f2 <= 0) return 9999;
-    return Math.abs(1200 * Math.log2(f1 / f2));
-  };
-  const _freqMin = _isNeg ? 50  : 200;
-  const _freqMax = _isNeg ? 500 : 1800;
-  const _step    = _isNeg ? 2   : 6;
-  let hotHz = _freqMin, bestScore = -1;
-  for(let mHz = _freqMin; mHz <= _freqMax; mHz += _step){
-    let score = 0;
-    for(const cHz of chordHzList){
-      const dHz = Math.abs(cHz - mHz);
-      for(const tHz of chordHzList){
-        const cd = _centDiff(dHz, tHz);
-        if(cd > 2 && cd < 80) score += Math.exp(-Math.pow((cd - 10) / 12, 2));
-        const cs = _centDiff((cHz + mHz) % 2000, tHz);
-        if(cs > 2 && cs < 80) score += Math.exp(-Math.pow((cs - 10) / 12, 2)) * 0.4;
-      }
-    }
-    if(score > bestScore){ bestScore = score; hotHz = mHz; }
+  // ── modHz: ルート音の分数倍音（常にスイートスポット）──
+  let modHz;
+  if(_isNeg){
+    // -側: 低域うねり（2oct〜4oct下へ段階的に降りる）
+    const hzA = rootHz * 0.25;    // 2oct下（唸り）
+    const hzB = rootHz * 0.125;   // 3oct下（深い唸り）
+    const hzC = rootHz * 0.0625;  // 4oct下（超低域）
+    modHz = hzA * (1 - zoneB) + hzB * Math.min(zoneB, 1 - zoneC) + hzC * zoneC;
+  } else {
+    // +側: 中域金属感（5度〜1oct下の倍音関係）
+    const hzA = rootHz * 0.5;     // 1oct下（中域金属感）
+    const hzB = rootHz * 0.75;    // 5度下（豊かな倍音）
+    const hzC = rootHz * 0.375;   // 5度+1oct下（複合金属感）
+    modHz = hzA * (1 - zoneB) + hzB * Math.min(zoneB, 1 - zoneC) + hzC * zoneC;
   }
 
-  // ── Zone B: 非整数比シフト ──
-  // 黄金比・φ（1.618）やπ（3.14）倍で非整数的な倍音を生成
-  const _phiRatios = _isNeg
-    ? [1/1.618, 1/Math.PI, 0.618, 1/2.718] // 暗い側: 低い非整数比
-    : [1.618,   Math.PI,   2.718, 4.236];   // 明るい側: 高い非整数比
-  const _phiIdx = Math.floor(zoneB * (_phiRatios.length - 1));
-  const _phiHz  = rootHz * _phiRatios[_phiIdx];
-
-  // ── Zone C: 高次非整数比（サイバネティック）──
-  // さらに高い非整数比でスペイシーな倍音
-  const _cyberRatios = _isNeg
-    ? [0.309, 0.191, 0.118] // フィボナッチ逆数系
-    : [5.236, 8.472, 13.708]; // フィボナッチ高次系
-  const _cyberIdx = Math.floor(zoneC * (_cyberRatios.length - 1));
-  const _cyberHz  = rootHz * _cyberRatios[_cyberIdx];
-
-  // ── パラメーターのブレンド ──
-  // modHz: A→B→Cへ滑らかにモーフ
-  const modHz = hotHz * (1 - zoneB) + _phiHz * Math.min(zoneB, 1 - zoneC) + _cyberHz * zoneC;
-
-  // depth: 非線形カーブ（0付近は緩やか・0.7以降は急増）
-  // 0→0: 0 / 0.3→0.25 / 0.7→0.55 / 1.0→0.95
+  // ── depth: 非線形カーブ ──
+  // 0: 0 / ±0.3: 0.22 / ±0.7: 0.55 / ±1.0: 0.92
   const depth = absC < 0.001 ? 0
-    : absC < 0.3 ? absC * 0.83          // zone A: 緩やか
-    : absC < 0.7 ? 0.25 + (absC - 0.3) * 0.75  // zone B: 中程度
-    : 0.55 + (absC - 0.7) * 1.33;       // zone C: 急増
+    : absC < 0.3 ? absC * 0.73
+    : absC < 0.7 ? 0.22 + (absC - 0.3) * 0.825
+    : 0.55 + (absC - 0.7) * 1.23;
 
-  // oscType: A=sine / B=triangle / C=sawtooth
+  // ── oscType: 倍音の豊かさ ──
+  // A: sine（純粋な変調・スムーズ）
+  // B: triangle（倍音増・中程度の金属感）
+  // C: sawtooth（倍音最大・サイバネティック）
   const oscType = zoneC > 0.3 ? 'sawtooth' : zoneB > 0.3 ? 'triangle' : 'sine';
 
-  const params = { modHz: Math.max(10, modHz), depth, oscType };
+  const params = { modHz: Math.max(5, modHz), depth, oscType };
   _rmHotspotCache = params;
   _rmHotspotChord = _cacheKey;
   return params;
