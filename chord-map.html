@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514113930 -->
+<!-- build: 20260514115402 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10747,6 +10747,109 @@ function stopArpScheduler(){
   if(arpScheduleTimer){ clearInterval(arpScheduleTimer); arpScheduleTimer=null; }
 }
 
+// ── PLUCKチョードストロークスケジューラー ──
+// PLUCKのみ: コードをBPM同期のリズムパターンで自動ストローク
+// ARPスケジューラーと同じマスタークロック基準
+
+let _pluckChordNextBeat  = 0;
+let _pluckChordTimer     = null;
+let _pluckChordScheduleMs = 25;
+let _pluckChordSeq       = null;  // 現在のストロークシーケンス
+let _pluckChordSeqPos    = 0;
+let _pluckChordRepeat    = 0;     // シーケンス繰り返し回数
+
+// ハウス的シンコペーションパターン候補（16分音符単位・1=ストローク 0=休符）
+// 2小節分（32ステップ）
+const _PLUCK_CHORD_PATTERNS = [
+  // A: ハウス基本（4分・8分混合）
+  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0,
+   1,0,0,0, 1,0,1,0, 1,0,0,0, 1,0,0,0],
+  // B: シンコペーション強め
+  [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0,
+   1,0,0,1, 0,0,1,0, 1,0,0,0, 0,1,0,0],
+  // C: 裏拍強調（90sハウス的）
+  [1,0,1,0, 0,1,0,0, 1,0,1,0, 0,0,1,0,
+   1,0,1,0, 0,1,0,1, 0,0,1,0, 1,0,0,0],
+  // D: タイトな16分ベース
+  [1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,0,0,
+   1,0,0,0, 0,1,0,0, 1,0,1,0, 0,0,1,0],
+];
+
+function _buildPluckChordSeq(){
+  return _PLUCK_CHORD_PATTERNS[
+    Math.floor(Math.random() * _PLUCK_CHORD_PATTERNS.length)
+  ];
+}
+
+function _schedulePluckChord(){
+  if(sceneCurrentName !== 'pluck'){ stopPluckChordScheduler(); return; }
+  const actx = safeGetCtx();
+  if(!actx){ _pluckChordTimer = setTimeout(_schedulePluckChord, _pluckChordScheduleMs); return; }
+
+  const _sixteenth = (60 / autoBpm) / 4;
+  const lookAhead  = actx.currentTime + 0.10;
+
+  while(_pluckChordNextBeat < lookAhead){
+    const t   = _pluckChordNextBeat;
+    const pos = _pluckChordSeqPos % _pluckChordSeq.length;
+    const hit = _pluckChordSeq[pos];
+
+    if(hit === 1 && S && S.root !== undefined){
+      // 少し未来のtimeでCHORDを再トリガー
+      // strum量を少なめに（パーカッシブなシーケンス感）
+      const _sc = SCENE_PRESETS.pluck;
+      const _strumMs = Math.max(2, (_sc.strum || 6) * 0.4);
+      // playSceneChordを直接呼ばず、AudioContext時刻指定で発音
+      setTimeout(() => {
+        if(sceneCurrentName === 'pluck' && S && S.root !== undefined){
+          playSceneChord(actx, S.root, S.type);
+        }
+      }, Math.max(0, (t - actx.currentTime) * 1000));
+    }
+
+    _pluckChordSeqPos++;
+
+    // シーケンス1周完了
+    if(_pluckChordSeqPos >= _pluckChordSeq.length){
+      _pluckChordSeqPos = 0;
+      _pluckChordRepeat++;
+      // 4〜8小節スパンで変容（ARPより大きいスパン）
+      const mutateEvery = 4 + Math.floor(Math.random() * 5); // 4〜8回
+      if(_pluckChordRepeat % mutateEvery === 0){
+        _pluckChordSeq = _buildPluckChordSeq();
+      }
+    }
+
+    _pluckChordNextBeat += _sixteenth;
+  }
+
+  _pluckChordTimer = setTimeout(_schedulePluckChord, _pluckChordScheduleMs);
+}
+
+function startPluckChordScheduler(){
+  stopPluckChordScheduler();
+  if(sceneCurrentName !== 'pluck') return;
+  _pluckChordSeq    = _buildPluckChordSeq();
+  _pluckChordSeqPos = 0;
+  _pluckChordRepeat = 0;
+
+  const actx = safeGetCtx();
+  if(!actx) return;
+  safeResume(actx, ()=>{
+    // マスタークロックから次の16分音符グリッドにスナップ
+    if(_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
+    const _sixteenth = (60 / autoBpm) / 4;
+    const _elapsed   = actx.currentTime - _masterClockOrigin;
+    const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+    _pluckChordNextBeat = _masterClockOrigin + _gridPos;
+    _schedulePluckChord();
+  });
+}
+
+function stopPluckChordScheduler(){
+  if(_pluckChordTimer){ clearTimeout(_pluckChordTimer); _pluckChordTimer = null; }
+}
+
 // ARPリズムステップカウンター
 let _arpRhythmStep = 0;
 let _arpLastMidi = null;
@@ -12460,6 +12563,9 @@ function playScene(root, type){
   const _doPlay = () => {
     // CHORD系を発音
     if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
+      // PLUCKはスケジューラーが自動ストロークするため、
+      // コードタップ時は1回だけ即時発音（コード切替の反応感を維持）
+      // スケジューラーが次のグリッドから新コードで続ける
       playSceneChord(actx, root, type);
     } else {
       _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
@@ -12873,6 +12979,13 @@ function applyScene(name){
 
   // Scene切替バーの表示を更新
   _updateSceneSwitcher();
+
+  // PLUCKチョードスケジューラーの起動・停止
+  if(name === 'pluck'){
+    startPluckChordScheduler();
+  } else {
+    stopPluckChordScheduler();
+  }
 }
 
 // ── Source切替 ──
