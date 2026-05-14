@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514124053 -->
+<!-- build: 20260514124603 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -3302,13 +3302,17 @@ function initCanvas(){
 
   canvas.addEventListener('pointerdown', e => {
     if(window._isCtrlScreen) return;
+    if(_sliderDragging) return; // スライダー操作中はモード切替を無視
     const {x, y} = canvasXY(e);
     const dist = distFromCenter(x, y);
     if(dist < L.SR - 10) return; // サークル内はコード操作に任せる
+    // SLスライダー付近（外周）はスワイプ開始を抑制
+    if(Math.abs(dist - L.SR) < 28) return;
     _modeSwipe = { startX: x, startY: y, startIdx: _modeOrder.indexOf(MAP_MODE), pointerId: e.pointerId };
   });
 
   canvas.addEventListener('pointermove', e => {
+    if(_sliderDragging){ _modeSwipe = null; return; } // スライダー操作中はキャンセル
     if(!_modeSwipe || e.pointerId !== _modeSwipe.pointerId) return;
     const {x, y} = canvasXY(e);
     const dx = x - _modeSwipe.startX;
@@ -11802,7 +11806,7 @@ function scheduleArpNotes(){
 
 // コード変更でARPシーケンスを更新
 function updateArpChord(root, type){
-  if(!arpOn) return;
+  if(!arpOn && !arpSolo) return; // arpSoloがONの場合も構成音を更新する
   // 前コードの情報を記憶してから更新（フレーズ文法の前コード引きずりに使用）
   if(arpSeq && arpSeq.length > 0){
     _phraseState.prevChordMidis = [...arpSeq.filter(m => typeof m === 'number')];
@@ -12751,8 +12755,8 @@ function playScene(root, type){
       _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
       _sceneVoices = [];
     }
-    // ARP連動
-    if(arpOn && typeof updateArpChord === 'function') updateArpChord(root, type);
+    // ARP連動（arpSoloがONの場合も構成音を更新）
+    if((arpOn || arpSolo) && typeof updateArpChord === 'function') updateArpChord(root, type);
   };
 
   if(actx.state === 'running'){
