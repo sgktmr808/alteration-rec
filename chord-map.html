@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514111545 -->
+<!-- build: 20260514113930 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -12635,8 +12635,8 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
   const _baseCutoff = sc.arpCutoff || 600;
   const _baseRes    = sc.arpRes    || 3.2;
   _slArpCutoff = Math.max(150, _baseCutoff * (1.0 + bright * 1.2));
-  // bright↑でresも連動して上昇（ACID的ピーク感）
-  _slArpRes    = Math.max(0.8, _baseRes * (1.0 + bright * 0.6 + tense * 0.5));
+  // bright↑でresを大きく上昇（ACID的ピーキーなうねり強化）
+  _slArpRes    = Math.max(0.8, _baseRes * (1.0 + bright * 1.2 + tense * 0.5));
   // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
   _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.08) - tense * 0.22));
   // bright↑でenvMod増加（フィルターエンベロープのピーク感を強化）
@@ -12644,8 +12644,8 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
   // warm↑: osc2mix増加（低域厚く）+ sub osc増加
   _slOsc2Mix   = 0.55 + warm * 0.35;
   _slArpSubGain = 0.12 + warm * 0.28; // sub osc: 0.12(cold)〜0.40(warm)
-  // moving↑: gate短縮（パーカッシブ）/ moving↓: gate延長（伸びる）
-  _slArpGate   = Math.max(60, Math.min(400, (sc.arpGate || 180) * (1.0 - moving * 0.45)));
+  // moving↑: gate短縮（パーカッシブ）/ moving↓: gate延長（最大600ms）
+  _slArpGate   = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
   // strange: フレーズ文法内で参照（跳躍頻度・音域に影響）
   _slArpPattern = null; // フレーズ文法パスではpatternは使わない
 }
