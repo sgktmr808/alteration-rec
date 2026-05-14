@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514162508 -->
+<!-- build: 20260514172905 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10805,33 +10805,35 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   if(arpEnvOut !== null){
     const _warmVal = sv ? sv('warm') : 0;
 
-    // ── Ring Modulation（complex連動・ARP用）──
+    // ── Ring Modulation（ARP用・正しいRM）──
     // CHORDと同じ_getRMParamsを使用（キャッシュ済み）
-    // depthはCHORDの半分（ARPは繊細に）
+    // depthはCHORDの半分（ARPは繊細に・コードの倍音を邪魔しない）
     const _rmComplexArp = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
     if(Math.abs(_rmComplexArp) > 0.02){
       const _SA = (typeof S !== 'undefined') ? S : null;
       const _rmPA = _SA
         ? _getRMParams(_SA.root, _SA.type, _rmComplexArp)
-        : { modHz: hz * 1.618, depth: Math.abs(_rmComplexArp) * 0.25, oscType: 'sine' };
+        : { modHz: hz * 0.5, depth: Math.abs(_rmComplexArp) * 0.25, oscType: 'sine' };
 
-      const _rmDryA = actx.createGain();
-      const _rmModA = actx.createGain();
-      const _rmWetA = actx.createGain();
-      const _rmOutA = actx.createGain();
+      // ARPはdepthを半分に（繊細に）
+      const _rmDepthA    = _rmPA.depth * 0.5;
+      const _rmCarrierA  = actx.createGain();
+      const _rmModDepthA = actx.createGain();
+      const _rmDryA      = actx.createGain();
+      const _rmOutA      = actx.createGain();
 
-      // ARPはdepthを半分に
-      _rmDryA.gain.value = 1.0 - _rmPA.depth * 0.42;
-      _rmWetA.gain.value = _rmPA.depth * 0.42;
-      _rmModA.gain.value = 1.0;
+      _rmCarrierA.gain.value  = 0;
+      _rmModDepthA.gain.value = _rmDepthA;
+      _rmDryA.gain.value      = 1.0 - _rmDepthA * 0.7;
 
       const _rmOscArp = actx.createOscillator();
       _rmOscArp.type = _rmPA.oscType;
       _rmOscArp.frequency.value = _rmPA.modHz;
-      _rmOscArp.connect(_rmModA.gain);
+      _rmOscArp.connect(_rmModDepthA);
+      _rmModDepthA.connect(_rmCarrierA.gain);
 
-      env.connect(_rmDryA); _rmDryA.connect(_rmOutA);
-      env.connect(_rmModA); _rmModA.connect(_rmWetA); _rmWetA.connect(_rmOutA);
+      env.connect(_rmCarrierA); _rmCarrierA.connect(_rmOutA);
+      env.connect(_rmDryA);     _rmDryA.connect(_rmOutA);
       arpEnvOut = _rmOutA;
 
       _rmOscArp.start(startTime);
@@ -12583,34 +12585,51 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
 
-  // ── Ring Modulation（complex連動・3ゾーン非線形設計）──
-  // Zone A(0〜0.3): ホットスポット・sine・subtle揺らぎ
-  // Zone B(0.3〜0.7): 黄金比/π系非整数比・triangle・メタリック
-  // Zone C(0.7〜1.0): フィボナッチ高次系・sawtooth・サイバネティック
+  // ── Ring Modulation（正しいRM: キャリア×モジュレーター）──
+  //
+  // 【実装】
+  //   gain.value = 0 にしてmodOscだけでgainを駆動
+  //   → 出力 = キャリア × modOsc
+  //   → 差音（carrier - mod）と和音（carrier + mod）が生まれる
+  //   → メタリック・うねり・金属感が出る
+  //
+  // 【dry/wet mix】
+  //   原音(dry)と変調音(wet)をblend
+  //   depth=0: dry100% / depth大: wetが増えてRM感が出る
+  //
   const _complex = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
   if(Math.abs(_complex) > 0.02){
     const _rmS = (typeof S !== 'undefined') ? S : null;
     const _rmP = _rmS
       ? _getRMParams(_rmS.root, _rmS.type, _complex)
-      : { modHz: hz * 1.618, depth: Math.abs(_complex) * 0.5, oscType: 'sine' };
+      : { modHz: hz * 0.5, depth: Math.abs(_complex) * 0.5, oscType: 'sine' };
 
-    const _rmDry = actx.createGain();
-    const _rmMod = actx.createGain();
-    const _rmWet = actx.createGain();
-    const _rmOut = actx.createGain();
+    // modOscのDepthGain: modOscの振幅を制御
+    // gain.value=0 → modOscだけでgainを±_rmP.depthで揺らす
+    const _rmCarrier  = actx.createGain(); // RM変調されたキャリア
+    const _rmModDepth = actx.createGain(); // modOscの深さ
+    const _rmDry      = actx.createGain(); // 原音(dry)
+    const _rmOut      = actx.createGain(); // 合算出力
 
-    _rmDry.gain.value = 1.0 - _rmP.depth * 0.85;
-    _rmWet.gain.value = _rmP.depth * 0.85;
-    _rmMod.gain.value = 1.0;
+    _rmCarrier.gain.value  = 0;             // modOscのみでgainを駆動
+    _rmModDepth.gain.value = _rmP.depth;    // 変調深さ
+    _rmDry.gain.value      = 1.0 - _rmP.depth * 0.7; // 原音は深さに応じて下げる
 
     const _rmOsc = actx.createOscillator();
     _rmOsc.type = _rmP.oscType;
     _rmOsc.frequency.value = _rmP.modHz;
-    _rmOsc.connect(_rmMod.gain);
 
+    // modOsc → _rmModDepth → _rmCarrier.gain（gainパラメーターを駆動）
+    _rmOsc.connect(_rmModDepth);
+    _rmModDepth.connect(_rmCarrier.gain);
+
+    // 信号パス:
+    //   vca → _rmCarrier（RM変調）→ _rmOut
+    //   vca → _rmDry（原音）      → _rmOut
+    //   _rmOut → panner
     vca.disconnect(panner);
-    vca.connect(_rmDry);  _rmDry.connect(_rmOut);
-    vca.connect(_rmMod);  _rmMod.connect(_rmWet); _rmWet.connect(_rmOut);
+    vca.connect(_rmCarrier); _rmCarrier.connect(_rmOut);
+    vca.connect(_rmDry);     _rmDry.connect(_rmOut);
     _rmOut.connect(panner);
 
     _rmOsc.start(t);
