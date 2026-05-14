@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260513143629 -->
+<!-- build: 20260514011017 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10924,15 +10924,37 @@ function _plainBuildNoteSeq(notes, cycleCount){
 
 // PLUCKの細胞を生成（4〜6音）
 function _buildPluckCell(notes){
+  // Mountain People的セル設計:
+  //   16分音符8ステップ（= 2拍）を1セルとする
+  //   低域重心・金属的・催眠的
+  //   発音位置は固定パターンから選ぶ（グリッドに正確）
+  //   音は低域〜中域から選ぶ（上に跳びすぎない）
   if(!notes || notes.length === 0) return [60];
-  const n = notes;
-  const len = 4 + Math.floor(Math.random() * 3); // 4〜6音
+  const sorted = [...notes].sort((a,b) => a - b);
+
+  // 低域プール（下位60%）
+  const loPool = sorted.slice(0, Math.max(1, Math.floor(sorted.length * 0.6)));
+
+  // 8ステップのリズムパターン候補（1=発音 0=休符）
+  // Mountain People的: 均等ではなく、空白が生む緊張感
+  const patterns = [
+    [1,1,0,1, 1,0,1,0],  // A: 表ノリ基本
+    [1,0,1,1, 0,1,1,0],  // B: 裏が強い
+    [1,1,0,1, 0,1,0,1],  // C: 後半に向かう
+    [1,0,1,0, 1,1,0,1],  // D: 前後コントラスト
+  ];
+  const pat = patterns[Math.floor(Math.random() * patterns.length)];
+
+  // セル生成: 発音位置には低域から音を選ぶ
   const cell = [];
-  // 低い音から順に密度高めで並べる（催眠的反復の基礎）
-  const base = Math.floor(n.length * 0.15); // 低め寄り
-  for(let i = 0; i < len; i++){
-    const idx = (base + i) % n.length;
-    cell.push(n[idx]);
+  let noteIdx = 0;
+  for(let i = 0; i < 8; i++){
+    if(pat[i] === 1){
+      cell.push(loPool[noteIdx % loPool.length]);
+      noteIdx++;
+    } else {
+      cell.push(null); // 休符
+    }
   }
   return cell;
 }
@@ -11241,38 +11263,55 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     // PLUCK: 4〜6音の細胞が催眠的に反復
     // ────────────────────────────────────────────
     case 'pluck': {
-      // 細胞を初期化（未生成の場合）
+      const _strangeVal = sv ? sv('strange') : 0;
+      const _movingVal  = sv ? sv('moving')  : 0;
+      const _warmVal    = sv ? sv('warm')    : 0;
+
+      // ── 初期化 ──
       if(!ps.pluckCell || ps.pluckCell.length === 0){
         ps.pluckCell = _buildPluckCell(notes);
         ps.pluckCellPos = 0;
+        ps.pluckRepeatCount = 0;
       }
 
-      const midi = ps.pluckCell[ps.pluckCellPos % ps.pluckCell.length];
-      ps.lastMidi = midi;
+      // ── 現在のステップ ──
+      const sPos = ps.pluckCellPos % ps.pluckCell.length;
+      const midi = ps.pluckCell[sPos]; // null=休符 / number=発音
       ps.pluckCellPos++;
 
+      // ── セル完了時: 変容判断 ──
       if(ps.pluckCellPos >= ps.pluckCell.length){
         ps.pluckCellPos = 0;
         ps.pluckRepeatCount++;
 
-        // 8反復に1回: 大きな変化（octジャンプまたはパターン反転）
-        if(ps.pluckRepeatCount % 8 === 0){
-          ps.pluckCell = _buildPluckCell(notes); // 完全再生成
-        } else {
-          // それ以外は微細変奏（1音だけ変化）
+        // moving↑で変容頻度増（4〜12反復に1回）
+        const mutateEvery = Math.max(4, Math.round(8 - _movingVal * 4));
+
+        if(ps.pluckRepeatCount % (mutateEvery * 2) === 0){
+          // 大きな変化: パターン完全再生成
+          ps.pluckCell = _buildPluckCell(notes);
+        } else if(ps.pluckRepeatCount % mutateEvery === 0){
+          // 小さな変化: 1音だけ差し替え
           ps.pluckCell = _mutatePluckCell(ps.pluckCell, notes);
         }
+        // それ以外: 同じパターンをループ（催眠的反復）
       }
 
-      // 確率的な休符（密度を少し間引く）
-      if(restProb > 0 && Math.random() < restProb){
-        ps.lastMidi = null;
-        return { midi: null, stepRatio: 0.5 * densityMul };
+      // 休符
+      if(midi === null){
+        return { midi: null, stepRatio: 1.0 * densityMul };
       }
 
-      // PLUCK: 16分基準のリズム（0.4〜0.6拍・均一感）
-      const pluckRatio = (0.47 + Math.random() * 0.06) * densityMul; // 16分を安定化
-      return { midi, stepRatio: pluckRatio };
+      ps.lastMidi = midi;
+
+      // ベロシティ: strange↑で強弱の振れ幅増（山と谷）
+      const velBase = 0.88 + (Math.random() - 0.5) * (0.15 + Math.abs(_strangeVal) * 0.25);
+      const velMul = Math.max(0.4, velBase);
+
+      // ゲート: warm↑で少し伸びる（基本は短くパーカッシブ）
+      const gateOverride = 0.6 + _warmVal * 0.3;
+
+      return { midi, stepRatio: 1.0 * densityMul, velMul, gateOverride };
     }
 
     // ────────────────────────────────────────────
@@ -11696,22 +11735,24 @@ const SCENE_PRESETS = {
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
   pluck: {
     label:'DEEP TECH',
-    // CHORD: sawtoothアンサンブル、暗く広い、filterがゆっくり開くswell
-    osc1:'sawtooth', osc2:'sawtooth', detune:11,
-    cutoff:900, res:1.1, envMod:0.65,
-    attack:0.10, decay:1.4, sustain:0.40, release:2.2,
-    vol:0.42, chorus:0.12, wet:0.42, strum:8,
-    trailSec:0.7, width:0.62, feltAttack:0.0, ghost:0.0, filterDrift:0.08,
+    // CHORD: The Mountain People的。低域重心・重くダーク・filterがゆっくりうねる
+    // osc1:sawtooth(低域の芯) + osc2:sawtooth(detuneで厚み)
+    // cutoff低め・res高め（共鳴感）・filterDriftでうねり
+    // attack短め（地を這う感）・sustain長め（持続感）
+    osc1:'sawtooth', osc2:'sawtooth', detune:9,
+    cutoff:480, res:1.4, envMod:0.55,
+    attack:0.06, decay:1.2, sustain:0.55, release:2.8,
+    vol:0.40, chorus:0.08, wet:0.40, strum:6,
+    trailSec:0.8, width:0.58, feltAttack:0.0, ghost:0.0, filterDrift:0.28,
     voicingFlavor:'detroit',
-    // ARP: Âme / Mathew Jonson的。催眠。16分の反復・フィルターが開く
-    // sawtooth・高res・強いfilter env・長めgate・疲れない密度
-    arpOsc:'sawtooth', arpCutoff:950, arpRes:2.2, arpEnvMod:0.92,
-    arpAttack:0.003, arpDecay:0.70, arpSustain:0.0,
-    arpGate:320, arpVol:0.26, arpWet:0.50, arpGhost:0.08,
-    arpOctRange:2, // 1オクターブ上まで含む催眠的反復
-    // リズム: 16分ベース・一定の密度・たまに長い音で変化
-    // 「繰り返しても疲れない」催眠的パターン
-    arpRhythm:[0.5, 0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.5, 1.0], arpRestProb:0.06,
+    // ARP: Mountain People的。金属的・催眠・16分グリッド・低域重心
+    // sawtooth・高res・強いfilter env（金属的クリック）
+    // 短いdecay・sustain 0（パーカッシブ）・密度は選ぶ
+    arpOsc:'sawtooth', arpCutoff:600, arpRes:3.2, arpEnvMod:0.98,
+    arpAttack:0.002, arpDecay:0.35, arpSustain:0.0,
+    arpGate:180, arpVol:0.28, arpWet:0.44, arpGhost:0.06,
+    arpOctRange:2,
+    arpRhythm:[1.0, 1.0, 1.0, 1.0], arpRestProb:0.08,
   },
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
