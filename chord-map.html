@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514123227 -->
+<!-- build: 20260514124053 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -58,6 +58,17 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .hdr-arp-btn.on{
   border-color:#80d4ff;color:#80d4ff;
   background:rgba(128,212,255,0.12);
+}
+.hdr-solo-btn{
+  font-family:var(--fm);font-size:9px;padding:4px 8px;
+  border:1px solid rgba(255,180,80,0.4);border-radius:var(--r);
+  color:rgba(255,180,80,0.6);background:transparent;cursor:pointer;
+  letter-spacing:.1em;transition:border-color .15s,color .15s,background .15s;
+  white-space:nowrap;user-select:none;-webkit-user-select:none;
+}
+.hdr-solo-btn.on{
+  border-color:#ffb450;color:#ffb450;
+  background:rgba(255,180,80,0.12);
 }
 .legend{flex-shrink:0;background:var(--surf2);border-bottom:1px solid var(--bdr);
   padding:4px 12px;display:flex;gap:10px;overflow-x:auto;align-items:center;-webkit-overflow-scrolling:touch;}
@@ -1079,6 +1090,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.7.1</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
+  <div class="hdr-solo-btn" id="hdr-solo-btn" onclick="toggleArpSolo()">SOLO</div>
 </div>
 <div class="legend">
   <div class="li"><div class="ldot" style="background:#4aaa72"></div><span class="ltxt">Diatonic</span></div>
@@ -11825,6 +11837,25 @@ function togglePad(){
   // PADは廃止（synthPanelOpenで制御）
 }
 
+let arpSolo = false; // ARPソロモード（全Scene共通）
+
+function toggleArpSolo(){
+  arpSolo = !arpSolo;
+  const btn = document.getElementById('hdr-solo-btn');
+  if(btn){
+    btn.classList.toggle('on', arpSolo);
+    btn.textContent = arpSolo ? 'SOLO ▶' : 'SOLO';
+  }
+  // ソロON: 鳴っているCHORDボイスをリリース
+  if(arpSolo){
+    const actx = safeGetCtx();
+    if(actx){
+      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
+      _sceneVoices = [];
+    }
+  }
+}
+
 function toggleArp(){
   arpOn=!arpOn;
   // SYNTHパネル内のボタンとヘッダーボタンを同期
@@ -12707,12 +12738,15 @@ function playScene(root, type){
   if(!actx) return;
 
   const _doPlay = () => {
-    // CHORD系を発音
+    // CHORD系を発音（arpSoloがONの場合はCHORDをスキップ）
     if(sceneCurrentSource === 'CHORD' || sceneCurrentSource === 'CHORD+ARP'){
-      // PLUCKはスケジューラーが自動ストロークするため、
-      // コードタップ時は1回だけ即時発音（コード切替の反応感を維持）
-      // スケジューラーが次のグリッドから新コードで続ける
-      playSceneChord(actx, root, type);
+      if(!arpSolo){
+        playSceneChord(actx, root, type);
+      } else {
+        // ソロモード: 鳴っているCHORDをリリースして無音に
+        _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.2));
+        _sceneVoices = [];
+      }
     } else {
       _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
       _sceneVoices = [];
