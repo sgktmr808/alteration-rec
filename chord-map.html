@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514132706 -->
+<!-- build: 20260514134408 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -2167,7 +2167,7 @@ const SL=[
   {id:'bright', cDeg:0,   lL:'Dark',     lR:'Bright',  col:'#e8d060', val:0, disp:0},
   {id:'tense',  cDeg:60,  lL:'Calm',     lR:'Tense',   col:'#d44a6a', val:0, disp:0},
   {id:'warm',   cDeg:120, lL:'Cold',     lR:'Warm',    col:'#d4823a', val:0, disp:0},
-  {id:'complex',cDeg:180, lL:'Simple',   lR:'Complex', col:'#9a6ad4', val:0, disp:0},
+  {id:'complex',cDeg:180, lL:'7th·RM',   lR:'13th·RM', col:'#9a6ad4', val:0, disp:0},
   {id:'moving', cDeg:240, lL:'Static',   lR:'Moving',  col:'#4a90d4', val:0, disp:0},
   {id:'strange',cDeg:300, lL:'Familiar', lR:'Strange', col:'#4aaa72', val:0, disp:0},
 ];
@@ -10711,6 +10711,30 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   if(arpEnvOut !== null){
     const _warmVal = sv ? sv('warm') : 0;
 
+    // ── Ring Modulation（complex連動・ARP用）──
+    // complex < 0: 7th連動 / complex > 0: 13th連動 / 0: 効果なし
+    // depthはCHORDの半分（subtleに）
+    const _rmComplexArp = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
+    const _rmDepthArp   = Math.abs(_rmComplexArp) * 0.15; // CHORDの半分
+    if(_rmDepthArp > 0.005){
+      const _rmIvArp  = _rmComplexArp < 0 ? 10 : 21;
+      const _rmHzArp  = hz * Math.pow(2, _rmIvArp / 12);
+      const _rmGainArp = actx.createGain();
+      _rmGainArp.gain.value = 0;
+      const _rmOscArp = actx.createOscillator();
+      _rmOscArp.type = 'sine';
+      _rmOscArp.frequency.value = _rmHzArp;
+      const _rmDepthGainArp = actx.createGain();
+      _rmDepthGainArp.gain.value = _rmDepthArp;
+      _rmOscArp.connect(_rmDepthGainArp);
+      _rmDepthGainArp.connect(_rmGainArp.gain);
+      // env → _rmGainArp（既存のarpEnvOutを置き換え）
+      env.connect(_rmGainArp);
+      arpEnvOut = _rmGainArp; // 以降の接続先を更新
+      _rmOscArp.start(startTime);
+      _rmOscArp.stop(startTime + gateSec + 0.3);
+    }
+
     // Scene別: 音色的ディレイ（gate長めのScene）
     // VELVETは共有ディレイのみ使用（音色的ディレイを除外）
     if(sceneCurrentName === 'strings' || sceneCurrentName === 'plain'){
@@ -12454,6 +12478,45 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
+
+  // ── Ring Modulation（complex連動・コードトーンに追従）──
+  // complex < 0: 7th連動（10半音上）/ complex > 0: 13th連動（21半音上）
+  // complex = 0: depth=0（ニュートラル・効果なし）
+  // depth = |complex| * 0.30（最大0.30・subtle）
+  let _rmOsc = null;
+  const _complex = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
+  const _rmDepth = Math.abs(_complex) * 0.30;
+  if(_rmDepth > 0.01){
+    // モジュレーター周波数: complex<0→7th / complex>0→13th
+    const _rmIv = _complex < 0 ? 10 : 21; // 半音数
+    const _rmHz  = hz * Math.pow(2, _rmIv / 12);
+
+    // リングモジュレーター: GainNodeのgainにmodOscを接続
+    const _rmGain = actx.createGain();
+    _rmGain.gain.value = 0; // DCオフセットなし（純粋なリングモジュレーション）
+
+    _rmOsc = actx.createOscillator();
+    _rmOsc.type = 'sine';
+    _rmOsc.frequency.value = _rmHz;
+
+    // modOsc → _rmGain.gain（gainパラメーターへの接続でリングモジュレーション）
+    _rmOsc.connect(_rmGain.gain);
+
+    // depth: modOscがgainを±_rmDepth揺らす
+    const _rmDepthGain = actx.createGain();
+    _rmDepthGain.gain.value = _rmDepth;
+    _rmOsc.connect(_rmDepthGain);
+    _rmDepthGain.connect(_rmGain.gain);
+
+    // 信号パス: vca → _rmGain → panner
+    // 既存のvca→pannerを切断して_rmGainを挿入
+    vca.disconnect(panner);
+    vca.connect(_rmGain);
+    _rmGain.connect(panner);
+
+    _rmOsc.start(t);
+    _rmOsc.stop(t + _oscMaxLife);
+  }
 
   // Space Presetリバーブsendに接続（存在する場合）
   const _chordRvbSend = getSpaceReverbSend();
