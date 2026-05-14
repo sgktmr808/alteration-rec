@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514011017 -->
+<!-- build: 20260514111545 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10929,28 +10929,37 @@ function _buildPluckCell(notes){
   //   低域重心・金属的・催眠的
   //   発音位置は固定パターンから選ぶ（グリッドに正確）
   //   音は低域〜中域から選ぶ（上に跳びすぎない）
-  if(!notes || notes.length === 0) return [60];
+  //   各ステップに { midi, vel, drift } を格納
+  //     vel:   ベロシティ倍率（0.75〜1.05・差は控えめ）
+  //     drift: ピッチドリフト量（0=なし・次サイクルで±半音〜全音）
+  if(!notes || notes.length === 0) return [{midi:60,vel:1.0,drift:0}];
   const sorted = [...notes].sort((a,b) => a - b);
 
   // 低域プール（下位60%）
   const loPool = sorted.slice(0, Math.max(1, Math.floor(sorted.length * 0.6)));
 
   // 8ステップのリズムパターン候補（1=発音 0=休符）
-  // Mountain People的: 均等ではなく、空白が生む緊張感
   const patterns = [
     [1,1,0,1, 1,0,1,0],  // A: 表ノリ基本
     [1,0,1,1, 0,1,1,0],  // B: 裏が強い
     [1,1,0,1, 0,1,0,1],  // C: 後半に向かう
     [1,0,1,0, 1,1,0,1],  // D: 前後コントラスト
   ];
+  // ベロシティテンプレート（8ステップ分・差は控えめ）
+  // 拍頭（0,4）やや強・裏（2,6）やや弱・それ以外中
+  const velTemplate = [1.04, 0.88, 0.92, 0.96, 1.02, 0.88, 0.94, 0.90];
+
   const pat = patterns[Math.floor(Math.random() * patterns.length)];
 
-  // セル生成: 発音位置には低域から音を選ぶ
   const cell = [];
   let noteIdx = 0;
   for(let i = 0; i < 8; i++){
     if(pat[i] === 1){
-      cell.push(loPool[noteIdx % loPool.length]);
+      const midi = loPool[noteIdx % loPool.length];
+      const vel  = velTemplate[i];
+      // ドリフト候補: 約30%のステップにドリフトを設定
+      const drift = Math.random() < 0.30 ? (Math.random() < 0.5 ? 1 : -1) : 0;
+      cell.push({ midi, vel, drift });
       noteIdx++;
     } else {
       cell.push(null); // 休符
@@ -10959,22 +10968,58 @@ function _buildPluckCell(notes){
   return cell;
 }
 
-// PLUCKの細胞に微細な変奏を加える（1音だけ差し替え・追加・省く）
-function _mutatePluckCell(cell, notes){
+// PLUCKの細胞に微細な変奏を加える
+// A: サイクルをまたいでピッチが半音〜全音ずれる（drift適用）
+// B: パターン内の特定位置が隣の音に動く
+// 稀に跳躍して高レンジへ（strange値で頻度調整）
+function _mutatePluckCell(cell, notes, strangeVal){
   if(!cell || cell.length === 0) return cell;
-  const mutated = [...cell];
+  strangeVal = strangeVal || 0;
+  const sorted = [...notes].sort((a,b) => a - b);
+  const mutated = cell.map(s => s === null ? null : Object.assign({}, s));
+
+  // 発音ステップのみ取得
+  const playSteps = mutated.map((s,i) => s !== null ? i : -1).filter(i => i >= 0);
+  if(playSteps.length === 0) return mutated;
+
   const op = Math.random();
-  if(op < 0.4 && notes.length > 0){
-    // 1音差し替え
-    const idx = Math.floor(Math.random() * mutated.length);
-    mutated[idx] = notes[Math.floor(Math.random() * notes.length)];
-  } else if(op < 0.65 && mutated.length < 7){
-    // 1音追加
-    mutated.push(notes[Math.floor(Math.random() * notes.length)]);
-  } else if(op < 0.85 && mutated.length > 3){
-    // 1音省く
-    mutated.splice(Math.floor(Math.random() * mutated.length), 1);
+
+  if(op < 0.45){
+    // A: driftを適用（半音〜全音ピッチシフト）
+    // driftが設定されているステップのmidiをずらす
+    playSteps.forEach(i => {
+      const s = mutated[i];
+      if(s.drift !== 0){
+        const shifted = s.midi + s.drift;
+        // notesの範囲内でクランプ
+        const lo = sorted[0]; const hi = sorted[sorted.length-1];
+        s.midi = Math.max(lo - 2, Math.min(hi + 2, shifted));
+        // 新しいdriftをランダムに再設定
+        s.drift = Math.random() < 0.35 ? (Math.random() < 0.5 ? 1 : -1) : 0;
+      }
+    });
+  } else if(op < 0.70){
+    // B: パターン内の1ステップが隣の音に動く
+    const idx = playSteps[Math.floor(Math.random() * playSteps.length)];
+    const s = mutated[idx];
+    const noteIdx = sorted.indexOf(s.midi);
+    if(noteIdx >= 0){
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const newIdx = Math.max(0, Math.min(sorted.length-1, noteIdx + dir));
+      s.midi = sorted[newIdx];
+    }
+  } else if(op < 0.85 + strangeVal * 0.1){
+    // 稀に跳躍（strange↑で頻度増）
+    // 高レンジ（上位30%）へジャンプ
+    const hiPool = sorted.slice(Math.floor(sorted.length * 0.7));
+    if(hiPool.length > 0){
+      const idx = playSteps[Math.floor(Math.random() * playSteps.length)];
+      mutated[idx].midi = hiPool[Math.floor(Math.random() * hiPool.length)];
+      mutated[idx].drift = 0; // ジャンプ後はdriftリセット
+    }
   }
+  // それ以外: 変化なし（催眠的反復を維持）
+
   return mutated;
 }
 
@@ -11276,7 +11321,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 
       // ── 現在のステップ ──
       const sPos = ps.pluckCellPos % ps.pluckCell.length;
-      const midi = ps.pluckCell[sPos]; // null=休符 / number=発音
+      const step = ps.pluckCell[sPos]; // null=休符 / {midi,vel,drift}=発音
       ps.pluckCellPos++;
 
       // ── セル完了時: 変容判断 ──
@@ -11284,32 +11329,32 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         ps.pluckCellPos = 0;
         ps.pluckRepeatCount++;
 
-        // moving↑で変容頻度増（4〜12反復に1回）
-        const mutateEvery = Math.max(4, Math.round(8 - _movingVal * 4));
+        // moving↑で変容頻度増（3〜10反復に1回）
+        const mutateEvery = Math.max(3, Math.round(7 - _movingVal * 4));
 
-        if(ps.pluckRepeatCount % (mutateEvery * 2) === 0){
+        if(ps.pluckRepeatCount % (mutateEvery * 3) === 0){
           // 大きな変化: パターン完全再生成
           ps.pluckCell = _buildPluckCell(notes);
         } else if(ps.pluckRepeatCount % mutateEvery === 0){
-          // 小さな変化: 1音だけ差し替え
-          ps.pluckCell = _mutatePluckCell(ps.pluckCell, notes);
+          // 小さな変化: A+B+跳躍
+          ps.pluckCell = _mutatePluckCell(ps.pluckCell, notes, _strangeVal);
         }
         // それ以外: 同じパターンをループ（催眠的反復）
       }
 
       // 休符
-      if(midi === null){
+      if(step === null){
         return { midi: null, stepRatio: 1.0 * densityMul };
       }
 
+      const midi = step.midi;
       ps.lastMidi = midi;
 
-      // ベロシティ: strange↑で強弱の振れ幅増（山と谷）
-      const velBase = 0.88 + (Math.random() - 0.5) * (0.15 + Math.abs(_strangeVal) * 0.25);
-      const velMul = Math.max(0.4, velBase);
+      // ベロシティ: セルのvelテンプレート基準・差は控えめ
+      const velMul = Math.max(0.6, step.vel + (Math.random() - 0.5) * 0.06);
 
       // ゲート: warm↑で少し伸びる（基本は短くパーカッシブ）
-      const gateOverride = 0.6 + _warmVal * 0.3;
+      const gateOverride = 0.55 + _warmVal * 0.30;
 
       return { midi, stepRatio: 1.0 * densityMul, velMul, gateOverride };
     }
@@ -12585,19 +12630,24 @@ function _applySL_glass(sc, bright, tense, warm, moving, strange){
 // moving: gate短縮（パーカッシブ）
 // strange: Euclidean変形パターン
 function _applySL_pluck(sc, bright, tense, warm, moving, strange){
-  _slArpCutoff = Math.max(200, (sc.arpCutoff || 950) * (1.0 + bright * 0.9));
-  _slArpRes    = Math.max(0.5, (sc.arpRes || 2.2) * (1.0 + tense * 0.7));
-  _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.06) - tense * 0.20));
-  _slArpEnvMod = Math.max(0.3, (sc.arpEnvMod || 0.92) * (1.0 + bright * 0.3));
-  _slOsc2Mix = 0.60 + warm * 0.30; // osc2（同音デチューン）の混ぜ具合
-  _slArpSubGain = 0.15 + warm * 0.25; // sub osc: 0.15(cold)〜0.40(warm)
-  _slArpGate = Math.max(60, (sc.arpGate || 320) * (1.0 - moving * 0.50));
-  // strange: bounce/thumbdn系（Familiar=下方向重視 / Strange=spiral/skip系）
-  if(strange > 0.6)       _slArpPattern = 'spiral';
-  else if(strange > 0.25) _slArpPattern = 'skip1up';
-  else if(strange < -0.6) _slArpPattern = 'thumbdn';
-  else if(strange < -0.25)_slArpPattern = 'down';
-  else                    _slArpPattern = null;
+  // bright↑: cutoff上昇（明るく）+ res同時上昇（ACID的ピーキーなうねり）
+  // bright↓: cutoff低下（暗く・金属的）
+  const _baseCutoff = sc.arpCutoff || 600;
+  const _baseRes    = sc.arpRes    || 3.2;
+  _slArpCutoff = Math.max(150, _baseCutoff * (1.0 + bright * 1.2));
+  // bright↑でresも連動して上昇（ACID的ピーク感）
+  _slArpRes    = Math.max(0.8, _baseRes * (1.0 + bright * 0.6 + tense * 0.5));
+  // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
+  _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.08) - tense * 0.22));
+  // bright↑でenvMod増加（フィルターエンベロープのピーク感を強化）
+  _slArpEnvMod = Math.max(0.4, (sc.arpEnvMod || 0.98) * (1.0 + bright * 0.4));
+  // warm↑: osc2mix増加（低域厚く）+ sub osc増加
+  _slOsc2Mix   = 0.55 + warm * 0.35;
+  _slArpSubGain = 0.12 + warm * 0.28; // sub osc: 0.12(cold)〜0.40(warm)
+  // moving↑: gate短縮（パーカッシブ）/ moving↓: gate延長（伸びる）
+  _slArpGate   = Math.max(60, Math.min(400, (sc.arpGate || 180) * (1.0 - moving * 0.45)));
+  // strange: フレーズ文法内で参照（跳躍頻度・音域に影響）
+  _slArpPattern = null; // フレーズ文法パスではpatternは使わない
 }
 
 // ── STRINGS: Detroit的・広い・アンセム・大きな呼吸 ──
