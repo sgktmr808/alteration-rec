@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514172905 -->
+<!-- build: 20260514175626 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10805,39 +10805,57 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   if(arpEnvOut !== null){
     const _warmVal = sv ? sv('warm') : 0;
 
-    // ── Ring Modulation（ARP用・正しいRM）──
-    // CHORDと同じ_getRMParamsを使用（キャッシュ済み）
-    // depthはCHORDの半分（ARPは繊細に・コードの倍音を邪魔しない）
-    const _rmComplexArp = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
-    if(Math.abs(_rmComplexArp) > 0.02){
+    // ── FM変調（complex連動・ARPのみ）──
+    //
+    // 【FM変調の仕組み】
+    //   modOscがキャリアosc1のfrequencyパラメーターを駆動
+    //   変調インデックス = modHz × depth
+    //   小さいdepth → わずかな揺らぎ・ビブラート感
+    //   大きいdepth → 複雑な倍音列・金属的・ベル的サウンド
+    //
+    // 【モジュレーター周波数（ルート音追従）】
+    //   -側: rootHz×0.25（2oct下）〜0.0625（4oct下）の低域うねり
+    //   +側: rootHz×0.5（1oct下）〜0.375（複合）の中域金属感
+    //   各ゾーンにデチューンを加えてスイートスポットを維持
+    //
+    // 【変調インデックス（Hz単位）】
+    //   = modHz × depth × scaleFactor
+    //   scaleFactor: 低域modHzは大きく・高域は小さく（知覚バランス）
+    const _fmComplexArp = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
+    if(Math.abs(_fmComplexArp) > 0.02){
       const _SA = (typeof S !== 'undefined') ? S : null;
-      const _rmPA = _SA
-        ? _getRMParams(_SA.root, _SA.type, _rmComplexArp)
-        : { modHz: hz * 0.5, depth: Math.abs(_rmComplexArp) * 0.25, oscType: 'sine' };
+      const _fmP = _SA
+        ? _getRMParams(_SA.root, _SA.type, _fmComplexArp)
+        : { modHz: hz * 0.25, depth: Math.abs(_fmComplexArp) * 0.5, oscType: 'sine' };
 
-      // ARPはdepthを半分に（繊細に）
-      const _rmDepthA    = _rmPA.depth * 0.5;
-      const _rmCarrierA  = actx.createGain();
-      const _rmModDepthA = actx.createGain();
-      const _rmDryA      = actx.createGain();
-      const _rmOutA      = actx.createGain();
+      // FM変調インデックス（Hz単位）
+      // 変調インデックス = modHz × depth × scaleFactor
+      // scaleFactor: modHzが低いほど大きく（低域うねりを強調）
+      const _fmScale = Math.max(0.5, Math.min(4.0, 80 / Math.max(1, _fmP.modHz)));
+      const _fmIndex = _fmP.modHz * _fmP.depth * _fmScale;
 
-      _rmCarrierA.gain.value  = 0;
-      _rmModDepthA.gain.value = _rmDepthA;
-      _rmDryA.gain.value      = 1.0 - _rmDepthA * 0.7;
+      // modOsc → GainNode（変調量）→ osc1.frequency（AudioParam）
+      const _fmModGain = actx.createGain();
+      _fmModGain.gain.value = _fmIndex;
 
-      const _rmOscArp = actx.createOscillator();
-      _rmOscArp.type = _rmPA.oscType;
-      _rmOscArp.frequency.value = _rmPA.modHz;
-      _rmOscArp.connect(_rmModDepthA);
-      _rmModDepthA.connect(_rmCarrierA.gain);
+      const _fmOsc = actx.createOscillator();
+      _fmOsc.type = _fmP.oscType;
+      _fmOsc.frequency.value = _fmP.modHz;
 
-      env.connect(_rmCarrierA); _rmCarrierA.connect(_rmOutA);
-      env.connect(_rmDryA);     _rmDryA.connect(_rmOutA);
-      arpEnvOut = _rmOutA;
+      // osc2にも同じFM変調（少し深さを下げる）
+      const _fmModGain2 = actx.createGain();
+      _fmModGain2.gain.value = _fmIndex * 0.7;
 
-      _rmOscArp.start(startTime);
-      _rmOscArp.stop(startTime + gateSec + 0.3);
+      _fmOsc.connect(_fmModGain);
+      _fmModGain.connect(osc1.frequency);  // osc1のfrequencyを変調
+
+      if(osc2){
+        _fmOsc.connect(_fmModGain2);
+        _fmModGain2.connect(osc2.frequency); // osc2も変調
+      }
+
+      _fmOsc.start(startTime);
+      _fmOsc.stop(startTime + gateSec + 0.3);
     }
 
     // Scene別: 音色的ディレイ（gate長めのScene）
@@ -12585,56 +12603,8 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
 
-  // ── Ring Modulation（正しいRM: キャリア×モジュレーター）──
-  //
-  // 【実装】
-  //   gain.value = 0 にしてmodOscだけでgainを駆動
-  //   → 出力 = キャリア × modOsc
-  //   → 差音（carrier - mod）と和音（carrier + mod）が生まれる
-  //   → メタリック・うねり・金属感が出る
-  //
-  // 【dry/wet mix】
-  //   原音(dry)と変調音(wet)をblend
-  //   depth=0: dry100% / depth大: wetが増えてRM感が出る
-  //
-  const _complex = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
-  if(Math.abs(_complex) > 0.02){
-    const _rmS = (typeof S !== 'undefined') ? S : null;
-    const _rmP = _rmS
-      ? _getRMParams(_rmS.root, _rmS.type, _complex)
-      : { modHz: hz * 0.5, depth: Math.abs(_complex) * 0.5, oscType: 'sine' };
-
-    // modOscのDepthGain: modOscの振幅を制御
-    // gain.value=0 → modOscだけでgainを±_rmP.depthで揺らす
-    const _rmCarrier  = actx.createGain(); // RM変調されたキャリア
-    const _rmModDepth = actx.createGain(); // modOscの深さ
-    const _rmDry      = actx.createGain(); // 原音(dry)
-    const _rmOut      = actx.createGain(); // 合算出力
-
-    _rmCarrier.gain.value  = 0;             // modOscのみでgainを駆動
-    _rmModDepth.gain.value = _rmP.depth;    // 変調深さ
-    _rmDry.gain.value      = 1.0 - _rmP.depth * 0.7; // 原音は深さに応じて下げる
-
-    const _rmOsc = actx.createOscillator();
-    _rmOsc.type = _rmP.oscType;
-    _rmOsc.frequency.value = _rmP.modHz;
-
-    // modOsc → _rmModDepth → _rmCarrier.gain（gainパラメーターを駆動）
-    _rmOsc.connect(_rmModDepth);
-    _rmModDepth.connect(_rmCarrier.gain);
-
-    // 信号パス:
-    //   vca → _rmCarrier（RM変調）→ _rmOut
-    //   vca → _rmDry（原音）      → _rmOut
-    //   _rmOut → panner
-    vca.disconnect(panner);
-    vca.connect(_rmCarrier); _rmCarrier.connect(_rmOut);
-    vca.connect(_rmDry);     _rmDry.connect(_rmOut);
-    _rmOut.connect(panner);
-
-    _rmOsc.start(t);
-    _rmOsc.stop(t + _oscMaxLife);
-  }
+  // ── CHORDへのRM/FM適用なし ──
+  // complexスライダーの効果はARPのFM変調のみ
 
   // Space Presetリバーブsendに接続（存在する場合）
   const _chordRvbSend = getSpaceReverbSend();
