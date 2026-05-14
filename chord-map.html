@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514134408 -->
+<!-- build: 20260514135204 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -10712,25 +10712,35 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     const _warmVal = sv ? sv('warm') : 0;
 
     // ── Ring Modulation（complex連動・ARP用）──
-    // complex < 0: 7th連動 / complex > 0: 13th連動 / 0: 効果なし
-    // depthはCHORDの半分（subtleに）
+    // CHORDと同じホットスポット周波数を使用（キャッシュ済み）
+    // depthはCHORDの半分（subtleに・ARPは繊細に）
     const _rmComplexArp = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
-    const _rmDepthArp   = Math.abs(_rmComplexArp) * 0.15; // CHORDの半分
-    if(_rmDepthArp > 0.005){
-      const _rmIvArp  = _rmComplexArp < 0 ? 10 : 21;
-      const _rmHzArp  = hz * Math.pow(2, _rmIvArp / 12);
-      const _rmGainArp = actx.createGain();
-      _rmGainArp.gain.value = 0;
+    const _rmDepthArp   = Math.abs(_rmComplexArp);
+    if(_rmDepthArp > 0.05){
+      const _S = (typeof S !== 'undefined') ? S : null;
+      const _rmHzArp = _S
+        ? _findRMHotspot(_S.root, _S.type, _rmComplexArp)
+        : hz * 1.5;
+
+      const _rmWetA = actx.createGain();
+      const _rmDryA = actx.createGain();
+      const _rmOutA = actx.createGain();
+      const _rmModA = actx.createGain();
+
+      // ARPはdepthを半分に（CHORDより控えめ）
+      _rmDryA.gain.value = 1.0 - _rmDepthArp * 0.35;
+      _rmWetA.gain.value = _rmDepthArp * 0.35;
+      _rmModA.gain.value = 1.0;
+
       const _rmOscArp = actx.createOscillator();
       _rmOscArp.type = 'sine';
       _rmOscArp.frequency.value = _rmHzArp;
-      const _rmDepthGainArp = actx.createGain();
-      _rmDepthGainArp.gain.value = _rmDepthArp;
-      _rmOscArp.connect(_rmDepthGainArp);
-      _rmDepthGainArp.connect(_rmGainArp.gain);
-      // env → _rmGainArp（既存のarpEnvOutを置き換え）
-      env.connect(_rmGainArp);
-      arpEnvOut = _rmGainArp; // 以降の接続先を更新
+      _rmOscArp.connect(_rmModA.gain);
+
+      env.connect(_rmDryA); _rmDryA.connect(_rmOutA);
+      env.connect(_rmModA); _rmModA.connect(_rmWetA); _rmWetA.connect(_rmOutA);
+      arpEnvOut = _rmOutA; // 以降の接続先を更新
+
       _rmOscArp.start(startTime);
       _rmOscArp.stop(startTime + gateSec + 0.3);
     }
@@ -10851,6 +10861,75 @@ function stopArpScheduler(){
 }
 
 /* ── CHORDストローク発音・スケジューラー（共通機能・一時無効化）──
+// ── Ring Modulation ホットスポット探索 ──
+// コードトーンに対して「5〜15セントのズレ」をピークとするベル曲線でスコアリング
+// コードチェンジ時に1回計算してキャッシュ
+
+let _rmHotspotCache = null; // { modHz, score, complex }
+let _rmHotspotChord = null; // キャッシュ対象のコード識別子
+
+function _findRMHotspot(root, type, complexVal){
+  const _cacheKey = root + '_' + type + '_' + Math.round(complexVal * 10);
+  if(_rmHotspotCache && _rmHotspotChord === _cacheKey){
+    return _rmHotspotCache.modHz;
+  }
+
+  // コードトーンのHz一覧
+  const _ri = (typeof ni === 'function') ? ni(root) : 0;
+  const _rootMidi = 48 + (_ri % 12);
+  const _ivs = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
+  const chordHzList = _ivs.map(iv => {
+    const m = _rootMidi + (iv % 12);
+    return midi2hz(m);
+  });
+
+  // complex値で探索レンジを決定
+  // complex < 0: 低域モジュレーター（50〜400Hz・暗い金属感）
+  // complex > 0: 高域モジュレーター（400〜2000Hz・明るい金属感）
+  const _isNeg = complexVal < 0;
+  const _freqMin = _isNeg ? 50  : 400;
+  const _freqMax = _isNeg ? 400 : 2000;
+  const _step    = _isNeg ? 2   : 8; // 探索ステップ（Hz）
+
+  // スコアリング: 差音・和音がコードトーンから5〜15セント外れているほど高スコア
+  const _centDiff = (f1, f2) => Math.abs(1200 * Math.log2(f1 / f2));
+
+  let bestHz = _freqMin, bestScore = -1;
+
+  for(let modHz = _freqMin; modHz <= _freqMax; modHz += _step){
+    let score = 0;
+    for(const carrHz of chordHzList){
+      const diffHz = Math.abs(carrHz - modHz);
+      const sumHz  = carrHz + modHz;
+
+      // 差音・和音それぞれのスコア
+      for(const targetHz of chordHzList){
+        // 差音とコードトーンの比較
+        const centsDiff = _centDiff(diffHz, targetHz);
+        // 5〜15セントのズレが最高スコア（ベル曲線）
+        if(centsDiff > 2 && centsDiff < 80){
+          const peak = Math.exp(-Math.pow((centsDiff - 10) / 12, 2));
+          score += peak;
+        }
+        // 和音とコードトーンの比較（差音より重みを下げる）
+        const centsSumDiff = _centDiff(sumHz % 1200, targetHz % 1200);
+        if(centsSumDiff > 2 && centsSumDiff < 80){
+          const peakSum = Math.exp(-Math.pow((centsSumDiff - 10) / 12, 2)) * 0.5;
+          score += peakSum;
+        }
+      }
+    }
+    if(score > bestScore){
+      bestScore = score;
+      bestHz = modHz;
+    }
+  }
+
+  _rmHotspotCache = { modHz: bestHz, score: bestScore, complex: complexVal };
+  _rmHotspotChord = _cacheKey;
+  return bestHz;
+}
+
 // ── PLUCK専用CHORDストローク発音 ──
 // _sceneVoicesに一切触れない・PLUCK専用ボイスプール
 // AudioContext時刻指定で発音（iOSスケジューリング対応）
@@ -12479,40 +12558,46 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
 
-  // ── Ring Modulation（complex連動・コードトーンに追従）──
-  // complex < 0: 7th連動（10半音上）/ complex > 0: 13th連動（21半音上）
-  // complex = 0: depth=0（ニュートラル・効果なし）
-  // depth = |complex| * 0.30（最大0.30・subtle）
-  let _rmOsc = null;
+  // ── Ring Modulation（complex連動・ホットスポット周波数）──
+  // complex = 0: 効果なし / < 0: 低域RM / > 0: 高域RM
+  // ホットスポット: コードトーンに対して5〜15セント外れた差音を生成
   const _complex = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
-  const _rmDepth = Math.abs(_complex) * 0.30;
-  if(_rmDepth > 0.01){
-    // モジュレーター周波数: complex<0→7th / complex>0→13th
-    const _rmIv = _complex < 0 ? 10 : 21; // 半音数
-    const _rmHz  = hz * Math.pow(2, _rmIv / 12);
+  const _rmDepth = Math.abs(_complex);
+  if(_rmDepth > 0.05){
+    // ホットスポット周波数を取得（Sグローバルからroot/typeを参照）
+    const _rmS = (typeof S !== 'undefined') ? S : null;
+    const _rmHz = _rmS
+      ? _findRMHotspot(_rmS.root, _rmS.type, _complex)
+      : hz * 1.5; // フォールバック
 
-    // リングモジュレーター: GainNodeのgainにmodOscを接続
-    const _rmGain = actx.createGain();
-    _rmGain.gain.value = 0; // DCオフセットなし（純粋なリングモジュレーション）
+    // 正しいリングモジュレーション実装:
+    // gain.value = 1.0（通過）にしてmodOscで±変調
+    // dry/wet mixで音量を保つ
+    const _rmWet  = actx.createGain();
+    const _rmDry  = actx.createGain();
+    const _rmOut  = actx.createGain();
+    const _rmMod  = actx.createGain(); // モジュレーターのgain（変調量）
 
-    _rmOsc = actx.createOscillator();
+    // depth: 0→dry100% / 1→wet100%
+    _rmDry.gain.value  = 1.0 - _rmDepth * 0.7;
+    _rmWet.gain.value  = _rmDepth * 0.7;
+    _rmMod.gain.value  = 1.0; // キャリアを通過させる
+
+    const _rmOsc = actx.createOscillator();
     _rmOsc.type = 'sine';
     _rmOsc.frequency.value = _rmHz;
 
-    // modOsc → _rmGain.gain（gainパラメーターへの接続でリングモジュレーション）
-    _rmOsc.connect(_rmGain.gain);
+    // modOsc → _rmMod.gain（gainパラメーターへの変調）
+    _rmOsc.connect(_rmMod.gain);
 
-    // depth: modOscがgainを±_rmDepth揺らす
-    const _rmDepthGain = actx.createGain();
-    _rmDepthGain.gain.value = _rmDepth;
-    _rmOsc.connect(_rmDepthGain);
-    _rmDepthGain.connect(_rmGain.gain);
-
-    // 信号パス: vca → _rmGain → panner
-    // 既存のvca→pannerを切断して_rmGainを挿入
+    // 信号パス:
+    // vca → _rmDry → _rmOut（dry）
+    // vca → _rmMod → _rmWet → _rmOut（wet・変調あり）
+    // _rmOut → panner
     vca.disconnect(panner);
-    vca.connect(_rmGain);
-    _rmGain.connect(panner);
+    vca.connect(_rmDry);   _rmDry.connect(_rmOut);
+    vca.connect(_rmMod);   _rmMod.connect(_rmWet); _rmWet.connect(_rmOut);
+    _rmOut.connect(panner);
 
     _rmOsc.start(t);
     _rmOsc.stop(t + _oscMaxLife);
