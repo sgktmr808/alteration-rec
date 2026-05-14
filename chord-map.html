@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514130351 -->
+<!-- build: 20260514131909 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -40,7 +40,7 @@
    height:100% → 100svh(safe)をフォールバック付きで指定
    dvh非対応ブラウザは100%にフォールバック */
 html{height:100%;height:100svh;overflow:hidden;}
-body{height:100%;height:100svh;overflow:hidden;}
+body{height:100%;height:100svh;overflow:hidden;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;}
 body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
 .hdr{flex-shrink:0;background:var(--surf);border-bottom:1px solid var(--bdr);
   padding:calc(var(--safe-t)+10px) 14px 10px;display:flex;align-items:center;gap:10px;}
@@ -114,7 +114,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   position:absolute;
   top:0;left:0;right:0;bottom:0;
 }
-#map-canvas{width:100%;height:100%;display:block;touch-action:none;}
+#map-canvas{width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
 #ctrl-screen{
   flex:0 0 50%;
   overflow-y:auto;
@@ -10761,7 +10761,8 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
   // ── Arp Ghost: 「光の尾」として粒を線に変える ──
   // 1oct上・暗いフィルター・遅延・長めのリリースで尾を引く
-  const ghostVol = sc.arpGhost || 0;
+  // D: complex連動ゴースト音量（_slArpGhostで上書き）
+  const ghostVol = _slArpGhost !== null ? _slArpGhost : (sc.arpGhost || 0);
   if(ghostVol > 0.02){
     // メイン音の発音から少し遅れて現れる（光の残像）
     const gDelay = 0.018 + Math.random() * 0.022;
@@ -12850,15 +12851,18 @@ function applySLToArp(){
     _slArpCutoff = null; _slArpRes = null; _slArpRestProb = null;
     _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
     _slArpOctRange = null; _slArpPattern = null;
-    _slArpEnvMod = null; _slArpSubGain = null;
+    _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
     return;
   }
 
-  // ── complex: 全Scene共通 — octaveRange + リズム密度 ──
-  _slArpOctRange = Math.max(1, Math.min(3,
-    (sc.arpOctRange || 1) + complex * 1.5
-  ));
-  _slRhythmDensity = 1.0 - complex * 0.4; // 0.6〜1.4倍のstep長さ
+  // ── complex: 全Scene共通 — ボイシング厚さ + ゴースト音量 ──
+  // A: complex↑でvoicingにテンション音を追加（buildSceneVoicingのcomplex引数で制御）
+  // arpOctRange・リズム密度は変更しない（BPM同期を崩さない）
+  _slArpOctRange = null; // arpOctRangeはScene固有値を使用（complexで変えない）
+  _slRhythmDensity = null; // リズム密度は変更しない
+  // D: complex↑でゴースト音量増加（グルーヴの粒立ち）
+  // complex=-1: ghost×0.3 / complex=0: ghost×1.0 / complex=+1: ghost×2.2
+  _slArpGhost = Math.max(0, (sc.arpGhost || 0) * (1.0 + complex * 1.2));
 
   // ── LOVEは専用実装に任せる ──
   if(sceneCurrentName === 'love'){
@@ -13038,6 +13042,7 @@ let _slArpGate     = null;
 let _slArpPattern  = null;
 let _slArpEnvMod   = null; // Scene固有: envMod上書き
 let _slArpSubGain  = null; // Scene固有: sub osc gainの上書き（pluck/warm連動）
+let _slArpGhost    = null; // 全Scene共通: complex連動ゴースト音量上書き
 
 // ── Pattern Grammar 切替（HOLD / STAB / BROKEN / PULSE / TRAIL / PLUCK ARP / FLOAT ARP / INNER LINE） ──
 
