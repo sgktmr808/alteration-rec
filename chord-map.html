@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260515080801 -->
+<!-- build: 20260515081317 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11938,15 +11938,15 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 // STRINGSの残留フェイジング層用。_phraseStateの代わりに外部stateを使う。
 function _phraseNextWithState(notes, baseSec, sc, densityMul, extState){
   if(!extState || !notes || notes.length === 0) return null;
-  // 一時的に_phraseStateを外部stateに差し替えて実行
-  const _saved = _phraseState;
-  // extStateを_phraseStateにコピー
-  Object.assign(_phraseState, extState);
+  // _phraseStateのディープコピーを保存（参照ではなく値をコピー）
+  const _savedJSON = JSON.stringify(_phraseState);
+  // extStateの内容を_phraseStateに適用
+  Object.assign(_phraseState, JSON.parse(JSON.stringify(extState)));
   const result = _phraseNext(notes, baseSec, sc, densityMul);
-  // 実行後の状態を外部stateに書き戻す
-  Object.assign(extState, _phraseState);
-  // _phraseStateを元に戻す
-  Object.assign(_phraseState, _saved);
+  // 実行後の_phraseStateをextStateに書き戻す（残留層の状態を更新）
+  Object.assign(extState, JSON.parse(JSON.stringify(_phraseState)));
+  // _phraseStateを元の状態に完全復元
+  Object.assign(_phraseState, JSON.parse(_savedJSON));
   return result;
 }
 
@@ -12124,11 +12124,9 @@ function updateArpChord(root, type){
     _stringsGhostState = JSON.parse(JSON.stringify(_phraseState));
     _stringsGhostFade  = 1.0; // フルボリュームから開始
     _stringsGhostStep  = 0;
-    // 残留層はメインARPから1〜3ステップ遅れて開始（Violin Phase的位相ズレ）
-    // 16分音符1〜3個分のズレが新しいパターンを生み出す
-    const _sixteenth = (60 / autoBpm) / 4;
-    const _phaseOffset = _sixteenth * (1 + Math.floor(Math.random() * 2)); // 1〜2ステップ
-    _stringsGhostNextBeat = arpNextBeat + _phaseOffset;
+    // 残留層はメインARPと同じグリッドから開始
+    // フェイジングはディレイと和声の違いから自然に生まれる
+    _stringsGhostNextBeat = arpNextBeat;
   }
 
   arpSeq=buildArpSeq(root, type);
