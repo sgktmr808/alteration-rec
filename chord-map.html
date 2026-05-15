@@ -11301,6 +11301,10 @@ const _phraseState = {
   stringsOffsetStep: 1,     // 1回あたりのオフセット増加量
   stringsShiftCount: 0,     // シフト実行回数（3の倍数でstep増加）
   stringsStepCount: 0,      // 8分音符ステップカウント（3拍=6ステップでシフト）
+  stringsBurstActive: false, // 群れの広がり中フラグ
+  stringsBurstCount: 0,      // 広がり持続カウント（8分音符単位）
+  stringsBurstDuration: 0,   // 今回の広がり持続長（moving連動）
+  stringsBurstInterval: 0,   // 次の広がりまでのカウント（初回はランダム設定）
   velvetRestRemain: 0,   // 未使用（互換性のため残す）
 
   // GLASS固有
@@ -11344,6 +11348,10 @@ function _resetPhraseState(){
   _phraseState.stringsOffsetStep = 1;
   _phraseState.stringsShiftCount = 0;
   _phraseState.stringsStepCount = 0;
+  _phraseState.stringsBurstActive   = false;
+  _phraseState.stringsBurstCount    = 0;
+  _phraseState.stringsBurstDuration = 0;
+  _phraseState.stringsBurstInterval = 0;
   // PLUCKの細胞はコードチェンジで再生成
   _phraseState.pluckCell = null;
   _phraseState.pluckCellPos = 0;
@@ -11885,7 +11893,8 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       //   同じモチーフが少しずつ位相がずれて聴こえてくる。
       //
       // 【SLスライダー】
-      //   moving↑: モチーフが長く（7音）/ moving↓: 短く（5音）
+      //   moving↑: モチーフが長く（7音）・バースト短くパッと戻る
+      //   moving↓: モチーフが短く（5音）・バーストがじわっと広がりじわっと戻る
       //   strange↑: オフセット増加が速い・跳躍確率増加
       //   strange↓: オフセット増加が遅い・近接音移動が増える
       //   warm↑: ベロシティの揺らぎ（人間的）
@@ -11975,10 +11984,95 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         if(ps.stringsShiftCount >= 9) ps.stringsShiftCount = 0;
       }
 
-      // ── 発音: オフセットを加えた位置から読む ──
-      const readPos = (ps.stringsMotifPos + ps.stringsPhaseOffset) % motifLen;
-      const midi = ps.stringsMotif[readPos];
-      ps.stringsMotifPos = (ps.stringsMotifPos + 1) % motifLen;
+      // ── バースト（群れの広がり）管理 ──
+      // moving↑: 短くパッと戻る / moving↓: じわっと広がりじわっと戻る
+      // 周期: 約32〜48拍（64〜96ステップ）に1回
+      if(ps.stringsBurstInterval <= 0){
+        // 初回または次のバースト待機カウントを設定
+        ps.stringsBurstInterval = 64 + Math.floor(Math.random() * 32); // 64〜96ステップ
+      }
+      ps.stringsBurstInterval--;
+
+      if(!ps.stringsBurstActive && ps.stringsBurstInterval <= 0){
+        // バースト開始
+        ps.stringsBurstActive = true;
+        ps.stringsBurstCount  = 0;
+        // moving↑: 2〜4拍（4〜8ステップ） / moving↓: 12〜16拍（24〜32ステップ）
+        ps.stringsBurstDuration = Math.round(
+          4 + (1.0 - (_movingVal + 1) / 2) * 28  // moving=-1→32 / moving=0→18 / moving=+1→4
+        );
+        ps.stringsBurstInterval = 64 + Math.floor(Math.random() * 32); // 次のバーストまで
+      }
+
+      // ── 発音: バースト中は音域全体から跳躍・通常時はオフセット読み ──
+      let midi;
+      let burstRatio = 0; // 0=通常 / 1=全開バースト
+
+      if(ps.stringsBurstActive){
+        ps.stringsBurstCount++;
+
+        // moving↑: 矩形（即ON/OFF） / moving↓: 台形（じわっとフェーズ）
+        const _movingNorm = (_movingVal + 1) / 2; // 0〜1
+        if(_movingNorm > 0.6){
+          // パッと全開・パッと終了
+          burstRatio = 1.0;
+        } else {
+          // じわっと: 台形エンベロープ（立ち上がり25% / 頂点50% / 立ち下がり25%）
+          const _phase = ps.stringsBurstCount / ps.stringsBurstDuration;
+          if(_phase < 0.25)      burstRatio = _phase / 0.25;
+          else if(_phase < 0.75) burstRatio = 1.0;
+          else                   burstRatio = (1.0 - _phase) / 0.25;
+          burstRatio = Math.max(0, Math.min(1, burstRatio));
+        }
+
+        if(burstRatio > 0.05){
+          // バースト音: arpSeqの最低音〜最高音の全レンジ + 1oct拡張
+          const _lo  = notes[0] - 12;                  // 1oct下まで拡張
+          const _hi  = notes[notes.length - 1] + 12;   // 1oct上まで拡張
+          // 可聴範囲クランプ（MIDI 24〜96: C1〜C7）
+          const _burstLo = Math.max(24, _lo);
+          const _burstHi = Math.min(96, _hi);
+
+          // burstRatio↑ほど遠い音へ跳躍しやすくなる
+          const _jumpBias = burstRatio * 0.8;
+          const prevMidi  = ps.lastMidi || notes[Math.floor(notes.length / 2)];
+          const _burstPool = notes.filter(n => n >= _burstLo && n <= _burstHi);
+          if(_burstPool.length > 0){
+            const weights = _burstPool.map(n => {
+              const dist = Math.abs(n - prevMidi) / 12; // オクターブ単位の距離
+              return (1 - _jumpBias) * (1 / (dist + 0.5)) + _jumpBias * dist;
+            });
+            const total = weights.reduce((a,b) => a+b, 0);
+            let rv = Math.random() * total;
+            midi = _burstPool[_burstPool.length - 1];
+            for(let j = 0; j < _burstPool.length; j++){
+              rv -= weights[j];
+              if(rv <= 0){ midi = _burstPool[j]; break; }
+            }
+          } else {
+            midi = notes[Math.floor(Math.random() * notes.length)];
+          }
+        } else {
+          // burstRatioが低い時は通常読み
+          const readPos0 = (ps.stringsMotifPos + ps.stringsPhaseOffset) % motifLen;
+          midi = ps.stringsMotif[readPos0];
+        }
+
+        // バースト終了判定
+        if(ps.stringsBurstCount >= ps.stringsBurstDuration){
+          ps.stringsBurstActive = false;
+          ps.stringsBurstCount  = 0;
+        }
+
+        // モチーフ位置は通常通り進める
+        ps.stringsMotifPos = (ps.stringsMotifPos + 1) % motifLen;
+
+      } else {
+        // 通常: オフセットを加えた位置から読む
+        const readPos = (ps.stringsMotifPos + ps.stringsPhaseOffset) % motifLen;
+        midi = ps.stringsMotif[readPos];
+        ps.stringsMotifPos = (ps.stringsMotifPos + 1) % motifLen;
+      }
 
       // モチーフ1周完了
       if(ps.stringsMotifPos === 0){
@@ -11988,14 +12082,14 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         if(ps.stringsRepeatCount >= regenEvery){
           ps.stringsMotif = null;
           ps.stringsRepeatCount = 0;
-          // オフセット系は引き継ぐ（位相の流れを維持）
         }
       }
 
-      // ── ベロシティ: 読み出し位置で弧を描く ──
-      const _arcPos = readPos / Math.max(1, motifLen - 1);
+      // ── ベロシティ: バースト中は少し強め ──
+      const _arcPos = (ps.stringsMotifPos % Math.max(1, motifLen)) / Math.max(1, motifLen - 1);
       const _arcVel = 0.72 + Math.sin(_arcPos * Math.PI) * 0.28;
-      const velMul  = Math.max(0.5, _arcVel + (Math.random() - 0.5) * _warmVal * 0.15);
+      const _burstVelBoost = burstRatio * 0.20; // バースト中は最大+0.20
+      const velMul  = Math.max(0.5, _arcVel + _burstVelBoost + (Math.random() - 0.5) * _warmVal * 0.15);
 
       // ── ステップ: 8分音符（0.5）・わずかなjitter ──
       const jitter = 1.0 + (Math.random() - 0.5) * 0.04;
@@ -12015,6 +12109,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 const _STRINGS_GHOST_KEYS = [
   'stringsMotif','stringsMotifPos','stringsRepeatCount',
   'stringsPhaseOffset','stringsOffsetStep','stringsShiftCount','stringsStepCount',
+  'stringsBurstActive','stringsBurstCount','stringsBurstDuration','stringsBurstInterval',
   'lastMidi','phrasePos','phraseCount',
 ];
 
