@@ -12026,14 +12026,41 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         }
 
         if(burstRatio > 0.05){
-          // バースト音: arpSeqの最低音〜最高音の全レンジ + 1oct拡張
-          const _lo  = notes[0] - 12;                  // 1oct下まで拡張
-          const _hi  = notes[notes.length - 1] + 12;   // 1oct上まで拡張
-          // 可聴範囲クランプ（MIDI 24〜96: C1〜C7）
-          const _burstLo = Math.max(24, _lo);
-          const _burstHi = Math.min(96, _hi);
+          // ── バースト音: 度数ターゲット方式（コードトーン・テンション範囲内）──
+          //
+          // バーストフェーズに応じて「狙う度数（semitone）」を変える
+          //   立ち上がり: 5〜7st（4度・5度・増4度）緊張が高まる
+          //   頂点:       9〜14st（短6度・短7度・長7度・短9度）最大の驚き
+          //   立ち下がり: 7〜10st（5度・短6度・短7度）解放に向かう
+          //
+          // moving↑: 頂点の度数が大きく（最大14st）/ moving↓: 全フェーズ広く（最大17st）
+          // 方向（上下）はジグザグ強制（前の動きと逆方向へ）
 
-          // バースト音: 重複除去済みの±1oct拡張プール
+          const _phase = ps.stringsBurstActive
+            ? ps.stringsBurstCount / Math.max(1, ps.stringsBurstDuration)
+            : 0.5;
+
+          // フェーズに応じた目標度数レンジ（min〜max semitone）
+          // moving↑: 頂点の上限を拡大 / moving↓: 全体を広く
+          const _movingNorm2 = (_movingVal + 1) / 2; // 0〜1
+          let _targetMin, _targetMax;
+          if(_phase < 0.25){
+            // 立ち上がり: 4度〜5度（緊張の始まり）
+            _targetMin = 5;
+            _targetMax = 7 + Math.round(_movingNorm2 * 2); // 7〜9
+          } else if(_phase < 0.75){
+            // 頂点: 短6度〜短9度（最大の驚き）
+            _targetMin = 8;
+            _targetMax = 11 + Math.round(_movingNorm2 * 6); // 11〜17
+          } else {
+            // 立ち下がり: 5度〜短7度（解放）
+            _targetMin = 6;
+            _targetMax = 10 + Math.round(_movingNorm2 * 3); // 10〜13
+          }
+
+          // ±1oct拡張したコードトーンプール（重複除去）
+          const _burstLo = Math.max(24, notes[0] - 12);
+          const _burstHi = Math.min(96, notes[notes.length - 1] + 12);
           const _burstSet = new Set();
           for(const n of notes){
             if(n - 12 >= _burstLo) _burstSet.add(n - 12);
@@ -12045,22 +12072,38 @@ function _phraseNext(notes, baseSec, sc, densityMul){
           if(_burstPool.length > 0){
             const prevMidi = ps.lastMidi || notes[Math.floor(notes.length / 2)];
 
-            // アクロバティック跳躍:
-            // burstRatio↑ほど「前の音から遠い音」を強く選ぶ（二乗で加速）
-            // さらに音域の端（最低・最高）への引力を加える
-            const _jumpBias = Math.pow(burstRatio, 0.7); // 0〜1（緩やかに加速）
-            const _edgePull = burstRatio * 0.5;           // 端への引力
-            const _poolLo   = _burstPool[0];
-            const _poolHi   = _burstPool[_burstPool.length - 1];
-            const _poolRange = Math.max(1, _poolHi - _poolLo);
+            // ジグザグ方向: 前の動きと逆方向を優先
+            // ps.stringsDir を流用（+1=上行 / -1=下行）
+            const _preferUp = (ps.stringsDir || 1) < 0; // 前が下行なら上行を好む
+            ps.stringsDir = _preferUp ? 1 : -1;         // 方向を反転して記録
 
+            // 各プール音へのスコアを計算
             const weights = _burstPool.map(n => {
-              const dist     = Math.abs(n - prevMidi) / 12;
-              const distW    = (1 - _jumpBias) * (1 / (dist + 0.3)) + _jumpBias * Math.pow(dist, 1.5);
-              // 音域の端（低・高）への引力（burstRatio↑で強く）
-              const edgeW    = _edgePull * (Math.abs(n - _poolLo) / _poolRange + Math.abs(n - _poolHi) / _poolRange);
-              return Math.max(0.01, distW + edgeW);
+              const interval = n - prevMidi; // 正=上行 / 負=下行
+              const absSt    = Math.abs(interval);
+
+              // 目標度数レンジへの近さ（範囲内なら高スコア）
+              let rangeScore;
+              if(absSt >= _targetMin && absSt <= _targetMax){
+                // 範囲内: 中央値に近いほど高スコア
+                const _center = (_targetMin + _targetMax) / 2;
+                rangeScore = 2.0 - Math.abs(absSt - _center) / (_targetMax - _targetMin + 1);
+              } else {
+                // 範囲外: 距離に応じてペナルティ
+                const _overMin = Math.max(0, _targetMin - absSt);
+                const _overMax = Math.max(0, absSt - _targetMax);
+                rangeScore = 0.3 / (1 + _overMin + _overMax);
+              }
+
+              // 方向スコア: 好ましい方向なら+0.5ボーナス
+              const dirScore = (_preferUp ? interval > 0 : interval < 0) ? 0.5 : 0.0;
+
+              // 同音は除外
+              if(absSt === 0) return 0.001;
+
+              return Math.max(0.01, rangeScore + dirScore);
             });
+
             const total = weights.reduce((a,b) => a+b, 0);
             let rv = Math.random() * total;
             midi = _burstPool[_burstPool.length - 1];
