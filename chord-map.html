@@ -10830,7 +10830,9 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     //   = modHz × depth × scaleFactor
     //   scaleFactor: 低域modHzは大きく・高域は小さく（知覚バランス）
     const _fmComplexArp = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
-    if(Math.abs(_fmComplexArp) > 0.02){
+    // PLUCKはcomplex↓時に専用FM変調（鉄球サウンド）を使用するため共通FM変調をスキップ
+    const _skipCommonFM = (sceneCurrentName === 'pluck' && _fmComplexArp < -0.02);
+    if(Math.abs(_fmComplexArp) > 0.02 && !_skipCommonFM){
       const _SA = (typeof S !== 'undefined') ? S : null;
       const _fmP = _SA
         ? _getRMParams(_SA.root, _SA.type, _fmComplexArp)
@@ -10892,27 +10894,28 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     }
 
     // ── PLUCK dark側FM変調（_slArpFMDepthPluck連動）──
-    // 非整数比モジュレーター2系統で金属・鉄球的共鳴を生成
-    //   系統1: hz×2.756（金属板共鳴の典型的な非整数比・輝き）
-    //   系統2: hz×0.367（低域の重み・鉄の質量感）
+    // complex↓（鉄球）: hz×2.756 / hz×0.367（重い金属共鳴）
+    // complex↑（スプリング）: hz×4.238 / hz×7.123（高次非整数比・バネ的）
     if(sceneCurrentName === 'pluck' && _slArpFMDepthPluck !== null && _slArpFMDepthPluck > 0.01){
-      const _plkFMIndex = hz * _slArpFMDepthPluck * 3.0; // depth×3.0（より強く）
+      const _complexNow = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
+      const _isSpring   = _complexNow > 0.02;
+      const _plkFMIndex = hz * _slArpFMDepthPluck * (_isSpring ? 2.0 : 3.0);
 
-      // 系統1: hz×2.756（非整数比・金属的輝き）
+      // 系統1
       const _plkFMOsc1  = actx.createOscillator();
       _plkFMOsc1.type   = 'sine';
-      _plkFMOsc1.frequency.value = hz * 2.756;
+      _plkFMOsc1.frequency.value = hz * (_isSpring ? 4.238 : 2.756);
       const _plkFMGain1 = actx.createGain();
       _plkFMGain1.gain.value = _plkFMIndex * 0.8;
       _plkFMOsc1.connect(_plkFMGain1);
       _plkFMGain1.connect(osc1.frequency);
 
-      // 系統2: hz×0.367（非整数比・鉄の質量感・低域うなり）
+      // 系統2
       const _plkFMOsc2  = actx.createOscillator();
       _plkFMOsc2.type   = 'sine';
-      _plkFMOsc2.frequency.value = hz * 0.367;
+      _plkFMOsc2.frequency.value = hz * (_isSpring ? 7.123 : 0.367);
       const _plkFMGain2 = actx.createGain();
-      _plkFMGain2.gain.value = _plkFMIndex * 0.6;
+      _plkFMGain2.gain.value = _plkFMIndex * (_isSpring ? 0.5 : 0.6);
       _plkFMOsc2.connect(_plkFMGain2);
       _plkFMGain2.connect(osc1.frequency);
 
@@ -13643,21 +13646,29 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
   _slOsc2Mix         = 0.55 + warm * 0.35;
   _slArpAttack       = null;
 
-  // ── complex（紫）: 鉄球衝突的サウンド ──
-  // complex↑: FM非整数比変調・PeriodicWaveモーフィング・decay延長・gate延長
-  // complex↓: 全パラメーターデフォルトに戻す
-  if(_complexVal > 0.02){
-    const _cRatio = _complexVal; // 0〜1
-    // FM変調: 非整数比2系統（発音側で_slArpFMDepthPluckを参照）
+  // ── complex（紫）: 金属的サウンド ──
+  // complex↓（左）: 鉄球衝突（FM非整数比・PeriodicWaveモーフィング・decay延長・gate延長）
+  // complex↑（右）: スプリング（高次非整数比・素早い減衰・短いgate）
+  if(_complexVal < -0.02){
+    // 鉄球サウンド
+    const _cRatio = -_complexVal; // 0〜1
     _slArpFMDepthPluck   = _cRatio * 1.20;
-    // PeriodicWaveモーフィング: sawtooth→square
     _slArpDarkRatioPluck = _cRatio;
-    // エンベロープ: res上昇・envMod低下（フィルター固定）・decay延長・gate延長
-    _slArpRes     = Math.min(9.0, _baseRes * (1.0 + _cRatio * 1.80)); // 3.2→9.0
-    _slArpEnvMod  = Math.max(0.02, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.98)); // 0.98→0.02
-    _slArpAttack  = 0.001 + _cRatio * 0.003;                         // 0.001→0.004
-    _slArpDecay   = 0.35 + _cRatio * 0.65;                           // 0.35→1.0s
-    _slArpGate    = Math.max(200, (sc.arpGate || 180) + _cRatio * 600); // 180→780ms
+    _slArpRes     = Math.min(9.0, _baseRes * (1.0 + _cRatio * 1.80));
+    _slArpEnvMod  = Math.max(0.02, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.98));
+    _slArpAttack  = 0.001 + _cRatio * 0.003;
+    _slArpDecay   = 0.35 + _cRatio * 0.65;
+    _slArpGate    = Math.max(200, (sc.arpGate || 180) + _cRatio * 600);
+  } else if(_complexVal > 0.02){
+    // スプリングサウンド
+    const _cRatio = _complexVal; // 0〜1
+    _slArpFMDepthPluck   = _cRatio * 0.80; // 高次FM（発音側で別比率を使う）
+    _slArpDarkRatioPluck = 0;              // PeriodicWaveモーフィングなし（sawtooth維持）
+    _slArpRes     = Math.min(5.5, _baseRes * (1.0 + _cRatio * 0.72));
+    _slArpEnvMod  = Math.max(0.05, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.95));
+    _slArpAttack  = 0.001; // 鋭いアタック維持
+    _slArpDecay   = Math.max(0.05, 0.35 - _cRatio * 0.30); // 0.35→0.05s（素早く減衰）
+    _slArpGate    = Math.max(40, (sc.arpGate || 180) - _cRatio * 120); // 180→60ms
   } else {
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
@@ -13669,7 +13680,7 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
   // warm↑: sub osc増加（低域の重さ）
   _slArpSubGain = 0.12 + warm * 0.28;
   // moving↑: gate短縮 / moving↓: gate延長（complex側でgateをセット済みの場合は上書きしない）
-  if(_complexVal <= 0.02){
+  if(Math.abs(_complexVal) <= 0.02){
     _slArpGate = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
   }
   // strange: フレーズ文法内で参照
