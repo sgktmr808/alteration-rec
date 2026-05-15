@@ -10167,6 +10167,7 @@ function applySpacePreset(name){
       _buildSpaceReverb(actx, preset);
       // ARP出力ノードをリセット（新しいリバーブバスに再接続させる）
       _resetArpOut();
+      _resetStringsColorDly();
     });
   }
 }
@@ -10892,25 +10893,23 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
     // Scene別: 音色的ディレイ（gate長めのScene）
     // VELVETは共有ディレイのみ使用（音色的ディレイを除外）
-    if(sceneCurrentName === 'strings' || sceneCurrentName === 'plain'){
-      // STRINGS: gate 440msに対して220msで音色的に溶け合う
+    if(sceneCurrentName === 'strings'){
+      // STRINGS: 共有colorDlyノードに接続（毎音生成しない）
+      const _sCDly = _getStringsColorDly(actx, rvbTarget);
+      arpEnvOut.connect(_sCDly);
+    } else if(sceneCurrentName === 'plain'){
       // PLAIN: gate 140ms + decay/releaseの余韻に対して160msで溶け合う
-      const _colorDlyTime = {
-        strings: 0.220,  // 220ms: gate440msの約半分
-        plain:   0.160,  // 160ms: gate140ms + 余韻に対して自然に溶ける
-      }[sceneCurrentName] || 0.200;
-
       const colorDly = actx.createDelay(1.0);
-      colorDly.delayTime.value = _colorDlyTime;
+      colorDly.delayTime.value = 0.160;
       const colorDlyFb = actx.createGain();
-      colorDlyFb.gain.value = 0.25 + _warmVal * 0.15; // warm連動: 0.25〜0.40
+      colorDlyFb.gain.value = 0.25 + _warmVal * 0.15;
       const colorDlyG = actx.createGain();
-      colorDlyG.gain.value = 0.40; // wet量: 音色の一部として溶け込む
+      colorDlyG.gain.value = 0.40;
       arpEnvOut.connect(colorDly);
       colorDly.connect(colorDlyFb);
       colorDlyFb.connect(colorDly);
       colorDly.connect(colorDlyG);
-      colorDlyG.connect(rvbTarget); // ディレイ → reverb（空間に溶ける）
+      colorDlyG.connect(rvbTarget);
     }
 
     // 全Scene共通: dry + reverb出力
@@ -12711,6 +12710,26 @@ function _getArpOut(actx){
 }
 function _resetArpOut(){ _arpOut = null; _arpOutCtx = null; }
 
+// ── STRINGS専用: colorDly共有ノード（毎音生成を避けてGC負荷を削減）──
+let _stringsColorDly    = null;
+let _stringsColorDlyCtx = null;
+function _getStringsColorDly(actx, rvbTarget){
+  if(_stringsColorDly && _stringsColorDlyCtx === actx) return _stringsColorDly;
+  const _warmVal = (typeof sv === 'function') ? (sv('warm') || 0) : 0;
+  const dly  = actx.createDelay(1.0);
+  dly.delayTime.value = 0.220;
+  const fb   = actx.createGain();
+  fb.gain.value = 0.25 + _warmVal * 0.15;
+  const wet  = actx.createGain();
+  wet.gain.value = 0.40;
+  dly.connect(fb); fb.connect(dly);
+  dly.connect(wet); wet.connect(rvbTarget);
+  _stringsColorDly    = dly; // 入力口としてdelayノードを返す
+  _stringsColorDlyCtx = actx;
+  return _stringsColorDly;
+}
+function _resetStringsColorDly(){ _stringsColorDly = null; _stringsColorDlyCtx = null; }
+
 // ── Scene別ボイシング取得 ──
 // slComplex(-1〜+1): 音数・音域の密度（全Scene共通）
 // slWarm(-1〜+1):    Scene固有の密集度・重心
@@ -13762,6 +13781,7 @@ function applyScene(name){
   }
   // ARP共有outをリセット（新Sceneのwet値を反映）
   _resetArpOut();
+  _resetStringsColorDly();
 
   // ── Scene切替後のボイス処理 ──
   // ボイスのリリースはplaySceneChordの_sceneTrailTimerに一元化
