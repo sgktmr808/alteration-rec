@@ -11987,21 +11987,29 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       // ── バースト（群れの広がり）管理 ──
       // moving↑: 短くパッと戻る / moving↓: じわっと広がりじわっと戻る
       // 周期: 約32〜48拍（64〜96ステップ）に1回
-      if(ps.stringsBurstInterval <= 0){
-        // 初回または次のバースト待機カウントを設定
-        ps.stringsBurstInterval = 64 + Math.floor(Math.random() * 32); // 64〜96ステップ
-      }
-      ps.stringsBurstInterval--;
-
-      if(!ps.stringsBurstActive && ps.stringsBurstInterval <= 0){
-        // バースト開始
-        ps.stringsBurstActive = true;
-        ps.stringsBurstCount  = 0;
-        // moving↑: 2〜4拍（4〜8ステップ） / moving↓: 12〜16拍（24〜32ステップ）
-        ps.stringsBurstDuration = Math.round(
-          4 + (1.0 - (_movingVal + 1) / 2) * 28  // moving=-1→32 / moving=0→18 / moving=+1→4
-        );
-        ps.stringsBurstInterval = 64 + Math.floor(Math.random() * 32); // 次のバーストまで
+      if(!ps.stringsBurstActive){
+        // 待機中: カウントダウン
+        if(ps.stringsBurstInterval <= 0){
+          // 初回セット
+          ps.stringsBurstInterval = 64 + Math.floor(Math.random() * 32);
+          console.log('[STRINGS BURST] interval init:', ps.stringsBurstInterval);
+        } else {
+          ps.stringsBurstInterval--;
+          if(ps.stringsBurstInterval <= 0){
+            // バースト開始
+            ps.stringsBurstActive   = true;
+            ps.stringsBurstCount    = 0;
+            ps.stringsBurstDuration = Math.round(
+              4 + (1.0 - (_movingVal + 1) / 2) * 28
+            );
+            console.log('[STRINGS BURST] START duration:', ps.stringsBurstDuration, 'moving:', _movingVal.toFixed(2));
+          }
+        }
+      } else {
+        // バースト中ログ（10ステップごと）
+        if(ps.stringsBurstCount % 10 === 1){
+          console.log('[STRINGS BURST] active count:', ps.stringsBurstCount, '/', ps.stringsBurstDuration, 'ratio:', burstRatio !== undefined ? burstRatio.toFixed(2) : '?');
+        }
       }
 
       // ── 発音: バースト中は音域全体から跳躍・通常時はオフセット読み ──
@@ -12122,8 +12130,10 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 
         // バースト終了判定
         if(ps.stringsBurstCount >= ps.stringsBurstDuration){
-          ps.stringsBurstActive = false;
-          ps.stringsBurstCount  = 0;
+          ps.stringsBurstActive   = false;
+          ps.stringsBurstCount    = 0;
+          // 次のバーストまでのインターバルをセット
+          ps.stringsBurstInterval = 64 + Math.floor(Math.random() * 32);
         }
 
         // モチーフ位置は通常通り進める
