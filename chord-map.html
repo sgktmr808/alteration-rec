@@ -13571,13 +13571,13 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
   const _baseRes    = sc.arpRes    || 3.2;
 
   if(bright < 0){
-    // ── Dark側: Jeff Mills / Prince Batman的・金属クリック ──
-    // cutoffはあまり下げない（倍音を残す）・resを自己発振域まで上げる
-    // FM変調で非整数倍音を加える（金属・ベル的質感）
+    // ── Dark側: Prince Batman / Jeff Mills的・金属クリック ──
+    // cutoffを高域に開く（高調波を残す）・resを自己発振域まで上げる
+    // envModを下げてフィルターをほぼ固定・FM変調で金属的倍音を加える
     const _darkRatio = -bright; // 0〜1
-    _slArpCutoff      = null; // cutoffは変化させない（倍音を残す）
+    _slArpCutoff      = Math.min(4000, _baseCutoff * (1.0 + _darkRatio * 5.0)); // 600→3600Hz（高域へ）
     _slArpRes         = Math.min(8.0, _baseRes * (1.0 + _darkRatio * 1.50));    // 3.2→8.0（自己発振域）
-    _slArpEnvMod      = Math.max(0.15, (sc.arpEnvMod || 0.98) * (1.0 - _darkRatio * 0.85)); // 0.98→0.15（フィルター開けたまま）
+    _slArpEnvMod      = Math.max(0.05, (sc.arpEnvMod || 0.98) * (1.0 - _darkRatio * 0.95)); // 0.98→0.05（フィルターほぼ固定）
     _slArpOsc2Type    = 'square';                                                // 矩形波で倍音を加える
     _slOsc2Mix        = 0.55 + _darkRatio * 0.30;                               // square比率増加（0.55→0.85）
     _slArpAttack      = Math.max(0.001, (sc.arpAttack || 0.002) - _darkRatio * 0.001);
