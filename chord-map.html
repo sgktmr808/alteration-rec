@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260515075954 -->
+<!-- build: 20260515080801 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11892,43 +11892,39 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         ps.velvetRepeatCount = 0;
       }
 
-      // ── 休符判定 ──
-      // restProbに加えてmoving↓で休符増
-      const _restProb = restProb + Math.max(0, -_movingVal) * 0.15;
-      if(_restProb > 0 && Math.random() < _restProb){
-        return { midi: null, stepRatio: (1.0 + Math.random() * 0.5) * densityMul };
-      }
-
-      // ── モチーフ発音 ──
+      // ── モチーフ発音（途切れず連続・Violin Phase的）──
       const mpos = ps.velvetMotifPos % ps.velvetMotif.length;
       const midi = ps.velvetMotif[mpos];
       ps.velvetMotifPos++;
 
-      // モチーフ完了 → 次モチーフ（同じか微変容）
+      // モチーフ完了 → 即次サイクル（休符なし・連続）
       if(ps.velvetMotifPos >= ps.velvetMotif.length){
         ps.velvetMotifPos = 0;
         ps.velvetRepeatCount++;
 
-        // 4〜8サイクルで微変容（1音だけ変える）
-        const mutateEvery = Math.max(4, Math.round(6 - _movingVal * 2));
+        // 8〜16サイクルで微変容（1音だけ変える）
+        // moving↑で変容頻度増
+        const mutateEvery = Math.max(6, Math.round(12 - _movingVal * 4));
         if(ps.velvetRepeatCount % mutateEvery === 0){
           const mutIdx = Math.floor(Math.random() * ps.velvetMotif.length);
           const sorted = [...notes].sort((a,b) => a-b);
           ps.velvetMotif[mutIdx] = sorted[Math.floor(Math.random() * sorted.length)];
         }
-        // 8〜16サイクルで完全再生成
+        // 24〜32サイクルで完全再生成（長い周期で変容）
         if(ps.velvetRepeatCount % (mutateEvery * 3) === 0){
-          ps.velvetMotif = null; // 次回再生成
+          ps.velvetMotif = null;
         }
       }
 
-      // ベロシティ: 弧の頂点（中間）で強く・端で弱く
+      // ベロシティ: フレーズ内の位置で弧を描く
+      // 頂点（中間）で強く・端で弱く → Violin Phaseのダイナミクス
       const _arcPos = mpos / Math.max(1, ps.velvetMotif.length - 1);
-      const _arcVel = 0.75 + Math.sin(_arcPos * Math.PI) * 0.30;
-      const velMul  = Math.max(0.5, _arcVel + (Math.random() - 0.5) * _warmVal * 0.15);
+      const _arcVel = 0.72 + Math.sin(_arcPos * Math.PI) * 0.28;
+      const velMul  = Math.max(0.5, _arcVel + (Math.random() - 0.5) * _warmVal * 0.12);
 
-      // ステップ: 均等な16分パルス（ライヒ的）
-      const stepRatio = 1.0 * densityMul;
+      // ステップ: 8分音符（0.5）で連続・わずかなjitter
+      const jitter = 1.0 + (Math.random() - 0.5) * 0.04;
+      const stepRatio = 0.5 * densityMul * jitter;
 
       if(midi !== null) ps.lastMidi = midi;
       return { midi, stepRatio, velMul };
@@ -12128,9 +12124,11 @@ function updateArpChord(root, type){
     _stringsGhostState = JSON.parse(JSON.stringify(_phraseState));
     _stringsGhostFade  = 1.0; // フルボリュームから開始
     _stringsGhostStep  = 0;
-    // 残留層はメインARPのarpNextBeatと完全に同じ位置から開始
-    // → グリッドが揃い気持ちいいタイミングになる
-    _stringsGhostNextBeat = arpNextBeat;
+    // 残留層はメインARPから1〜3ステップ遅れて開始（Violin Phase的位相ズレ）
+    // 16分音符1〜3個分のズレが新しいパターンを生み出す
+    const _sixteenth = (60 / autoBpm) / 4;
+    const _phaseOffset = _sixteenth * (1 + Math.floor(Math.random() * 2)); // 1〜2ステップ
+    _stringsGhostNextBeat = arpNextBeat + _phaseOffset;
   }
 
   arpSeq=buildArpSeq(root, type);
@@ -12417,16 +12415,14 @@ const SCENE_PRESETS = {
     vol:0.44, chorus:0.30, wet:0.52, strum:22,
     trailSec:2.5, width:0.85, feltAttack:0.0, ghost:0.0, filterDrift:0.28,
     voicingFlavor:'open',
-    // ARP: ライヒ的ミニマルパルス
-    // 短いモチーフが正確なグリッドで反復・コードチェンジで旧層が残留
-    // 長めgate（弦的余韻）・低velHumanize（機械的均等感）
-    arpOsc:'sawtooth', arpCutoff:1200, arpRes:0.40, arpEnvMod:0.22,
-    arpAttack:0.012, arpDecay:0.80, arpSustain:0.25,
-    arpGate:520, arpVol:0.20, arpWet:0.52, arpGhost:0.22,
+    // ARP: Violin Phase的ミニマリズム
+    // 同じ短いフレーズが途切れず連続・コードチェンジで位相ズレが生まれる
+    // 休符ほぼなし・8分音符で流れ続ける
+    arpOsc:'sawtooth', arpCutoff:1400, arpRes:0.35, arpEnvMod:0.20,
+    arpAttack:0.008, arpDecay:0.60, arpSustain:0.30,
+    arpGate:280, arpVol:0.18, arpWet:0.52, arpGhost:0.15,
     arpOctRange:2,
-    // リズム: 均等な16分パルス（ライヒ的）
-    // 密度は少なめ・休符で呼吸・フェイジングで揺らぎが生まれる
-    arpRhythm:[1.0, 1.0, 1.0, 1.0], arpRestProb:0.18,
+    arpRhythm:[0.5, 0.5, 0.5, 0.5], arpRestProb:0.02,
   },
 };
 
