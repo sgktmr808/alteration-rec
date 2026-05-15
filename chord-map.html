@@ -12889,12 +12889,12 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
   // 9度: 淡い色彩・浮遊感
   // rootMidiの1oct上に配置（ARPの音域と重ならない高域）
   if(sceneCurrentName === 'strings'){
-    const _5th  = rootMidi + 24 + 7;  // 2oct上の5度
-    const _9th  = rootMidi + 24 + 14; // 2oct上の9度
+    const _5th  = rootMidi + 12 + 7;  // 1oct上の5度
+    const _9th  = rootMidi + 12 + 14; // 1oct上の9度
     let strNotes = [_5th, _9th];
 
     // complex↑: 長7度を加える（緊張感・美しさ）
-    if(_slC > 0.4) strNotes.push(rootMidi + 24 + 11);
+    if(_slC > 0.4) strNotes.push(rootMidi + 12 + 11);
     // complex↓: 5度のみ（最小限の骨格）
     if(_slC < -0.4) strNotes = [_5th];
 
