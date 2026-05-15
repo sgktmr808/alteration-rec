@@ -11269,9 +11269,13 @@ const _phraseState = {
   velvetInRepeat: false, // テクノ反復中フラグ
   velvetRepeatCount: 0,  // 反復カウント
   // STRINGS専用
-  stringsMotif: null,    // STRINGSモチーフ音配列
-  stringsMotifPos: 0,    // STRINGSモチーフ内位置
-  stringsRepeatCount: 0, // STRINGSサイクル完了数
+  stringsMotif: null,       // STRINGSモチーフ音配列
+  stringsMotifPos: 0,       // STRINGSモチーフ内位置
+  stringsRepeatCount: 0,    // STRINGSサイクル完了数
+  stringsPhaseOffset: 0,    // 位相オフセット（累積）
+  stringsOffsetStep: 1,     // 1回あたりのオフセット増加量
+  stringsShiftCount: 0,     // シフト実行回数（3の倍数でstep増加）
+  stringsStepCount: 0,      // 8分音符ステップカウント（3拍=6ステップでシフト）
   velvetRestRemain: 0,   // 未使用（互換性のため残す）
 
   // GLASS固有
@@ -11311,6 +11315,10 @@ function _resetPhraseState(){
   _phraseState.stringsMotif = null;
   _phraseState.stringsMotifPos = 0;
   _phraseState.stringsRepeatCount = 0;
+  _phraseState.stringsPhaseOffset = 0;
+  _phraseState.stringsOffsetStep = 1;
+  _phraseState.stringsShiftCount = 0;
+  _phraseState.stringsStepCount = 0;
   // PLUCKの細胞はコードチェンジで再生成
   _phraseState.pluckCell = null;
   _phraseState.pluckCellPos = 0;
@@ -11841,88 +11849,128 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     }
 
     // ────────────────────────────────────────────
-    // STRINGS: 大きな呼吸・2拍単位・方向性のある動き
+    // STRINGS: 距離感ベースモチーフ + 位相オフセット方式
     // ────────────────────────────────────────────
     case 'strings': {
       // ────────────────────────────────────────────
-      // STRINGS: ライヒ×ガムラン的フェイジング設計
-      //
       // 【設計思想】
-      //   均等な16分パルスの中に短いモチーフを配置。
-      //   コードチェンジで旧モチーフが残留・新旧が重なりフェイジングが生まれる。
-      //   モチーフは4〜6音・上行→頂点→下降の弧を描く。
-      //   ライヒ的均等感 + ガムラン的インターロッキング。
+      //   前の音からの距離感で次の音を選ぶ（小移動70% / 跳躍20% / 同音10%）。
+      //   3拍（8分音符×6）ごとにモチーフの読み出し位置をずらす（位相オフセット）。
+      //   3の倍数回シフトするたびにオフセット増加量を+1する。
+      //   同じモチーフが少しずつ位相がずれて聴こえてくる。
       //
       // 【SLスライダー】
-      //   moving↑: パルスが密に・モチーフが短く
-      //   moving↓: 休符が増える・より疎に
-      //   strange↑: モチーフに非コードトーンが混入
+      //   moving↑: モチーフが長く（7音）/ moving↓: 短く（5音）
+      //   strange↑: オフセット増加が速い・跳躍確率増加
+      //   strange↓: オフセット増加が遅い・近接音移動が増える
       //   warm↑: ベロシティの揺らぎ（人間的）
+      //   tense↑: restProb減少・gate延長（推進力）
       // ────────────────────────────────────────────
 
       const _strangeVal = sv ? sv('strange') : 0;
       const _movingVal  = sv ? sv('moving')  : 0;
       const _warmVal    = sv ? sv('warm')    : 0;
 
+      const sorted = [...notes].sort((a,b) => a-b);
+
       // ── モチーフ初期化 ──
-      // 4〜6音の弧型モチーフ（上行→頂点→下降）
       if(ps.stringsMotif === null){
-        const sorted = [...notes].sort((a,b) => a-b);
-        const _lo  = sorted.slice(0, Math.ceil(sorted.length/3));
-        const _mid = sorted.slice(Math.ceil(sorted.length/3), Math.ceil(sorted.length*2/3));
-        const _hi  = sorted.slice(Math.ceil(sorted.length*2/3));
+        const _motifLen = 5 + Math.round(_movingVal * 2); // 5〜7音
 
-        const _pickFrom = (pool) => {
-          if(!pool || pool.length === 0) return sorted[0];
-          return pool[Math.floor(Math.random() * pool.length)];
-        };
+        // 跳躍確率: strange↑で増加 / strange↓で減少
+        const _leapProb   = 0.20 + _strangeVal * 0.20; // 0〜0.40
+        const _repeatProb = 0.10;
 
-        const _motifLen = 4 + Math.round(_movingVal * 1.0);
         const motif = [];
+        let prev = sorted[Math.floor(sorted.length / 2)]; // 中央音から開始
+
         for(let i = 0; i < _motifLen; i++){
-          const phase = i / (_motifLen - 1);
-          const zone = phase < 0.5
-            ? (phase < 0.25 ? _lo : _mid)
-            : (phase < 0.75 ? _hi : _mid);
-          let m = _pickFrom(zone);
-          if(_strangeVal > 0.4 && Math.random() < _strangeVal * 0.3){
-            m += (Math.random() < 0.5 ? 1 : -1);
+          const r = Math.random();
+          let chosen;
+
+          if(r < _repeatProb){
+            // 同音反復
+            chosen = prev;
+          } else if(r < _repeatProb + _leapProb){
+            // 跳躍: 5半音以上離れた音から選ぶ
+            const farNotes = sorted.filter(n => Math.abs(n - prev) >= 5 && n !== prev);
+            if(farNotes.length > 0){
+              chosen = farNotes[Math.floor(Math.random() * farNotes.length)];
+            } else {
+              chosen = sorted[Math.floor(Math.random() * sorted.length)];
+            }
+          } else {
+            // 小移動: 4半音以内の近傍音（距離に応じた重み付き）
+            const weights = sorted.map(n => {
+              const dist = Math.abs(n - prev);
+              if(dist === 0) return 0.1;
+              if(dist > 4) return 0;
+              return 1 / (dist + 0.5);
+            });
+            const total = weights.reduce((a,b) => a+b, 0);
+            if(total === 0){
+              chosen = sorted[Math.floor(Math.random() * sorted.length)];
+            } else {
+              let rv = Math.random() * total;
+              chosen = sorted[sorted.length - 1];
+              for(let j = 0; j < sorted.length; j++){
+                rv -= weights[j];
+                if(rv <= 0){ chosen = sorted[j]; break; }
+              }
+            }
           }
-          motif.push(m);
+          motif.push(chosen);
+          prev = chosen;
         }
-        ps.stringsMotif = motif;
-        ps.stringsMotifPos = 0;
+
+        ps.stringsMotif       = motif;
+        ps.stringsMotifPos    = 0;
         ps.stringsRepeatCount = 0;
+        // オフセット系はコードチェンジでリセットしない（位相の流れを維持）
       }
 
-      // ── モチーフ発音（途切れず連続・Violin Phase的）──
-      const motifLen = ps.stringsMotif.length; // nullリセット前に保存
-      const mpos = ps.stringsMotifPos % motifLen;
-      const midi = ps.stringsMotif[mpos];
-      ps.stringsMotifPos++;
+      const motifLen = ps.stringsMotif.length;
 
-      // モチーフ完了 → 即次サイクル（休符なし・連続）
-      if(ps.stringsMotifPos >= motifLen){
-        ps.stringsMotifPos = 0;
+      // ── 3拍ごとに位相オフセットをずらす ──
+      // strange↑: シフト間隔を短く（速くずれる） / strange↓: 長く（ゆっくり）
+      const _shiftInterval = Math.max(2, Math.round(6 - _strangeVal * 3)); // 3〜9ステップ
+      ps.stringsStepCount++;
+      if(ps.stringsStepCount >= _shiftInterval){
+        ps.stringsStepCount = 0;
+        ps.stringsShiftCount++;
+        ps.stringsPhaseOffset += ps.stringsOffsetStep;
+        // 3の倍数回シフトでオフセット増加量を+1（上限はモチーフ長の半分）
+        if(ps.stringsShiftCount % 3 === 0){
+          ps.stringsOffsetStep = Math.min(
+            Math.floor(motifLen / 2),
+            ps.stringsOffsetStep + 1
+          );
+        }
+      }
+
+      // ── 発音: オフセットを加えた位置から読む ──
+      const readPos = (ps.stringsMotifPos + ps.stringsPhaseOffset) % motifLen;
+      const midi = ps.stringsMotif[readPos];
+      ps.stringsMotifPos = (ps.stringsMotifPos + 1) % motifLen;
+
+      // モチーフ1周完了
+      if(ps.stringsMotifPos === 0){
         ps.stringsRepeatCount++;
-
-        const mutateEvery = Math.max(6, Math.round(12 - _movingVal * 4));
-        if(ps.stringsRepeatCount % mutateEvery === 0){
-          const mutIdx = Math.floor(Math.random() * motifLen);
-          const sorted = [...notes].sort((a,b) => a-b);
-          ps.stringsMotif[mutIdx] = sorted[Math.floor(Math.random() * sorted.length)];
-        }
-        if(ps.stringsRepeatCount % (mutateEvery * 3) === 0){
-          ps.stringsMotif = null; // 次回呼び出しで再生成
+        // 8〜16周で完全再生成
+        const regenEvery = Math.max(8, Math.round(16 - _movingVal * 4));
+        if(ps.stringsRepeatCount >= regenEvery){
+          ps.stringsMotif = null;
+          ps.stringsRepeatCount = 0;
+          // オフセット系は引き継ぐ（位相の流れを維持）
         }
       }
 
-      // ベロシティ: フレーズ内の位置で弧を描く
-      const _arcPos = mpos / Math.max(1, motifLen - 1);
+      // ── ベロシティ: 読み出し位置で弧を描く ──
+      const _arcPos = readPos / Math.max(1, motifLen - 1);
       const _arcVel = 0.72 + Math.sin(_arcPos * Math.PI) * 0.28;
-      const velMul  = Math.max(0.5, _arcVel + (Math.random() - 0.5) * _warmVal * 0.12);
+      const velMul  = Math.max(0.5, _arcVel + (Math.random() - 0.5) * _warmVal * 0.15);
 
-      // ステップ: 8分音符（0.5）で連続・わずかなjitter
+      // ── ステップ: 8分音符（0.5）・わずかなjitter ──
       const jitter = 1.0 + (Math.random() - 0.5) * 0.04;
       const stepRatio = 0.5 * densityMul * jitter;
 
@@ -11939,6 +11987,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 // _phraseNextWithStateで使うキー（STRINGSのフレーズ文法で使う状態のみ）
 const _STRINGS_GHOST_KEYS = [
   'stringsMotif','stringsMotifPos','stringsRepeatCount',
+  'stringsPhaseOffset','stringsOffsetStep','stringsShiftCount','stringsStepCount',
   'lastMidi','phrasePos','phraseCount',
 ];
 
@@ -13303,12 +13352,9 @@ function _applySL_strings(sc, bright, tense, warm, moving, strange){
   _slOsc2Mix = 0.55 + warm * 0.35; // 0.20〜0.90
   _slArpSubGain = null;
   _slArpGate = Math.max(100, (sc.arpGate || 440) * (1.0 + warm * 0.3) * (1.0 - moving * 0.45));
-  // strange: アンセム的飛躍（Familiar=thumbup安定 / Strange=up2高音域へ）
-  if(strange > 0.6)       _slArpPattern = 'up2';
-  else if(strange > 0.25) _slArpPattern = 'updown';
-  else if(strange < -0.6) _slArpPattern = 'thumbup';
-  else if(strange < -0.25)_slArpPattern = 'down';
-  else                    _slArpPattern = null;
+  // strange: オフセット速度・跳躍確率はフレーズ文法内で直接sv('strange')を参照するため
+  // arpPatternの切替は行わない（フレーズ文法中は無効なため）
+  _slArpPattern = null;
 }
 
 // ── デフォルト（フォールバック）──
