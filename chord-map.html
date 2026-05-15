@@ -11992,7 +11992,6 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         if(ps.stringsBurstInterval <= 0){
           // 初回セット
           ps.stringsBurstInterval = 64 + Math.floor(Math.random() * 32);
-          console.log('[STRINGS BURST] interval init:', ps.stringsBurstInterval);
         } else {
           ps.stringsBurstInterval--;
           if(ps.stringsBurstInterval <= 0){
@@ -12002,13 +12001,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
             ps.stringsBurstDuration = Math.round(
               4 + (1.0 - (_movingVal + 1) / 2) * 28
             );
-            console.log('[STRINGS BURST] START duration:', ps.stringsBurstDuration, 'moving:', _movingVal.toFixed(2));
           }
-        }
-      } else {
-        // バースト中ログ（10ステップごと）
-        if(ps.stringsBurstCount % 10 === 1){
-          console.log('[STRINGS BURST] active count:', ps.stringsBurstCount, '/', ps.stringsBurstDuration, 'ratio:', burstRatio !== undefined ? burstRatio.toFixed(2) : '?');
         }
       }
 
