@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260515075348 -->
+<!-- build: 20260515075954 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -12128,13 +12128,9 @@ function updateArpChord(root, type){
     _stringsGhostState = JSON.parse(JSON.stringify(_phraseState));
     _stringsGhostFade  = 1.0; // フルボリュームから開始
     _stringsGhostStep  = 0;
-    const actx = safeGetCtx();
-    if(actx && _masterClockOrigin !== null){
-      const _sixteenth = (60 / autoBpm) / 4;
-      const _elapsed   = actx.currentTime - _masterClockOrigin;
-      const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-      _stringsGhostNextBeat = _masterClockOrigin + _gridPos;
-    }
+    // 残留層はメインARPのarpNextBeatと完全に同じ位置から開始
+    // → グリッドが揃い気持ちいいタイミングになる
+    _stringsGhostNextBeat = arpNextBeat;
   }
 
   arpSeq=buildArpSeq(root, type);
