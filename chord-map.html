@@ -12033,14 +12033,33 @@ function _phraseNext(notes, baseSec, sc, densityMul){
           const _burstLo = Math.max(24, _lo);
           const _burstHi = Math.min(96, _hi);
 
-          // burstRatio↑ほど遠い音へ跳躍しやすくなる
-          const _jumpBias = burstRatio * 0.8;
-          const prevMidi  = ps.lastMidi || notes[Math.floor(notes.length / 2)];
-          const _burstPool = notes.filter(n => n >= _burstLo && n <= _burstHi);
+          // バースト音: 重複除去済みの±1oct拡張プール
+          const _burstSet = new Set();
+          for(const n of notes){
+            if(n - 12 >= _burstLo) _burstSet.add(n - 12);
+            if(n >= _burstLo && n <= _burstHi) _burstSet.add(n);
+            if(n + 12 <= _burstHi) _burstSet.add(n + 12);
+          }
+          const _burstPool = [..._burstSet].sort((a,b) => a - b);
+
           if(_burstPool.length > 0){
+            const prevMidi = ps.lastMidi || notes[Math.floor(notes.length / 2)];
+
+            // アクロバティック跳躍:
+            // burstRatio↑ほど「前の音から遠い音」を強く選ぶ（二乗で加速）
+            // さらに音域の端（最低・最高）への引力を加える
+            const _jumpBias = Math.pow(burstRatio, 0.7); // 0〜1（緩やかに加速）
+            const _edgePull = burstRatio * 0.5;           // 端への引力
+            const _poolLo   = _burstPool[0];
+            const _poolHi   = _burstPool[_burstPool.length - 1];
+            const _poolRange = Math.max(1, _poolHi - _poolLo);
+
             const weights = _burstPool.map(n => {
-              const dist = Math.abs(n - prevMidi) / 12; // オクターブ単位の距離
-              return (1 - _jumpBias) * (1 / (dist + 0.5)) + _jumpBias * dist;
+              const dist     = Math.abs(n - prevMidi) / 12;
+              const distW    = (1 - _jumpBias) * (1 / (dist + 0.3)) + _jumpBias * Math.pow(dist, 1.5);
+              // 音域の端（低・高）への引力（burstRatio↑で強く）
+              const edgeW    = _edgePull * (Math.abs(n - _poolLo) / _poolRange + Math.abs(n - _poolHi) / _poolRange);
+              return Math.max(0.01, distW + edgeW);
             });
             const total = weights.reduce((a,b) => a+b, 0);
             let rv = Math.random() * total;
