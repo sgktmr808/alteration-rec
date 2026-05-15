@@ -10582,7 +10582,7 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   const _velHumanizeRange = _quietArpScenes.has(sceneCurrentName) ? 0.32 : 0.14;
   const _velHumanize = 0.86 + Math.random() * _velHumanizeRange;
   const vol    = (sc.arpVol    || 0.26) * _velHumanize * velMul;
-  const atk    = sc.arpAttack || 0.006;
+  const atk    = _slArpAttack !== null ? _slArpAttack : (sc.arpAttack || 0.006);
   const decay  = sc.arpDecay  || 0.22;
   const envMod = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.5);
   const oscType = sc.arpOsc   || 'sawtooth';
@@ -10644,7 +10644,7 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   if(sceneCurrentName === 'love'){
     osc2.setPeriodicWave(_getLoveWave(actx));
   } else {
-    osc2.type = sc.arpOsc2 || oscType;
+    osc2.type = _slArpOsc2Type !== null ? _slArpOsc2Type : (sc.arpOsc2 || oscType);
   }
   osc2.frequency.value = hz * Math.pow(2, 6 / 1200);
 
@@ -10863,6 +10863,31 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
       _fmOsc.start(startTime);
       _fmOsc.stop(startTime + gateSec + 0.3);
+    }
+
+    // ── STRINGS bright側FM変調（_slArpFMDepth連動）──
+    if(sceneCurrentName === 'strings' && _slArpFMDepth !== null && _slArpFMDepth > 0.01){
+      // モジュレーター: rootHz × 0.5（1oct下）でエッジのある金属感
+      const _strFMHz    = hz * 0.5;
+      const _strFMIndex = hz * _slArpFMDepth * 1.2; // 変調インデックス（Hz単位）
+
+      const _strFMOsc  = actx.createOscillator();
+      _strFMOsc.type   = 'sawtooth'; // sawtoothで複雑な倍音列を生成
+      _strFMOsc.frequency.value = _strFMHz;
+
+      const _strFMGain = actx.createGain();
+      _strFMGain.gain.value = _strFMIndex;
+      _strFMOsc.connect(_strFMGain);
+      _strFMGain.connect(osc1.frequency);
+
+      // osc2にも少し浅くかける
+      const _strFMGain2 = actx.createGain();
+      _strFMGain2.gain.value = _strFMIndex * 0.5;
+      _strFMOsc.connect(_strFMGain2);
+      _strFMGain2.connect(osc2.frequency);
+
+      _strFMOsc.start(startTime);
+      _strFMOsc.stop(startTime + gateSec + 0.3);
     }
 
     // Scene別: 音色的ディレイ（gate長めのScene）
@@ -13193,6 +13218,7 @@ function applySLToArp(){
     _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
     _slArpOctRange = null; _slArpPattern = null;
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
+    _slArpAttack = null; _slArpOsc2Type = null; _slArpFMDepth = null;
     return;
   }
 
@@ -13354,6 +13380,30 @@ function _applySL_strings(sc, bright, tense, warm, moving, strange){
   _slOsc2Mix = 0.55 + warm * 0.35; // 0.20〜0.90
   _slArpSubGain = null;
   _slArpGate = Math.max(100, (sc.arpGate || 440) * (1.0 + warm * 0.3) * (1.0 - moving * 0.45));
+
+  // ── bright: 暗側=A方式（波形ブレンド+attack遅め）/ 明側=B方式（FM変調+attack速め）──
+  if(bright < 0){
+    // Dark方向: osc2をtriangle成分にブレンド（dark↓ほどtriangle比率増加）
+    // attackを遅めに（弓がゆっくり乗る感覚）
+    const _darkRatio = -bright; // 0〜1
+    _slArpOsc2Type = 'triangle';           // osc2をtriangleに
+    _slOsc2Mix     = Math.min(0.90, 0.55 + _darkRatio * 0.35 + warm * 0.20); // triangle比率を上げる
+    _slArpAttack   = (sc.arpAttack || 0.008) + _darkRatio * 0.052; // 0.008〜0.060秒
+    _slArpFMDepth  = null; // FM変調なし
+  } else if(bright > 0){
+    // Bright方向: FM変調でエッジ・倍音を複雑に
+    // attackを速めに（鋭い立ち上がり）
+    const _brightRatio = bright; // 0〜1
+    _slArpOsc2Type = null;  // sawtooth維持
+    _slArpAttack   = Math.max(0.002, (sc.arpAttack || 0.008) - _brightRatio * 0.006); // 0.008〜0.002秒
+    _slArpFMDepth  = _brightRatio * 0.55; // FM変調深さ（0〜0.55）
+  } else {
+    // center: デフォルト
+    _slArpOsc2Type = null;
+    _slArpAttack   = null;
+    _slArpFMDepth  = null;
+  }
+
   // strange: オフセット速度・跳躍確率はフレーズ文法内で直接sv('strange')を参照するため
   // arpPatternの切替は行わない（フレーズ文法中は無効なため）
   _slArpPattern = null;
@@ -13381,6 +13431,9 @@ let _slArpPattern  = null;
 let _slArpEnvMod   = null; // Scene固有: envMod上書き
 let _slArpSubGain  = null; // Scene固有: sub osc gainの上書き（pluck/warm連動）
 let _slArpGhost    = null; // 全Scene共通: complex連動ゴースト音量上書き
+let _slArpAttack   = null; // Scene固有: attack上書き（STRINGS bright連動）
+let _slArpOsc2Type = null; // Scene固有: osc2波形上書き（STRINGS dark側 triangle blend）
+let _slArpFMDepth  = null; // Scene固有: FM変調深さ（STRINGS bright側）
 
 // ── Pattern Grammar 切替（HOLD / STAB / BROKEN / PULSE / TRAIL / PLUCK ARP / FLOAT ARP / INNER LINE） ──
 
