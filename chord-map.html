@@ -11938,7 +11938,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       if(ps.stringsStepCount >= _shiftInterval){
         ps.stringsStepCount = 0;
         ps.stringsShiftCount++;
-        ps.stringsPhaseOffset += ps.stringsOffsetStep;
+        ps.stringsPhaseOffset = (ps.stringsPhaseOffset + ps.stringsOffsetStep) % motifLen;
         // 3の倍数回シフトでオフセット増加量を+1（上限はモチーフ長の半分）
         if(ps.stringsShiftCount % 3 === 0){
           ps.stringsOffsetStep = Math.min(
@@ -11946,6 +11946,8 @@ function _phraseNext(notes, baseSec, sc, densityMul){
             ps.stringsOffsetStep + 1
           );
         }
+        // stringsShiftCountは9の倍数で折り返す（3の倍数判定を保ちつつ累積防止）
+        if(ps.stringsShiftCount >= 9) ps.stringsShiftCount = 0;
       }
 
       // ── 発音: オフセットを加えた位置から読む ──
