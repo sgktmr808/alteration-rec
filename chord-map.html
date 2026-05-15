@@ -10584,7 +10584,7 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   const _velHumanize = 0.86 + Math.random() * _velHumanizeRange;
   const vol    = (sc.arpVol    || 0.26) * _velHumanize * velMul;
   const atk    = _slArpAttack !== null ? _slArpAttack : (sc.arpAttack || 0.006);
-  const decay  = sc.arpDecay  || 0.22;
+  const decay  = _slArpDecay  !== null ? _slArpDecay  : (sc.arpDecay  || 0.22);
   const envMod = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.5);
   const oscType = sc.arpOsc   || 'sawtooth';
   // SLスライダー反映（nullなら各Sceneのデフォルト値を使用）
@@ -13494,7 +13494,7 @@ function applySLToArp(){
     _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
     _slArpOctRange = null; _slArpPattern = null;
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
-    _slArpAttack = null; _slArpOsc2Type = null; _slArpFMDepth = null;
+    _slArpAttack = null; _slArpDecay = null; _slArpOsc2Type = null; _slArpFMDepth = null;
     _slArpFMDepthPluck = null; _slArpDarkRatioPluck = 0;
     return;
   }
@@ -13638,7 +13638,8 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
     _slArpOsc2Type    = 'square';
     _slOsc2Mix        = 0.55 + _darkRatio * 0.30;
     _slArpAttack      = 0.001 + _darkRatio * 0.003; // 0.001→0.004（質量感）
-    _slArpGate        = Math.max(40, (sc.arpGate || 180) * (1.0 - _darkRatio * 0.55)); // 180→80ms（衝突の鋭さ）
+    _slArpDecay       = 0.35 + _darkRatio * 0.65;   // 0.35→1.0s（余韻・鉄球の共鳴）
+    _slArpGate        = Math.max(200, (sc.arpGate || 180) + _darkRatio * 600); // 180→780ms（減衰を自然に切らせる）
     _slArpFMDepthPluck   = _darkRatio * 1.20; // FM変調深さ（0→1.20・2倍に増加）
     _slArpDarkRatioPluck = _darkRatio;        // PeriodicWaveモーフィング用
   } else {
@@ -13649,6 +13650,7 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
     _slArpOsc2Type       = null;
     _slOsc2Mix           = 0.55 + warm * 0.35;
     _slArpAttack         = null;
+    _slArpDecay          = null;
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
   }
@@ -13733,6 +13735,7 @@ let _slArpEnvMod   = null; // Scene固有: envMod上書き
 let _slArpSubGain  = null; // Scene固有: sub osc gainの上書き（pluck/warm連動）
 let _slArpGhost    = null; // 全Scene共通: complex連動ゴースト音量上書き
 let _slArpAttack   = null; // Scene固有: attack上書き（STRINGS bright連動）
+let _slArpDecay    = null; // Scene固有: decay上書き（PLUCK dark連動）
 let _slArpOsc2Type = null; // Scene固有: osc2波形上書き（STRINGS dark側 triangle blend）
 let _slArpFMDepth  = null; // Scene固有: FM変調深さ（STRINGS bright側）
 let _slArpFMDepthPluck = null; // PLUCK専用: FM変調深さ（dark側・金属感）
