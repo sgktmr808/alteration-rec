@@ -13547,24 +13547,37 @@ function _applySL_glass(sc, bright, tense, warm, moving, strange){
 // moving: gate短縮（パーカッシブ）
 // strange: Euclidean変形パターン
 function _applySL_pluck(sc, bright, tense, warm, moving, strange){
-  // bright↑: cutoff上昇（明るく）+ res同時上昇（ACID的ピーキーなうねり）
-  // bright↓: cutoff低下（暗く・金属的）
   const _baseCutoff = sc.arpCutoff || 600;
   const _baseRes    = sc.arpRes    || 3.2;
-  _slArpCutoff = Math.max(150, _baseCutoff * (1.0 + bright * 1.2));
-  // bright↑でresを大きく上昇（ACID的ピーキーなうねり強化）
-  _slArpRes    = Math.max(0.8, _baseRes * (1.0 + bright * 1.2 + tense * 0.5));
+
+  if(bright < 0){
+    // ── Dark側: Jeff Mills / Prince Batman的・金属クリック ──
+    // cutoff低下・res自己発振寸前・envMod強化・square波ブレンド
+    const _darkRatio = -bright; // 0〜1
+    _slArpCutoff  = Math.max(120, _baseCutoff * (1.0 - _darkRatio * 0.80)); // 600→120Hz
+    _slArpRes     = Math.min(7.5, _baseRes * (1.0 + _darkRatio * 1.15));    // 3.2→6.5
+    _slArpEnvMod  = Math.min(2.0, (sc.arpEnvMod || 0.98) * (1.0 + _darkRatio * 0.85)); // 0.98→1.8
+    _slArpOsc2Type = 'square';  // 矩形波で金属的な倍音
+    _slOsc2Mix    = 0.55 + _darkRatio * 0.30; // sawtooth→square比率増加（0.55→0.85）
+    _slArpAttack  = Math.max(0.001, (sc.arpAttack || 0.002) - _darkRatio * 0.001); // さらに鋭く
+  } else {
+    // ── Bright側（center含む）: ACID的ピーキーなうねり ──
+    _slArpCutoff  = bright > 0 ? Math.max(150, _baseCutoff * (1.0 + bright * 1.2)) : null;
+    _slArpRes     = bright > 0 ? Math.max(0.8, _baseRes * (1.0 + bright * 1.2 + tense * 0.5)) : null;
+    _slArpEnvMod  = bright > 0 ? Math.max(0.4, (sc.arpEnvMod || 0.98) * (1.0 + bright * 0.4)) : null;
+    _slArpOsc2Type = null; // sawtooth維持
+    _slOsc2Mix    = 0.55 + warm * 0.35;
+    _slArpAttack  = null;
+  }
+
   // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
   _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.08) - tense * 0.22));
-  // bright↑でenvMod増加（フィルターエンベロープのピーク感を強化）
-  _slArpEnvMod = Math.max(0.4, (sc.arpEnvMod || 0.98) * (1.0 + bright * 0.4));
-  // warm↑: osc2mix増加（低域厚く）+ sub osc増加
-  _slOsc2Mix   = 0.55 + warm * 0.35;
-  _slArpSubGain = 0.12 + warm * 0.28; // sub osc: 0.12(cold)〜0.40(warm)
+  // warm↑: sub osc増加（低域の重さ）
+  _slArpSubGain = 0.12 + warm * 0.28;
   // moving↑: gate短縮（パーカッシブ）/ moving↓: gate延長（最大600ms）
-  _slArpGate   = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
-  // strange: フレーズ文法内で参照（跳躍頻度・音域に影響）
-  _slArpPattern = null; // フレーズ文法パスではpatternは使わない
+  _slArpGate = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
+  // strange: フレーズ文法内で参照
+  _slArpPattern = null;
 }
 
 // ── STRINGS: Detroit的・広い・アンセム・大きな呼吸 ──
