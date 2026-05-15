@@ -13524,7 +13524,7 @@ function applySLToArp(){
     case 'plain':   _applySL_plain(sc, bright, tense, warm, moving, strange);   break;
     case 'velvet':  _applySL_velvet(sc, bright, tense, warm, moving, strange);  break;
     case 'glass':   _applySL_glass(sc, bright, tense, warm, moving, strange);   break;
-    case 'pluck':   _applySL_pluck(sc, bright, tense, warm, moving, strange);   break;
+    case 'pluck':   _applySL_pluck(sc, bright, tense, warm, moving, strange, complex);   break;
     case 'strings': _applySL_strings(sc, bright, tense, warm, moving, strange); break;
     default:        _applySL_default(sc, bright, tense, warm, moving, strange); break;
   }
@@ -13620,47 +13620,56 @@ function _applySL_glass(sc, bright, tense, warm, moving, strange){
 // warm:   sub osc gain増加（低域の重さ）
 // moving: gate短縮（パーカッシブ）
 // strange: Euclidean変形パターン
-function _applySL_pluck(sc, bright, tense, warm, moving, strange){
+function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
   const _baseCutoff = sc.arpCutoff || 600;
   const _baseRes    = sc.arpRes    || 3.2;
+  const _complexVal = complex || 0;
 
-  if(bright < 0){
-    // ── Dark側: Prince Batman / Jeff Mills的・金属クリック ──
-    // cutoffを高域に開く（高調波を残す）・resを自己発振域まで上げる
-    // envModを下げてフィルターをほぼ固定・FM変調で金属的倍音を加える
-    const _darkRatio = -bright; // 0〜1
-    // 鉄球衝突的サウンド:
-    // cutoff高域開放（倍音を残す）・res自己発振域・envMod最小（フィルター固定）
-    // FM非整数比で金属共鳴・attack微増（質量感）・gate短縮（衝突の鋭さ）
-    _slArpCutoff      = Math.min(4000, _baseCutoff * (1.0 + _darkRatio * 5.0)); // 600→3600Hz
-    _slArpRes         = Math.min(9.0, _baseRes * (1.0 + _darkRatio * 1.80));    // 3.2→9.0（自己発振域）
-    _slArpEnvMod      = Math.max(0.02, (sc.arpEnvMod || 0.98) * (1.0 - _darkRatio * 0.98)); // 0.98→0.02
-    _slArpOsc2Type    = 'square';
-    _slOsc2Mix        = 0.55 + _darkRatio * 0.30;
-    _slArpAttack      = 0.001 + _darkRatio * 0.003; // 0.001→0.004（質量感）
-    _slArpDecay       = 0.35 + _darkRatio * 0.65;   // 0.35→1.0s（余韻・鉄球の共鳴）
-    _slArpGate        = Math.max(200, (sc.arpGate || 180) + _darkRatio * 600); // 180→780ms（減衰を自然に切らせる）
-    _slArpFMDepthPluck   = _darkRatio * 1.20; // FM変調深さ（0→1.20・2倍に増加）
-    _slArpDarkRatioPluck = _darkRatio;        // PeriodicWaveモーフィング用
+  // ── bright: ACID的ピーキーなうねり（Dark↓ / Bright↑）──
+  if(bright > 0){
+    // Bright側: cutoff上昇 + res上昇 + envMod増加
+    _slArpCutoff  = Math.max(150, _baseCutoff * (1.0 + bright * 1.2));
+    _slArpRes     = Math.max(0.8, _baseRes * (1.0 + bright * 1.2 + tense * 0.5));
+    _slArpEnvMod  = Math.max(0.4, (sc.arpEnvMod || 0.98) * (1.0 + bright * 0.4));
+  } else if(bright < 0){
+    // Dark側: cutoff低下（暗く閉じる）
+    _slArpCutoff  = Math.max(120, _baseCutoff * (1.0 + bright * 0.8)); // 600→120Hz
+    _slArpRes     = null;
+    _slArpEnvMod  = null;
   } else {
-    // ── Bright側（center含む）: ACID的ピーキーなうねり ──
-    _slArpCutoff       = bright > 0 ? Math.max(150, _baseCutoff * (1.0 + bright * 1.2)) : null;
-    _slArpRes          = bright > 0 ? Math.max(0.8, _baseRes * (1.0 + bright * 1.2 + tense * 0.5)) : null;
-    _slArpEnvMod       = bright > 0 ? Math.max(0.4, (sc.arpEnvMod || 0.98) * (1.0 + bright * 0.4)) : null;
-    _slArpOsc2Type       = null;
-    _slOsc2Mix           = 0.55 + warm * 0.35;
-    _slArpAttack         = null;
-    _slArpDecay          = null;
+    _slArpCutoff = null; _slArpRes = null; _slArpEnvMod = null;
+  }
+  _slArpOsc2Type     = null;
+  _slOsc2Mix         = 0.55 + warm * 0.35;
+  _slArpAttack       = null;
+
+  // ── complex（紫）: 鉄球衝突的サウンド ──
+  // complex↑: FM非整数比変調・PeriodicWaveモーフィング・decay延長・gate延長
+  // complex↓: 全パラメーターデフォルトに戻す
+  if(_complexVal > 0.02){
+    const _cRatio = _complexVal; // 0〜1
+    // FM変調: 非整数比2系統（発音側で_slArpFMDepthPluckを参照）
+    _slArpFMDepthPluck   = _cRatio * 1.20;
+    // PeriodicWaveモーフィング: sawtooth→square
+    _slArpDarkRatioPluck = _cRatio;
+    // エンベロープ: res上昇・envMod低下（フィルター固定）・decay延長・gate延長
+    _slArpRes     = Math.min(9.0, _baseRes * (1.0 + _cRatio * 1.80)); // 3.2→9.0
+    _slArpEnvMod  = Math.max(0.02, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.98)); // 0.98→0.02
+    _slArpAttack  = 0.001 + _cRatio * 0.003;                         // 0.001→0.004
+    _slArpDecay   = 0.35 + _cRatio * 0.65;                           // 0.35→1.0s
+    _slArpGate    = Math.max(200, (sc.arpGate || 180) + _cRatio * 600); // 180→780ms
+  } else {
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
+    _slArpDecay          = null;
   }
 
   // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
   _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.08) - tense * 0.22));
   // warm↑: sub osc増加（低域の重さ）
   _slArpSubGain = 0.12 + warm * 0.28;
-  // moving↑: gate短縮 / moving↓: gate延長（Dark側は既にgateをセット済みのため上書きしない）
-  if(bright >= 0){
+  // moving↑: gate短縮 / moving↓: gate延長（complex側でgateをセット済みの場合は上書きしない）
+  if(_complexVal <= 0.02){
     _slArpGate = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
   }
   // strange: フレーズ文法内で参照
