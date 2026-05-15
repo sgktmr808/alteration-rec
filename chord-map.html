@@ -10892,25 +10892,27 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     }
 
     // ── PLUCK dark側FM変調（_slArpFMDepthPluck連動）──
-    // 2系統: hz×2.0（ベル的輝き）+ hz×0.5（低域うなり）
+    // 非整数比モジュレーター2系統で金属・鉄球的共鳴を生成
+    //   系統1: hz×2.756（金属板共鳴の典型的な非整数比・輝き）
+    //   系統2: hz×0.367（低域の重み・鉄の質量感）
     if(sceneCurrentName === 'pluck' && _slArpFMDepthPluck !== null && _slArpFMDepthPluck > 0.01){
-      const _plkFMIndex = hz * _slArpFMDepthPluck * 1.5;
+      const _plkFMIndex = hz * _slArpFMDepthPluck * 3.0; // depth×3.0（より強く）
 
-      // 系統1: hz×2.0（整数比・ベル的輝き）
+      // 系統1: hz×2.756（非整数比・金属的輝き）
       const _plkFMOsc1  = actx.createOscillator();
       _plkFMOsc1.type   = 'sine';
-      _plkFMOsc1.frequency.value = hz * 2.0;
+      _plkFMOsc1.frequency.value = hz * 2.756;
       const _plkFMGain1 = actx.createGain();
-      _plkFMGain1.gain.value = _plkFMIndex * 0.7;
+      _plkFMGain1.gain.value = _plkFMIndex * 0.8;
       _plkFMOsc1.connect(_plkFMGain1);
       _plkFMGain1.connect(osc1.frequency);
 
-      // 系統2: hz×0.5（低域うなり・厚み）
+      // 系統2: hz×0.367（非整数比・鉄の質量感・低域うなり）
       const _plkFMOsc2  = actx.createOscillator();
       _plkFMOsc2.type   = 'sine';
-      _plkFMOsc2.frequency.value = hz * 0.5;
+      _plkFMOsc2.frequency.value = hz * 0.367;
       const _plkFMGain2 = actx.createGain();
-      _plkFMGain2.gain.value = _plkFMIndex * 0.5;
+      _plkFMGain2.gain.value = _plkFMIndex * 0.6;
       _plkFMOsc2.connect(_plkFMGain2);
       _plkFMGain2.connect(osc1.frequency);
 
@@ -13627,13 +13629,17 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
     // cutoffを高域に開く（高調波を残す）・resを自己発振域まで上げる
     // envModを下げてフィルターをほぼ固定・FM変調で金属的倍音を加える
     const _darkRatio = -bright; // 0〜1
-    _slArpCutoff      = Math.min(4000, _baseCutoff * (1.0 + _darkRatio * 5.0)); // 600→3600Hz（高域へ）
-    _slArpRes         = Math.min(8.0, _baseRes * (1.0 + _darkRatio * 1.50));    // 3.2→8.0（自己発振域）
-    _slArpEnvMod      = Math.max(0.05, (sc.arpEnvMod || 0.98) * (1.0 - _darkRatio * 0.95)); // 0.98→0.05（フィルターほぼ固定）
-    _slArpOsc2Type    = 'square';                                                // 矩形波で倍音を加える
-    _slOsc2Mix        = 0.55 + _darkRatio * 0.30;                               // square比率増加（0.55→0.85）
-    _slArpAttack      = Math.max(0.001, (sc.arpAttack || 0.002) - _darkRatio * 0.001);
-    _slArpFMDepthPluck   = _darkRatio * 0.60; // FM変調深さ（0→0.60）
+    // 鉄球衝突的サウンド:
+    // cutoff高域開放（倍音を残す）・res自己発振域・envMod最小（フィルター固定）
+    // FM非整数比で金属共鳴・attack微増（質量感）・gate短縮（衝突の鋭さ）
+    _slArpCutoff      = Math.min(4000, _baseCutoff * (1.0 + _darkRatio * 5.0)); // 600→3600Hz
+    _slArpRes         = Math.min(9.0, _baseRes * (1.0 + _darkRatio * 1.80));    // 3.2→9.0（自己発振域）
+    _slArpEnvMod      = Math.max(0.02, (sc.arpEnvMod || 0.98) * (1.0 - _darkRatio * 0.98)); // 0.98→0.02
+    _slArpOsc2Type    = 'square';
+    _slOsc2Mix        = 0.55 + _darkRatio * 0.30;
+    _slArpAttack      = 0.001 + _darkRatio * 0.003; // 0.001→0.004（質量感）
+    _slArpGate        = Math.max(40, (sc.arpGate || 180) * (1.0 - _darkRatio * 0.55)); // 180→80ms（衝突の鋭さ）
+    _slArpFMDepthPluck   = _darkRatio * 1.20; // FM変調深さ（0→1.20・2倍に増加）
     _slArpDarkRatioPluck = _darkRatio;        // PeriodicWaveモーフィング用
   } else {
     // ── Bright側（center含む）: ACID的ピーキーなうねり ──
@@ -13651,8 +13657,10 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
   _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.08) - tense * 0.22));
   // warm↑: sub osc増加（低域の重さ）
   _slArpSubGain = 0.12 + warm * 0.28;
-  // moving↑: gate短縮（パーカッシブ）/ moving↓: gate延長（最大600ms）
-  _slArpGate = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
+  // moving↑: gate短縮 / moving↓: gate延長（Dark側は既にgateをセット済みのため上書きしない）
+  if(bright >= 0){
+    _slArpGate = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
+  }
   // strange: フレーズ文法内で参照
   _slArpPattern = null;
 }
