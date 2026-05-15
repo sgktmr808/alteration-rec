@@ -11351,7 +11351,7 @@ function _resetPhraseState(){
   _phraseState.stringsBurstActive   = false;
   _phraseState.stringsBurstCount    = 0;
   _phraseState.stringsBurstDuration = 0;
-  _phraseState.stringsBurstInterval = 0;
+  // stringsBurstIntervalはコードチェンジをまたいで継続（タップでリセットしない）
   // PLUCKの細胞はコードチェンジで再生成
   _phraseState.pluckCell = null;
   _phraseState.pluckCellPos = 0;
@@ -12014,12 +12014,13 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 
         // moving↑: 矩形（即ON/OFF） / moving↓: 台形（じわっとフェーズ）
         const _movingNorm = (_movingVal + 1) / 2; // 0〜1
+        // _phaseは矩形・台形どちらでも度数ターゲット計算に使うため先に算出
+        const _phase = ps.stringsBurstCount / Math.max(1, ps.stringsBurstDuration);
         if(_movingNorm > 0.6){
           // パッと全開・パッと終了
           burstRatio = 1.0;
         } else {
           // じわっと: 台形エンベロープ（立ち上がり25% / 頂点50% / 立ち下がり25%）
-          const _phase = ps.stringsBurstCount / ps.stringsBurstDuration;
           if(_phase < 0.25)      burstRatio = _phase / 0.25;
           else if(_phase < 0.75) burstRatio = 1.0;
           else                   burstRatio = (1.0 - _phase) / 0.25;
@@ -12034,29 +12035,24 @@ function _phraseNext(notes, baseSec, sc, densityMul){
           //   頂点:       9〜14st（短6度・短7度・長7度・短9度）最大の驚き
           //   立ち下がり: 7〜10st（5度・短6度・短7度）解放に向かう
           //
-          // moving↑: 頂点の度数が大きく（最大14st）/ moving↓: 全フェーズ広く（最大17st）
+          // moving↑: 頂点の度数が大きく（最大17st）/ moving↓: 全フェーズ広く
           // 方向（上下）はジグザグ強制（前の動きと逆方向へ）
 
-          const _phase = ps.stringsBurstActive
-            ? ps.stringsBurstCount / Math.max(1, ps.stringsBurstDuration)
-            : 0.5;
-
           // フェーズに応じた目標度数レンジ（min〜max semitone）
-          // moving↑: 頂点の上限を拡大 / moving↓: 全体を広く
-          const _movingNorm2 = (_movingVal + 1) / 2; // 0〜1
+          // _movingNormはburstRatio計算時に算出済みのものを流用
           let _targetMin, _targetMax;
           if(_phase < 0.25){
             // 立ち上がり: 4度〜5度（緊張の始まり）
             _targetMin = 5;
-            _targetMax = 7 + Math.round(_movingNorm2 * 2); // 7〜9
+            _targetMax = 7 + Math.round(_movingNorm * 2); // 7〜9
           } else if(_phase < 0.75){
             // 頂点: 短6度〜短9度（最大の驚き）
             _targetMin = 8;
-            _targetMax = 11 + Math.round(_movingNorm2 * 6); // 11〜17
+            _targetMax = 11 + Math.round(_movingNorm * 6); // 11〜17
           } else {
             // 立ち下がり: 5度〜短7度（解放）
             _targetMin = 6;
-            _targetMax = 10 + Math.round(_movingNorm2 * 3); // 10〜13
+            _targetMax = 10 + Math.round(_movingNorm * 3); // 10〜13
           }
 
           // ±1oct拡張したコードトーンプール（重複除去）
@@ -12150,8 +12146,9 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         }
       }
 
-      // ── ベロシティ: バースト中は少し強め ──
-      const _arcPos = (ps.stringsMotifPos % Math.max(1, motifLen)) / Math.max(1, motifLen - 1);
+      // ── ベロシティ: 発音位置で弧を描く・バースト中は少し強め ──
+      const _playedPos = (ps.stringsMotifPos - 1 + motifLen) % motifLen;
+      const _arcPos = _playedPos / Math.max(1, motifLen - 1);
       const _arcVel = 0.72 + Math.sin(_arcPos * Math.PI) * 0.28;
       const _burstVelBoost = burstRatio * 0.20; // バースト中は最大+0.20
       const velMul  = Math.max(0.5, _arcVel + _burstVelBoost + (Math.random() - 0.5) * _warmVal * 0.15);
