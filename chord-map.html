@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- build: 20260514175626 -->
+<!-- build: 20260515075348 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -9756,6 +9756,13 @@ let arpTimer=null;
 let arpStep=0;
 let arpSeq=[];             // 現在のアルペジオノート列（MIDI）
 let arpNextBeat=0;         // 次の発音予定AudioContext時刻
+
+// ── STRINGS フェイジング残留層 ──
+let _stringsGhostSeq   = null;  // 旧コードのarpSeq
+let _stringsGhostState = null;  // 旧コードのフレーズ状態
+let _stringsGhostFade  = 0;     // フェードアウト進行（1.0→0.0）
+let _stringsGhostStep  = 0;     // 残留層のステップ数カウント
+let _stringsGhostNextBeat = 0;  // 残留層の次発音時刻
 let _masterClockOrigin=null; // マスタークロック起点（ファーストタップ時に一度だけ設定）
 let arpScheduleTimer=null;
 
@@ -11830,68 +11837,123 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     // STRINGS: 大きな呼吸・2拍単位・方向性のある動き
     // ────────────────────────────────────────────
     case 'strings': {
-      // フレーズ先頭の空白（必須）
-      if(ps.phrasePos === 0 && ps.phraseCount > 0){
-        ps.phrasePos = 1;
-        const gapRatio = (1.0 + Math.random() * 0.5) * densityMul;
-        return { midi: null, stepRatio: gapRatio };
-      }
+      // ────────────────────────────────────────────
+      // STRINGS: ライヒ×ガムラン的フェイジング設計
+      //
+      // 【設計思想】
+      //   均等な16分パルスの中に短いモチーフを配置。
+      //   コードチェンジで旧モチーフが残留・新旧が重なりフェイジングが生まれる。
+      //   モチーフは4〜6音・上行→頂点→下降の弧を描く。
+      //   ライヒ的均等感 + ガムラン的インターロッキング。
+      //
+      // 【SLスライダー】
+      //   moving↑: パルスが密に・モチーフが短く
+      //   moving↓: 休符が増える・より疎に
+      //   strange↑: モチーフに非コードトーンが混入
+      //   warm↑: ベロシティの揺らぎ（人間的）
+      // ────────────────────────────────────────────
 
-      // 確率的な休符（Calm方向で増える）
-      if(restProb > 0 && Math.random() < restProb){
-        const gapRatio = (1.5 + Math.random() * 1.0) * densityMul;
-        return { midi: null, stepRatio: gapRatio };
-      }
+      const _strangeVal = sv ? sv('strange') : 0;
+      const _movingVal  = sv ? sv('moving')  : 0;
+      const _warmVal    = sv ? sv('warm')    : 0;
 
-      // 方向に沿った音選択（上行/下行）
-      let midi;
-      const dir = ps.stringsDir;
-      if(ps.lastMidi === null){
-        midi = dir > 0 ? notes[0] : notes[notes.length-1];
-      } else {
-        const candidates = notes.filter(m => dir > 0 ? m >= ps.lastMidi : m <= ps.lastMidi);
-        if(candidates.length > 1){
-          // 方向に沿って1〜2音進む
-          const sortedC = dir > 0 ? candidates : [...candidates].reverse();
-          midi = sortedC[Math.min(1, sortedC.length-1)];
-        } else {
-          // 端に達したら方向反転
-          ps.stringsDir *= -1;
-          ps.stringsDirMeasure++;
-          midi = ps.stringsDir > 0 ? notes[0] : notes[notes.length-1];
-          // 4小節に1回アクセント（跳躍）
-          if(ps.stringsDirMeasure % 4 === 0){
-            ps.stringsAccentNext = true;
+      // ── モチーフ初期化 ──
+      // 4〜6音の弧型モチーフ（上行→頂点→下降）
+      if(ps.velvetMotif === null){
+        // notes配列を低・中・高に分割
+        const sorted = [...notes].sort((a,b) => a-b);
+        const _lo  = sorted.slice(0, Math.ceil(sorted.length/3));
+        const _mid = sorted.slice(Math.ceil(sorted.length/3), Math.ceil(sorted.length*2/3));
+        const _hi  = sorted.slice(Math.ceil(sorted.length*2/3));
+
+        const _pickFrom = (pool) => {
+          if(!pool || pool.length === 0) return sorted[0];
+          return pool[Math.floor(Math.random() * pool.length)];
+        };
+
+        // 弧型モチーフ: 低→中→高→中（インターロッキングの基礎）
+        const _motifLen = 4 + Math.round(_movingVal * 1.0); // moving↑で長め
+        const motif = [];
+        for(let i = 0; i < _motifLen; i++){
+          const phase = i / (_motifLen - 1); // 0→1
+          // 前半上昇・後半下降（弧）
+          const zone = phase < 0.5
+            ? (phase < 0.25 ? _lo : _mid)
+            : (phase < 0.75 ? _hi : _mid);
+          // strange↑で時々非コードトーン（±1半音）
+          let m = _pickFrom(zone);
+          if(_strangeVal > 0.4 && Math.random() < _strangeVal * 0.3){
+            m += (Math.random() < 0.5 ? 1 : -1);
           }
+          motif.push(m);
+        }
+        ps.velvetMotif = motif;
+        ps.velvetMotifPos = 0;
+        ps.velvetRepeatCount = 0;
+      }
+
+      // ── 休符判定 ──
+      // restProbに加えてmoving↓で休符増
+      const _restProb = restProb + Math.max(0, -_movingVal) * 0.15;
+      if(_restProb > 0 && Math.random() < _restProb){
+        return { midi: null, stepRatio: (1.0 + Math.random() * 0.5) * densityMul };
+      }
+
+      // ── モチーフ発音 ──
+      const mpos = ps.velvetMotifPos % ps.velvetMotif.length;
+      const midi = ps.velvetMotif[mpos];
+      ps.velvetMotifPos++;
+
+      // モチーフ完了 → 次モチーフ（同じか微変容）
+      if(ps.velvetMotifPos >= ps.velvetMotif.length){
+        ps.velvetMotifPos = 0;
+        ps.velvetRepeatCount++;
+
+        // 4〜8サイクルで微変容（1音だけ変える）
+        const mutateEvery = Math.max(4, Math.round(6 - _movingVal * 2));
+        if(ps.velvetRepeatCount % mutateEvery === 0){
+          const mutIdx = Math.floor(Math.random() * ps.velvetMotif.length);
+          const sorted = [...notes].sort((a,b) => a-b);
+          ps.velvetMotif[mutIdx] = sorted[Math.floor(Math.random() * sorted.length)];
+        }
+        // 8〜16サイクルで完全再生成
+        if(ps.velvetRepeatCount % (mutateEvery * 3) === 0){
+          ps.velvetMotif = null; // 次回再生成
         }
       }
 
-      // アクセント音（跳躍）
-      if(ps.stringsAccentNext){
-        midi = ps.stringsDir > 0 ? notes[notes.length-1] : notes[0];
-        ps.stringsAccentNext = false;
-      }
+      // ベロシティ: 弧の頂点（中間）で強く・端で弱く
+      const _arcPos = mpos / Math.max(1, ps.velvetMotif.length - 1);
+      const _arcVel = 0.75 + Math.sin(_arcPos * Math.PI) * 0.30;
+      const velMul  = Math.max(0.5, _arcVel + (Math.random() - 0.5) * _warmVal * 0.15);
 
-      ps.lastMidi = midi;
-      ps.phrasePos++;
-      if(ps.phrasePos >= 2){
-        ps.phrasePos = 0;
-        ps.phraseCount++;
-        // 2小節で方向チェック
-        if(ps.phraseCount % 2 === 0){
-          ps.stringsDir *= -1;
-        }
-      }
+      // ステップ: 均等な16分パルス（ライヒ的）
+      const stepRatio = 1.0 * densityMul;
 
-      // STRINGS: 2拍単位の重い音（1.8〜2.2拍）
-      const strRatio = (1.8 + Math.random() * 0.15) * densityMul; // 幅を縮小
-      return { midi, stepRatio: strRatio };
+      if(midi !== null) ps.lastMidi = midi;
+      return { midi, stepRatio, velMul };
     }
 
     default:
       return null; // フレーズ文法を使わない（既存パスへ）
   }
 }
+// ── _phraseNextWithState: 外部状態を受け取るフレーズ文法 ──
+// STRINGSの残留フェイジング層用。_phraseStateの代わりに外部stateを使う。
+function _phraseNextWithState(notes, baseSec, sc, densityMul, extState){
+  if(!extState || !notes || notes.length === 0) return null;
+  // 一時的に_phraseStateを外部stateに差し替えて実行
+  const _saved = _phraseState;
+  // extStateを_phraseStateにコピー
+  Object.assign(_phraseState, extState);
+  const result = _phraseNext(notes, baseSec, sc, densityMul);
+  // 実行後の状態を外部stateに書き戻す
+  Object.assign(extState, _phraseState);
+  // _phraseStateを元に戻す
+  Object.assign(_phraseState, _saved);
+  return result;
+}
+
 // ── LOVE ARP用 PeriodicWave キャッシュ ──
 let _lovePeriodicWave = null;
 let _lovePeriodicWaveCtx = null;
@@ -11933,6 +11995,48 @@ function scheduleArpNotes(){
   // PatternGrammarのARP系（PLUCK/FLOAT/INNER）使用中は既存パスを使う
   const _patternArpActive = typeof _getPatternArpSc === 'function' && _getPatternArpSc() !== null;
   const _usePhraseGrammar = _PHRASE_SCENES.has(sceneCurrentName) && !_patternArpActive;
+
+  // ── STRINGSフェイジング残留層の発音 ──
+  // 旧コードのARPが新コードのARPと重なりながらフェードアウト
+  if(sceneCurrentName === 'strings' && _stringsGhostSeq && _stringsGhostFade > 0.01){
+    while(_stringsGhostNextBeat < lookAhead){
+      const _gt = _stringsGhostNextBeat;
+      const _sixteenth = (60 / autoBpm) / 4;
+
+      // フレーズ文法で残留層の音を取得
+      const _ghostResult = _phraseNextWithState(
+        _stringsGhostSeq, baseSec, sc, densityMul, _stringsGhostState
+      );
+
+      if(_ghostResult && _ghostResult.midi !== null){
+        // フェード量: 8〜16拍で0→消える（moving↑で短く）
+        const _movingVal = sv ? sv('moving') : 0;
+        const _fadeBars  = Math.max(8, 16 - _movingVal * 4);
+        _stringsGhostFade = Math.max(0, 1.0 - _stringsGhostStep / (_fadeBars * 4));
+
+        if(_stringsGhostFade > 0.01){
+          // 残留層はvelMulにfadeを掛けて音量を下げる
+          const _ghostVel = (_ghostResult.velMul || 1.0) * _stringsGhostFade * 0.65;
+          _playSceneArpNote(actx, _ghostResult.midi, _gt,
+            dlyDestination || actx.destination, _ghostVel, _ghostResult.gateOverride);
+        }
+        _stringsGhostStep++;
+      }
+
+      const _stepSec = _ghostResult
+        ? Math.max(_sixteenth * 0.2, _sixteenth * (_ghostResult.stepRatio || 1.0))
+        : _sixteenth;
+      _stringsGhostNextBeat += _stepSec;
+
+      // フェード完了したら残留層を消去
+      if(_stringsGhostFade <= 0.01){
+        _stringsGhostSeq   = null;
+        _stringsGhostState = null;
+        _stringsGhostFade  = 0;
+        break;
+      }
+    }
+  }
 
   while(arpNextBeat<lookAhead){
     const t=arpNextBeat;
@@ -12018,6 +12122,21 @@ function updateArpChord(root, type){
       _phraseState.hangingMidi = _phraseState.lastMidi;
     }
   }
+  // STRINGSのみ: 旧コードのarpSeqとフレーズ状態を残留層として保存
+  if(sceneCurrentName === 'strings' && arpSeq && arpSeq.length > 0){
+    _stringsGhostSeq   = [...arpSeq];
+    _stringsGhostState = JSON.parse(JSON.stringify(_phraseState));
+    _stringsGhostFade  = 1.0; // フルボリュームから開始
+    _stringsGhostStep  = 0;
+    const actx = safeGetCtx();
+    if(actx && _masterClockOrigin !== null){
+      const _sixteenth = (60 / autoBpm) / 4;
+      const _elapsed   = actx.currentTime - _masterClockOrigin;
+      const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+      _stringsGhostNextBeat = _masterClockOrigin + _gridPos;
+    }
+  }
+
   arpSeq=buildArpSeq(root, type);
   arpStep=0;
   _arpLastMidi = null;
@@ -12292,22 +12411,26 @@ const SCENE_PRESETS = {
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
   strings: {
-    label:'BLACK STRINGS',
-    osc1:'sawtooth', osc2:'sawtooth', detune:14,
-    cutoff:2000, res:0.65, envMod:0.38,
-    attack:0.28, decay:1.1, sustain:0.75, release:4.5,
-    vol:0.48, chorus:0.25, wet:0.54, strum:20,
-    trailSec:0.8, width:0.80, feltAttack:0.0, ghost:0.0, filterDrift:0.18,
-    voicingFlavor:'detroit',
-    // ARP: Detroit的。推進力・少ない音数・広がり・アンセム感
-    // sawtooth・中域cutoff・長めgate・低めres・広いステレオ
-    arpOsc:'sawtooth', arpCutoff:1500, arpRes:0.45, arpEnvMod:0.28,
-    arpAttack:0.020, arpDecay:0.55, arpSustain:0.15,
-    arpGate:440, arpVol:0.24, arpWet:0.48, arpGhost:0.18,
-    arpOctRange:2, // 広い音域・アンセム感
-    // リズム: 2拍単位の重い推進・少ない音数・Detroit的なうねり
-    // 「前に進んでいく」感覚
-    arpRhythm:[2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 1.5, 0.5], arpRestProb:0.05,
+    label:'PHASE STRINGS',
+    // CHORD: ライヒ×ガムラン的ストリングスパッド
+    // ガムラン的な意図的detuneで「面」として聞こえる弦の集団感
+    // attack長め（弓が弦に乗る感覚）・filterDrift深め（弦のピッチ揺らぎ）
+    osc1:'sawtooth', osc2:'sawtooth', detune:18,
+    cutoff:1600, res:0.55, envMod:0.30,
+    attack:0.45, decay:1.4, sustain:0.72, release:5.5,
+    vol:0.44, chorus:0.30, wet:0.52, strum:22,
+    trailSec:2.5, width:0.85, feltAttack:0.0, ghost:0.0, filterDrift:0.28,
+    voicingFlavor:'open',
+    // ARP: ライヒ的ミニマルパルス
+    // 短いモチーフが正確なグリッドで反復・コードチェンジで旧層が残留
+    // 長めgate（弦的余韻）・低velHumanize（機械的均等感）
+    arpOsc:'sawtooth', arpCutoff:1200, arpRes:0.40, arpEnvMod:0.22,
+    arpAttack:0.012, arpDecay:0.80, arpSustain:0.25,
+    arpGate:520, arpVol:0.20, arpWet:0.52, arpGhost:0.22,
+    arpOctRange:2,
+    // リズム: 均等な16分パルス（ライヒ的）
+    // 密度は少なめ・休符で呼吸・フェイジングで揺らぎが生まれる
+    arpRhythm:[1.0, 1.0, 1.0, 1.0], arpRestProb:0.18,
   },
 };
 
