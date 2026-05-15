@@ -12883,6 +12883,24 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
     return [...new Set(det)].sort((a,b)=>a-b).slice(0,5);
   }
 
+  // ── STRINGS: 高域5度 + 9度（ARPに主役を渡す・空間の天井）──
+  // CHORDは高域でロングトーンとして空気感を作る
+  // 5度: 中性・透明・主張しない骨格
+  // 9度: 淡い色彩・浮遊感
+  // rootMidiの1oct上に配置（ARPの音域と重ならない高域）
+  if(sceneCurrentName === 'strings'){
+    const _5th  = rootMidi + 12 + 7;  // 1oct上の5度
+    const _9th  = rootMidi + 12 + 14; // 1oct上の9度
+    let strNotes = [_5th, _9th];
+
+    // complex↑: 長7度を加える（緊張感・美しさ）
+    if(_slC > 0.4) strNotes.push(rootMidi + 12 + 11);
+    // complex↓: 5度のみ（最小限の骨格）
+    if(_slC < -0.4) strNotes = [_5th];
+
+    return [...new Set(strNotes)].sort((a,b)=>a-b);
+  }
+
   // ── PLAIN (open voicing) ──
   let open = [notes[0]-12, ...notes.slice(1)];
   if(open.length >= 2) open[open.length-1] += 12;
