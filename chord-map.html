@@ -11896,28 +11896,29 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       }
 
       // ── モチーフ発音（途切れず連続・Violin Phase的）──
-      const mpos = ps.stringsMotifPos % ps.stringsMotif.length;
+      const motifLen = ps.stringsMotif.length; // nullリセット前に保存
+      const mpos = ps.stringsMotifPos % motifLen;
       const midi = ps.stringsMotif[mpos];
       ps.stringsMotifPos++;
 
       // モチーフ完了 → 即次サイクル（休符なし・連続）
-      if(ps.stringsMotifPos >= ps.stringsMotif.length){
+      if(ps.stringsMotifPos >= motifLen){
         ps.stringsMotifPos = 0;
         ps.stringsRepeatCount++;
 
         const mutateEvery = Math.max(6, Math.round(12 - _movingVal * 4));
         if(ps.stringsRepeatCount % mutateEvery === 0){
-          const mutIdx = Math.floor(Math.random() * ps.stringsMotif.length);
+          const mutIdx = Math.floor(Math.random() * motifLen);
           const sorted = [...notes].sort((a,b) => a-b);
           ps.stringsMotif[mutIdx] = sorted[Math.floor(Math.random() * sorted.length)];
         }
         if(ps.stringsRepeatCount % (mutateEvery * 3) === 0){
-          ps.stringsMotif = null;
+          ps.stringsMotif = null; // 次回呼び出しで再生成
         }
       }
 
       // ベロシティ: フレーズ内の位置で弧を描く
-      const _arcPos = mpos / Math.max(1, ps.stringsMotif.length - 1);
+      const _arcPos = mpos / Math.max(1, motifLen - 1);
       const _arcVel = 0.72 + Math.sin(_arcPos * Math.PI) * 0.28;
       const velMul  = Math.max(0.5, _arcVel + (Math.random() - 0.5) * _warmVal * 0.12);
 
