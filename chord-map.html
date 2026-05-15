@@ -10891,6 +10891,25 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
       _strFMOsc.stop(startTime + gateSec + 0.3);
     }
 
+    // ── PLUCK dark側FM変調（_slArpFMDepthPluck連動）──
+    // 非整数比モジュレーター（hz × 1.414 ≒ √2）で金属・ベル的倍音を生成
+    if(sceneCurrentName === 'pluck' && _slArpFMDepthPluck !== null && _slArpFMDepthPluck > 0.01){
+      const _plkFMHz    = hz * 1.414; // √2倍：非整数比で金属感
+      const _plkFMIndex = hz * _slArpFMDepthPluck * 1.5;
+
+      const _plkFMOsc  = actx.createOscillator();
+      _plkFMOsc.type   = 'sine';
+      _plkFMOsc.frequency.value = _plkFMHz;
+
+      const _plkFMGain = actx.createGain();
+      _plkFMGain.gain.value = _plkFMIndex;
+      _plkFMOsc.connect(_plkFMGain);
+      _plkFMGain.connect(osc1.frequency);
+
+      _plkFMOsc.start(startTime);
+      _plkFMOsc.stop(startTime + gateSec + 0.1);
+    }
+
     // Scene別: 音色的ディレイ（gate長めのScene）
     // VELVETは共有ディレイのみ使用（音色的ディレイを除外）
     if(sceneCurrentName === 'strings'){
@@ -13422,6 +13441,7 @@ function applySLToArp(){
     _slArpOctRange = null; _slArpPattern = null;
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
     _slArpAttack = null; _slArpOsc2Type = null; _slArpFMDepth = null;
+    _slArpFMDepthPluck = null;
     return;
   }
 
@@ -13552,22 +13572,25 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange){
 
   if(bright < 0){
     // ── Dark側: Jeff Mills / Prince Batman的・金属クリック ──
-    // cutoff低下・res自己発振寸前・envMod強化・square波ブレンド
+    // cutoffはあまり下げない（倍音を残す）・resを自己発振域まで上げる
+    // FM変調で非整数倍音を加える（金属・ベル的質感）
     const _darkRatio = -bright; // 0〜1
-    _slArpCutoff  = Math.max(120, _baseCutoff * (1.0 - _darkRatio * 0.80)); // 600→120Hz
-    _slArpRes     = Math.min(7.5, _baseRes * (1.0 + _darkRatio * 1.15));    // 3.2→6.5
-    _slArpEnvMod  = Math.min(2.0, (sc.arpEnvMod || 0.98) * (1.0 + _darkRatio * 0.85)); // 0.98→1.8
-    _slArpOsc2Type = 'square';  // 矩形波で金属的な倍音
-    _slOsc2Mix    = 0.55 + _darkRatio * 0.30; // sawtooth→square比率増加（0.55→0.85）
-    _slArpAttack  = Math.max(0.001, (sc.arpAttack || 0.002) - _darkRatio * 0.001); // さらに鋭く
+    _slArpCutoff      = Math.max(350, _baseCutoff * (1.0 - _darkRatio * 0.40)); // 600→350Hz（緩やかに）
+    _slArpRes         = Math.min(8.0, _baseRes * (1.0 + _darkRatio * 1.50));    // 3.2→8.0（自己発振域）
+    _slArpEnvMod      = Math.max(0.15, (sc.arpEnvMod || 0.98) * (1.0 - _darkRatio * 0.85)); // 0.98→0.15（フィルター開けたまま）
+    _slArpOsc2Type    = 'square';                                                // 矩形波で倍音を加える
+    _slOsc2Mix        = 0.55 + _darkRatio * 0.30;                               // square比率増加（0.55→0.85）
+    _slArpAttack      = Math.max(0.001, (sc.arpAttack || 0.002) - _darkRatio * 0.001);
+    _slArpFMDepthPluck = _darkRatio * 0.60; // FM変調深さ（0→0.60）
   } else {
     // ── Bright側（center含む）: ACID的ピーキーなうねり ──
-    _slArpCutoff  = bright > 0 ? Math.max(150, _baseCutoff * (1.0 + bright * 1.2)) : null;
-    _slArpRes     = bright > 0 ? Math.max(0.8, _baseRes * (1.0 + bright * 1.2 + tense * 0.5)) : null;
-    _slArpEnvMod  = bright > 0 ? Math.max(0.4, (sc.arpEnvMod || 0.98) * (1.0 + bright * 0.4)) : null;
-    _slArpOsc2Type = null; // sawtooth維持
-    _slOsc2Mix    = 0.55 + warm * 0.35;
-    _slArpAttack  = null;
+    _slArpCutoff       = bright > 0 ? Math.max(150, _baseCutoff * (1.0 + bright * 1.2)) : null;
+    _slArpRes          = bright > 0 ? Math.max(0.8, _baseRes * (1.0 + bright * 1.2 + tense * 0.5)) : null;
+    _slArpEnvMod       = bright > 0 ? Math.max(0.4, (sc.arpEnvMod || 0.98) * (1.0 + bright * 0.4)) : null;
+    _slArpOsc2Type     = null;
+    _slOsc2Mix         = 0.55 + warm * 0.35;
+    _slArpAttack       = null;
+    _slArpFMDepthPluck = null;
   }
 
   // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
@@ -13650,6 +13673,7 @@ let _slArpGhost    = null; // 全Scene共通: complex連動ゴースト音量上
 let _slArpAttack   = null; // Scene固有: attack上書き（STRINGS bright連動）
 let _slArpOsc2Type = null; // Scene固有: osc2波形上書き（STRINGS dark側 triangle blend）
 let _slArpFMDepth  = null; // Scene固有: FM変調深さ（STRINGS bright側）
+let _slArpFMDepthPluck = null; // PLUCK専用: FM変調深さ（dark側・金属感）
 
 // ── Pattern Grammar 切替（HOLD / STAB / BROKEN / PULSE / TRAIL / PLUCK ARP / FLOAT ARP / INNER LINE） ──
 
