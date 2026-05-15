@@ -12889,12 +12889,12 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
   // 9度: 淡い色彩・浮遊感
   // rootMidiの1oct上に配置（ARPの音域と重ならない高域）
   if(sceneCurrentName === 'strings'){
-    const _5th  = rootMidi + 12 + 7;  // 1oct上の5度
-    const _9th  = rootMidi + 12 + 14; // 1oct上の9度
+    const _5th  = rootMidi + 24 + 7;  // 2oct上の5度
+    const _9th  = rootMidi + 24 + 14; // 2oct上の9度
     let strNotes = [_5th, _9th];
 
     // complex↑: 長7度を加える（緊張感・美しさ）
-    if(_slC > 0.4) strNotes.push(rootMidi + 12 + 11);
+    if(_slC > 0.4) strNotes.push(rootMidi + 24 + 11);
     // complex↓: 5度のみ（最小限の骨格）
     if(_slC < -0.4) strNotes = [_5th];
 
@@ -13294,9 +13294,18 @@ function playSceneChord(actx, root, type){
     if(_keptMidiSet.has(midi)){ return; }
     const hz = midi2hz(Math.max(24, Math.min(108, midi)));
     // scのvolをvelScaleで一時上書き（BROKENのみ音量差）
-    const scNote = (chordPatternMode === 'broken' && velScale !== 1.0)
-      ? Object.assign({}, sc, { vol: (sc.vol || 0.18) * velScale })
-      : sc;
+    // STRINGSは声部別音量: 低声部（5度）ほんのり・トップ（9度）控えめ
+    let scNote;
+    if(sceneCurrentName === 'strings'){
+      const _strVol = i === 0
+        ? (sc.vol || 0.18) * 0.25  // 5度: ほんのり
+        : (sc.vol || 0.18) * 0.55; // 9度（トップ）: 控えめ
+      scNote = Object.assign({}, sc, { vol: _strVol });
+    } else if(chordPatternMode === 'broken' && velScale !== 1.0){
+      scNote = Object.assign({}, sc, { vol: (sc.vol || 0.18) * velScale });
+    } else {
+      scNote = sc;
+    }
     const voice = _playSceneNote(actx, hz, scNote, t, out, panPositions[i]);
     if(voice) voice.midi = midi; // 共通ノード保持のためmidiを記録
     _sceneVoices.push(voice);
