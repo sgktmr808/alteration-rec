@@ -13702,21 +13702,22 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     // W-7 tungsten サウンド（重め・暗い・金属的ベル）
     // ratio1:1.587（立方根2）/ ratio2:4.756（高次非整数比）
     const _cRatio = _complexVal; // 0〜1
-    _slArpFMDepthPluck   = _cRatio * 0.90; // FM深さ（発音側で ratio1/2 を使用）
-    _slArpDarkRatioPluck = 0;              // PeriodicWaveモーフィングなし（sawtooth維持）
-    _slArpCarrierMix     = _cRatio * 0.18; // pure sineミックス量（0〜0.18・透明感の芯）
-    // cutoff: complexが上がるほど基準値を引き上げ（籠り防止）
-    // bright分岐の結果を上書き
-    const _brightNow = bright || 0;
-    _slArpCutoff = Math.max(
-      1800,
-      (_slArpCutoff !== null ? _slArpCutoff : _baseCutoff) * (1.0 + _cRatio * 2.0 + _brightNow * 0.8)
-    );
-    _slArpRes    = Math.max(0.5, _baseRes * (1.0 - _cRatio * 0.70)); // 3.2→0.96（金属ベルらしく低め）
-    _slArpEnvMod = Math.max(0.10, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.85)); // フィルターほぼ固定
-    _slArpAttack  = 0.001; // 鋭いアタック維持
-    _slArpDecay   = 0.34;  // W-7固定（素早く減衰しすぎない）
-    _slArpGate    = Math.max(80, (sc.arpGate || 180) - _cRatio * 100); // 180→80ms
+    _slArpFMDepthPluck   = _cRatio * 0.90;
+    _slArpDarkRatioPluck = 0;
+    _slArpCarrierMix     = _cRatio * 0.18;
+
+    // bright分岐の結果（complex=0時の基準値）とW-7目標値を補間
+    // complex=0: bright分岐そのまま / complex=1: W-7固定値に完全移行
+    const _brightCutoff = _slArpCutoff !== null ? _slArpCutoff : _baseCutoff;  // bright分岐結果
+    const _brightRes    = _slArpRes    !== null ? _slArpRes    : _baseRes;
+    const _brightEnvMod = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.98);
+    _slArpCutoff = _brightCutoff * (1 - _cRatio) + 4444 * _cRatio;
+    _slArpRes    = _brightRes    * (1 - _cRatio) + 0.05 * _cRatio;
+    _slArpEnvMod = _brightEnvMod * (1 - _cRatio) + 0.0  * _cRatio;
+
+    _slArpAttack  = 0.001;
+    _slArpDecay   = 0.34;
+    _slArpGate    = Math.max(80, (sc.arpGate || 180) - _cRatio * 100);
   } else {
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
