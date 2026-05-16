@@ -11054,10 +11054,13 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     // ゆっくり立ち上がり → 長めに尾を引く
     genv.gain.setValueAtTime(0.001, t1);
     genv.gain.linearRampToValueAtTime(ghostPeak, t1 + atk + 0.02);
-    genv.gain.exponentialRampToValueAtTime(ghostPeak * 0.3, t1 + gateSec * 0.8);
-    genv.gain.exponentialRampToValueAtTime(0.001, t1 + gateSec * 1.4); // 本体より長く残る
+    const _ghostDecaySec = (_w7Ratio > 0.5) ? atk + decay : gateSec * 0.8;
+    const _ghostEndSec   = (_w7Ratio > 0.5) ? atk + decay + decay * 1.5 : gateSec * 1.4;
+    const _ghostStopSec  = (_w7Ratio > 0.5) ? atk + decay + decay * 1.5 + 0.1 : gateSec * 1.5 + 0.05;
+    genv.gain.exponentialRampToValueAtTime(ghostPeak * 0.3, t1 + _ghostDecaySec);
+    genv.gain.exponentialRampToValueAtTime(0.001, t1 + _ghostEndSec);
     gosc.connect(glpf); glpf.connect(genv); genv.connect(rvbTarget);
-    gosc.start(t1); gosc.stop(t1 + gateSec * 1.5 + 0.05);
+    gosc.start(t1); gosc.stop(t1 + _ghostStopSec);
   }
 }
 
