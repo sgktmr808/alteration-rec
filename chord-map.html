@@ -10647,11 +10647,6 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   } else {
     osc2.type = _slArpOsc2Type !== null ? _slArpOsc2Type : (sc.arpOsc2 || oscType);
   }
-  // osc2 detune: W-7時はwarm連動（warm↓=0cent / center=6cent / warm↑=18cent）
-  const _osc2DetuneCents = (_w7Ratio > 0 && _slArpW7Detune !== null)
-    ? Math.max(0, _slArpW7Detune)  // W-7: warm連動デチューン
-    : 6;                            // 通常: 固定6セント
-  osc2.frequency.value = hz * Math.pow(2, _osc2DetuneCents / 1200);
 
   // ── SUB OSC: 1oct下のsine（深み）──
   const sub = actx.createOscillator();
@@ -10685,6 +10680,12 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   const _w7Ratio = (sceneCurrentName === 'pluck' && _slArpCarrierMix !== null)
     ? Math.min(1, _slArpCarrierMix / 0.18)
     : 0;
+  // osc2 detune: W-7時はwarm連動（warm↓=1cent / center=6cent / warm↑=18cent）
+  // _w7Ratio確定後に設定（_w7Ratio宣言前に参照するとReferenceError）
+  const _osc2DetuneCents = (_w7Ratio > 0 && _slArpW7Detune !== null)
+    ? Math.max(1, Math.min(18, _slArpW7Detune)) // W-7: warm連動・下限1cent（コムフィルター防止）
+    : 6;                                          // 通常: 固定6セント
+  osc2.frequency.value = hz * Math.pow(2, _osc2DetuneCents / 1200);
   const _baseCutoffClosed = Math.max(cutoff * 0.15, 60);
   const _baseCutoffOpen   = Math.min(cutoff, nyq);
   const baseCutoff = isLoveScene
