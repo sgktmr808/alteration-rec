@@ -13735,7 +13735,8 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     // complex補間: center側の現在値 → W-7目標値+bright差分
     const _baseCutoffNow = _slArpCutoff !== null ? _slArpCutoff : _baseCutoff;
     const _baseResNow    = _slArpRes    !== null ? _slArpRes    : _baseRes;
-    const _baseEnvNow    = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.98);
+    // bright=0（_slArpEnvMod=null）のとき0から補間。sc.arpEnvModを起点にするとcomplex途中でenvModが残る
+    const _baseEnvNow    = _slArpEnvMod !== null ? _slArpEnvMod : 0;
     _slArpCutoff = _baseCutoffNow * (1 - _cRatio) + Math.max(200, _w7Cutoff + _brightDeltaCutoff) * _cRatio;
     _slArpRes    = _baseResNow    * (1 - _cRatio) + Math.max(0.05, _w7Res + _brightDeltaRes)      * _cRatio;
     _slArpEnvMod = _baseEnvNow   * (1 - _cRatio) + Math.max(0,    _w7EnvMod + _brightDeltaEnvMod) * _cRatio;
