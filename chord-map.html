@@ -10899,7 +10899,9 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     if(sceneCurrentName === 'pluck' && _slArpFMDepthPluck !== null && _slArpFMDepthPluck > 0.01){
       const _complexNow = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
       const _isSpring   = _complexNow > 0.02;
-      const _plkFMIndex = hz * _slArpFMDepthPluck * (_isSpring ? 1.8 : 3.0);
+      const _plkFMIndex = _isSpring
+        ? _slArpFMDepthPluck * 180        // W-7: 固定スケール（hz乗算によるノイズ防止）
+        : hz * _slArpFMDepthPluck * 3.0;  // 鉄球: 現行維持
 
       // 系統1
       const _plkFMOsc1  = actx.createOscillator();
@@ -13692,7 +13694,7 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpFMDepthPluck   = _cRatio * 1.20;
     _slArpDarkRatioPluck = _cRatio;
     _slArpRes     = Math.min(5.5, _baseRes * (1.0 + _cRatio * 0.80)); // 自己発振域を外す
-    _slArpEnvMod  = Math.max(0.40, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.60)); // フィルターを最低限開く
+    _slArpEnvMod  = Math.max(0.65, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.35)); // フィルターを十分開く
     _slArpAttack  = 0.001 + _cRatio * 0.003;
     _slArpDecay   = 0.35 + _cRatio * 0.65;
     _slArpGate    = Math.max(200, (sc.arpGate || 180) + _cRatio * 600);
