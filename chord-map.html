@@ -13691,8 +13691,8 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     const _cRatio = -_complexVal; // 0〜1
     _slArpFMDepthPluck   = _cRatio * 1.20;
     _slArpDarkRatioPluck = _cRatio;
-    _slArpRes     = Math.min(9.0, _baseRes * (1.0 + _cRatio * 1.80));
-    _slArpEnvMod  = Math.max(0.02, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.98));
+    _slArpRes     = Math.min(5.5, _baseRes * (1.0 + _cRatio * 0.80)); // 自己発振域を外す
+    _slArpEnvMod  = Math.max(0.40, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.60)); // フィルターを最低限開く
     _slArpAttack  = 0.001 + _cRatio * 0.003;
     _slArpDecay   = 0.35 + _cRatio * 0.65;
     _slArpGate    = Math.max(200, (sc.arpGate || 180) + _cRatio * 600);
