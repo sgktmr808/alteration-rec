@@ -13706,18 +13706,27 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpDarkRatioPluck = 0;
     _slArpCarrierMix     = _cRatio * 0.18;
 
-    // bright分岐の結果（complex=0時の基準値）とW-7目標値を補間
-    // complex=0: bright分岐そのまま / complex=1: W-7固定値に完全移行
-    const _brightCutoff = _slArpCutoff !== null ? _slArpCutoff : _baseCutoff;  // bright分岐結果
-    const _brightRes    = _slArpRes    !== null ? _slArpRes    : _baseRes;
-    const _brightEnvMod = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.98);
-    _slArpCutoff = _brightCutoff * (1 - _cRatio) + 4444 * _cRatio;
-    _slArpRes    = _brightRes    * (1 - _cRatio) + 0.05 * _cRatio;
-    _slArpEnvMod = _brightEnvMod * (1 - _cRatio) + 0.0  * _cRatio;
+    // W-7基準値（bright=0・complex=1時の目標値）
+    const _w7Cutoff = 4444;
+    const _w7Res    = 0.05;
+    const _w7EnvMod = 0.0;
 
-    _slArpAttack  = 0.001;
-    _slArpDecay   = 0.34;
-    _slArpGate    = Math.max(80, (sc.arpGate || 180) - _cRatio * 100);
+    // brightの差分（bright=0で0・bright↑で上乗せ・bright↓で下げ）
+    const _brightDeltaCutoff = bright * _baseCutoff * 1.2;
+    const _brightDeltaRes    = bright > 0 ? bright * _baseRes * 1.2 : 0;
+    const _brightDeltaEnvMod = bright > 0 ? bright * (sc.arpEnvMod || 0.98) * 0.4 : 0;
+
+    // complex補間: center側の現在値 → W-7目標値+bright差分
+    const _baseCutoffNow = _slArpCutoff !== null ? _slArpCutoff : _baseCutoff;
+    const _baseResNow    = _slArpRes    !== null ? _slArpRes    : _baseRes;
+    const _baseEnvNow    = _slArpEnvMod !== null ? _slArpEnvMod : (sc.arpEnvMod || 0.98);
+    _slArpCutoff = _baseCutoffNow * (1 - _cRatio) + Math.max(200, _w7Cutoff + _brightDeltaCutoff) * _cRatio;
+    _slArpRes    = _baseResNow    * (1 - _cRatio) + Math.max(0.05, _w7Res + _brightDeltaRes)      * _cRatio;
+    _slArpEnvMod = _baseEnvNow   * (1 - _cRatio) + Math.max(0,    _w7EnvMod + _brightDeltaEnvMod) * _cRatio;
+
+    _slArpAttack = 0.001;
+    _slArpDecay  = 0.34;
+    _slArpGate   = Math.max(80, (sc.arpGate || 180) - _cRatio * 100);
   } else {
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
