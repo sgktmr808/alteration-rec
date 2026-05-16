@@ -10690,9 +10690,12 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   lpf.frequency.setValueAtTime(baseCutoff, startTime);
   if(!isLoveScene){
     lpf.frequency.exponentialRampToValueAtTime(peakCutoff, startTime + atk + 0.01);
-    lpf.frequency.exponentialRampToValueAtTime(
-      Math.max(cutoff * 0.25, 60), startTime + atk + decay
-    );
+    if(_w7Ratio < 0.5){
+      // W-7時はdecay後のLPFクローズをスキップ（開放状態を維持）
+      lpf.frequency.exponentialRampToValueAtTime(
+        Math.max(cutoff * 0.25, 60), startTime + atk + decay
+      );
+    }
   }
   // LOVEはfilterをほぼ固定 → 輝きが持続する
 
