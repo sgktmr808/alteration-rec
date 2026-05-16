@@ -10718,10 +10718,13 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     const plainRelease = sc.arpRelease || 0.38;
     env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.015, 0.001), startTime + atk + plainDecay);
     env.gain.exponentialRampToValueAtTime(0.001, startTime + atk + plainDecay + plainRelease);
-  } else if(sceneCurrentName === 'pluck' && _w7Ratio > 0.5){
+  } else if(sceneCurrentName === 'pluck' && _w7Ratio > 0){
     // W-7: attack → decay → 余韻（gateで切らない）
+    // moving連動: releaseタイム倍率（moving↑=短/moving↓=長）下限=0.4倍（click noise防止）
+    const _w7RelMul = _slArpW7Release !== null ? Math.max(0.4, _slArpW7Release) : 1.0;
+    const _w7ReleaseSec = decay * 1.5 * _w7RelMul;
     env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.01, 0.001), startTime + atk + decay);
-    env.gain.exponentialRampToValueAtTime(0.0001, startTime + atk + decay + decay * 1.5);
+    env.gain.exponentialRampToValueAtTime(0.0001, startTime + atk + decay + _w7ReleaseSec);
   } else {
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
   }
@@ -10746,11 +10749,23 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
   // ── ルーティング ──
   // LOVEはosc1_morphをlpfに接続・osc1本体は使わない
+  // ── W-7専用: HPFノード（bright↑で高域を通す）──
+  // bright↑: HPFが開く（4000Hz max）/ bright↓: LPFで表現済み / bright=0: bypass
+  let _w7FilterOut = lpf; // デフォルトはLPFの出力をenvに接続
+  if(_w7Ratio > 0 && _slArpW7HpfFreq !== null && _slArpW7HpfFreq > 20){
+    const _w7Hpf = actx.createBiquadFilter();
+    _w7Hpf.type = 'highpass';
+    _w7Hpf.frequency.value = _slArpW7HpfFreq;
+    _w7Hpf.Q.value = 0.5;
+    lpf.connect(_w7Hpf);
+    _w7FilterOut = _w7Hpf; // HPFの出力をenvに接続
+  }
+
   if(_loveOsc1Morph) _loveOsc1Morph.connect(lpf);
   else if(!_loveOsc1Handled) osc1.connect(lpf);
   osc2.connect(osc2g); osc2g.connect(lpf);
   sub.connect(subG);   subG.connect(lpf);
-  lpf.connect(env);
+  _w7FilterOut.connect(env);
 
   // ── LOVE専用: ハイシェルフで有機的な倍音を薄く加える ──
   // sineだけでは冷たい・ハイシェルフで3kHz以上をわずかに持ち上げる
@@ -10912,9 +10927,13 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     if(sceneCurrentName === 'pluck' && _slArpFMDepthPluck !== null && _slArpFMDepthPluck > 0.01){
       const _complexNow = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
       const _isSpring   = _complexNow > 0.02;
+      // W-7 warm連動: warm↓=暖=modIndex低め(×0.4) / warm↑=冷=modIndex高め(×1.6)
+      const _w7WarmMul  = (_isSpring && _slArpW7FMWarm !== null)
+        ? Math.max(0.4, 1.0 + _slArpW7FMWarm * 0.6)
+        : 1.0;
       const _plkFMIndex = _isSpring
-        ? _slArpFMDepthPluck * 180        // W-7: 固定スケール（hz乗算によるノイズ防止）
-        : hz * _slArpFMDepthPluck * 3.0;  // 鉄球: 現行維持
+        ? _slArpFMDepthPluck * 180 * _w7WarmMul   // W-7: 固定スケール × warm倍率
+        : hz * _slArpFMDepthPluck * 3.0;           // 鉄球: 現行維持
 
       // 系統1
       const _plkFMOsc1  = actx.createOscillator();
@@ -10934,9 +10953,13 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
       _plkFMOsc2.connect(_plkFMGain2);
       _plkFMGain2.connect(osc1.frequency);
 
-      const _fmStopSec = (_isSpring && _w7Ratio > 0.5)
-        ? startTime + atk + decay + decay * 1.5 + 0.1  // W-7: VCA消滅後まで維持
-        : startTime + gateSec + 0.1;                    // 通常: gate基準
+      // W-7: FMoscStopをgateSec基準とdecay基準の間でモーフィング
+      const _fmRelMul = _slArpW7Release !== null ? Math.max(0.4, _slArpW7Release) : 1.0;
+      const _fmStopW7 = startTime + atk + decay + decay * 1.5 * _fmRelMul + 0.1;
+      const _fmStopNormal = startTime + gateSec + 0.1;
+      const _fmStopSec = _isSpring
+        ? _fmStopNormal * (1 - _w7Ratio) + _fmStopW7 * _w7Ratio
+        : _fmStopNormal;
       _plkFMOsc1.start(startTime); _plkFMOsc1.stop(_fmStopSec);
       _plkFMOsc2.start(startTime); _plkFMOsc2.stop(_fmStopSec);
 
@@ -11027,8 +11050,13 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   osc2.start(startTime); sub.start(startTime);
   // LOVEはrelease余韻分長めにoscを維持
   const _plainRelSec = (sceneCurrentName === 'plain') ? (sc.arpDecay || 0.28) + (sc.arpRelease || 0.38) + 0.05 : 0.08;
-  const _w7StopExtra = (_w7Ratio > 0.5) ? (atk + decay + decay * 1.5 + 0.1 - gateSec) : 0;
-  const oscStopExtra = isLoveScene ? 0.65 : (_w7StopExtra > 0 ? _w7StopExtra : _plainRelSec);
+  // W-7: oscStopをgateSec基準とdecay基準の間でモーフィング（二値スイッチ廃止）
+  const _w7RelMulStop = _slArpW7Release !== null ? Math.max(0.4, _slArpW7Release) : 1.0;
+  const _w7StopSec = atk + decay + decay * 1.5 * _w7RelMulStop + 0.1;
+  const _w7StopExtra = _w7StopSec - gateSec;
+  const oscStopExtra = isLoveScene ? 0.65
+    : _w7Ratio > 0 ? (_plainRelSec * (1 - _w7Ratio) + _w7StopExtra * _w7Ratio)
+    : _plainRelSec;
   if(!_loveOsc1Handled) osc1.stop(startTime + gateSec + oscStopExtra);
   osc2.stop(startTime + gateSec + oscStopExtra);
   sub.stop(startTime + gateSec + oscStopExtra);
@@ -11054,9 +11082,11 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     // ゆっくり立ち上がり → 長めに尾を引く
     genv.gain.setValueAtTime(0.001, t1);
     genv.gain.linearRampToValueAtTime(ghostPeak, t1 + atk + 0.02);
-    const _ghostDecaySec = (_w7Ratio > 0.5) ? atk + decay : gateSec * 0.8;
-    const _ghostEndSec   = (_w7Ratio > 0.5) ? atk + decay + decay * 1.5 : gateSec * 1.4;
-    const _ghostStopSec  = (_w7Ratio > 0.5) ? atk + decay + decay * 1.5 + 0.1 : gateSec * 1.5 + 0.05;
+    // W-7: Ghost stop時刻をgateSec基準とdecay基準の間でモーフィング
+    const _ghostRelMul  = _slArpW7Release !== null ? Math.max(0.4, _slArpW7Release) : 1.0;
+    const _ghostDecaySec = (gateSec * 0.8) * (1 - _w7Ratio) + (atk + decay) * _w7Ratio;
+    const _ghostEndSec   = (gateSec * 1.4) * (1 - _w7Ratio) + (atk + decay + decay * 1.5 * _ghostRelMul) * _w7Ratio;
+    const _ghostStopSec  = (gateSec * 1.5 + 0.05) * (1 - _w7Ratio) + (atk + decay + decay * 1.5 * _ghostRelMul + 0.1) * _w7Ratio;
     genv.gain.exponentialRampToValueAtTime(ghostPeak * 0.3, t1 + _ghostDecaySec);
     genv.gain.exponentialRampToValueAtTime(0.001, t1 + _ghostEndSec);
     gosc.connect(glpf); glpf.connect(genv); genv.connect(rvbTarget);
@@ -11967,7 +11997,13 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         return { midi: null, stepRatio: 1.0 * densityMul };
       }
 
-      const midi = step.midi;
+      // W-7 strange連動: オクターブシフト（strange↑=+1oct高レンジ / strange↓=-1oct低レンジ）
+      // スマートフォン可聴下限: MIDI 48（C3・約131Hz）
+      let midi = step.midi;
+      if(_slArpW7OctShift !== null && Math.abs(_slArpW7OctShift) > 0.5){
+        const _octShift = Math.round(_slArpW7OctShift);
+        midi = Math.max(48, midi + _octShift); // 下限: MIDI 48（C3）
+      }
       ps.lastMidi = midi;
 
       // ベロシティ: セルのvelテンプレート基準・差は控えめ
@@ -13558,6 +13594,7 @@ function applySLToArp(){
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
     _slArpAttack = null; _slArpDecay = null; _slArpOsc1Type = null; _slArpOsc2Type = null; _slArpFMDepth = null;
     _slArpFMDepthPluck = null; _slArpDarkRatioPluck = 0; _slArpCarrierMix = null;
+    _slArpW7HpfFreq = null; _slArpW7FMWarm = null; _slArpW7Release = null; _slArpW7OctShift = null;
     return;
   }
 
@@ -13755,6 +13792,23 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpAttack = 0.001;
     _slArpDecay  = 0.34;
     _slArpGate   = Math.max(80, (sc.arpGate || 180) - _cRatio * 100);
+
+    // ── W-7専用: 各SLスライダーのパラメーターをcomplex値でモーフィング ──
+    // bright: HPF（right↑）/ LPF（left↓）・中央フラット
+    // bright↑でHPFが開く（0→4000Hz）・bright↓はcutoff補間で表現済み
+    _slArpW7HpfFreq = bright > 0 ? bright * _cRatio * 4000 : 0;
+
+    // warm: FM倍音質感（warm↓=暖・modIndex低め / warm↑=冷・modIndex高め）
+    // complex値でモーフィング（center側は効果なし）
+    _slArpW7FMWarm = warm * _cRatio;
+
+    // moving: releaseタイム倍率（moving↑=短 / moving↓=長 / center=現在設定）
+    // moving=+1: ×0.4（クリックノイズ出ない最短） / moving=-1: ×2.0（長め）
+    _slArpW7Release = (1.0 - moving * 0.6) * (1.0 - _cRatio) + (1.0 - moving * 0.6) * _cRatio;
+
+    // strange: オクターブシフト（strange↑=+1oct高レンジ / strange↓=-1oct低レンジ）
+    // スマートフォン可聴下限: MIDI 48（C3・約131Hz）
+    _slArpW7OctShift = Math.round(strange * 12) * _cRatio; // -12〜+12半音
   } else {
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
@@ -13763,6 +13817,10 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpOsc1Type       = null;
     _slArpOsc2Type       = null;
     _slArpSubGain        = null;
+    _slArpW7HpfFreq      = null;
+    _slArpW7FMWarm       = null;
+    _slArpW7Release      = null;
+    _slArpW7OctShift     = null;
   }
 
   // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
@@ -13852,6 +13910,10 @@ let _slArpFMDepth  = null; // Scene固有: FM変調深さ（STRINGS bright側）
 let _slArpFMDepthPluck = null; // PLUCK専用: FM変調深さ（dark側・金属感）
 let _slArpDarkRatioPluck = 0; // PLUCK専用: darkRatio（PeriodicWaveモーフィング用）
 let _slArpCarrierMix = null;  // PLUCK専用: スプリング（W-7）pure sineミックス量（0〜1）
+let _slArpW7HpfFreq  = null;  // W-7専用: bright連動HPF周波数（bright↑で開く・0=不使用）
+let _slArpW7FMWarm   = null;  // W-7専用: warm連動FM倍音質感（warm↓=暖/warm↑=冷）
+let _slArpW7Release  = null;  // W-7専用: moving連動releaseタイム倍率（↑=短/↓=長）
+let _slArpW7OctShift = null;  // W-7専用: strange連動オクターブシフト（半音単位）
 
 // ── Pattern Grammar 切替（HOLD / STAB / BROKEN / PULSE / TRAIL / PLUCK ARP / FLOAT ARP / INNER LINE） ──
 
