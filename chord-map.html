@@ -12004,10 +12004,13 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       if(_slArpW7OctShift !== null && Math.abs(_slArpW7OctShift) > 0.5 && notes.length > 0){
         const _octShift   = Math.round(_slArpW7OctShift);
         const _targetMidi = midi + _octShift;
-        // コード構成音の中から最も近い音を選択
-        const _closest = notes.reduce((prev, curr) =>
-          Math.abs(curr - _targetMidi) < Math.abs(prev - _targetMidi) ? curr : prev
-        );
+        // 数値のみにフィルタ（型安全）してコード構成音の中から最も近い音を選択
+        const _numNotes = notes.filter(n => typeof n === 'number');
+        const _closest = _numNotes.length > 0
+          ? _numNotes.reduce((prev, curr) =>
+              Math.abs(curr - _targetMidi) < Math.abs(prev - _targetMidi) ? curr : prev
+            )
+          : midi;
         midi = Math.max(48, _closest); // 下限: MIDI 48（C3）
       }
       ps.lastMidi = midi;
@@ -13783,7 +13786,7 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
 
     // brightの差分（W-7基準値に上乗せ）
     const _brightDeltaCutoff = bright * _w7Cutoff * 0.40;           // ±2400Hz
-    const _brightDeltaRes    = bright > 0 ? bright * 0.80 : 0;      // 上方向のみ
+    const _brightDeltaRes    = (bright > 0 ? bright * 0.80 : 0) + (tense > 0 ? tense * 0.20 : 0); // bright上方向+tense連動
     const _brightDeltaEnvMod = bright > 0 ? bright * 0.25 : 0;      // 上方向のみ
 
     // complex補間: center側の現在値 → W-7目標値+bright差分
@@ -13802,7 +13805,7 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     // ── W-7専用: 各SLスライダーのパラメーターをcomplex値でモーフィング ──
     // bright: HPF（right↑）/ LPF（left↓）・中央フラット
     // bright↑でHPFが開く（0→4000Hz）・bright↓はcutoff補間で表現済み
-    _slArpW7HpfFreq = bright > 0 ? bright * _cRatio * 4000 : 0;
+    _slArpW7HpfFreq = bright > 0 ? bright * _cRatio * 2000 : 0;
 
     // warm: FM倍音質感（warm↓=暖・modIndex低め / warm↑=冷・modIndex高め）
     // complex値でモーフィング（center側は効果なし）
