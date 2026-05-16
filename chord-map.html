@@ -13687,7 +13687,7 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
   } else {
     _slArpCutoff = null; _slArpRes = null; _slArpEnvMod = null;
   }
-  _slArpOsc2Type     = null;
+  if(_complexVal <= 0.02) _slArpOsc2Type = null; // W-7時は上書きしない
   _slOsc2Mix         = 0.55 + warm * 0.35;
   _slArpAttack       = null;
 
@@ -13752,8 +13752,8 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
 
   // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
   _slArpRestProb = Math.max(0, Math.min(0.50, (sc.arpRestProb || 0.08) - tense * 0.22));
-  // warm↑: sub osc増加（低域の重さ）
-  _slArpSubGain = 0.12 + warm * 0.28;
+  // warm↑: sub osc増加（低域の重さ）W-7時は上書きしない
+  if(_slArpCarrierMix === null) _slArpSubGain = 0.12 + warm * 0.28;
   // moving↑: gate短縮 / moving↓: gate延長（complex側でgateをセット済みの場合は上書きしない）
   if(Math.abs(_complexVal) <= 0.02){
     _slArpGate = Math.max(60, Math.min(600, (sc.arpGate || 180) * (1.0 - moving * 0.60)));
