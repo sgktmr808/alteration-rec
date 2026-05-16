@@ -13803,12 +13803,14 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpW7FMWarm = warm * _cRatio;
 
     // moving: releaseタイム倍率（moving↑=短 / moving↓=長 / center=現在設定）
-    // moving=+1: ×0.4（クリックノイズ出ない最短） / moving=-1: ×2.0（長め）
-    _slArpW7Release = (1.0 - moving * 0.6) * (1.0 - _cRatio) + (1.0 - moving * 0.6) * _cRatio;
+    // moving=+1: ×0.4（クリックノイズ出ない最短） / moving=-1: ×1.6（長め）
+    // complex=0で効果なし(1.0) / complex=1でmoving連動
+    _slArpW7Release = 1.0 * (1 - _cRatio) + (1.0 - moving * 0.6) * _cRatio;
 
     // strange: オクターブシフト（strange↑=+1oct高レンジ / strange↓=-1oct低レンジ）
     // スマートフォン可聴下限: MIDI 48（C3・約131Hz）
-    _slArpW7OctShift = Math.round(strange * 12) * _cRatio; // -12〜+12半音
+    // complex途中でも整数シフトが正しく機能するよう、先にMath.roundしてからcRatio適用
+    _slArpW7OctShift = Math.round(strange * 12 * _cRatio); // -12〜+12半音
   } else {
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
