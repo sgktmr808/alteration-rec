@@ -10634,7 +10634,7 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     var _loveOsc1Handled = true;
     var _loveOsc1Morph = osc1_morph; // lpf宣言後に接続するため保持
   } else {
-    osc1.type = oscType;
+    osc1.type = _slArpOsc1Type !== null ? _slArpOsc1Type : oscType;
     var _loveOsc1Handled = false;
     var _loveOsc1Morph = null;
   }
@@ -10677,9 +10677,15 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   // 通常: baseCutoffから開く（filter env） → マリンバ的な「ポン」感
   // LOVE: peakCutoffから始めてゆっくり維持 → グラス感・暖かさが持続
   const isLoveScene = (sceneCurrentName === 'love');
+  // W-7連動比率（complex値に応じて0→1）
+  const _w7Ratio = (sceneCurrentName === 'pluck' && _slArpCarrierMix !== null)
+    ? Math.min(1, _slArpCarrierMix / 0.18)
+    : 0;
+  const _baseCutoffClosed = Math.max(cutoff * 0.15, 60);
+  const _baseCutoffOpen   = Math.min(cutoff, nyq);
   const baseCutoff = isLoveScene
-    ? Math.min(cutoff * (1 + envMod * 1.5), nyq)  // 最初から開いた状態
-    : Math.max(cutoff * 0.15, 60);                  // 通常: 閉じた状態
+    ? Math.min(cutoff * (1 + envMod * 1.5), nyq)
+    : _baseCutoffClosed * (1 - _w7Ratio) + _baseCutoffOpen * _w7Ratio;
   const peakCutoff = Math.min(cutoff * (1 + envMod * 2.8), nyq);
   lpf.frequency.setValueAtTime(baseCutoff, startTime);
   if(!isLoveScene){
@@ -13536,7 +13542,7 @@ function applySLToArp(){
     _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
     _slArpOctRange = null; _slArpPattern = null;
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
-    _slArpAttack = null; _slArpDecay = null; _slArpOsc2Type = null; _slArpFMDepth = null;
+    _slArpAttack = null; _slArpDecay = null; _slArpOsc1Type = null; _slArpOsc2Type = null; _slArpFMDepth = null;
     _slArpFMDepthPluck = null; _slArpDarkRatioPluck = 0; _slArpCarrierMix = null;
     return;
   }
@@ -13706,15 +13712,22 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpDarkRatioPluck = 0;
     _slArpCarrierMix     = _cRatio * 0.18;
 
+    // osc1/osc2をsineにモーフィング（complex↑でsawtooth→sine）
+    _slArpOsc1Type = 'sine';
+    _slArpOsc2Type = 'sine';
+
+    // subGainをcomplex↑で0に向けてモーフィング
+    _slArpSubGain = Math.max(0, 0.35 * (1 - _cRatio));
+
     // W-7基準値（bright=0・complex=1時の目標値）
-    const _w7Cutoff = 4444;
+    const _w7Cutoff = 6000;
     const _w7Res    = 0.05;
     const _w7EnvMod = 0.0;
 
-    // brightの差分（bright=0で0・bright↑で上乗せ・bright↓で下げ）
-    const _brightDeltaCutoff = bright * _baseCutoff * 1.2;
-    const _brightDeltaRes    = bright > 0 ? bright * _baseRes * 1.2 : 0;
-    const _brightDeltaEnvMod = bright > 0 ? bright * (sc.arpEnvMod || 0.98) * 0.4 : 0;
+    // brightの差分（W-7基準値に上乗せ）
+    const _brightDeltaCutoff = bright * _w7Cutoff * 0.40;           // ±2400Hz
+    const _brightDeltaRes    = bright > 0 ? bright * 0.80 : 0;      // 上方向のみ
+    const _brightDeltaEnvMod = bright > 0 ? bright * 0.25 : 0;      // 上方向のみ
 
     // complex補間: center側の現在値 → W-7目標値+bright差分
     const _baseCutoffNow = _slArpCutoff !== null ? _slArpCutoff : _baseCutoff;
@@ -13732,6 +13745,9 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpDarkRatioPluck = 0;
     _slArpCarrierMix     = null;
     _slArpDecay          = null;
+    _slArpOsc1Type       = null;
+    _slArpOsc2Type       = null;
+    _slArpSubGain        = null;
   }
 
   // tense↑: restProb減少（密に）/ tense↓: restProb増加（疎に）
@@ -13815,6 +13831,7 @@ let _slArpSubGain  = null; // Scene固有: sub osc gainの上書き（pluck/warm
 let _slArpGhost    = null; // 全Scene共通: complex連動ゴースト音量上書き
 let _slArpAttack   = null; // Scene固有: attack上書き（STRINGS bright連動）
 let _slArpDecay    = null; // Scene固有: decay上書き（PLUCK dark連動）
+let _slArpOsc1Type = null; // PLUCK専用: osc1波形上書き（W-7 sine モーフィング）
 let _slArpOsc2Type = null; // Scene固有: osc2波形上書き（STRINGS dark側 triangle blend）
 let _slArpFMDepth  = null; // Scene固有: FM変調深さ（STRINGS bright側）
 let _slArpFMDepthPluck = null; // PLUCK専用: FM変調深さ（dark側・金属感）
