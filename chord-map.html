@@ -10718,6 +10718,10 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     const plainRelease = sc.arpRelease || 0.38;
     env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.015, 0.001), startTime + atk + plainDecay);
     env.gain.exponentialRampToValueAtTime(0.001, startTime + atk + plainDecay + plainRelease);
+  } else if(sceneCurrentName === 'pluck' && _w7Ratio > 0.5){
+    // W-7: attack → decay → 余韻（gateで切らない）
+    env.gain.exponentialRampToValueAtTime(Math.max(vol * 0.01, 0.001), startTime + atk + decay);
+    env.gain.exponentialRampToValueAtTime(0.0001, startTime + atk + decay + decay * 1.5);
   } else {
     env.gain.exponentialRampToValueAtTime(0.001, startTime + gateSec);
   }
@@ -10930,8 +10934,11 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
       _plkFMOsc2.connect(_plkFMGain2);
       _plkFMGain2.connect(osc1.frequency);
 
-      _plkFMOsc1.start(startTime); _plkFMOsc1.stop(startTime + gateSec + 0.1);
-      _plkFMOsc2.start(startTime); _plkFMOsc2.stop(startTime + gateSec + 0.1);
+      const _fmStopSec = (_isSpring && _w7Ratio > 0.5)
+        ? startTime + atk + decay + decay * 1.5 + 0.1  // W-7: VCA消滅後まで維持
+        : startTime + gateSec + 0.1;                    // 通常: gate基準
+      _plkFMOsc1.start(startTime); _plkFMOsc1.stop(_fmStopSec);
+      _plkFMOsc2.start(startTime); _plkFMOsc2.stop(_fmStopSec);
 
       // ── W-7 pure sineミックス（carrierMix連動・透明感の芯）──
       // FM倍音が鳴ったあと純音成分だけが余韻として残る構造
@@ -11020,7 +11027,8 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   osc2.start(startTime); sub.start(startTime);
   // LOVEはrelease余韻分長めにoscを維持
   const _plainRelSec = (sceneCurrentName === 'plain') ? (sc.arpDecay || 0.28) + (sc.arpRelease || 0.38) + 0.05 : 0.08;
-  const oscStopExtra = isLoveScene ? 0.65 : _plainRelSec;
+  const _w7StopExtra = (_w7Ratio > 0.5) ? (atk + decay + decay * 1.5 + 0.1 - gateSec) : 0;
+  const oscStopExtra = isLoveScene ? 0.65 : (_w7StopExtra > 0 ? _w7StopExtra : _plainRelSec);
   if(!_loveOsc1Handled) osc1.stop(startTime + gateSec + oscStopExtra);
   osc2.stop(startTime + gateSec + oscStopExtra);
   sub.stop(startTime + gateSec + oscStopExtra);
