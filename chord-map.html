@@ -10893,18 +10893,18 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
       _strFMOsc.stop(startTime + gateSec + 0.3);
     }
 
-    // ── PLUCK dark側FM変調（_slArpFMDepthPluck連動）──
+    // ── PLUCK スプリング側FM変調（_slArpFMDepthPluck連動）──
     // complex↓（鉄球）: hz×2.756 / hz×0.367（重い金属共鳴）
-    // complex↑（スプリング）: hz×4.238 / hz×7.123（高次非整数比・バネ的）
+    // complex↑（W-7 tungsten）: hz×1.587 / hz×4.756（立方根2・高次非整数比）
     if(sceneCurrentName === 'pluck' && _slArpFMDepthPluck !== null && _slArpFMDepthPluck > 0.01){
       const _complexNow = (typeof sv === 'function') ? (sv('complex') || 0) : 0;
       const _isSpring   = _complexNow > 0.02;
-      const _plkFMIndex = hz * _slArpFMDepthPluck * (_isSpring ? 2.0 : 3.0);
+      const _plkFMIndex = hz * _slArpFMDepthPluck * (_isSpring ? 1.8 : 3.0);
 
       // 系統1
       const _plkFMOsc1  = actx.createOscillator();
       _plkFMOsc1.type   = 'sine';
-      _plkFMOsc1.frequency.value = hz * (_isSpring ? 4.238 : 2.756);
+      _plkFMOsc1.frequency.value = hz * (_isSpring ? 1.587 : 2.756);
       const _plkFMGain1 = actx.createGain();
       _plkFMGain1.gain.value = _plkFMIndex * 0.8;
       _plkFMOsc1.connect(_plkFMGain1);
@@ -10913,7 +10913,7 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
       // 系統2
       const _plkFMOsc2  = actx.createOscillator();
       _plkFMOsc2.type   = 'sine';
-      _plkFMOsc2.frequency.value = hz * (_isSpring ? 7.123 : 0.367);
+      _plkFMOsc2.frequency.value = hz * (_isSpring ? 4.756 : 0.367);
       const _plkFMGain2 = actx.createGain();
       _plkFMGain2.gain.value = _plkFMIndex * (_isSpring ? 0.5 : 0.6);
       _plkFMOsc2.connect(_plkFMGain2);
@@ -10921,6 +10921,43 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
       _plkFMOsc1.start(startTime); _plkFMOsc1.stop(startTime + gateSec + 0.1);
       _plkFMOsc2.start(startTime); _plkFMOsc2.stop(startTime + gateSec + 0.1);
+
+      // ── W-7 pure sineミックス（carrierMix連動・透明感の芯）──
+      // FM倍音が鳴ったあと純音成分だけが余韻として残る構造
+      // PLUCK スプリング（_isSpring）時のみ発音。他Sceneには影響しない。
+      if(_isSpring && _slArpCarrierMix !== null && _slArpCarrierMix > 0.01){
+        const _pureOsc  = actx.createOscillator();
+        _pureOsc.type   = 'sine';
+        _pureOsc.frequency.value = hz;
+
+        const _pureDecay   = decay * 1.5;
+        const _pureRelease = decay * 2.4; // releaseはdecayから算出
+        const _pureVol     = vol * _slArpCarrierMix * 0.40;
+
+        const _pureEnv = actx.createGain();
+        _pureEnv.gain.setValueAtTime(0.0, startTime);
+        _pureEnv.gain.linearRampToValueAtTime(_pureVol, startTime + 0.003);
+        _pureEnv.gain.exponentialRampToValueAtTime(
+          Math.max(_pureVol * 0.06, 0.0001), startTime + _pureDecay
+        );
+        _pureEnv.gain.exponentialRampToValueAtTime(
+          0.00001, startTime + _pureDecay + _pureRelease
+        );
+
+        // HPF（低域濁り防止・PLUCKのarpCutoffと連動）
+        const _pureHpf = actx.createBiquadFilter();
+        _pureHpf.type = 'highpass';
+        _pureHpf.frequency.value = Math.max(180, cutoff * 0.18);
+        _pureHpf.Q.value = 0.5;
+
+        _pureOsc.connect(_pureEnv);
+        _pureEnv.connect(_pureHpf);
+        _pureHpf.connect(rvbTarget); // 共有リバーブへ（共通ディレイは避ける・余韻のみ）
+
+        const _pureStop = startTime + _pureDecay + _pureRelease + 0.05;
+        _pureOsc.start(startTime);
+        _pureOsc.stop(_pureStop);
+      }
     }
 
     // ── PLUCK PeriodicWaveモーフィング（sawtooth→square）──
@@ -13498,7 +13535,7 @@ function applySLToArp(){
     _slArpOctRange = null; _slArpPattern = null;
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
     _slArpAttack = null; _slArpDecay = null; _slArpOsc2Type = null; _slArpFMDepth = null;
-    _slArpFMDepthPluck = null; _slArpDarkRatioPluck = 0;
+    _slArpFMDepthPluck = null; _slArpDarkRatioPluck = 0; _slArpCarrierMix = null;
     return;
   }
 
@@ -13660,18 +13697,21 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
     _slArpDecay   = 0.35 + _cRatio * 0.65;
     _slArpGate    = Math.max(200, (sc.arpGate || 180) + _cRatio * 600);
   } else if(_complexVal > 0.02){
-    // スプリングサウンド
+    // W-7 tungsten サウンド（重め・暗い・金属的ベル）
+    // ratio1:1.587（立方根2）/ ratio2:4.756（高次非整数比）
     const _cRatio = _complexVal; // 0〜1
-    _slArpFMDepthPluck   = _cRatio * 0.80; // 高次FM（発音側で別比率を使う）
+    _slArpFMDepthPluck   = _cRatio * 0.90; // FM深さ（発音側で ratio1/2 を使用）
     _slArpDarkRatioPluck = 0;              // PeriodicWaveモーフィングなし（sawtooth維持）
-    _slArpRes     = Math.min(5.5, _baseRes * (1.0 + _cRatio * 0.72));
+    _slArpCarrierMix     = _cRatio * 0.18; // pure sineミックス量（0〜0.18・透明感の芯）
+    _slArpRes     = Math.min(4.5, _baseRes * (1.0 + _cRatio * 0.41));
     _slArpEnvMod  = Math.max(0.05, (sc.arpEnvMod || 0.98) * (1.0 - _cRatio * 0.95));
     _slArpAttack  = 0.001; // 鋭いアタック維持
-    _slArpDecay   = Math.max(0.05, 0.35 - _cRatio * 0.30); // 0.35→0.05s（素早く減衰）
-    _slArpGate    = Math.max(40, (sc.arpGate || 180) - _cRatio * 120); // 180→60ms
+    _slArpDecay   = 0.34;  // W-7固定（素早く減衰しすぎない）
+    _slArpGate    = Math.max(80, (sc.arpGate || 180) - _cRatio * 100); // 180→80ms
   } else {
     _slArpFMDepthPluck   = null;
     _slArpDarkRatioPluck = 0;
+    _slArpCarrierMix     = null;
     _slArpDecay          = null;
   }
 
@@ -13760,6 +13800,7 @@ let _slArpOsc2Type = null; // Scene固有: osc2波形上書き（STRINGS dark側
 let _slArpFMDepth  = null; // Scene固有: FM変調深さ（STRINGS bright側）
 let _slArpFMDepthPluck = null; // PLUCK専用: FM変調深さ（dark側・金属感）
 let _slArpDarkRatioPluck = 0; // PLUCK専用: darkRatio（PeriodicWaveモーフィング用）
+let _slArpCarrierMix = null;  // PLUCK専用: スプリング（W-7）pure sineミックス量（0〜1）
 
 // ── Pattern Grammar 切替（HOLD / STAB / BROKEN / PULSE / TRAIL / PLUCK ARP / FLOAT ARP / INNER LINE） ──
 
