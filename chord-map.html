@@ -10690,12 +10690,11 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   lpf.frequency.setValueAtTime(baseCutoff, startTime);
   if(!isLoveScene){
     lpf.frequency.exponentialRampToValueAtTime(peakCutoff, startTime + atk + 0.01);
-    if(_w7Ratio < 0.5){
-      // W-7時はdecay後のLPFクローズをスキップ（開放状態を維持）
-      lpf.frequency.exponentialRampToValueAtTime(
-        Math.max(cutoff * 0.25, 60), startTime + atk + decay
-      );
-    }
+    // W-7: クローズ先をモーフィング（W-7=0: cutoff*0.25まで閉じる / W-7=1: フラット維持）
+    const _lpfCloseFreq = Math.max(cutoff * 0.25, 60) * (1 - _w7Ratio) + cutoff * _w7Ratio;
+    lpf.frequency.exponentialRampToValueAtTime(
+      Math.max(_lpfCloseFreq, 60), startTime + atk + decay
+    );
   }
   // LOVEはfilterをほぼ固定 → 輝きが持続する
 
@@ -10971,8 +10970,9 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
         _pureOsc.type   = 'sine';
         _pureOsc.frequency.value = hz;
 
-        const _pureDecay   = decay * 1.5;
-        const _pureRelease = decay * 2.4; // releaseはdecayから算出
+        const _pureRelMul  = _slArpW7Release !== null ? Math.max(0.4, _slArpW7Release) : 1.0;
+        const _pureDecay   = decay * 1.5 * _pureRelMul;
+        const _pureRelease = decay * 2.4 * _pureRelMul; // releaseはdecayから算出
         const _pureVol     = vol * _slArpCarrierMix * 0.40;
 
         const _pureEnv = actx.createGain();
@@ -11998,11 +11998,17 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       }
 
       // W-7 strange連動: オクターブシフト（strange↑=+1oct高レンジ / strange↓=-1oct低レンジ）
+      // コード構成音（notes）の中から最も近い音を選ぶ（クロマティックシフト禁止）
       // スマートフォン可聴下限: MIDI 48（C3・約131Hz）
       let midi = step.midi;
-      if(_slArpW7OctShift !== null && Math.abs(_slArpW7OctShift) > 0.5){
-        const _octShift = Math.round(_slArpW7OctShift);
-        midi = Math.max(48, midi + _octShift); // 下限: MIDI 48（C3）
+      if(_slArpW7OctShift !== null && Math.abs(_slArpW7OctShift) > 0.5 && notes.length > 0){
+        const _octShift   = Math.round(_slArpW7OctShift);
+        const _targetMidi = midi + _octShift;
+        // コード構成音の中から最も近い音を選択
+        const _closest = notes.reduce((prev, curr) =>
+          Math.abs(curr - _targetMidi) < Math.abs(prev - _targetMidi) ? curr : prev
+        );
+        midi = Math.max(48, _closest); // 下限: MIDI 48（C3）
       }
       ps.lastMidi = midi;
 
