@@ -10902,8 +10902,8 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
     // ── STRINGS bright側FM変調（_slArpFMDepth連動）──
     if(sceneCurrentName === 'strings' && _slArpFMDepth !== null && _slArpFMDepth > 0.01){
-      // モジュレーター: rootHz × 0.749（非整数比）で金属的な複雑さ・弦楽器らしさ
-      const _strFMHz    = hz * 0.749;
+      // モジュレーター: rootHz × 0.5（1oct下）でエッジのある金属感
+      const _strFMHz    = hz * 0.5;
       const _strFMIndex = hz * _slArpFMDepth * 1.2; // 変調インデックス（Hz単位）
 
       const _strFMOsc  = actx.createOscillator();
