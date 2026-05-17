@@ -1096,7 +1096,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   <div class="hdr-title">CHORD MAP</div>
   <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.8.0</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
-  <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
   <div class="hdr-solo-btn" id="hdr-solo-btn" onclick="toggleArpSolo()">SOLO</div>
 </div>
 <div class="legend">
@@ -1395,7 +1394,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   <span class="synth-sec-title">ARP · SH-101</span>
                   <div class="synth-pill arp" id="arp-on-btn" onclick="toggleArp()">OFF</div>
                 </div>
-                <div class="synth-row">
+                <div class="synth-row" id="arp-pattern-row" style="display:none">
                   <span class="synth-lbl">PATTERN</span>
                   <div class="synth-pills" id="arp-pattern-pills">
                     <div class="synth-pill arp on" data-pat="up">UP</div>
