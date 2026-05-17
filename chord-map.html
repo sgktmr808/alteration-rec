@@ -10064,6 +10064,33 @@ const SPACE_PRESETS = {
 };
 
 let spaceCurrentName = 'room';
+// ── マスターバス + リミッター（全音楽系出力の集約点） ──
+let _masterBus     = null; // GainNode: 全出力の集約点
+let _masterLimiter = null; // DynamicsCompressor: クリッピング防止
+let _masterBusCtx  = null; // AudioContext参照（切替検知用）
+
+function getMasterBus(actx){
+  if(_masterBus && _masterBusCtx === actx) return _masterBus;
+  // 既存ノードを切断
+  try{ if(_masterLimiter) _masterLimiter.disconnect(); }catch(e){}
+  try{ if(_masterBus)     _masterBus.disconnect();     }catch(e){}
+  // masterBus（Gain: 音量調整用・将来のマスターボリューム実装に備える）
+  _masterBus = actx.createGain();
+  _masterBus.gain.value = 1.0;
+  // masterLimiter（DynamicsCompressor: リミッター設定）
+  _masterLimiter = actx.createDynamicsCompressor();
+  _masterLimiter.threshold.value = -3.0;  // -3dBFSで働き始める
+  _masterLimiter.knee.value      =  0.0;  // ハードニー（即座にリミット）
+  _masterLimiter.ratio.value     = 20.0;  // 20:1（実質リミッター）
+  _masterLimiter.attack.value    =  0.001; // 1ms（素早く反応）
+  _masterLimiter.release.value   =  0.10;  // 100ms（自然に戻る）
+  // routing: masterBus → masterLimiter → destination
+  _masterBus.connect(_masterLimiter);
+  _masterLimiter.connect(actx.destination);
+  _masterBusCtx = actx;
+  return _masterBus;
+}
+
 let _spaceReverbNode = null;   // ConvolverNode or MultiDelayNode
 let _spaceReverbGain = null;   // リバーブsend gain
 let _spaceReverbReturnGain = null; // リバーブreturn gain
@@ -10131,11 +10158,11 @@ function _buildSpaceReverb(actx, preset){
   hpf.frequency.value = 6000;
   hpf.gain.value = -4;
 
-  // routing: sendGain → convolver → hpf → returnGain → destination
+  // routing: sendGain → convolver → hpf → returnGain → masterBus → limiter → destination
   sendGain.connect(convolver);
   convolver.connect(hpf);
   hpf.connect(returnGain);
-  returnGain.connect(actx.destination);
+  returnGain.connect(getMasterBus(actx));
 
   _spaceReverbNode = convolver;
   _spaceReverbGain = sendGain;
@@ -10195,7 +10222,7 @@ function buildDelayNodes(actx){
   dlyInputGain.gain.value=1;
 
   if(dlyTime==='off'){
-    dlyInputGain.connect(actx.destination);
+    dlyInputGain.connect(getMasterBus(actx));
     dlyDestination=dlyInputGain;
     return;
   }
@@ -10215,14 +10242,14 @@ function buildDelayNodes(actx){
 
   // dry path
   dlyInputGain.connect(dlyDryGain);
-  dlyDryGain.connect(actx.destination);
+  dlyDryGain.connect(getMasterBus(actx));
 
   // delay L path
   dlyInputGain.connect(dlyNodeL);
   dlyNodeL.connect(dlyFbGainL);
   dlyFbGainL.connect(dlyNodeL); // feedback loop
   dlyNodeL.connect(dlyWetGainL);
-  dlyWetGainL.connect(actx.destination);
+  dlyWetGainL.connect(getMasterBus(actx));
 
   // PING: cross-feedback L↔R
   if(dlyTime==='ping'){
@@ -10231,7 +10258,7 @@ function buildDelayNodes(actx){
     dlyFbGainR.connect(dlyNodeL);
     dlyFbGainL.connect(dlyNodeR);
     dlyNodeR.connect(dlyWetGainR);
-    dlyWetGainR.connect(actx.destination);
+    dlyWetGainR.connect(getMasterBus(actx));
   }
 
   dlyDestination=dlyInputGain;
