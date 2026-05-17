@@ -1087,7 +1087,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 <div class="hdr">
   <a class="hdr-back" href="chord-link.html">← HOME</a>
   <div class="hdr-title">CHORD MAP</div>
-  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.7.1</div>
+  <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.8.0</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
   <div class="hdr-arp-btn" id="hdr-arp-btn" onclick="toggleArp()">ARP</div>
   <div class="hdr-solo-btn" id="hdr-solo-btn" onclick="toggleArpSolo()">SOLO</div>
@@ -12055,6 +12055,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const _strangeVal = sv ? sv('strange') : 0;
       const _movingVal  = sv ? sv('moving')  : 0;
       const _warmVal    = sv ? sv('warm')    : 0;
+      const _tenseVal   = sv ? sv('tense')   : 0;
 
       const sorted = [...notes].sort((a,b) => a-b);
 
@@ -12118,7 +12119,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
 
       // ── 3拍ごとに位相オフセットをずらす ──
       // strange↑: シフト間隔を短く（速くずれる） / strange↓: 長く（ゆっくり）
-      const _shiftInterval = Math.max(2, Math.round(6 - _strangeVal * 3)); // 3〜9ステップ
+      const _shiftInterval = Math.max(2, Math.round(6 - _strangeVal * 3 - _tenseVal * 1.5)); // tense+: 短く速い / tense-: 長く余白
       ps.stringsStepCount++;
       if(ps.stringsStepCount >= _shiftInterval){
         ps.stringsStepCount = 0;
@@ -12815,7 +12816,7 @@ const SCENE_PRESETS = {
     // osc2octは_playSceneArpNoteでは未使用のため、ghost（1oct上sine）で倍音を出す
     arpOsc:'sine', arpOsc2:'sine', arpCutoff:4500, arpRes:0.25, arpEnvMod:0.08,
     arpAttack:0.004, arpDecay:0.35, arpSustain:0.06,
-    arpGate:480, arpVol:0.09, arpWet:0.52, arpGhost:0.30,
+    arpGate:480, arpVol:0.14, arpWet:0.52, arpGhost:0.30,
     // shimmerパターンで毎ステップリアルタイム選択（arpRhythmは間隔制御のみ）
     arpRhythm:[3.9, 1.9, 1.0, 4.9, 1.9, 1.0, 6.9, 1.9, 1.0, 2.8, 3.9], arpRestProb:0.22,
   },
@@ -12986,10 +12987,11 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
     }
 
     notes = _applyComplex(notes);
-    // 音数を3音に絞る（密度を下げる・CHORDをうるさくしない）
+    // 音数: strange↑時は4音まで（13th・#11が切り落とされる問題を修正）/ それ以外は3音
     // 7th・3rd・9thを優先して残す
     const _keep = notes.sort((a,b)=>a-b);
-    return _keep.slice(0,3);
+    const _keepMax = (_slS > 0.4) ? 4 : 3;
+    return _keep.slice(0, _keepMax);
   }
 
   if(flavor === 'glass'){
@@ -13871,8 +13873,8 @@ function _applySL_pluck(sc, bright, tense, warm, moving, strange, complex){
 function _applySL_strings(sc, bright, tense, warm, moving, strange){
   _slArpCutoff = Math.max(300, (sc.arpCutoff || 1500) * (1.0 + bright * 0.65));
   _slArpRes    = Math.max(0.2, (sc.arpRes || 0.45) * (1.0 + tense * 0.5));
-  // tense+: restProb減少・gate延長（推進力） / tense-: restProb増加（間引き）
-  _slArpRestProb = Math.max(0, Math.min(0.55, (sc.arpRestProb || 0.05) - tense * 0.25));
+  // tense: _shiftIntervalをフレーズ文法内でsv('tense')から直接参照（restProbは無効のため削除）
+  _slArpRestProb = null;
   _slArpEnvMod = Math.max(0.1, (sc.arpEnvMod || 0.28) * (1.0 + tense * 0.4));
   // warm: osc2mix増加（厚み）+ gate延長
   _slOsc2Mix = 0.55 + warm * 0.35; // 0.20〜0.90
