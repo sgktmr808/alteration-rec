@@ -1400,13 +1400,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   </div>
                 </div>
                 <div class="synth-row">
-                  <span class="synth-lbl">RATE</span>
-                  <div class="synth-pills" id="arp-rate-pills">
-                    <div class="synth-pill arp" data-r="1/4">1/4</div>
-                    <div class="synth-pill arp on" data-r="1/8">1/8</div>
-                    <div class="synth-pill arp" data-r="1/16">1/16</div>
-                    <div class="synth-pill arp" data-r="1/32">1/32</div>
-                  </div>
                 </div>
                 <div class="synth-row">
                   <span class="synth-lbl">VOL</span>
@@ -12669,13 +12662,8 @@ function initSynthUI(){
       if(arpOn&&S&&S.root) { arpSeq=buildArpSeq(S.root,S.type); arpStep=0; }
     };
   });
-  // ARPレートpill初期化
-  document.querySelectorAll('#arp-rate-pills .synth-pill').forEach(p=>{
-    p.onclick=()=>{
-      arpRate=p.dataset.r;
-      document.querySelectorAll('#arp-rate-pills .synth-pill').forEach(q=>q.classList.toggle('on',q===p));
-    };
-  });
+  // ARPレートpill初期化（UIは廃止・arpRateはPULSEパターン用にデフォルト1/16で固定）
+  // document.querySelectorAll('#arp-rate-pills .synth-pill') → HTML削除済み
   // DELAYタイムpill初期化
   document.querySelectorAll('#dly-time-pills .synth-pill').forEach(p=>{
     p.onclick=()=>{
