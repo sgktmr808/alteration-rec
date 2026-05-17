@@ -12806,7 +12806,7 @@ const SCENE_PRESETS = {
     // cutoffは中域よりやや上・envModでスタブ的な開きを出す
     cutoff:2000, res:0.5, envMod:0.55,
     // 速いattack（跳ねる）・sustain低め（完全なスタブ感）
-    attack:0.006, decay:0.22, sustain:0.12, release:1.0,
+    attack:0.006, decay:0.22, sustain:0.20, release:1.0,
     vol:0.42, chorus:0.02, wet:0.52, strum:2,
     trailSec:1.0, width:0.66, feltAttack:0.12, ghost:0.0, filterDrift:0.06,
     voicingFlavor:'garage',
@@ -13186,7 +13186,7 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   const vca = actx.createGain();
   vca.gain.setValueAtTime(0.001, t);
   vca.gain.linearRampToValueAtTime(sc.vol * 0.68, t + sc.attack);
-  vca.gain.setValueAtTime(sc.vol * 0.68 * sc.sustain, t + sc.attack + sc.decay);
+  vca.gain.linearRampToValueAtTime(sc.vol * 0.68 * sc.sustain, t + sc.attack + sc.decay);
 
   // OSC2 mix
   // osc2oct=2（1oct上）のとき: 薄い倍音として0.28程度
@@ -13324,13 +13324,19 @@ function playSceneChord(actx, root, type){
       chordTrail  = Math.max(0.2, Math.min(4.0, (_sc.trailSec || 1.0) - moving * 0.6));
       break;
     case 'love':
-      // LOVEはCHORDパラメーター固定。変化は最小限
+      // bright: cutoff微開放（sineなので控えめ）
       chordCutoff = Math.max(200, _sc.cutoff * (1.0 + bright * 0.3));
       chordRes    = Math.max(0.3, _sc.res * (1.0 + tense * 0.3));
       chordDetune = _sc.detune + warm * 2;
       chordWet    = _sc.wet;
       chordDrift  = _sc.filterDrift || 0.05;
-      chordTrail  = Math.max(0.5, _sc.trailSec - moving * 0.3);
+      // moving↑: スタブ（decay短・sustain低・trail短）
+      // moving↓: パッド（decay長・sustain高・trail長）
+      sc = Object.assign({}, sc, {
+        decay:   Math.max(0.10, (_sc.decay   || 0.22) - moving * 0.08),  // 0.14〜0.30s
+        sustain: Math.max(0.10, Math.min(0.40, (_sc.sustain || 0.20) - moving * 0.12)), // 0.08〜0.32
+      });
+      chordTrail  = Math.max(0.5, Math.min(2.0, (_sc.trailSec || 1.0) - moving * 0.8)); // 0.5〜1.8s
       break;
     case 'pluck':
       // bright: cutoff大幅上昇（フィルターが鋭く開く）
