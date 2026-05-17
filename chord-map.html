@@ -6315,6 +6315,8 @@ function startGroove(mode){
   autoBpm=preset.bpm;
   updateBpmDisplay(autoBpm);
   updateDelayTime();
+  // ARP再起動: 新BPMのグリッドに再スナップ（Grooveとの同期）
+  if(arpOn) startArpScheduler();
 
   if(phraseMode!=='off'){
     phraseStyle='groove';
@@ -13587,6 +13589,18 @@ function playScene(root, type){
   let actx;
   try{ actx = (typeof getCtx === 'function') ? getCtx() : null; }catch(e){ return; }
   if(!actx) return;
+
+  // Groove再生中: 次の1拍頭（4分音符）までコードチェンジをクオンタイズ
+  if(grooveMode && _masterClockOrigin !== null && actx.state === 'running'){
+    const _beat = 60 / autoBpm; // 1拍（秒）
+    const _elapsed = actx.currentTime - _masterClockOrigin;
+    const _nextBeat = Math.ceil(_elapsed / _beat) * _beat;
+    const _delayMs = Math.max(0, (_masterClockOrigin + _nextBeat - actx.currentTime) * 1000);
+    if(_delayMs > 20){ // 20ms以上ある場合のみ遅延（即打ちは即座に発音）
+      setTimeout(()=>{ _doPlay(); }, _delayMs);
+      return;
+    }
+  }
 
   const _doPlay = () => {
     // CHORD系を発音（arpSoloがONの場合はCHORDをスキップ）
