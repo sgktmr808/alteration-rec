@@ -10902,8 +10902,8 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
     // ── STRINGS bright側FM変調（_slArpFMDepth連動）──
     if(sceneCurrentName === 'strings' && _slArpFMDepth !== null && _slArpFMDepth > 0.01){
-      // モジュレーター: rootHz × 0.5（1oct下）でエッジのある金属感
-      const _strFMHz    = hz * 0.5;
+      // モジュレーター: rootHz × 0.749（非整数比）で金属的な複雑さ・弦楽器らしさ
+      const _strFMHz    = hz * 0.749;
       const _strFMIndex = hz * _slArpFMDepth * 1.2; // 変調インデックス（Hz単位）
 
       const _strFMOsc  = actx.createOscillator();
@@ -13290,7 +13290,7 @@ function playSceneChord(actx, root, type){
   const chordWidth  = Math.max(0.1, Math.min(1.0, (_sc.width || 0.55) + complex * 0.3));
 
   // Scene固有パラメーター計算
-  let chordCutoff, chordRes, chordDetune, chordWet, chordDrift, chordTrail, chordChorus;
+  let chordCutoff, chordRes, chordDetune, chordWet, chordDrift, chordTrail, chordChorus, chordDecay, chordSustain;
   chordChorus = _sc.chorus; // デフォルトはSceneの値をそのまま使う
 
   switch(sceneCurrentName){
@@ -13332,11 +13332,10 @@ function playSceneChord(actx, root, type){
       chordDrift  = _sc.filterDrift || 0.05;
       // moving↑: スタブ（decay短・sustain低・trail短）
       // moving↓: パッド（decay長・sustain高・trail長）
-      sc = Object.assign({}, sc, {
-        decay:   Math.max(0.10, (_sc.decay   || 0.22) - moving * 0.08),  // 0.14〜0.30s
-        sustain: Math.max(0.10, Math.min(0.40, (_sc.sustain || 0.20) - moving * 0.12)), // 0.08〜0.32
-      });
-      chordTrail  = Math.max(0.5, Math.min(2.0, (_sc.trailSec || 1.0) - moving * 0.8)); // 0.5〜1.8s
+      // ※ sc はこのswitch後に宣言されるため _sc から直接取得する
+      chordDecay   = Math.max(0.10, (_sc.decay   || 0.22) - moving * 0.08);   // 0.14〜0.30s
+      chordSustain = Math.max(0.10, Math.min(0.40, (_sc.sustain || 0.20) - moving * 0.12)); // 0.08〜0.32
+      chordTrail   = Math.max(0.5, Math.min(2.0, (_sc.trailSec || 1.0) - moving * 0.8)); // 0.5〜1.8s
       break;
     case 'pluck':
       // bright: cutoff大幅上昇（フィルターが鋭く開く）
@@ -13388,6 +13387,8 @@ function playSceneChord(actx, root, type){
     width:       finalWidth,
     trailSec:    chordTrail,
     chorus:      chordChorus,
+    ...(chordDecay   !== undefined && { decay:   chordDecay   }),
+    ...(chordSustain !== undefined && { sustain: chordSustain }),
   });
 
   // 前回リリース中のボイスを即座に消音（濁り防止）
