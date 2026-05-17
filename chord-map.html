@@ -10902,8 +10902,8 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
 
     // ── STRINGS bright側FM変調（_slArpFMDepth連動）──
     if(sceneCurrentName === 'strings' && _slArpFMDepth !== null && _slArpFMDepth > 0.01){
-      // モジュレーター: rootHz × 0.5（1oct下）でエッジのある金属感
-      const _strFMHz    = hz * 0.5;
+      // モジュレーター: rootHz × 0.749（非整数比）で金属的な複雑さ・弦楽器らしさ
+      const _strFMHz    = hz * 0.749;
       const _strFMIndex = hz * _slArpFMDepth * 1.2; // 変調インデックス（Hz単位）
 
       const _strFMOsc  = actx.createOscillator();
@@ -11917,8 +11917,8 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const velMul = Math.max(0.4, baseVel + (Math.random() - 0.5) * _warmVal * 0.15);
 
       // ノートレングス: warm↑で伸びる（絶対秒数・1.0以上で絶対値として扱われる）
-      // warm=-1: 0.5s / warm=0: 0.9s / warm=+1: 1.6s
-      const gateOverride = 0.9 + _warmVal * 0.7;
+      // warm=-1: 0.6s / warm=0: 0.9s / warm=+1: 1.2s
+      const gateOverride = 0.9 + _warmVal * 0.3;
 
       if(midi != null) ps.lastMidi = midi;
       return { midi, stepRatio: 1.0 * densityMul, velMul, gateOverride };
@@ -12769,7 +12769,7 @@ const SCENE_PRESETS = {
     trailSec:2.2, width:0.72, feltAttack:0.08, ghost:0.0, filterDrift:0.52, // drift大きくフェイザー感増
     voicingFlavor:'rootless',
     // ARP: CHORDの倍音として機能する設計
-    arpOsc:'sine', arpOsc2:'sine', arpCutoff:900, arpRes:0.30, arpEnvMod:0.15,
+    arpOsc:'sine', arpOsc2:'sine', arpCutoff:1400, arpRes:0.30, arpEnvMod:0.28,
     arpAttack:0.02, arpDecay:0.80, arpSustain:0.40,
     arpGate:800, arpVol:0.28, arpWet:0.50, arpGhost:0.10,
     arpOctRange:2,
@@ -13639,6 +13639,7 @@ function applySLToArp(){
 
   // ── Scene固有処理 ──
   switch(sceneCurrentName){
+    case 'love':    _applySL_love(sc, bright, tense, warm, moving, strange);    break;
     case 'plain':   _applySL_plain(sc, bright, tense, warm, moving, strange);   break;
     case 'velvet':  _applySL_velvet(sc, bright, tense, warm, moving, strange);  break;
     case 'glass':   _applySL_glass(sc, bright, tense, warm, moving, strange);   break;
@@ -13666,6 +13667,28 @@ function _rebuildArpIfNeeded(){
 // warm:   attack丸め + decay伸ばし（溶けていく感）
 // moving: gate短縮（粒感） / 延長（余韻）
 // strange: リズムシャッフルの深さ
+// ── LOVE: Korg M1的sine積み重ね・shimmer ARP ──
+// bright: cutoff上昇（sineなので上げても破綻しない・開放感）
+// tense:  restProb増減（Tense=shimmerが密に / Calm=間引き・余白）
+// warm:   ghost音量（倍音の華やかさ）+ gate延長
+// moving: gate短縮（粒感） / 延長（余韻を残す）
+// strange: envMod増減（開きすぎない範囲で明暗）
+function _applySL_love(sc, bright, tense, warm, moving, strange){
+  // bright: sineなので広い範囲で上昇（4500Hz基準・最大8000Hz）
+  _slArpCutoff = Math.max(1500, (sc.arpCutoff || 4500) * (1.0 + bright * 0.55));
+  // tense: resは変化なし（sine系でresを上げると発振しやすい）
+  _slArpRes = sc.arpRes || 0.25;
+  // tense: restProb増減（Tense=shimmerが詰まる / Calm=余白）
+  _slArpRestProb = Math.max(0, Math.min(0.55, (sc.arpRestProb || 0.22) - tense * 0.18));
+  // warm: ghost音量（sine倍音の華やかさ）
+  _slArpGhost = Math.max(0.05, Math.min(0.55, (sc.arpGhost || 0.30) + warm * 0.18));
+  // warm + moving: gate（warm↑=長く余韻 / moving↑=短く粒感）
+  _slArpGate = Math.max(80, (sc.arpGate || 480) * (1.0 + warm * 0.25) * (1.0 - moving * 0.35));
+  // strange: envModで倍音の開き方を変化（0.08基準・上げすぎない）
+  _slArpEnvMod = Math.max(0.02, Math.min(0.22, (sc.arpEnvMod || 0.08) + strange * 0.10));
+  _slArpSubGain = null; _slArpPattern = null;
+}
+
 function _applySL_plain(sc, bright, tense, warm, moving, strange){
   _slArpCutoff = Math.max(300, (sc.arpCutoff || 1600) * (1.0 + bright * 0.5));
   // tense+: restProb減少(粒増)・envMod増(締まる) / tense-: restProb増加(音減る)
