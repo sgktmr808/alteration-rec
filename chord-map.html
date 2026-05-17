@@ -458,6 +458,13 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .saved-empty{font-family:var(--fm);font-size:9px;color:var(--dim);padding:6px 2px;opacity:.6;}
 /* P2: タイムラインmini-canvas */
 .saved-tl{display:block;width:100%;height:20px;}
+/* サウンド状態復元ボタン */
+.saved-restore{
+  font-family:var(--fm);font-size:8px;color:rgba(232,197,71,0.7);
+  padding:4px 6px;cursor:pointer;border-left:1px solid var(--bdr);
+  transition:background .12s,color .12s;letter-spacing:.04em;white-space:nowrap;
+}
+.saved-restore:hover{color:var(--acc);background:var(--acc-a);}
 /* ── P2: SUS版ボタン ── */
 .saved-sus{
   font-family:var(--fm);font-size:8px;color:rgba(74,170,114,0.75);
@@ -2783,7 +2790,7 @@ function drawFrame(){
     ctx.arc(cx,cy,MR,a1,a2);ctx.closePath();
     ctx.fillStyle=hexToRgba(sec.col,0.03);ctx.fill();
     const midA=(a1+a2)/2;
-    ctx.font='7px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font='8px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=hexToRgba(sec.col,0.38);
     ctx.fillText(sec.label,cx+MR*0.82*Math.cos(midA),cy+MR*0.82*Math.sin(midA));
   });
@@ -2904,7 +2911,7 @@ function drawFrame(){
     }
 
     // Label — bolder for top nodes
-    const fSize=isTop?10:9;
+    const fSize=isTop?11:10;
     ctx.font=`bold ${fSize}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=isTop?'#fff':col;
     ctx.shadowColor=isTop?col:'transparent';ctx.shadowBlur=isTop?6:0;
@@ -2913,8 +2920,8 @@ function drawFrame(){
 
     // Relation label
     if(node.label){
-      ctx.font='6.5px DM Mono,monospace';
-      ctx.fillStyle=col;ctx.globalAlpha=0.42*op;
+      ctx.font='8px DM Mono,monospace';
+      ctx.fillStyle=col;ctx.globalAlpha=0.55*op;
       ctx.fillText(node.label,x,y+nr+9);
     }
     ctx.globalAlpha=1;
@@ -2943,7 +2950,7 @@ function drawFrame(){
         ctx.strokeStyle='rgba(255,255,255,0.55)';
         ctx.lineWidth=1.5;ctx.globalAlpha=0.65*op;ctx.stroke();
         const sncLbl=(snc.semitone>0?'+':'')+snc.semitone+' '+snc.changedFrom+'→'+snc.changedTo;
-        ctx.font='5.5px DM Mono,monospace';
+        ctx.font='7px DM Mono,monospace';
         ctx.fillStyle='rgba(255,255,255,0.80)';
         ctx.globalAlpha=0.80*op;ctx.textAlign='center';
         ctx.fillText(sncLbl, x, y+nr+20);
@@ -2952,14 +2959,14 @@ function drawFrame(){
     }
     // ── 2-B: Sus解決ラベル ──
     if(node.susResolveLabel){
-      ctx.font='5.5px DM Mono,monospace';
+      ctx.font='7px DM Mono,monospace';
       ctx.fillStyle='#e8c547';ctx.globalAlpha=0.80*op;ctx.textAlign='center';
       ctx.fillText(node.susResolveLabel, x, y-nr-8);
       ctx.globalAlpha=1;
     }
     // ── 2-C: Dimパッシングラベル ──
     if(node.dimPassLabel){
-      ctx.font='5.5px DM Mono,monospace';
+      ctx.font='7px DM Mono,monospace';
       ctx.fillStyle='#9a6ad4';ctx.globalAlpha=0.80*op;ctx.textAlign='center';
       ctx.fillText(node.dimPassLabel, x, y-nr-8);
       ctx.globalAlpha=1;
@@ -2978,9 +2985,9 @@ function drawFrame(){
   ctx.beginPath();ctx.arc(cx,cy,27,0,Math.PI*2);
   ctx.fillStyle='rgba(232,197,71,0.15)';ctx.fill();
   ctx.strokeStyle='#e8c547';ctx.lineWidth=1.5;ctx.stroke();
-  ctx.font='bold 13px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font='bold 15px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillStyle='#e8c547';ctx.fillText(S.root,cx,cy-7);
-  ctx.font='9px DM Mono,monospace';ctx.fillStyle='#b0a060';
+  ctx.font='11px DM Mono,monospace';ctx.fillStyle='#b0a060';
   ctx.fillText(CT[S.type]?.sym||'maj',cx,cy+9);
 
   // ── EMO MAP: 中央ノードに感情ベクトル表示 + カラーリング ──
@@ -2993,7 +3000,7 @@ function drawFrame(){
       ctx.lineWidth=ei===1?2.5:1.0;ctx.stroke();
     }
     // 感情インジケーターテキスト（中央ノード下）
-    ctx.font='6px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.font='7px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='top';
     const bLabel='B:'+(cev.brightness*10|0).toString();
     const tLabel=' T:'+(cev.tension*10|0).toString();
     const rLabel=' R:'+(cev.resolution*10|0).toString();
@@ -6398,7 +6405,7 @@ function drawGroovePulse(ctx){
   ctx.stroke();ctx.globalAlpha=1;
 
   // ラベル（左上）
-  ctx.font='bold 7px DM Mono,monospace';
+  ctx.font='bold 9px DM Mono,monospace';
   ctx.textAlign='left';ctx.textBaseline='top';
   ctx.fillStyle=preset.pulseCol;
   ctx.globalAlpha=0.65;
@@ -6454,8 +6461,8 @@ function drawAutoOverlay(ctx){
   }
 
   // ── BPM indicator ──
-  ctx.font='7px DM Mono,monospace';ctx.textAlign='right';ctx.textBaseline='bottom';
-  ctx.fillStyle='rgba(232,197,71,0.5)';
+  ctx.font='9px DM Mono,monospace';ctx.textAlign='right';ctx.textBaseline='bottom';
+  ctx.fillStyle='rgba(232,197,71,0.65)';
   ctx.fillText(`AUTO  ${autoBpm}BPM`,L.W-10,L.H-8);
 }
 
@@ -6520,6 +6527,65 @@ function moveToChord(root,type){
 // ═══════════════════════════════════════════════════════
 const SAVED_PROGS_KEY='chord_saved_progs';
 
+// ── サウンドステート キャプチャ / リストア ──
+
+function captureCurrentSoundState(){
+  return {
+    scene:   sceneCurrentName,
+    bpm:     autoBpm,
+    space:   spaceCurrentName,
+    sliders: Object.fromEntries(
+      ['bright','tense','warm','complex','moving','strange']
+        .map(id => [id, SL.find(s=>s.id===id)?.val ?? 0])
+    ),
+    mix: {
+      dlyTime: dlyTime,
+      dlyMix:  dlyMix,
+      dlyFb:   typeof dlyFb !== 'undefined' ? dlyFb : null,
+      arpVol:  arpVol,
+    }
+  };
+}
+
+function restoreSoundState(entry){
+  const ss = entry.soundState;
+  if(!ss) return; // 旧フォーマット（soundStateなし）は何もしない
+
+  // Scene + BPM
+  if(ss.scene) applyScene(ss.scene, false); // マップ経由なのでchangeBpm=false
+  if(ss.bpm)   updateBpmDisplay(ss.bpm);
+
+  // Space
+  if(ss.space && typeof applySpacePreset === 'function') applySpacePreset(ss.space);
+
+  // Sliders
+  if(ss.sliders){
+    SL.forEach(s => {
+      if(ss.sliders[s.id] !== undefined){
+        s.val  = ss.sliders[s.id];
+        s.disp = ss.sliders[s.id];
+      }
+    });
+    if(typeof renderSliders === 'function')  renderSliders();
+    if(typeof applySLToArp === 'function')   applySLToArp();
+  }
+
+  // Mix
+  if(ss.mix){
+    if(ss.mix.dlyTime) { dlyTime = ss.mix.dlyTime; updateDelayTime(); }
+    if(ss.mix.dlyMix  != null) {
+      dlyMix = ss.mix.dlyMix;
+      const mxEl = document.getElementById('dly-mix');
+      if(mxEl) mxEl.value = Math.round(ss.mix.dlyMix * 100);
+    }
+    if(ss.mix.arpVol  != null) {
+      arpVol = ss.mix.arpVol;
+      const avEl = document.getElementById('arp-vol');
+      if(avEl) avEl.value = Math.round(ss.mix.arpVol * 100);
+    }
+  }
+}
+
 function loadSavedProgs(){
   try{
     return JSON.parse(localStorage.getItem(SAVED_PROGS_KEY)||'[]');
@@ -6551,6 +6617,7 @@ function saveCurrentProgression(){
     chords:history.map(h=>({root:h.root,type:h.type})),
     savedAt:new Date().toISOString(),
     key:S.root, // 保存時のキー（参考情報）
+    soundState: captureCurrentSoundState(), // 音色・スライダー・BPM状態を保存
   };
   progs.unshift(entry); // 最新を先頭に
   if(progs.length>20)progs.length=20; // 最大20件
@@ -7186,9 +7253,14 @@ function renderSavedList(){
     const susBtn=hasSus
       ?`<div class="saved-sus" data-id="${p.id}" onclick="playSusProg(${p.id})" title="Sus版で再生">SUS</div>`
       :'';
+    // 音色情報が保存されている場合のみRESTOREボタンを表示
+    const restoreBtn = p.soundState
+      ? `<div class="saved-restore" onclick="restoreSoundState(loadSavedProgs().find(x=>x.id===${p.id}))" title="Scene/BPM/スライダーを復元">◎</div>`
+      : '';
     return `<div class="saved-item" data-id="${p.id}">
       <div class="saved-item-row">
         <div class="saved-play" onclick="playSavedProg(${p.id})" title="${chordStr}">${p.name}</div>
+        ${restoreBtn}
         ${susBtn}
         <div class="saved-del" onclick="deleteSavedProg(${p.id})" title="削除">✕</div>
       </div>
