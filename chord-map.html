@@ -802,7 +802,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   padding:10px 12px 8px;gap:6px;
   background:var(--surf2);border-top:1px solid var(--bdr);
 }
-.bpm-dial-wrap{position:relative;width:130px;height:130px;}
+.bpm-dial-wrap{position:relative;width:130px;height:130px;cursor:ns-resize;touch-action:none;}
 .bpm-dial-svg{position:absolute;inset:0;width:100%;height:100%;}
 .bpm-dial-center{position:absolute;inset:0;display:flex;flex-direction:column;
   align-items:center;justify-content:center;pointer-events:none;}
@@ -3245,8 +3245,9 @@ function initCanvas(){
         drag={idx,startAngle:angle,startVal:SL[idx].val};return;
       }
     }
-    // Center node — tap to play chord（EXPANDモード時はスキップ）
+    // Center node — tap to play chord + タップテンポ登録（EXPANDモード時はスキップ）
     if(dist<32&&MAP_MODE!=='expand'){
+      _registerTapTempo(); // コードを叩くリズムでテンポを設定
       if(autoPlay){stopAuto();}
       else{
         /* playChord disabled: notifySynth handles audio */
@@ -9778,6 +9779,31 @@ let _stringsGhostFade  = 0;     // フェードアウト進行（1.0→0.0）
 let _stringsGhostStep  = 0;     // 残留層のステップ数カウント
 let _stringsGhostNextBeat = 0;  // 残留層の次発音時刻
 let _masterClockOrigin=null; // マスタークロック起点（ファーストタップ時に一度だけ設定）
+
+// ── タップテンポ ──
+// 中央コードノードを叩いてBPMを設定する（4タップ平均・2秒リセット）
+let _tapTempoTimes = []; // タップ時刻記録（最大4件・performance.now基準）
+
+function _registerTapTempo(){
+  const now = performance.now();
+  // 2秒以上空いたら新しいシーケンスとして開始
+  if(_tapTempoTimes.length > 0 && now - _tapTempoTimes[_tapTempoTimes.length - 1] > 2000){
+    _tapTempoTimes = [];
+  }
+  _tapTempoTimes.push(now);
+  // 視覚フィードバック: 中央から短いパルス
+  if(typeof fxSpawnPulse === 'function') fxSpawnPulse(L.cx, L.cy, 'rgba(232,197,71,0.45)');
+  // 2タップ以上で即時BPM算出・更新（4タップで安定した平均値に収束）
+  if(_tapTempoTimes.length >= 2){
+    const recent = _tapTempoTimes.slice(-4);
+    let total = 0;
+    for(let i = 1; i < recent.length; i++) total += recent[i] - recent[i - 1];
+    const bpm = Math.round(60000 / (total / (recent.length - 1)));
+    if(bpm >= 40 && bpm <= 180) updateBpmDisplay(bpm);
+  }
+  // 最大4件に絞る（古いタップを破棄）
+  if(_tapTempoTimes.length > 4) _tapTempoTimes = _tapTempoTimes.slice(-4);
+}
 let arpScheduleTimer=null;
 
 // DELAY用AudioNodeキャッシュ
@@ -16449,8 +16475,45 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
   }
   // F4: グローバル公開（grooveから呼び出せるように）
   window.updateBpmDisplay=function(bpm){ setBpm(bpm); };
-  document.getElementById('bpm-dial-minus')?.addEventListener('click',()=>setBpm(autoBpm-4));
-  document.getElementById('bpm-dial-plus')?.addEventListener('click',()=>setBpm(autoBpm+4));
+  // ── ダイヤルドラッグ操作（上ドラッグ=BPM増・下ドラッグ=BPM減）──
+  {
+    const dialWrap = document.getElementById('bpm-dial-wrap');
+    let _dd = false, _ddY = 0, _ddBpm = 0;
+    dialWrap?.addEventListener('pointerdown', e=>{
+      // ±ボタン上のイベントはボタン側で処理
+      if(e.target.closest('.bpm-dial-step')) return;
+      _dd = true; _ddY = e.clientY; _ddBpm = autoBpm;
+      dialWrap.setPointerCapture(e.pointerId);
+    });
+    dialWrap?.addEventListener('pointermove', e=>{
+      if(!_dd) return;
+      const delta = Math.round((_ddY - e.clientY) / 2); // 2px = 1BPM
+      setBpm(_ddBpm + delta);
+    });
+    dialWrap?.addEventListener('pointerup',   ()=>{ _dd = false; });
+    dialWrap?.addEventListener('pointercancel',()=>{ _dd = false; });
+  }
+
+  // ── ±ボタン: タップ=±4 / 長押し=±1連続 ──
+  function _setupBpmBtn(elId, dir){
+    const el = document.getElementById(elId);
+    if(!el) return;
+    let _hold = null, _rep = null;
+    const _stop = ()=>{ clearTimeout(_hold); clearInterval(_rep); _hold=null; _rep=null; };
+    el.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      setBpm(autoBpm + dir * 4); // 即時±4
+      _hold = setTimeout(()=>{
+        _rep = setInterval(()=>setBpm(autoBpm + dir * 1), 80); // 長押し: ±1連続
+      }, 400);
+    });
+    el.addEventListener('pointerup',    _stop);
+    el.addEventListener('pointercancel',_stop);
+    el.addEventListener('pointerleave', _stop);
+  }
+  _setupBpmBtn('bpm-dial-minus', -1);
+  _setupBpmBtn('bpm-dial-plus',  +1);
+
   // 初期描画
   updateDial(autoBpm);
 })();
