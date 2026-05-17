@@ -13273,8 +13273,9 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
     feltLpf.frequency.value = hz * 8;
     const feltDur = 0.06 + sc.feltAttack * 0.12; // 60〜180ms
     const feltVol = sc.vol * sc.feltAttack * 0.5;
-    feltEnv.gain.setValueAtTime(feltVol, t);
-    feltEnv.gain.exponentialRampToValueAtTime(0.001, t + feltDur);
+    feltEnv.gain.setValueAtTime(0.0001, t);
+    feltEnv.gain.linearRampToValueAtTime(feltVol, t + 0.004);       // 4msランプ（クリックノイズ防止）
+    feltEnv.gain.exponentialRampToValueAtTime(0.001, t + feltDur + 0.004);
     felt.connect(feltLpf); feltLpf.connect(feltEnv); feltEnv.connect(panner);
     felt.start(t); felt.stop(t + feltDur + 0.01);
   }
@@ -13452,11 +13453,12 @@ function playSceneChord(actx, root, type){
   // 前コードのボイスを照合: 次コードに含まれるノートは保持、それ以外はリリース
   const _keptVoices = [];
   _sceneVoices.forEach(v => {
-    if(v && v.midi !== undefined && _nextMidiSet.has(v.midi)){
-      // 共通ノード: リリースせず保持（次コードでも鳴り続ける）
+    if(v && v.midi !== undefined && _nextMidiSet.has(v.midi) && !v.releasing){
+      // 共通ノード: リリース中でない場合のみ保持（次コードでも鳴り続ける）
+      // releasing=trueの声部は保持しない（_sceneTrailTimerとの競合によるノイズ防止）
       _keptVoices.push(v);
     } else {
-      // 非共通ノード: trailSecでフェードアウト
+      // 非共通ノード・リリース中の声部: trailSecでフェードアウト（releasing=trueなら即return）
       _releaseSceneVoice(v, actx, trailSec);
     }
   });
@@ -16430,13 +16432,12 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
     updateDial(v);
     // ディレイタイムをBPMに追従
     updateDelayTime();
-    // ARP動作中はdelayノードを再構築してBPMに完全追従
+    // ARP動作中: arpNextBeatが過去になっていた場合のみ補正
+    // ※ ディレイ更新はupdateDelayTime()で完結
+    // ※ buildDelayNodes再構築はバッファフラッシュによるポップノイズの原因のため除去
     if(arpOn && arpScheduleTimer){
       const actx=safeGetCtx();
       if(actx){
-        safeResume(actx, ()=>buildDelayNodes(actx));
-        // BPM変更時はarpNextBeatをリセットしない（マスタークロックを維持）
-        // arpNextBeatが過去になっていた場合のみ補正
         if(arpNextBeat < actx.currentTime){
           const _sixteenth = (60 / autoBpm) / 4;
           const _elapsed = actx.currentTime - (_masterClockOrigin || actx.currentTime);
