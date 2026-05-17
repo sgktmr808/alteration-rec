@@ -1468,11 +1468,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           </div>
         </div>
 
-        <!-- LEARN BAR -->
-        <div class="learn-bar" id="learn-bar">
-          <span class="learn-lbl">LEARNED</span>
-          <div id="learn-chips"></div>
-        </div>
 
         <!-- アイコンボタン行: AUTO / REC / PHRASE -->
         <div class="icon-row">
@@ -1485,11 +1480,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             <div class="icon-sym">●</div>
             <div class="icon-lbl">REC</div>
             <div class="icon-sub" id="ic-rec-sub">MIDI off</div>
-          </div>
-          <div class="icon-btn ic-phrase feature-phrase" id="ic-phrase-btn">
-            <div class="icon-sym">♪</div>
-            <div class="icon-lbl">PHRASE</div>
-            <div class="icon-sub" id="ic-phrase-sub">— off</div>
           </div>
         </div>
 
@@ -1573,108 +1563,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           </div>
         </div>
 
-        <!-- PHRASEパネル (ic-phrase-btnでトグル) -->
-        <div class="phrase-panel feature-phrase" id="phrase-panel">
-          <div class="phrase-panel-t">♪ PHRASE</div>
-          <div class="phrase-sels">
-            <select class="phrase-sel" id="phrase-mode-sel">
-              <option value="off">— OFF</option>
-              <option value="melody">MELODY</option>
-              <option value="adlib">ADLIB</option>
-            </select>
-            <select class="phrase-sel" id="phrase-timbre-sel">
-              <optgroup label="─ CLASSIC ─">
-                <option value="crystal">CRYSTAL</option>
-                <option value="celeste">CELESTE</option>
-                <option value="bell">BELL</option>
-                <option value="piano">PIANO</option>
-                <option value="marimba">MARIMBA</option>
-                <option value="koto">KOTO</option>
-              </optgroup>
-              <optgroup label="─ VINTAGE ─">
-                <option value="rhodes">RHODES</option>
-                <option value="wurlitzer">WURLITZER</option>
-                <option value="moog">MOOG</option>
-                <option value="clavinet">CLAVINET</option>
-                <option value="organ">ORGAN</option>
-              </optgroup>
-              <optgroup label="─ STRINGS ─">
-                <option value="violin">VIOLIN</option>
-                <option value="cello">CELLO</option>
-                <option value="ensemble">ENSEMBLE</option>
-                <option value="strings">STRINGS</option>
-              </optgroup>
-              <optgroup label="─ ELECTRONIC ─">
-                <option value="sawlead">SAW LEAD</option>
-                <option value="glidelead">GLIDE LEAD</option>
-                <option value="trancelead">TRANCE LEAD</option>
-                <option value="pulsebass">PULSE BASS</option>
-                <option value="plucksynth">PLUCK</option>
-                <option value="acid">ACID</option>
-                <option value="synth">SYNTH</option>
-                <option value="detroit">DETROIT</option>
-              </optgroup>
-            </select>
-            <select class="phrase-sel" id="timbre-sel">
-              <optgroup label="─ MELODIC ─">
-                <option value="synth">SYNTH</option>
-                <option value="piano">PIANO</option>
-                <option value="organ">ORGAN</option>
-                <option value="guitar">GUITAR</option>
-                <option value="marimba">MARIMBA</option>
-                <option value="celeste">CELESTE</option>
-                <option value="bell">BELL</option>
-                <option value="koto">KOTO</option>
-                <option value="oud">OUD</option>
-              </optgroup>
-              <optgroup label="─ AMBIENT ─">
-                <option value="ambient">AMBIENT</option>
-                <option value="pad">PAD</option>
-                <option value="strings">STRINGS</option>
-                <option value="crystal">CRYSTAL</option>
-                <option value="drone">DRONE</option>
-                <option value="cosmos">COSMOS</option>
-              </optgroup>
-              <optgroup label="─ WORLD/ETHNIC ─">
-                <option value="tibetan">TIBETAN</option>
-                <option value="throat">THROAT</option>
-                <option value="rainforest">RAINFOREST</option>
-                <option value="waterphone">WATERPHONE</option>
-              </optgroup>
-              <optgroup label="─ ELECTRONIC ─">
-                <option value="braindance">BRAINDANCE</option>
-                <option value="acid">ACID 303</option>
-                <option value="reese">REESE BASS</option>
-                <option value="technopad">TECHNO PAD</option>
-                <option value="housechord">HOUSE CHORD</option>
-                <option value="supersaw">SUPERSAW</option>
-                <option value="plucksynth">PLUCK</option>
-                <option value="bass808">808 BASS</option>
-                <option value="ravestab">RAVE STAB</option>
-                <option value="detroit">DETROIT</option>
-                <option value="junglestab">JUNGLE STAB</option>
-                <option value="trancelead">TRANCE LEAD</option>
-                <option value="deephouse">DEEP HOUSE</option>
-              </optgroup>
-            </select>
-          </div>
-          <!-- PHRASE STYLE (F1: CHORD/SCALE/JAZZ/AMBIENT/GROOVE) -->
-          <div class="phrase-style-row" id="phrase-style-row">
-            <div class="phrase-style-btn on" data-style="chord">CHORD</div>
-            <div class="phrase-style-btn" data-style="scale">SCALE</div>
-            <div class="phrase-style-btn" data-style="jazz">JAZZ</div>
-            <div class="phrase-style-btn" data-style="ambient">AMBIENT</div>
-            <div class="phrase-style-btn" data-style="groove">GROOVE</div>
-          </div>
-          <!-- 音量スライダー -->
-          <div style="display:flex;align-items:center;gap:8px;margin-top:7px;">
-            <span style="font-family:var(--fm);font-size:7.5px;color:var(--dim);letter-spacing:.08em;flex-shrink:0;">VOL</span>
-            <input type="range" id="phrase-vol-sl" min="0" max="100" value="75"
-              style="-webkit-appearance:none;appearance:none;flex:1;height:3px;border-radius:2px;
-                background:var(--bdr2);accent-color:var(--acc);cursor:pointer;">
-            <span id="phrase-vol-val" style="font-family:var(--fm);font-size:8px;color:var(--acc);width:24px;text-align:right;">75</span>
-          </div>
-        </div>
 
         <!-- SECTORS -->
         <div class="sector-hdr" id="sector-hdr">
@@ -1689,11 +1577,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <div class="prog-bar" id="prog-bar" style="display:none">
           <select class="auto-sel" id="prog-genre-sel"></select>
           <select class="auto-sel wide" id="prog-name-sel"></select>
-        </div>
-
-        <div class="db-banner" id="db-banner">
-          <span id="db-banner-msg">⚡ guitar-db-filtered.js があればより多くのボイシングが使えます</span>
-          <button class="db-load-btn" onclick="loadGuitarDB()">LOAD</button>
         </div>
 
         <!-- 後方互換ダミー要素 (JS参照用) -->
@@ -1799,7 +1682,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         "></div>
       </div>
 
-      <div class="csv-btn" id="csv-export">↓ Export votes CSV</div>
       <div class="csv-btn" id="midi-path-export" style="margin-left:6px">♩ PATH → MIDI</div>
       <div class="csv-btn" id="midi-phrase-export" style="margin-left:6px">♪ Phrase → MIDI</div>
     </div>
@@ -2440,17 +2322,7 @@ function renderLearnBar(){
     return`<div class="learn-chip">${CT[t]?.sym||t} ${stars}</div>`;
   }).join('');
 }
-function exportCSV(){
-  const rows=['root,type,frets,label,vote,timestamp'];
-  for(const[k,d]of Object.entries(votes)){
-    const p=k.split('__');
-    rows.push(`${p[0]},${p[1]},"${p[2]}","${d.label}",${d.v},"${d.ts}"`);
-  }
-  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='chord_votes.csv';a.click();
-}
-document.getElementById('csv-export').addEventListener('click',exportCSV);
+
 
 // ═══════════════════════
 // STATE & LAYOUT
@@ -16953,7 +16825,7 @@ renderLearnBar();
 
 function loadGuitarDB(){
   if(typeof GUITAR_DB!=='undefined'){
-    document.getElementById('db-banner').classList.remove('show');return;
+    const _b=document.getElementById('db-banner');if(_b)_b.classList.remove('show');return;
   }
   const msg=document.getElementById('db-banner-msg');
   if(msg)msg.textContent='⏳ Loading guitar-db-filtered.js…';
@@ -16961,7 +16833,7 @@ function loadGuitarDB(){
   s.src='guitar-db-filtered.js?t='+Date.now();
   s.onload=()=>{
     if(msg)msg.textContent='✓ guitar-db loaded — voicings enriched';
-    setTimeout(()=>document.getElementById('db-banner').classList.remove('show'),2200);
+    setTimeout(()=>{const _b=document.getElementById('db-banner');if(_b)_b.classList.remove('show');},2200);
     Object.keys(VCACHE).forEach(k=>delete VCACHE[k]);
     renderPosZone();
   };
