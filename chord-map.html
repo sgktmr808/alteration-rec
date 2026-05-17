@@ -10168,6 +10168,7 @@ function applySpacePreset(name){
       // ARP出力ノードをリセット（新しいリバーブバスに再接続させる）
       _resetArpOut();
       _resetStringsColorDly();
+      _resetPlainColorDly();
     });
   }
 }
@@ -11022,18 +11023,9 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
       const _sCDly = _getStringsColorDly(actx, rvbTarget);
       arpEnvOut.connect(_sCDly);
     } else if(sceneCurrentName === 'plain'){
-      // PLAIN: gate 140ms + decay/releaseの余韻に対して160msで溶け合う
-      const colorDly = actx.createDelay(1.0);
-      colorDly.delayTime.value = 0.160;
-      const colorDlyFb = actx.createGain();
-      colorDlyFb.gain.value = 0.25 + _warmVal * 0.15;
-      const colorDlyG = actx.createGain();
-      colorDlyG.gain.value = 0.40;
-      arpEnvOut.connect(colorDly);
-      colorDly.connect(colorDlyFb);
-      colorDlyFb.connect(colorDly);
-      colorDly.connect(colorDlyG);
-      colorDlyG.connect(rvbTarget);
+      // PLAIN: 共有colorDlyノードに接続（毎音生成→共有化でGC負荷軽減）
+      const _pCDly = _getPlainColorDly(actx, rvbTarget);
+      arpEnvOut.connect(_pCDly);
     }
 
     // 全Scene共通: dry + reverb出力
@@ -12919,6 +12911,26 @@ function _getStringsColorDly(actx, rvbTarget){
 }
 function _resetStringsColorDly(){ _stringsColorDly = null; _stringsColorDlyCtx = null; }
 
+// ── PLAIN: 共有colorDlyノード（毎音生成→共有化でiPhoneのGC負荷軽減） ──
+let _plainColorDly    = null;
+let _plainColorDlyCtx = null;
+function _getPlainColorDly(actx, rvbTarget){
+  if(_plainColorDly && _plainColorDlyCtx === actx) return _plainColorDly;
+  const _warmVal = (typeof sv === 'function') ? (sv('warm') || 0) : 0;
+  const dly = actx.createDelay(1.0);
+  dly.delayTime.value = 0.160;
+  const fb  = actx.createGain();
+  fb.gain.value = 0.25 + _warmVal * 0.15;
+  const wet = actx.createGain();
+  wet.gain.value = 0.40;
+  dly.connect(fb); fb.connect(dly);
+  dly.connect(wet); wet.connect(rvbTarget);
+  _plainColorDly    = dly;
+  _plainColorDlyCtx = actx;
+  return _plainColorDly;
+}
+function _resetPlainColorDly(){ _plainColorDly = null; _plainColorDlyCtx = null; }
+
 // ── Scene別ボイシング取得 ──
 // slComplex(-1〜+1): 音数・音域の密度（全Scene共通）
 // slWarm(-1〜+1):    Scene固有の密集度・重心
@@ -14146,6 +14158,7 @@ function applyScene(name){
   // ARP共有outをリセット（新Sceneのwet値を反映）
   _resetArpOut();
   _resetStringsColorDly();
+  _resetPlainColorDly();
   _resetPluckMorphWave();
 
   // ── Scene切替後のボイス処理 ──
