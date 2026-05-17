@@ -6075,8 +6075,18 @@ function autoStep(){
   autoHistory.push({root:next.root,type:next.type});
   if(autoHistory.length>32)autoHistory.shift();
   moveToChord(next.root,next.type);
-  const interval=Math.round(60000/autoBpm*2);
-  autoTimer=setTimeout(autoStep,interval);
+  // 次回タイマー: _masterClockOrigin基準で次の1小節グリッドにスナップ
+  const _actx = safeGetCtx();
+  if(_actx && _masterClockOrigin !== null){
+    const _bar = (60 / autoBpm) * 4; // 1小節=4拍（秒）
+    const _elapsed = _actx.currentTime - _masterClockOrigin;
+    const _nextBar = Math.ceil(_elapsed / _bar) * _bar;
+    const _delayMs = (_masterClockOrigin + _nextBar - _actx.currentTime) * 1000;
+    autoTimer = setTimeout(autoStep, Math.max(0, _delayMs));
+  } else {
+    // フォールバック: Groove未起動時は従来通り
+    autoTimer = setTimeout(autoStep, Math.round(60000 / autoBpm * 4));
+  }
 }
 
 function startAuto(){
@@ -6343,6 +6353,15 @@ function startGroove(mode){
       const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
       _grooveNextBeat = _masterClockOrigin + _gridPos;
       _grooveSchedule();
+      // AutoPlay再スケジュール: 新BPMの次の1小節グリッドに再スナップ
+      if(autoPlay){
+        clearTimeout(autoTimer);
+        const _bar = (60 / autoBpm) * 4;
+        const _elapsedBar = audioCtx.currentTime - _masterClockOrigin;
+        const _nextBar = Math.ceil(_elapsedBar / _bar) * _bar;
+        const _delayMs = (_masterClockOrigin + _nextBar - audioCtx.currentTime) * 1000;
+        autoTimer = setTimeout(autoStep, Math.max(0, _delayMs));
+      }
     });
   } else {
     _grooveNextBeat = 0;
