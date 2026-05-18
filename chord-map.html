@@ -12586,9 +12586,9 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const _burstVelBoost = burstRatio * 0.20; // バースト中は最大+0.20
       const velMul  = Math.max(0.5, _arcVel + _burstVelBoost + (Math.random() - 0.5) * _warmVal * 0.15);
 
-      // ── ステップ: 8分音符（0.5）・わずかなjitter ──
+      // ── ステップ: 16分音符（1.0）・わずかなjitter ──
       const jitter = 1.0 + (Math.random() - 0.5) * 0.04;
-      const stepRatio = 0.5 * densityMul * jitter;
+      const stepRatio = 1.0 * densityMul * jitter;
 
       if(midi !== null) ps.lastMidi = midi;
       return { midi, stepRatio, velMul };
@@ -12704,6 +12704,16 @@ function scheduleArpNotes(){
   if(!actx) return;
   const baseSec=arpStepMs()/1000;
   const lookAhead=actx.currentTime+(arpLookAheadMs/1000);
+
+  // B: 詰め込み防止 — arpNextBeatが2ステップ分以上過去にある場合は異常と判断して再スナップ
+  // 閾値をステップ秒数の2倍にすることでBPMが低い場合の誤検知を防ぐ
+  const _sixteenthSec = (60 / autoBpm) / 4;
+  const _snapThreshold = _sixteenthSec * 2;
+  if(arpNextBeat < actx.currentTime - _snapThreshold){
+    const _elapsed = actx.currentTime - (_masterClockOrigin || actx.currentTime);
+    const _gridPos = Math.ceil(_elapsed / _sixteenthSec) * _sixteenthSec;
+    arpNextBeat = (_masterClockOrigin || actx.currentTime) + _gridPos;
+  }
   const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const rhythm = sc.arpRhythm;
   const restProb = _slArpRestProb !== null ? _slArpRestProb : (sc.arpRestProb || 0);
@@ -13191,7 +13201,7 @@ const SCENE_PRESETS = {
     arpAttack:0.008, arpDecay:0.60, arpSustain:0.30,
     arpGate:280, arpVol:0.18, arpWet:0.52, arpGhost:0.15,
     arpOctRange:2,
-    arpRhythm:[0.5, 0.5, 0.5, 0.5], arpRestProb:0.05,
+    arpRhythm:[1.0, 1.0, 1.0, 1.0], arpRestProb:0.05,
   },
 };
 
