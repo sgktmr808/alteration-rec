@@ -48,28 +48,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .hdr-back:hover{color:var(--text);}
 .hdr-title{font-family:var(--fm);font-size:11px;font-weight:500;color:var(--acc);letter-spacing:.15em;flex:1;}
 .hdr-chord{font-family:var(--fm);font-size:18px;font-weight:500;color:var(--text);}
-.hdr-arp-btn{
-  font-family:var(--fm);font-size:9px;padding:4px 10px;
-  border:1px solid rgba(128,212,255,0.4);border-radius:var(--r);
-  color:rgba(128,212,255,0.6);background:transparent;cursor:pointer;
-  letter-spacing:.1em;transition:border-color .15s,color .15s,background .15s;
-  white-space:nowrap;user-select:none;-webkit-user-select:none;
-}
-.hdr-arp-btn.on{
-  border-color:#80d4ff;color:#80d4ff;
-  background:rgba(128,212,255,0.12);
-}
-.hdr-solo-btn{
-  font-family:var(--fm);font-size:9px;padding:4px 8px;
-  border:1px solid rgba(255,180,80,0.4);border-radius:var(--r);
-  color:rgba(255,180,80,0.6);background:transparent;cursor:pointer;
-  letter-spacing:.1em;transition:border-color .15s,color .15s,background .15s;
-  white-space:nowrap;user-select:none;-webkit-user-select:none;
-}
-.hdr-solo-btn.on{
-  border-color:#ffb450;color:#ffb450;
-  background:rgba(255,180,80,0.12);
-}
 .legend{flex-shrink:0;background:var(--surf2);border-bottom:1px solid var(--bdr);
   padding:4px 12px;display:flex;gap:10px;overflow-x:auto;align-items:center;-webkit-overflow-scrolling:touch;}
 .legend::-webkit-scrollbar{display:none;}
@@ -2538,6 +2516,10 @@ function invalidate(){dirty=true;}
 // ═══════════════════════
 function fxSpawnParticles(x,y,col){
   const count=8;
+  // 上限80粒：超過分は古いものから削除
+  if(FX.particles.length + count > 80){
+    FX.particles.splice(0, FX.particles.length + count - 80);
+  }
   for(let i=0;i<count;i++){
     const angle=Math.random()*Math.PI*2;
     const speed=1.0+Math.random()*2.5;
@@ -6524,8 +6506,16 @@ function loadSavedProgs(){
 }
 
 function storeSavedProgs(progs){
-  try{localStorage.setItem(SAVED_PROGS_KEY,JSON.stringify(progs));}
-  catch(e){console.warn('saveProgression: localStorage失敗',e);}
+  let data=progs;
+  while(data.length>0){
+    try{
+      localStorage.setItem(SAVED_PROGS_KEY,JSON.stringify(data));
+      return;
+    }catch(e){
+      data=data.slice(1); // 容量超過: 最古のエントリを削除して再試行
+    }
+  }
+  console.warn('storeSavedProgs: 全エントリ削除後も保存失敗');
 }
 
 // 現在のS.historyを保存する
