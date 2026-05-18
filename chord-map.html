@@ -12837,7 +12837,7 @@ const SCENE_PRESETS = {
 
   // 1. PLAIN ROOM — サティ的。余白、淡い和声、静けさ
   plain: {
-    label:'PLAIN ROOM', bpm:100,
+    label:'PLAIN ROOM', bpm:100, dlyType:'1/8D',
     osc1:'sine', osc2:'triangle', detune:4,
     cutoff:1100, res:0.5, envMod:0.40,
     attack:0.15, decay:0.7, sustain:0.50, release:5.0,
@@ -12861,7 +12861,7 @@ const SCENE_PRESETS = {
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス × Octave One的。中域、内声、柔らかいテンション
   velvet: {
-    label:'VELVET ROOTLESS', bpm:88,
+    label:'VELVET ROOTLESS', bpm:88, dlyType:'1/4',
     // ローズピアノ的サウンド（70s コズミックジャズファンク・ロニーリストンスミス的）:
     //   osc1:triangle（高域が丸い・倍音控えめ）
     //   osc2:sawtooth（薄く混ぜて芯と倍音を補う）
@@ -12886,7 +12886,7 @@ const SCENE_PRESETS = {
 
   // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
   glass: {
-    label:'GLASS PIANO', bpm:68,
+    label:'GLASS PIANO', bpm:68, dlyType:'1/4D',
     osc1:'sine', osc2:'sine', detune:2,
     cutoff:3000, res:1.1, envMod:0.32,
     attack:0.020, decay:0.45, sustain:0.38, release:2.0,
@@ -12907,7 +12907,7 @@ const SCENE_PRESETS = {
   // 4. LOVE STAB — 透明感のある跳ねるコードスタブ
   // 身体性は残しつつ、空気・余韻・透明感を加える
   love: {
-    label:'LOVE STAB', bpm:124,
+    label:'LOVE STAB', bpm:124, dlyType:'1/8',
     // Korg M1的なFM感: sine基音 + sine1oct上（osc2）で透明な倍音を作る
     // sawtoothの重さを排除し、sineの積み重ねで明るさと透明感を両立
     osc1:'sine', osc2:'sine', osc2oct:2, detune:1,
@@ -12932,7 +12932,7 @@ const SCENE_PRESETS = {
 
   // 5. DEEP TECH — Bicep/Jon Hopkins的ディープテクノシーケンス
   pluck: {
-    label:'DEEP TECH', bpm:139,
+    label:'DEEP TECH', bpm:139, dlyType:'1/16',
     // CHORD: The Mountain People的。低域重心・重くダーク・filterがゆっくりうねる
     // osc1:sawtooth(低域の芯) + osc2:sawtooth(detuneで厚み)
     // cutoff低め・res高め（共鳴感）・filterDriftでうねり
@@ -12955,7 +12955,7 @@ const SCENE_PRESETS = {
 
   // 6. BLACK STRINGS — Detroit的。広い、深い、ストリングス、アンセム感
   strings: {
-    label:'PHASE STRINGS', bpm:108,
+    label:'PHASE STRINGS', bpm:108, dlyType:'1/8D',
     // CHORD: ライヒ×ガムラン的ストリングスパッド
     // ガムラン的な意図的detuneで「面」として聞こえる弦の集団感
     // attack長め（弓が弦に乗る感覚）・filterDrift深め（弦のピッチ揺らぎ）
@@ -14118,14 +14118,14 @@ const _ARP_PATTERN_PRESETS = {
     arpOsc:'sine', arpCutoff:3200, arpRes:1.4, arpEnvMod:0.58,
     arpAttack:0.004, arpDecay:0.16, arpSustain:0.0,
     arpGate:150, arpVol:0.18, arpWet:0.52, arpGhost:0.22,
-    arpRhythm:[1.0, 3.0, 1.0, 1.0, 2.0, 1.0, 4.0], arpRestProb:0.30,
+    arpRhythm:[1.0, 3.0, 1.0, 1.0, 2.0, 1.0, 7.0], arpRestProb:0.30,
   },
   inner_line: {
     // VELVET ROOTLESS 系: 中域、内声的、エヴァンス的
     arpOsc:'triangle', arpCutoff:1300, arpRes:0.7, arpEnvMod:0.42,
     arpAttack:0.010, arpDecay:0.38, arpSustain:0.0,
     arpGate:300, arpVol:0.24, arpWet:0.36, arpGhost:0.18,
-    arpRhythm:[1.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 1.5], arpRestProb:0.15,
+    arpRhythm:[1.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 2.5], arpRestProb:0.15,
   },
 };
 
@@ -14201,10 +14201,19 @@ function switchSceneNext(){
 function applyScene(name, changeBpm=false){
   const _prevSceneName = sceneCurrentName; // 変容判定用に前のScene名を保持
   sceneCurrentName = name;
-  // SYNTHパネルからの切替時のみBPMをSceneプリセット値に変更
+  // SYNTHパネルからの切替時のみBPM・dlyTypeをSceneプリセット値に変更
   if(changeBpm){
     const _sceneBpm = (SCENE_PRESETS[name] || {}).bpm;
     if(_sceneBpm) updateBpmDisplay(_sceneBpm);
+    // Scene別dlyType適用（BPMと同じタイミングで切替）
+    const _sceneDlyTime = (SCENE_PRESETS[name] || {}).dlyType;
+    if(_sceneDlyTime && _sceneDlyTime !== dlyTime){
+      dlyTime = _sceneDlyTime;
+      updateDelayTime();
+      document.querySelectorAll('#dly-time-pills .synth-pill').forEach(p =>
+        p.classList.toggle('on', p.dataset.t === dlyTime)
+      );
+    }
   }
   // SLスライダーのARP上書き値をリセット
   _slArpCutoff = null;
