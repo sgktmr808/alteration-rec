@@ -6047,16 +6047,17 @@ function startAuto(){
   autoTo={x:L.cx,y:L.cy,root:S.root,type:S.type};
   document.getElementById('auto-btn').textContent='■ STOP';
   document.getElementById('auto-btn').classList.add('on');
-  const interval=Math.round(60000/autoBpm*2);
-  autoTimer=setTimeout(autoStep,interval);
-  dirty=true;
-}
-
-function stopAuto(){
-  autoPlay=false;
-  if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
-  document.getElementById('auto-btn').textContent='▶ AUTO';
-  document.getElementById('auto-btn').classList.remove('on');
+  // ⑤ 初回タイマーもmasterClockOrigin基準で次の1小節グリッドにスナップ
+  const _actxA = safeGetCtx();
+  if(_actxA && _masterClockOrigin !== null){
+    const _bar = (60 / autoBpm) * 4;
+    const _elapsed = _actxA.currentTime - _masterClockOrigin;
+    const _nextBar = Math.ceil(_elapsed / _bar) * _bar;
+    const _delayMs = (_masterClockOrigin + _nextBar - _actxA.currentTime) * 1000;
+    autoTimer = setTimeout(autoStep, Math.max(0, _delayMs));
+  } else {
+    autoTimer = setTimeout(autoStep, Math.round(60000/autoBpm*2));
+  }
   dirty=true;
 }
 
@@ -6075,8 +6076,7 @@ function stopAuto(){
 // ═══════════════════════════════════════════════════════
 function grooveStepMs(){
   if(!grooveMode) return 125;
-  const bpm=GROOVE_PRESETS[grooveMode].bpm;
-  return (60000/bpm)/4; // 16分音符1ステップのms
+  return (60000/autoBpm)/4; // 16分音符1ステップのms（autoBpm基準でARP/Kickと統一）
 }
 
 // K2: Groove専用打楽器合成（pluck()非依存）
@@ -16762,6 +16762,18 @@ document.querySelectorAll('.kick-btn').forEach(btn=>{
           const _elapsed = actx.currentTime - _masterClockOrigin;
           const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
           _kickNextBeat = _masterClockOrigin + _gridPos;
+        }
+      }
+    }
+    // Groove動作中: _grooveNextBeatを次の16分音符グリッドへ再スナップ（④ BPM変更同期）
+    if(grooveMode && _grooveScheduleTimer){
+      const actx=safeGetCtx();
+      if(actx && _masterClockOrigin !== null){
+        if(_grooveNextBeat < actx.currentTime){
+          const _sixteenth = (60 / autoBpm) / 4;
+          const _elapsed = actx.currentTime - _masterClockOrigin;
+          const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+          _grooveNextBeat = _masterClockOrigin + _gridPos;
         }
       }
     }
