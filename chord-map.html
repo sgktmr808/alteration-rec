@@ -2962,6 +2962,16 @@ function drawFrame(){
     ctx.globalAlpha = isDragging ? 1.0 : (otherDimmed ? 0.15 : (active ? 0.9 : 0.35));
     ctx.stroke(); ctx.globalAlpha = 1;
 
+    // H: アクティブ時にthumb内へ「×2」ラベル（ダブルタップリセットのヒント）
+    if(active && !isDragging && !otherDimmed){
+      ctx.font = 'bold 5px DM Mono,monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#000';
+      ctx.globalAlpha = 0.65;
+      ctx.fillText('×2', tx, ty);
+      ctx.globalAlpha = 1;
+    }
+
     // Labels
     ctx.font = '7px DM Mono,monospace'; ctx.textBaseline = 'middle'; ctx.lineCap = 'butt';
     [[sl.cDeg-ARC_HALF, sl.lL, sl.val<-0.05],[sl.cDeg+ARC_HALF, sl.lR, sl.val>0.05]].forEach(([deg,txt,act])=>{
@@ -14436,6 +14446,22 @@ function applyScene(name, changeBpm=false){
   _slArpWet = null;
   _slArpFeltAttack = null;
   _slGlassIntervalScale = 1.0;
+  // I: Scene切替時の漏れリセット（Scene固有パラメーターの残留を防ぐ）
+  _slOsc2Mix           = null;
+  _slArpGhost          = null;
+  _slArpAttack         = null;
+  _slArpDecay          = null;
+  _slArpOsc1Type       = null;
+  _slArpOsc2Type       = null;
+  _slArpFMDepth        = null;
+  _slArpFMDepthPluck   = null;
+  _slArpDarkRatioPluck = 0;
+  _slArpCarrierMix     = null;
+  _slArpW7HpfFreq      = null;
+  _slArpW7FMWarm       = null;
+  _slArpW7Release      = null;
+  _slArpW7OctShift     = null;
+  _slArpW7Detune       = null;
   _arpOut = null; // arpWetリセット時に再構築
   // UI更新
   document.querySelectorAll('.scene-pill').forEach(el =>
