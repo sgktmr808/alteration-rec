@@ -12007,7 +12007,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       ps.glassIntervalIdx++;
 
       // 確率的な完全スキップ（より孤独な光）
-      if(restProb > 0.25 && Math.random() < restProb * 0.6){
+      if(Math.random() < restProb * 0.6){
         // 間隔だけ消費して発音しない
         return { midi: null, stepRatio };
       }
