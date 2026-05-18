@@ -817,6 +817,16 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 .groove-btn.on{border-color:#d4823a;color:#d4823a;background:rgba(212,130,58,0.12);}
 .groove-btn:active{opacity:.7;}
+.kick-preset-row{display:flex;gap:4px;flex-wrap:nowrap;padding:4px 0;}
+.kick-btn{
+  font-family:var(--fm);font-size:8px;padding:5px 0;flex:1;
+  border:1px solid rgba(128,212,255,0.35);border-radius:var(--r);
+  color:rgba(128,212,255,0.65);background:transparent;cursor:pointer;
+  text-align:center;letter-spacing:.06em;user-select:none;-webkit-user-select:none;
+  transition:border-color .15s,color .15s,background .15s;
+}
+.kick-btn.on{border-color:#80d4ff;color:#80d4ff;background:rgba(128,212,255,0.12);}
+.kick-btn:active{opacity:.7;}
 /* 後方互換 (auto-bpm は JS側で使用) */
 .auto-bpm{display:none;}
 .auto-bpm-val{display:none;}
@@ -1518,8 +1528,15 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <option value="pattern">PATTERN</option>
             </select>
           </div>
-          <!-- F4: Grooveプリセット -->
-          <div class="groove-preset-row" id="groove-preset-row">
+          <!-- F4: Kickパターン (仮実装 / Groove再設計まで) -->
+          <div class="kick-preset-row" id="kick-preset-row">
+            <div class="kick-btn" data-kick="pt1">pt1<br><span style="font-size:6px;opacity:.6;">HOUSE</span></div>
+            <div class="kick-btn" data-kick="pt2">pt2<br><span style="font-size:6px;opacity:.6;">AMAPIANO</span></div>
+            <div class="kick-btn" data-kick="pt3">pt3<br><span style="font-size:6px;opacity:.6;">GQOM</span></div>
+            <div class="kick-btn" data-kick="pt4">pt4<br><span style="font-size:6px;opacity:.6;">L.TRAP</span></div>
+          </div>
+          <!-- F4: 旧Grooveプリセット (Groove再設計まで非表示) -->
+          <div class="groove-preset-row" id="groove-preset-row" style="display:none">
             <div style="font-family:var(--fm);font-size:7px;color:var(--dim);width:100%;margin-bottom:2px;letter-spacing:.08em;">HOUSE</div>
             <div class="groove-btn" data-groove="house">JUNO<br><span style="font-size:6px;opacity:.6;">124</span></div>
             <div class="groove-btn" data-groove="house_deep">DEEP<br><span style="font-size:6px;opacity:.6;">120</span></div>
@@ -3066,7 +3083,7 @@ function drawFrame(){
   // ── AUTO PLAY overlay (always on top) ──
   drawAutoOverlay(ctx);
   // ── F4: GROOVE パルスオーバーレイ ──
-  if(grooveMode) drawGroovePulse(ctx);
+  if(grooveMode || kickMode) drawGroovePulse(ctx);
 
   // ── COSMIC FX (topmost) ──
   fxDrawAndUpdate(ctx);
@@ -6295,6 +6312,168 @@ function stopGroove(){
   if(_grooveScheduleTimer){ clearTimeout(_grooveScheduleTimer); _grooveScheduleTimer = null; }
   if(grooveTimer){ clearTimeout(grooveTimer); grooveTimer = null; } // 旧タイマーも念のため
   grooveMode=null;
+
+// ════════════════════════════════════════════════════════
+// KICK PATTERNS — キックのみ仮実装（Groove再設計まで）
+// House / Amapiano / Gqom / Latin Trap
+// 8小節128ステップ、bar4-beat4ゴースト、bar8-beat4アクセント
+// 32小節周期でタイミング微変化
+// ════════════════════════════════════════════════════════
+
+let kickMode = null;
+let _kickTick = 0;          // 絶対ステップ数（リセットしない）
+let _kickNextBeat = 0;
+let _kickScheduleTimer = null;
+let _kickPulse = 0;         // 描画用パルス（0〜1）
+const _KICK_LOOK_AHEAD_MS = 80;
+const _KICK_SCHEDULE_MS   = 20;
+
+const _KICK_LABELS = {
+  pt1: 'HOUSE', pt2: 'AMAPIANO', pt3: 'GQOM', pt4: 'L.TRAP'
+};
+const _KICK_COL = 'rgba(128,212,255,0.85)';
+
+// ── キック発音: ジャンル別パラメーター ──
+function _playKickHit(actx, t, vol, genre) {
+  const P = {
+    pt1: { s:82, e:34, pt:0.10, sv:1.5, cv:1.1, dc:0.42 }, // House: tight
+    pt2: { s:76, e:28, pt:0.14, sv:1.7, cv:0.9, dc:0.55 }, // Amapiano: deep
+    pt3: { s:70, e:24, pt:0.18, sv:1.8, cv:0.8, dc:0.62 }, // Gqom: darkest
+    pt4: { s:80, e:38, pt:0.22, sv:1.6, cv:1.0, dc:0.58 }, // L.Trap: 808-like
+  };
+  const p = P[genre] || P.pt1;
+  // Sub: ピッチエンベロープ付きサイン波
+  const sub = actx.createOscillator(), subG = actx.createGain();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(p.s, t);
+  sub.frequency.exponentialRampToValueAtTime(p.e, t + p.pt);
+  subG.gain.setValueAtTime(vol * p.sv, t);
+  subG.gain.exponentialRampToValueAtTime(0.001, t + p.dc);
+  sub.connect(subG); subG.connect(actx.destination);
+  sub.start(t); sub.stop(t + p.dc + 0.05);
+  // Click: アタックトランジェント
+  const clk = actx.createOscillator(), clkG = actx.createGain();
+  clk.type = 'sine';
+  clk.frequency.setValueAtTime(460, t);
+  clk.frequency.exponentialRampToValueAtTime(52, t + 0.012);
+  clkG.gain.setValueAtTime(vol * p.cv, t);
+  clkG.gain.exponentialRampToValueAtTime(0.001, t + 0.032);
+  clk.connect(clkG); clkG.connect(actx.destination);
+  clk.start(t); clk.stop(t + 0.05);
+}
+
+// ── 128ステップパターン生成（8小節 × 16ステップ）──
+// 値: null=休符 / Number=velocity (0.0〜1.2)
+function _buildKickPattern(mode) {
+  const pat = new Array(128).fill(null);
+  const h = (bar, st, vol) => { pat[bar * 16 + st] = vol; };
+
+  if (mode === 'pt1') { // House: 4-on-the-floor
+    for (let b = 0; b < 8; b++) {
+      h(b, 0, 0.88); h(b, 4, 0.82); h(b, 8, 0.85); h(b, 12, 0.80);
+    }
+    h(3, 14, 0.22);  // bar4 beat4後: ゴーストキック
+    pat[3*16+12] = 1.10; // bar4 beat4: アクセント（4拍目強調）
+    pat[7*16+12] = 1.15; // bar8 beat4: 最大アクセント
+
+  } else if (mode === 'pt2') { // Amapiano: log drum的シンコペーション
+    for (let b = 0; b < 8; b++) {
+      h(b,  0, 0.85); h(b,  2, 0.62);
+      h(b,  8, 0.80); h(b, 13, 0.68);
+    }
+    h(3, 14, 0.20);       // bar4 beat4後: ゴースト
+    pat[7*16+12] = 1.10;  // bar8 beat4: アクセント
+
+  } else if (mode === 'pt3') { // Gqom: dark minimal
+    for (let b = 0; b < 8; b++) {
+      h(b, 0, 0.90);
+      if (b % 2 === 0) { h(b, 7, 0.68); h(b, 8, 0.78); }
+      else             { h(b, 4, 0.62); h(b, 15, 0.58); }
+    }
+    h(3, 14, 0.20);       // bar4 beat4後: ゴースト
+    pat[7*16+12] = 1.12;  // bar8 beat4: アクセント
+
+  } else if (mode === 'pt4') { // Latin Trap: trap + clave
+    for (let b = 0; b < 8; b++) {
+      h(b,  0, 0.88); h(b,  6, 0.70);
+      if (b % 2 === 0) { h(b, 9,  0.62); }
+      else             { h(b, 12, 0.75); }
+    }
+    h(3, 14, 0.22);       // bar4 beat4後: ゴースト
+    pat[7*16+12] = 1.10;  // bar8 beat4: アクセント
+  }
+
+  return pat;
+}
+
+let _kickPattern = null;
+
+function startKick(mode) {
+  if (kickMode === mode) { stopKick(); return; }
+  stopKick();
+  kickMode = mode;
+  _kickTick = 0;
+  _kickPattern = _buildKickPattern(mode);
+
+  const actx = safeGetCtx();
+  if (!actx) return;
+  safeResume(actx, () => {
+    if (_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
+    const stepSec = 60 / autoBpm / 4;
+    const elapsed = actx.currentTime - _masterClockOrigin;
+    const nextGrid = Math.ceil((elapsed + 0.001) / stepSec) * stepSec;
+    _kickNextBeat = _masterClockOrigin + nextGrid;
+    _kickSchedule();
+  });
+  document.querySelectorAll('.kick-btn').forEach(b =>
+    b.classList.toggle('on', b.dataset.kick === mode)
+  );
+  dirty = true;
+}
+
+function stopKick() {
+  if (_kickScheduleTimer) { clearTimeout(_kickScheduleTimer); _kickScheduleTimer = null; }
+  kickMode = null; _kickPattern = null; _kickPulse = 0;
+  document.querySelectorAll('.kick-btn').forEach(b => b.classList.remove('on'));
+  dirty = true;
+}
+
+function _kickSchedule() {
+  if (!kickMode) { _kickScheduleTimer = null; return; }
+  const actx = safeGetCtx();
+  if (!actx) { _kickScheduleTimer = setTimeout(_kickSchedule, _KICK_SCHEDULE_MS); return; }
+  safeResume(actx);
+
+  const lookAhead = actx.currentTime + _KICK_LOOK_AHEAD_MS / 1000;
+  const stepSec   = 60 / autoBpm / 4; // 1/16音符・BPM追従
+
+  while (_kickNextBeat < lookAhead) {
+    const step128 = _kickTick % 128; // 8小節内位置
+    const step512 = _kickTick % 512; // 32小節内位置
+
+    // Amapiano: 軽いスウィング（奇数ステップを6%遅らせる）
+    let tOff = 0;
+    if (kickMode === 'pt2' && step128 % 2 === 1) tOff = stepSec * 0.06;
+
+    // 32小節後半（bar17〜32）: タイミング微変化（±3ms）
+    if (step512 >= 256 && step128 % 4 === 2) {
+      tOff += Math.sin(step512 * 0.13) * 0.003;
+    }
+
+    const t   = _kickNextBeat + tOff;
+    const vol = _kickPattern ? _kickPattern[step128] : null;
+
+    if (vol !== null && vol > 0) {
+      _playKickHit(actx, t, vol, kickMode);
+      // 4拍頭（step=0,4,8,12 within bar）でパルス
+      if (step128 % 4 === 0) { _kickPulse = vol; dirty = true; }
+    }
+
+    _kickTick++;
+    _kickNextBeat += stepSec;
+  }
+  _kickScheduleTimer = setTimeout(_kickSchedule, _KICK_SCHEDULE_MS);
+}
   groovePulse=0;
   document.querySelectorAll('.groove-btn').forEach(b=>b.classList.remove('on'));
   dirty=true;
@@ -6302,6 +6481,38 @@ function stopGroove(){
 
 // Canvas上のGrooveパルスオーバーレイ描画
 function drawGroovePulse(ctx){
+  // kickMode専用ビジュアル
+  if(kickMode && !grooveMode){
+    if(_kickPulse <= 0.01) return;
+    _kickPulse *= 0.78; dirty = true;
+    const cx=L.cx, cy=L.cy;
+    const r=40+_kickPulse*22;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle=_KICK_COL;
+    ctx.lineWidth=2;
+    ctx.globalAlpha=_kickPulse*0.45;
+    ctx.stroke();ctx.globalAlpha=1;
+    // ラベル
+    ctx.font='bold 9px DM Mono,monospace';
+    ctx.textAlign='left';ctx.textBaseline='top';
+    ctx.fillStyle=_KICK_COL;
+    ctx.globalAlpha=0.60;
+    ctx.fillText(`${_KICK_LABELS[kickMode]}  ${autoBpm} BPM`, 10, L.H-36);
+    ctx.globalAlpha=1;
+    // 8小節グリッド（128ステップ → 8つのセル）
+    const step=_kickTick%128, barIdx=Math.floor(step/16);
+    const gw=120,gh=6,gx=cx-gw/2,gy=cy+L.SR*0.82;
+    for(let i=0;i<8;i++){
+      const x=gx+i*(gw/8), w=gw/8-1;
+      const isActive=(i===barIdx);
+      const hasBar4=(i===3), hasBar8=(i===7);
+      ctx.fillStyle=isActive?_KICK_COL:hasBar4||hasBar8?'rgba(128,212,255,0.28)':'rgba(255,255,255,0.06)';
+      ctx.globalAlpha=isActive?0.9:0.6;
+      ctx.fillRect(x,gy,w,gh);
+    }
+    ctx.globalAlpha=1;
+    return;
+  }
   if(!grooveMode||groovePulse<=0.01) return;
   groovePulse*=0.78; // 減衰
   dirty=true;
@@ -16464,6 +16675,11 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
 // F4: Grooveプリセットボタン
 document.querySelectorAll('.groove-btn').forEach(btn=>{
   btn.addEventListener('click',()=>startGroove(btn.dataset.groove));
+});
+
+// Kickパターンボタン
+document.querySelectorAll('.kick-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>startKick(btn.dataset.kick));
 });
 
 // ── BPMダイヤル UI ──
