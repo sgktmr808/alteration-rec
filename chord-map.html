@@ -6312,6 +6312,7 @@ function stopGroove(){
   if(_grooveScheduleTimer){ clearTimeout(_grooveScheduleTimer); _grooveScheduleTimer = null; }
   if(grooveTimer){ clearTimeout(grooveTimer); grooveTimer = null; } // 旧タイマーも念のため
   grooveMode=null;
+}
 
 // ════════════════════════════════════════════════════════
 // KICK PATTERNS — キックのみ仮実装（Groove再設計まで）
@@ -6349,7 +6350,7 @@ function _playKickHit(actx, t, vol, genre) {
   sub.frequency.exponentialRampToValueAtTime(p.e, t + p.pt);
   subG.gain.setValueAtTime(vol * p.sv, t);
   subG.gain.exponentialRampToValueAtTime(0.001, t + p.dc);
-  sub.connect(subG); subG.connect(actx.destination);
+  sub.connect(subG); subG.connect(getMasterBus(actx));
   sub.start(t); sub.stop(t + p.dc + 0.05);
   // Click: アタックトランジェント
   const clk = actx.createOscillator(), clkG = actx.createGain();
@@ -6358,7 +6359,7 @@ function _playKickHit(actx, t, vol, genre) {
   clk.frequency.exponentialRampToValueAtTime(52, t + 0.012);
   clkG.gain.setValueAtTime(vol * p.cv, t);
   clkG.gain.exponentialRampToValueAtTime(0.001, t + 0.032);
-  clk.connect(clkG); clkG.connect(actx.destination);
+  clk.connect(clkG); clkG.connect(getMasterBus(actx));
   clk.start(t); clk.stop(t + 0.05);
 }
 
@@ -6419,10 +6420,11 @@ function startKick(mode) {
   if (!actx) return;
   safeResume(actx, () => {
     if (_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
-    const stepSec = 60 / autoBpm / 4;
-    const elapsed = actx.currentTime - _masterClockOrigin;
-    const nextGrid = Math.ceil((elapsed + 0.001) / stepSec) * stepSec;
-    _kickNextBeat = _masterClockOrigin + nextGrid;
+    // ARP/Grooveと同じ式でグリッドにスナップ（F: クロック統一）
+    const _sixteenth = (60 / autoBpm) / 4;
+    const _elapsed = actx.currentTime - _masterClockOrigin;
+    const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+    _kickNextBeat = _masterClockOrigin + _gridPos;
     _kickSchedule();
   });
   document.querySelectorAll('.kick-btn').forEach(b =>
@@ -6473,10 +6475,6 @@ function _kickSchedule() {
     _kickNextBeat += stepSec;
   }
   _kickScheduleTimer = setTimeout(_kickSchedule, _KICK_SCHEDULE_MS);
-}
-  groovePulse=0;
-  document.querySelectorAll('.groove-btn').forEach(b=>b.classList.remove('on'));
-  dirty=true;
 }
 
 // Canvas上のGrooveパルスオーバーレイ描画
@@ -16726,6 +16724,18 @@ document.querySelectorAll('.kick-btn').forEach(btn=>{
           const _elapsed = actx.currentTime - (_masterClockOrigin || actx.currentTime);
           const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
           arpNextBeat = (_masterClockOrigin || actx.currentTime) + _gridPos;
+        }
+      }
+    }
+    // Kick動作中: _kickNextBeatをARPと同じグリッドへ再スナップ（F: クロック統一）
+    if(kickMode && _kickScheduleTimer){
+      const actx=safeGetCtx();
+      if(actx && _masterClockOrigin !== null){
+        if(_kickNextBeat < actx.currentTime){
+          const _sixteenth = (60 / autoBpm) / 4;
+          const _elapsed = actx.currentTime - _masterClockOrigin;
+          const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+          _kickNextBeat = _masterClockOrigin + _gridPos;
         }
       }
     }
