@@ -775,11 +775,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .icon-btn.ic-rec .icon-sym,.icon-btn.ic-rec .icon-lbl{color:#d44a6a;}
 .icon-btn.ic-rec .icon-sub{color:#d44a6a;}
 .icon-btn.ic-rec.on{background:rgba(212,74,106,0.1);border-color:#d44a6a;}
-/* PHRASE — 黄 */
-.icon-btn.ic-phrase{border-color:rgba(232,197,71,0.25);}
-.icon-btn.ic-phrase .icon-sym,.icon-btn.ic-phrase .icon-lbl{color:var(--acc);}
-.icon-btn.ic-phrase .icon-sub{color:var(--acc);}
-.icon-btn.ic-phrase.on{background:var(--acc-a);border-color:var(--acc);}
 
 /* ── BPMダイヤルエリア ── */
 .bpm-dial-area{
@@ -986,14 +981,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .learn-chip{font-family:var(--fm);font-size:8px;padding:1px 6px;flex-shrink:0;
   border:1px solid rgba(232,197,71,0.3);border-radius:var(--r);color:var(--acc);background:var(--acc-a);}
 
-/* ── DB バナー ── */
-.db-banner{font-family:var(--fm);font-size:8px;padding:4px 12px;
-  background:rgba(212,130,58,0.12);border-top:1px solid rgba(212,130,58,0.3);
-  color:rgba(212,130,58,0.9);display:none;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
-.db-banner.show{display:flex;}
-.db-load-btn{font-family:var(--fm);font-size:8px;padding:2px 8px;
-  border:1px solid rgba(212,130,58,0.5);border-radius:var(--r);
-  color:rgba(212,130,58,0.9);background:transparent;cursor:pointer;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -1392,8 +1379,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                   </div>
                 </div>
                 <div class="synth-row">
-                </div>
-                <div class="synth-row">
                   <span class="synth-lbl">VOL</span>
                   <input class="synth-slider arp" id="arp-vol" type="range" min="0" max="100" value="38"
                     oninput="arpVol=parseInt(this.value)/100;this.style.setProperty('--pct',this.value+'%');document.getElementById('arp-vol-val').textContent=this.value+'%';">
@@ -1454,7 +1439,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         </div>
 
 
-        <!-- アイコンボタン行: AUTO / REC / PHRASE -->
+        <!-- アイコンボタン行: AUTO / REC -->
         <div class="icon-row">
           <div class="icon-btn ic-auto" id="ic-auto-btn">
             <div class="icon-sym">▶</div>
@@ -11408,12 +11393,19 @@ function startArpScheduler(){
     const _elapsed = actx.currentTime - _masterClockOrigin;
     const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
     arpNextBeat = _masterClockOrigin + _gridPos;
-    arpScheduleTimer=setInterval(()=>scheduleArpNotes(), arpScheduleMs);
+    // ③ setInterval → setTimeout チェーン（iOSタイマー蓄積ドリフト対策）
+    // 処理完了後に次回を予約する方式でGroove/Kickと統一
+    function _arpTick(){
+      if(!arpOn){ arpScheduleTimer = null; return; }
+      scheduleArpNotes();
+      arpScheduleTimer = setTimeout(_arpTick, arpScheduleMs);
+    }
+    arpScheduleTimer = setTimeout(_arpTick, arpScheduleMs);
   });
 }
 
 function stopArpScheduler(){
-  if(arpScheduleTimer){ clearInterval(arpScheduleTimer); arpScheduleTimer=null; }
+  if(arpScheduleTimer){ clearTimeout(arpScheduleTimer); arpScheduleTimer=null; }
 }
 
 /* ── CHORDストローク発音・スケジューラー（共通機能・一時無効化）──
@@ -16752,7 +16744,8 @@ document.querySelectorAll('.kick-btn').forEach(btn=>{
     // ARP動作中: arpNextBeatが過去になっていた場合のみ補正
     // ※ ディレイ更新はupdateDelayTime()で完結
     // ※ buildDelayNodes再構築はバッファフラッシュによるポップノイズの原因のため除去
-    if(arpOn && arpScheduleTimer){
+    // ③ arpScheduleTimer → arpOn で判断（setTimeoutはハンドルが一瞬nullになるため）
+    if(arpOn){
       const actx=safeGetCtx();
       if(actx){
         if(arpNextBeat < actx.currentTime){
@@ -16920,24 +16913,6 @@ document.querySelectorAll('.kick-btn').forEach(btn=>{
         if(icRecSub) icRecSub.textContent=n?`${n} notes`:'MIDI off';
       }
     },0);
-  });
-
-  // PHRASE トグル
-  const icPhrase=document.getElementById('ic-phrase-btn');
-  const icPhraseSub=document.getElementById('ic-phrase-sub');
-  const phrasePanel=document.getElementById('phrase-panel');
-  icPhrase?.addEventListener('click',()=>{
-    const isOpen=phrasePanel?.classList.contains('open');
-    if(isOpen){
-      phrasePanel.classList.remove('open');
-      icPhrase.classList.remove('on');
-      if(icPhraseSub) icPhraseSub.textContent='— off';
-    } else {
-      phrasePanel.classList.add('open');
-      icPhrase.classList.add('on');
-      const mode=document.getElementById('phrase-mode-sel')?.value||'off';
-      if(icPhraseSub) icPhraseSub.textContent=mode==='off'?'— off':mode.toUpperCase();
-    }
   });
 })();
 
@@ -17166,53 +17141,6 @@ function exportPhraseMidi(){
 // ═══════════════════════════════════════════════════
 renderLearnBar();
 
-// ═══════════════════════════════════════════════════
-// 課題5: guitar-db-filtered.js 動的ロード
-// バンドル済み → バナー非表示
-// 未バンドル → 自動試行 → なければバナー表示
-// ═══════════════════════════════════════════════════
-(function initGuitarDB(){
-  if(typeof GUITAR_DB!=='undefined'){
-    const b=document.getElementById('db-banner');
-    if(b)b.classList.remove('show');
-    return;
-  }
-  const s=document.createElement('script');
-  s.src='guitar-db-filtered.js';
-  s.onload=()=>{
-    const b=document.getElementById('db-banner');
-    const m=document.getElementById('db-banner-msg');
-    if(m)m.textContent='✓ guitar-db loaded — voicings enriched';
-    setTimeout(()=>{if(b)b.classList.remove('show');},2200);
-    Object.keys(VCACHE).forEach(k=>delete VCACHE[k]);
-    renderPosZone();
-  };
-  s.onerror=()=>{
-    const b=document.getElementById('db-banner');
-    if(b)b.classList.add('show');
-  };
-  document.head.appendChild(s);
-})();
-
-function loadGuitarDB(){
-  if(typeof GUITAR_DB!=='undefined'){
-    const _b=document.getElementById('db-banner');if(_b)_b.classList.remove('show');return;
-  }
-  const msg=document.getElementById('db-banner-msg');
-  if(msg)msg.textContent='⏳ Loading guitar-db-filtered.js…';
-  const s=document.createElement('script');
-  s.src='guitar-db-filtered.js?t='+Date.now();
-  s.onload=()=>{
-    if(msg)msg.textContent='✓ guitar-db loaded — voicings enriched';
-    setTimeout(()=>{const _b=document.getElementById('db-banner');if(_b)_b.classList.remove('show');},2200);
-    Object.keys(VCACHE).forEach(k=>delete VCACHE[k]);
-    renderPosZone();
-  };
-  s.onerror=()=>{
-    if(msg)msg.textContent='⚠ guitar-db-filtered.js not found — place it beside chord-map.html';
-  };
-  document.head.appendChild(s);
-}
 // CHORD SELECTタブのMIDIエクスポートボタン
 document.getElementById('midi-path-export').addEventListener('click',exportPathMidi);
 document.getElementById('midi-phrase-export').addEventListener('click',exportPhraseMidi);
