@@ -1096,7 +1096,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   <div class="hdr-title">CHORD MAP</div>
   <div id="app-version" style="font-family:var(--fm);font-size:7px;color:rgba(255,180,80,0.7);letter-spacing:.08em;padding:1px 5px;border:1px solid rgba(255,180,80,0.3);border-radius:3px;">v14.8.0</div>
   <div class="hdr-chord" id="hdr-chord">Am9</div>
-  <div class="hdr-solo-btn" id="hdr-solo-btn" onclick="toggleArpSolo()">SOLO</div>
 </div>
 <div class="legend">
   <div class="li"><div class="ldot" style="background:#4aaa72"></div><span class="ltxt">Diatonic</span></div>
@@ -2620,6 +2619,8 @@ function drawFrame(){
   if(relCache&&relCache.some(n=>n.dx!==undefined&&Math.abs(n.dop-n.opacity)>0.005))dirty=true;
   // Keep graph physics running while unsettled
   if(MAP_MODE==='graph'&&graphInited&&graphTick<300)dirty=true;
+  // 量子化待機中のパルスアニメーション
+  if(_arpPendingAction)dirty=true;
   // Q6: モーダルオーバーレイのフェードイン更新
   if(modalMapMode && modalOverlayAlpha<0.999){
     modalOverlayAlpha+=(1-modalOverlayAlpha)*0.12;
@@ -2851,14 +2852,41 @@ function drawFrame(){
     ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);
   }
   ctx.beginPath();ctx.arc(cx,cy,31,0,Math.PI*2);
-  ctx.fillStyle='rgba(232,197,71,0.05)';ctx.fill();
-  ctx.strokeStyle='rgba(232,197,71,0.14)';ctx.lineWidth=1;ctx.stroke();
-  ctx.beginPath();ctx.arc(cx,cy,27,0,Math.PI*2);
-  ctx.fillStyle='rgba(232,197,71,0.15)';ctx.fill();
-  ctx.strokeStyle='#e8c547';ctx.lineWidth=1.5;ctx.stroke();
+  if(arpSolo){
+    // SOLO ON: 白いリング
+    ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.45)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,27,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.16)';ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=2;ctx.stroke();
+  } else if(arpOn){
+    // ARP ON: 青白いリング
+    ctx.fillStyle='rgba(128,212,255,0.06)';ctx.fill();
+    ctx.strokeStyle='rgba(128,212,255,0.28)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,27,0,Math.PI*2);
+    ctx.fillStyle='rgba(128,212,255,0.14)';ctx.fill();
+    ctx.strokeStyle='#80d4ff';ctx.lineWidth=2;ctx.stroke();
+  } else {
+    // 通常: 金色
+    ctx.fillStyle='rgba(232,197,71,0.05)';ctx.fill();
+    ctx.strokeStyle='rgba(232,197,71,0.14)';ctx.lineWidth=1;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,27,0,Math.PI*2);
+    ctx.fillStyle='rgba(232,197,71,0.15)';ctx.fill();
+    ctx.strokeStyle='#e8c547';ctx.lineWidth=1.5;ctx.stroke();
+  }
+  // 量子化待機中: 外周パルスリング
+  if(_arpPendingAction){
+    const _ph=performance.now()/220;
+    const _pa=0.4+0.4*Math.sin(_ph);
+    ctx.beginPath();ctx.arc(cx,cy,37,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(128,212,255,${_pa})`;
+    ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([]);
+  }
   ctx.font='bold 15px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillStyle='#e8c547';ctx.fillText(S.root,cx,cy-7);
-  ctx.font='11px DM Mono,monospace';ctx.fillStyle='#b0a060';
+  ctx.fillStyle=arpSolo?'rgba(255,255,255,0.95)':arpOn?'#80d4ff':'#e8c547';
+  ctx.fillText(S.root,cx,cy-7);
+  ctx.font='11px DM Mono,monospace';
+  ctx.fillStyle=arpSolo?'rgba(200,200,200,0.75)':arpOn?'#6090a8':'#b0a060';
   ctx.fillText(CT[S.type]?.sym||'maj',cx,cy+9);
 
   // ── EMO MAP: 中央ノードに感情ベクトル表示 + カラーリング ──
@@ -3125,13 +3153,18 @@ function initCanvas(){
     }
     // Center node — tap to play chord + タップテンポ登録（EXPANDモード時はスキップ）
     if(dist<32&&MAP_MODE!=='expand'){
-      _registerTapTempo(); // コードを叩くリズムでテンポを設定
-      if(autoPlay){stopAuto();}
-      else{
-        /* playChord disabled: notifySynth handles audio */
-        if(FEATURES.phraseEngine) triggerPhrase(S.root,S.type);
-        notifySynth(S.root,S.type);
-      }
+      // ロングプレス検出開始（タップ処理はpointerupへ）
+      _centerDown=true;
+      _centerDownPos={x,y};
+      _centerLongPressed=false;
+      if(_centerLongPressTimer){clearTimeout(_centerLongPressTimer);_centerLongPressTimer=null;}
+      _centerLongPressTimer=setTimeout(()=>{
+        _centerLongPressed=true;
+        _centerLongPressTimer=null;
+        _performArpToggleFromMap();
+        fxSpawnPulse(L.cx,L.cy,arpSolo?'rgba(255,255,255,0.45)':arpOn?'rgba(128,212,255,0.45)':'rgba(128,212,255,0.45)');
+        invalidate();
+      },500);
       return;
     }
     // COMPASSモードは独立したhit検出（nodeHitsを使わない）
@@ -3174,6 +3207,14 @@ function initCanvas(){
   canvas.addEventListener('pointermove',e=>{
     const{x,y}=canvasXY(e);
     fxAddTrail(x,y);invalidate();
+    // 中央ノードロングプレス中に動いたらキャンセル
+    if(_centerDown && _centerLongPressTimer && _centerDownPos){
+      const mdx=x-_centerDownPos.x, mdy=y-_centerDownPos.y;
+      if(Math.sqrt(mdx*mdx+mdy*mdy)>8){
+        clearTimeout(_centerLongPressTimer);_centerLongPressTimer=null;
+        _centerDown=false;_centerDownPos=null;
+      }
+    }
 
     if(!drag){
       // スワイプ連続発音
@@ -3209,6 +3250,20 @@ function initCanvas(){
 
   canvas.addEventListener('pointerup',()=>{
     _sliderDragging = false; // スライダー操作終了
+    // 中央ノード: 短押し（タップ）処理
+    if(_centerDown){
+      if(_centerLongPressTimer){clearTimeout(_centerLongPressTimer);_centerLongPressTimer=null;}
+      if(!_centerLongPressed){
+        _registerTapTempo();
+        if(autoPlay){stopAuto();}
+        else{
+          if(FEATURES.phraseEngine) triggerPhrase(S.root,S.type);
+          notifySynth(S.root,S.type);
+        }
+      }
+      _centerDown=false;
+      _centerDownPos=null;
+    }
     if(drag){
       // Snap to 0.05 grid on release
       const sl=SL[drag.idx];
@@ -3220,6 +3275,11 @@ function initCanvas(){
     drag=null;
   });
 
+  canvas.addEventListener('pointercancel',()=>{
+    if(_centerLongPressTimer){clearTimeout(_centerLongPressTimer);_centerLongPressTimer=null;}
+    _centerDown=false;_centerDownPos=null;_centerLongPressed=false;
+  });
+
   // ── モード切り替えスワイプ（左右）──
   // MAPタブ表示中・サークル外側・上下移動量より左右が大きいときのみ反応
   const _modeOrder = ['radial','link','chain','pivot','expand','wave','bridge'];
@@ -3228,6 +3288,7 @@ function initCanvas(){
   canvas.addEventListener('pointerdown', e => {
     if(window._isCtrlScreen) return;
     if(_sliderDragging) return; // スライダー操作中はモード切替を無視
+    if(_centerDown) return;     // 中央ノードロングプレス中はスワイプ無視
     const {x, y} = canvasXY(e);
     const dist = distFromCenter(x, y);
     if(dist < L.SR - 10) return; // サークル内はコード操作に任せる
@@ -9637,6 +9698,12 @@ function hitTestBartok(tx,ty){
 // ── 状態変数 ──
 let padOn=true; // PADは常時有効（タップで発音）
 let arpOn=false;
+let _centerDown=false;          // 中央ノード押下中フラグ
+let _centerDownPos=null;        // 押下開始座標 {x,y}
+let _centerLongPressTimer=null; // ロングプレス検出タイマー
+let _centerLongPressed=false;   // ロングプレス実行済みフラグ
+let _arpPendingAction=null;     // 量子化待機中アクション ('arp-on'|'solo-on'|'solo-off')
+let _arpPendingTimer=null;      // 量子化待機タイマーID
 let synthPanelOpen=false; // legacyPad無効化につき固定。playScene()で発音。
 
 // PADパラメーター（幻想的・広がりのあるデフォルト）
@@ -12607,11 +12674,6 @@ let arpSolo = false; // ARPソロモード（全Scene共通）
 
 function toggleArpSolo(){
   arpSolo = !arpSolo;
-  const btn = document.getElementById('hdr-solo-btn');
-  if(btn){
-    btn.classList.toggle('on', arpSolo);
-    btn.textContent = arpSolo ? 'SOLO ▶' : 'SOLO';
-  }
   // ソロON: 鳴っているCHORDボイスをリリース
   if(arpSolo){
     const actx = safeGetCtx();
@@ -12620,22 +12682,81 @@ function toggleArpSolo(){
       _sceneVoices = [];
     }
   }
+  invalidate(); // 中央ノード状態表示を更新
+}
+
+// ── マップ画面からのARP/SOLOトグル（量子化付き）──
+function _performArpToggleFromMap(){
+  if(!arpOn){
+    _scheduleArpMapAction('arp-on');
+  } else if(!arpSolo){
+    _scheduleArpMapAction('solo-on');
+  } else {
+    _scheduleArpMapAction('solo-off');
+  }
+}
+
+function _scheduleArpMapAction(action){
+  // 既存の待機をキャンセル
+  if(_arpPendingTimer){clearTimeout(_arpPendingTimer);_arpPendingTimer=null;}
+  _arpPendingAction=null;
+
+  const isSync = grooveMode!==null || autoPlay;
+  if(!isSync){
+    // Groove/Auto停止中: 即時実行
+    _executeArpMapAction(action);
+    return;
+  }
+
+  // 量子化: ビート位置を算出
+  const actx=safeGetCtx();
+  if(!actx||_masterClockOrigin===null){
+    _executeArpMapAction(action);
+    return;
+  }
+  const barSec=(60/autoBpm)*4;
+  const elapsed=actx.currentTime-_masterClockOrigin;
+  const beatInBar=(elapsed%barSec)/(60/autoBpm); // 0〜4
+  const isBeat4=beatInBar>=3.0;
+
+  // 次小節頭までのms（epsilon=0.01で現在が小節頭の場合も次へ）
+  const nextBarSec=Math.ceil((elapsed+0.01)/barSec)*barSec;
+  let delayMs=(_masterClockOrigin+nextBarSec-actx.currentTime)*1000;
+  if(isBeat4) delayMs+=barSec*1000; // ビート4: さらに1小節待つ
+
+  _arpPendingAction=action;
+  dirty=true;
+
+  _arpPendingTimer=setTimeout(()=>{
+    _arpPendingAction=null;
+    _arpPendingTimer=null;
+    _executeArpMapAction(action);
+    dirty=true;
+  },Math.max(0,delayMs));
+}
+
+function _executeArpMapAction(action){
+  if(action==='arp-on'  && !arpOn)   toggleArp();
+  if(action==='solo-on' && arpOn && !arpSolo) toggleArpSolo();
+  if(action==='solo-off'&& arpSolo)  toggleArpSolo();
+  invalidate();
 }
 
 function toggleArp(){
   arpOn=!arpOn;
-  // SYNTHパネル内のボタンとヘッダーボタンを同期
-  document.querySelectorAll('#arp-on-btn, #hdr-arp-btn').forEach(btn=>{
+  // SYNTHパネル内のボタンを同期（hdr-arp-btnは削除済み）
+  document.querySelectorAll('#arp-on-btn').forEach(btn=>{
     if(!btn) return;
-    btn.textContent=arpOn?(btn.id==='hdr-arp-btn'?'ARP ▶':'ON'):(btn.id==='hdr-arp-btn'?'ARP':'OFF');
+    btn.textContent=arpOn?'ON':'OFF';
     btn.classList.toggle('on', arpOn);
-    btn.classList.toggle('arp', btn.id==='arp-on-btn');
+    btn.classList.toggle('arp', true);
   });
   if(arpOn){
     startArpScheduler();
   } else {
     stopArpScheduler();
   }
+  invalidate(); // 中央ノード状態表示を更新
 }
 
 // スライダー値表示更新
