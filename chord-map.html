@@ -1370,7 +1370,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                     <div class="synth-pill pattern-pill on" data-pattern="hold" onclick="applyChordPattern('hold')">HOLD</div>
                     <div class="synth-pill pattern-pill" data-pattern="stab" onclick="applyChordPattern('stab')">STAB</div>
                     <div class="synth-pill pattern-pill" data-pattern="broken" onclick="applyChordPattern('broken')">BROKEN</div>
-                    <div class="synth-pill pattern-pill" data-pattern="pulse" onclick="applyChordPattern('pulse')">PULSE</div>
                     <div class="synth-pill pattern-pill" data-pattern="trail" onclick="applyChordPattern('trail')">TRAIL</div>
                     <div class="synth-pill pattern-pill" data-pattern="pluck_arp" onclick="applyChordPattern('pluck_arp')">PLUCK ARP</div>
                     <div class="synth-pill pattern-pill" data-pattern="float_arp" onclick="applyChordPattern('float_arp')">FLOAT ARP</div>
@@ -10034,7 +10033,7 @@ function shuffleArr(arr){
 function arpStepMs(){
   if(arpRate==='free') return arpFreeMs;
   const beatMs=60000/autoBpm;
-  const map={'1/4':beatMs,'1/8':beatMs/2,'1/16':beatMs/4,'1/32':beatMs/8,
+  const map={'1/4':beatMs,'1/8':beatMs/2,'1/16':beatMs/4,
              '1/8T':beatMs/3,'1/16T':beatMs/6};
   return map[arpRate]??beatMs/2;
 }
@@ -12800,8 +12799,6 @@ function initSynthUI(){
       if(arpOn&&S&&S.root) { arpSeq=buildArpSeq(S.root,S.type); arpStep=0; }
     };
   });
-  // ARPレートpill初期化（UIは廃止・arpRateはPULSEパターン用にデフォルト1/16で固定）
-  // document.querySelectorAll('#arp-rate-pills .synth-pill') → HTML削除済み
   // DELAYタイムpill初期化
   document.querySelectorAll('#dly-time-pills .synth-pill').forEach(p=>{
     p.onclick=()=>{
@@ -12830,8 +12827,7 @@ function initSynthUI(){
 // ── 現在のScene / Source 状態 ──
 let sceneCurrentName = 'plain';   // 現在のScene名
 let sceneCurrentSource = 'CHORD'; // 'CHORD' | 'ARP' | 'CHORD+ARP'
-let chordPatternMode = 'hold';    // 'hold' | 'stab' | 'broken' | 'pulse' | 'pluck_arp' | 'float_arp' | 'inner_line' | 'trail'
-let _chordPulseTimer = null;      // PULSEモードの反復タイマー
+let chordPatternMode = 'hold';    // 'hold' | 'stab' | 'broken' | 'pluck_arp' | 'float_arp' | 'inner_line' | 'trail'
 let _patternArpParams = null;     // PLUCK ARP / FLOAT ARP / INNER LINE 用パラメーター上書き
 // ── Trail Wave LFO（波打ち際の呼吸）──
 // TRAILパターン時のtrailSecを正弦波でゆっくり揺らす
@@ -12866,7 +12862,7 @@ const SCENE_PRESETS = {
     arpAttack:0.002, arpDecay:0.28, arpSustain:0.0, arpRelease:0.38,
     arpGate:140, arpVol:0.24, arpWet:0.38, arpGhost:0.10,
     arpOctRange:2,
-    arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.20,
+    arpRhythm:[1.0, 1.0, 1.0], arpRestProb:0.14,
   },
 
   // 2. VELVET ROOTLESS — ビル・エヴァンス × Octave One的。中域、内声、柔らかいテンション
@@ -12982,7 +12978,7 @@ const SCENE_PRESETS = {
     arpAttack:0.008, arpDecay:0.60, arpSustain:0.30,
     arpGate:280, arpVol:0.18, arpWet:0.52, arpGhost:0.15,
     arpOctRange:2,
-    arpRhythm:[0.5, 0.5, 0.5, 0.5], arpRestProb:0.02,
+    arpRhythm:[0.5, 0.5, 0.5, 0.5], arpRestProb:0.05,
   },
 };
 
@@ -13664,35 +13660,6 @@ function playSceneChord(actx, root, type){
     _sceneVoices.forEach(v => _releaseSceneVoice(v, a2, sc.release));
     setTimeout(()=>{ _sceneVoices = []; }, Math.round(Math.min(sc.release, 3.5) * 1000) + 200);
   }, Math.round(holdSec * 1000));
-
-  // ── PULSE: 一定間隔でコードを自動反復（CHORDのみ） ──
-  // ※ PULSEタイマーはapplyChordPattern('pulse')時のみ起動
-  // playSceneChord呼び出し後、PULSEが有効ならタイマーをセット
-  if(chordPatternMode === 'pulse' && !_chordPulseTimer){
-    const pulseIntervalMs = arpStepMs() * 2; // 2拍ごとに反復
-    _chordPulseTimer = setInterval(()=>{
-      if(chordPatternMode !== 'pulse'){ clearInterval(_chordPulseTimer); _chordPulseTimer = null; return; }
-      if(!S || !S.root) return;
-      const a3 = safeGetCtx(); if(!a3) return;
-      // PULSEは短い発音（STABに近い）
-      const _pBase = SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
-      const pSc = Object.assign({}, _pBase, {
-        attack:   0.012,
-        release:  0.35,
-        trailSec: 0.2,
-        vol:      _pBase.vol * 0.7,
-      });
-      const pOut = (typeof getOut === 'function') ? getOut(a3, pSc.wet) : a3.destination;
-      const pMidis = buildSceneVoicing(S.root, S.type, pSc.voicingFlavor, sv('complex'), sv('warm'), sv('strange'));
-      const pBase = Math.max(a3.currentTime, 0.1) + 0.05;
-      pMidis.forEach((midi, i) => {
-        const hz = midi2hz(Math.max(24, Math.min(108, midi)));
-        const pan = (pMidis.length > 1) ? (i / (pMidis.length - 1) * 2 - 1) * pSc.width : 0;
-        const v = _playSceneNote(a3, hz, pSc, pBase + i * (pSc.strum / 1000), pOut, pan);
-        _sceneVoices.push(v);
-      });
-    }, pulseIntervalMs);
-  }
 }
 
 // ── メインディスパッチャー ──
@@ -13901,7 +13868,7 @@ function _applySL_glass(sc, bright, tense, warm, moving, strange){
   _slArpCutoff = Math.max(500, (sc.arpCutoff || 3800) * (1.0 + bright * 0.8));
   _slArpRes    = Math.max(0.5, (sc.arpRes || 1.6) * (1.0 + tense * 0.55));
   // tense+: restProb大幅減少（密） / tense-: 大幅増加（孤独な光）
-  _slArpRestProb = Math.max(0, Math.min(0.80, (sc.arpRestProb || 0.38) - tense * 0.35));
+  _slArpRestProb = Math.max(0, Math.min(0.80, (sc.arpRestProb || 0.38) - tense * 0.25));
   _slArpEnvMod = Math.max(0.2, (sc.arpEnvMod || 0.65) * (1.0 + tense * 0.3));
   // warm: ghost感（osc2mix）+ gate（残像が増える）
   _slOsc2Mix = 0.30 + warm * 0.50; // 負=0.30 / 正=0.80
@@ -14156,9 +14123,6 @@ const _ARP_PATTERN_PRESETS = {
 };
 
 function applyChordPattern(mode){
-  // PULSEタイマーをまず停止（前モードのPULSEを確実にクリア）
-  if(_chordPulseTimer){ clearInterval(_chordPulseTimer); _chordPulseTimer = null; }
-
   // ARP系パターン: ARPパラメーター上書きを設定
   // SOURCEとARPのON/OFFはユーザーの意思を尊重 → 強制切替しない
   const isArpPattern = (mode === 'pluck_arp' || mode === 'float_arp' || mode === 'inner_line');
@@ -14169,16 +14133,9 @@ function applyChordPattern(mode){
     if(!arpOn){
       toggleArp();
     }
-  } else if(mode === 'pulse'){
-    // PULSE: CHORDを反復するためSOURCEをCHORDに自動切替
-    _patternArpParams = null;
-    if(sceneCurrentSource !== 'CHORD' && sceneCurrentSource !== 'CHORD+ARP'){
-      applySource('CHORD');
-    }
   } else {
     // CHORD系パターン（HOLD/STAB/BROKEN/TRAIL）:
-    // ARP用上書きをクリア + SOURCEがARPのみならCHORDに自動切替
-    // CHORD系Pattern: ARP用パラメーター上書きをクリア
+    // ARP用上書きをクリア
     // ARPのON/OFFはユーザーの意思を尊重 → 強制停止しない
     _patternArpParams = null;
   }
