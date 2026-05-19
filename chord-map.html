@@ -13337,10 +13337,10 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
     }
 
     notes = _applyComplex(notes);
-    // 音数: strange↑時は4音まで（13th・#11が切り落とされる問題を修正）/ それ以外は3音
-    // 7th・3rd・9thを優先して残す
+    // 音数: strange > 0.7 で5音（13th+#11両方）/ strange > 0.4 で4音（#11のみ）/ それ以外は3音
+    // 7th・3rd・9th・#11・13thを優先して残す
     const _keep = notes.sort((a,b)=>a-b);
-    const _keepMax = (_slS > 0.4) ? 4 : 3;
+    const _keepMax = (_slS > 0.7) ? 5 : (_slS > 0.4) ? 4 : 3;
     return _keep.slice(0, _keepMax);
   }
 
