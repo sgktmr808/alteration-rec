@@ -1314,6 +1314,17 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           </div>
         </div>
 
+        <!-- LOOP BEACH: COLLECTED FRAGMENTS -->
+        <div class="saved-zone" id="collected-zone">
+          <div class="saved-hdr" id="collected-hdr" onclick="toggleCollectedPanel()">
+            <span class="saved-hdr-l">◊ COLLECTED</span>
+            <span class="saved-tog" id="collected-tog">▼</span>
+          </div>
+          <div class="saved-wrap" id="collected-wrap">
+            <div class="saved-list" id="collected-list"></div>
+          </div>
+        </div>
+
         <!-- SYNTH PAD + ARP パネル -->
         <div class="synth-zone" id="synth-zone">
           <div class="synth-hdr" id="synth-hdr" onclick="toggleSynthPanel()">
@@ -3080,6 +3091,9 @@ function drawFrame(){
   // ── F4: GROOVE パルスオーバーレイ ──
   if(grooveMode || kickMode) drawGroovePulse(ctx);
 
+  // ── Loop Beach: ガラスのかけら（FXより下に描く） ──
+  if(typeof _drawAndUpdateSeaGlass === 'function') _drawAndUpdateSeaGlass(ctx);
+
   // ── COSMIC FX (topmost) ──
   fxDrawAndUpdate(ctx);
 }
@@ -3123,6 +3137,13 @@ function initCanvas(){
 
   canvas.addEventListener('pointerdown',e=>{
     const{x,y}=canvasXY(e);
+    // Loop Beach: ガラスのかけら判定（最優先）
+    if(typeof _hitTestSeaGlass === 'function' && _hitTestSeaGlass(x, y)){
+      e.preventDefault();
+      return;
+    }
+    // Loop Beach: タップ座標履歴に記録
+    if(typeof _recordTapCoord === 'function') _recordTapCoord(x, y);
     fxAddTrail(x,y);
     FX.swipeAccum=0;FX.swipeLastHit=null;
     const dist=distFromCenter(x,y);
@@ -6596,6 +6617,8 @@ function moveToChord(root,type){
   S.voicing=null;
   S.root=root;S.type=type;
   S.history=S.history.slice(0,S.histIdx+1);S.history.push({root,type});S.histIdx=S.history.length-1;
+  // Loop Beach: パターン検知（AUTO中はスキップ）
+  if(typeof _checkPatternDetection === 'function') _checkPatternDetection();
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
   // Q6: モーダルオーバーレイをコード変更時にフェードイン再開
   if(modalMapMode) modalOverlayAlpha=0;
@@ -6639,6 +6662,449 @@ function moveToChord(root,type){
   }
   renderPosZone();
 }
+
+// ═══════════════════════════════════════════════════════
+// LOOP BEACH — Sound Memory / Sea Glass Collection Layer
+// ═══════════════════════════════════════════════════════
+// パターン検知 → ガラスのかけら出現 → タップで採取
+// コンセプト: 演奏中に繰り返し惹かれた瞬間を「拾う」
+
+const COLLECTED_CLIPS_KEY = 'chord_collected_clips_v1';
+
+// ── グローバル状態 ──
+let _patternDetectCount = 0;
+let _patternDetectTarget = 2 + Math.floor(Math.random() * 3); // 2〜4
+let _patternCooldown = false;
+let _patternLastChordIdx = -1;
+let _tapCoordHistory = []; // {x, y} 最大12件
+let _seaGlassShards = [];  // {x, y, spawnTime, opacity, id}
+const _SEA_GLASS_LIFETIME_MS = 10000;
+const _SEA_GLASS_MAX = 2;
+const _SEA_GLASS_RADIUS = 30;
+const _PATTERN_SCORE_THRESHOLD = 4;
+
+// ── タップ座標記録（グループ6で使用）──
+function _recordTapCoord(x, y){
+  _tapCoordHistory.push({x, y});
+  if(_tapCoordHistory.length > 12) _tapCoordHistory.shift();
+}
+
+// ── 音楽理論ヘルパー ──
+function _rootToPc(root){
+  return (typeof ni === 'function') ? ni(root) : 0;
+}
+
+// ── パターン検知シグナル（各グループ）──
+
+// グループ1: コード反復
+function _sigGroup1(hist){
+  if(hist.length < 2) return 0;
+  // 完全一致4コードループ（最強）
+  if(hist.length >= 8){
+    const last4 = hist.slice(-4).map(h => h.root + h.type).join('|');
+    const prev4 = hist.slice(-8, -4).map(h => h.root + h.type).join('|');
+    if(last4 === prev4) return 5;
+  }
+  // 同じroot+typeが直近6コードに3回以上
+  if(hist.length >= 3){
+    const recent6 = hist.slice(-6);
+    const counts = {};
+    for(const h of recent6){
+      const key = h.root + h.type;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    if(Object.values(counts).some(c => c >= 3)) return 4;
+  }
+  // 同じroot+typeが直近8コードに2回以上
+  if(hist.length >= 2){
+    const recent8 = hist.slice(-8);
+    const counts = {};
+    for(const h of recent8){
+      const key = h.root + h.type;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    if(Object.values(counts).some(c => c >= 2)) return 2;
+  }
+  return 0;
+}
+
+// グループ2: 往復・経路
+function _sigGroup2(hist){
+  if(hist.length < 3) return 0;
+  // 2コード間往復 (A→B→A or B→A→B)
+  const k = h => h.root + h.type;
+  const n = hist.length;
+  if(n >= 3 && k(hist[n-3]) === k(hist[n-1]) && k(hist[n-3]) !== k(hist[n-2])){
+    return 3;
+  }
+  // 逆方向経路 (A→B→C followed by C→B→A)
+  if(n >= 6){
+    const a = hist.slice(n-6, n-3);
+    const b = hist.slice(n-3);
+    if(k(a[0]) === k(b[2]) && k(a[1]) === k(b[1]) && k(a[2]) === k(b[0]) &&
+       k(a[0]) !== k(a[1]) && k(a[1]) !== k(a[2])){
+      return 3;
+    }
+  }
+  return 0;
+}
+
+// グループ3: Root多様性
+function _sigGroup3(hist){
+  if(hist.length < 5) return 0;
+  let best = 0;
+  // 直近6コードに同じrootが3回
+  if(hist.length >= 6){
+    const recent6 = hist.slice(-6);
+    const rootCounts = {};
+    for(const h of recent6){
+      rootCounts[h.root] = (rootCounts[h.root] || 0) + 1;
+    }
+    if(Object.values(rootCounts).some(c => c >= 3)) best = Math.max(best, 2);
+  }
+  // 直近8コードのroot種類が2種類以下
+  if(hist.length >= 5){
+    const recent = hist.slice(-Math.min(8, hist.length));
+    const roots = new Set(recent.map(h => h.root));
+    if(roots.size <= 2) best = Math.max(best, 2);
+  }
+  return best;
+}
+
+// グループ4: Scene/タイプ一致
+function _sigGroup4(hist){
+  if(hist.length < 4) return 0;
+  // 同じSceneで同じコードタイプを4回連続（Sceneは現在値のみ参照可能なので、コードタイプの4連続）
+  const last4 = hist.slice(-4);
+  const allSameType = last4.every(h => h.type === last4[0].type);
+  return allSameType ? 1 : 0;
+}
+
+// グループ5: 音楽理論パターン
+function _sigGroup5(hist){
+  if(hist.length < 3) return 0;
+  let best = 0;
+  // 半音隣接往復（C↔C#など）
+  if(hist.length >= 3){
+    const n = hist.length;
+    const pc = i => _rootToPc(hist[i].root);
+    if(n >= 3){
+      const diff1 = Math.abs(pc(n-1) - pc(n-2));
+      const diff2 = Math.abs(pc(n-2) - pc(n-3));
+      const d1 = Math.min(diff1, 12 - diff1);
+      const d2 = Math.min(diff2, 12 - diff2);
+      if(d1 === 1 && d2 === 1 && pc(n-1) === pc(n-3)){
+        best = Math.max(best, 3);
+      }
+    }
+  }
+  // 完全4度上行/5度下行が2回（rootピッチクラスで判定）
+  if(hist.length >= 4){
+    const n = hist.length;
+    const pc = i => _rootToPc(hist[i].root);
+    const interval = (a, b) => (pc(b) - pc(a) + 12) % 12;
+    // 4度上行 = +5半音 / 5度下行 = -7半音 = +5半音(mod12)
+    let p4count = 0;
+    for(let i = n-3; i < n; i++){
+      if(i > 0 && interval(i-1, i) === 5) p4count++;
+    }
+    if(p4count >= 2) best = Math.max(best, 2);
+  }
+  // 同じスケール（メジャースケール簡易判定）内3コード以上繰り返し登場
+  if(hist.length >= 5){
+    const recent = hist.slice(-Math.min(8, hist.length));
+    const rootSet = new Set(recent.map(h => _rootToPc(h.root)));
+    if(rootSet.size >= 3 && rootSet.size <= 5){
+      // 全てメジャースケールC（白鍵）に含まれるか等、簡略判定
+      const cMajor = new Set([0, 2, 4, 5, 7, 9, 11]);
+      const allInC = [...rootSet].every(p => cMajor.has(p));
+      if(allInC){ best = Math.max(best, 2); }
+    }
+  }
+  return best;
+}
+
+// グループ6: 空間・行動
+function _sigGroup6(){
+  if(_tapCoordHistory.length < 3) return 0;
+  let best = 0;
+  // 同じ半径50px以内を3回タップ
+  const recent3 = _tapCoordHistory.slice(-3);
+  for(const center of recent3){
+    let count = 0;
+    for(const p of recent3){
+      const dx = p.x - center.x, dy = p.y - center.y;
+      if(dx*dx + dy*dy <= 50*50) count++;
+    }
+    if(count >= 3){ best = Math.max(best, 2); break; }
+  }
+  // 直近12コードのタップ座標分散が小さい
+  if(_tapCoordHistory.length >= 8){
+    const pts = _tapCoordHistory.slice(-Math.min(12, _tapCoordHistory.length));
+    const cx = pts.reduce((s,p) => s+p.x, 0) / pts.length;
+    const cy = pts.reduce((s,p) => s+p.y, 0) / pts.length;
+    const variance = pts.reduce((s,p) => {
+      const dx = p.x-cx, dy = p.y-cy;
+      return s + dx*dx + dy*dy;
+    }, 0) / pts.length;
+    // 分散の平方根 < 80px なら「狭い範囲」
+    if(Math.sqrt(variance) < 80) best = Math.max(best, 2);
+  }
+  return best;
+}
+
+// ── スコア評価メイン ──
+function _evaluatePatternScore(){
+  const hist = (S && S.history && S.histIdx >= 0)
+    ? S.history.slice(0, S.histIdx + 1)
+    : [];
+  if(hist.length < 2) return 0;
+
+  const score =
+    _sigGroup1(hist) +
+    _sigGroup2(hist) +
+    _sigGroup3(hist) +
+    _sigGroup4(hist) +
+    _sigGroup5(hist) +
+    _sigGroup6();
+
+  return score;
+}
+
+// ── パターン検知エントリポイント（setChord末尾から呼ぶ）──
+function _checkPatternDetection(){
+  // AUTO動作中はスキップ（提案1=A）
+  if(autoPlay) return;
+
+  // クールダウン: 前回検知から1コード経過していなければスキップ
+  if(_patternCooldown){
+    if(S.histIdx > _patternLastChordIdx){
+      _patternCooldown = false;
+    } else {
+      return;
+    }
+  }
+
+  const score = _evaluatePatternScore();
+  if(score >= _PATTERN_SCORE_THRESHOLD){
+    _patternDetectCount++;
+    _patternCooldown = true;
+    _patternLastChordIdx = S.histIdx;
+
+    if(_patternDetectCount >= _patternDetectTarget){
+      _spawnSeaGlassShard();
+      _patternDetectCount = 0;
+      _patternDetectTarget = 2 + Math.floor(Math.random() * 3); // 2〜4再抽選
+    }
+  }
+}
+
+// ── ガラスのかけら出現 ──
+function _spawnSeaGlassShard(){
+  if(_seaGlassShards.length >= _SEA_GLASS_MAX) return;
+
+  // 配置候補を探す: ノードと既存ガラスを避ける
+  const canvas = document.getElementById('map-canvas');
+  if(!canvas) return;
+  const W = canvas.width / (L.DPR || 1);
+  const H = canvas.height / (L.DPR || 1);
+
+  const MAX_TRIES = 30;
+  for(let i = 0; i < MAX_TRIES; i++){
+    const x = 50 + Math.random() * (W - 100);
+    const y = 50 + Math.random() * (H - 100);
+
+    // 既存のコードノードから100px以内なら却下
+    let okNode = true;
+    if(nodeHits && nodeHits.length){
+      for(const n of nodeHits){
+        const dx = x - n.x, dy = y - n.y;
+        if(dx*dx + dy*dy < 100*100){ okNode = false; break; }
+      }
+    }
+    if(!okNode) continue;
+
+    // 中央ノードから80px以内なら却下
+    const dxc = x - L.cx, dyc = y - L.cy;
+    if(dxc*dxc + dyc*dyc < 80*80) continue;
+
+    // 既存のアクティブなガラスから200px以内なら却下
+    let okShard = true;
+    for(const s of _seaGlassShards){
+      const dx = x - s.x, dy = y - s.y;
+      if(dx*dx + dy*dy < 200*200){ okShard = false; break; }
+    }
+    if(!okShard) continue;
+
+    // 配置成功
+    _seaGlassShards.push({
+      x, y,
+      spawnTime: Date.now(),
+      opacity: 0,
+      id: 'shard_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+    });
+    dirty = true;
+    return;
+  }
+  // 候補が見つからなければ出現しない
+}
+
+// ── ガラスの描画・寿命管理（drawFrame末尾から呼ぶ）──
+function _drawAndUpdateSeaGlass(ctx){
+  if(!_seaGlassShards.length) return;
+  const now = Date.now();
+  const _animPhase = (now / 1000) % (Math.PI * 2);
+
+  for(let i = _seaGlassShards.length - 1; i >= 0; i--){
+    const s = _seaGlassShards[i];
+    const age = now - s.spawnTime;
+
+    // 寿命チェック
+    if(age >= _SEA_GLASS_LIFETIME_MS){
+      _seaGlassShards.splice(i, 1);
+      continue;
+    }
+
+    // フェードイン（最初の0.5秒）/ フェードアウト（最後の1秒）
+    let alpha;
+    if(age < 500){
+      alpha = age / 500;
+    } else if(age > _SEA_GLASS_LIFETIME_MS - 1000){
+      alpha = (_SEA_GLASS_LIFETIME_MS - age) / 1000;
+    } else {
+      // 明滅 0.4〜0.8
+      alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(_animPhase * 0.7));
+    }
+
+    // 描画: 半透明の青緑円・縁取り
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // 外側のぼかし
+    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, _SEA_GLASS_RADIUS);
+    grad.addColorStop(0, 'rgba(150,220,210,0.7)');
+    grad.addColorStop(0.6, 'rgba(120,200,200,0.4)');
+    grad.addColorStop(1, 'rgba(100,180,200,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, _SEA_GLASS_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    // 中心の小さな白い光
+    ctx.fillStyle = 'rgba(220,250,250,0.8)';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // アニメーションを継続させる
+  if(_seaGlassShards.length) dirty = true;
+}
+
+// ── ガラスのタップ判定（pointerdownから呼ぶ）──
+function _hitTestSeaGlass(x, y){
+  for(let i = _seaGlassShards.length - 1; i >= 0; i--){
+    const s = _seaGlassShards[i];
+    const dx = x - s.x, dy = y - s.y;
+    if(dx*dx + dy*dy <= _SEA_GLASS_RADIUS * _SEA_GLASS_RADIUS){
+      _collectSeaGlass(s);
+      _seaGlassShards.splice(i, 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+// ── ガラスを採取してClipとして保存 ──
+function _collectSeaGlass(shard){
+  const hist = (S && S.history && S.histIdx >= 0)
+    ? S.history.slice(0, S.histIdx + 1)
+    : [];
+  const chords = hist.slice(-4).map(h => ({ root: h.root, type: h.type }));
+
+  const clip = {
+    id: 'clip_' + Date.now(),
+    collectedAt: new Date().toISOString(),
+    chords: chords,
+    scene: (typeof sceneCurrentName !== 'undefined') ? sceneCurrentName : 'plain',
+    bpm: (typeof autoBpm !== 'undefined') ? autoBpm : 100,
+    soundState: (typeof captureCurrentSoundState === 'function')
+      ? captureCurrentSoundState()
+      : null,
+  };
+
+  // localStorage 保存
+  try {
+    const existing = JSON.parse(localStorage.getItem(COLLECTED_CLIPS_KEY) || '[]');
+    existing.unshift(clip); // 新しいものを先頭に
+    localStorage.setItem(COLLECTED_CLIPS_KEY, JSON.stringify(existing));
+  } catch(e) {
+    console.warn('Sea glass save failed:', e);
+  }
+
+  // 採取時の視覚フィードバック（パルス）
+  if(typeof fxSpawnPulse === 'function'){
+    fxSpawnPulse(shard.x, shard.y, 'rgba(180,230,220,0.7)');
+  }
+  if(typeof fxSpawnParticles === 'function'){
+    fxSpawnParticles(shard.x, shard.y, '#a0d8d0');
+  }
+
+  // COLLECTEDセクションを更新
+  if(typeof _renderCollectedList === 'function') _renderCollectedList();
+}
+
+// ── COLLECTED リストのロード/レンダリング ──
+function _loadCollectedClips(){
+  try {
+    return JSON.parse(localStorage.getItem(COLLECTED_CLIPS_KEY) || '[]');
+  } catch(e) {
+    return [];
+  }
+}
+
+function _deleteCollectedClip(id){
+  try {
+    const list = _loadCollectedClips().filter(c => c.id !== id);
+    localStorage.setItem(COLLECTED_CLIPS_KEY, JSON.stringify(list));
+    _renderCollectedList();
+  } catch(e) {
+    console.warn('Sea glass delete failed:', e);
+  }
+}
+
+function _renderCollectedList(){
+  const el = document.getElementById('collected-list');
+  if(!el) return;
+  const clips = _loadCollectedClips();
+  if(!clips.length){
+    el.innerHTML = '<div class="saved-empty">No fragments collected yet</div>';
+    return;
+  }
+  el.innerHTML = clips.map(c => {
+    const date = new Date(c.collectedAt);
+    const time = date.toLocaleString('ja-JP', {
+      month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const chordStr = (c.chords || []).map(ch => {
+      const sym = (typeof CT !== 'undefined' && CT[ch.type]) ? CT[ch.type].sym : ch.type;
+      return ch.root + sym;
+    }).join(' - ');
+    const sceneLbl = (c.scene || 'plain').toUpperCase();
+    return `<div class="saved-item">
+      <div class="saved-item-row">
+        <div class="saved-play" title="${time}">${chordStr || '—'}</div>
+        <div class="saved-del" onclick="_deleteCollectedClip('${c.id}')">×</div>
+      </div>
+      <div style="font-family:var(--fm);font-size:7px;color:var(--dim);padding:0 8px 4px;letter-spacing:.08em;">
+        ${sceneLbl} · ${c.bpm} BPM · ${time}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 初期表示
+setTimeout(() => { if(typeof _renderCollectedList === 'function') _renderCollectedList(); }, 100);
+
 // ═══════════════════════════════════════════════════════
 // SAVED PROGRESSIONS — 進行保存・再生機能
 // ═══════════════════════════════════════════════════════
@@ -7313,6 +7779,17 @@ function toggleSavedPanel(){
   if(wrap)wrap.classList.toggle('open',savedPanelOpen);
   if(tog)tog.textContent=savedPanelOpen?'▲':'▼';
   if(savedPanelOpen)renderSavedList();
+}
+
+// Loop Beach: COLLECTEDパネルの開閉
+let collectedPanelOpen = false;
+function toggleCollectedPanel(){
+  collectedPanelOpen = !collectedPanelOpen;
+  const wrap = document.getElementById('collected-wrap');
+  const tog  = document.getElementById('collected-tog');
+  if(wrap) wrap.classList.toggle('open', collectedPanelOpen);
+  if(tog)  tog.textContent = collectedPanelOpen ? '▲' : '▼';
+  if(collectedPanelOpen && typeof _renderCollectedList === 'function') _renderCollectedList();
 }
 
 // SAVEDリストをDOMに描画
