@@ -13771,8 +13771,96 @@ function playSceneChord(actx, root, type){
     ? getOut(actx, sc.wet)
     : actx.destination;
 
-  // Scene別voicingFlavorでボイシング取得（_nextMidisを使い回す）
-  const midis = _nextMidis;
+  // ── アダプティブ・ボイスリーディング ──
+  // フェード中の音と半音でぶつかる場合、オクターブシフト→テンション付与→ミュートで解決
+  // 発動条件: trailSec > 0.5（STAB等の短リリースは除外）かつフェード中の音が存在する
+  const _fadingMidis = _sceneReleasingVoices
+    .filter(v => v && v.midi !== undefined)
+    .map(v => v.midi);
+
+  let workMidis = [..._nextMidis];
+
+  if(trailSec > 0.5 && _fadingMidis.length > 0){
+    const _fadingSet = new Set(_fadingMidis);
+
+    // Scene別閾値: STRINGSは高域設計を保護
+    const _isStrings = (sceneCurrentName === 'strings');
+    const _upperLim = _isStrings ? 86 : 79;
+    const _lowerLim = _isStrings ? 55 : 36;
+
+    // Scene別テンション優先順（ピッチクラスのインターバル）
+    // VELVET/GLASS/STRINGS: 9th→#11→13th→b7（浮遊感優先）
+    // その他: 9th→13th→b7→#11（安定感優先）
+    const _tensionOrder = (sceneCurrentName === 'velvet' ||
+                           sceneCurrentName === 'glass'  ||
+                           sceneCurrentName === 'strings')
+      ? [14, 18, 21, 10]
+      : [14, 21, 10, 18];
+
+    // コードルートのピッチクラス（テンション音の基準）
+    const _ri = (typeof ni === 'function') ? ni(root) : 0;
+
+    // 半音クラッシュ判定（引数は m のみ・_fadingMidisをクロージャ参照）
+    const _hasClash = (m) => _fadingMidis.some(f => Math.abs(m - f) === 1);
+
+    // 解決済みMIDIを追跡してSTEP3/4での重複を防止
+    const _resolvedSet = new Set();
+    // 解決済み or 元voicingに存在する → 使用不可
+    const _isUsed = (n) => _resolvedSet.has(n) || workMidis.includes(n);
+
+    workMidis = workMidis.map(m => {
+      // STEP1: ユニゾン（完全同音）→ ミュート
+      if(_fadingSet.has(m)) return null;
+
+      // STEP2: クラッシュなし → そのまま・解決済みに登録
+      if(!_hasClash(m)){
+        _resolvedSet.add(m);
+        return m;
+      }
+
+      // STEP3a: +12 オクターブ上（重複チェック込み）
+      const mUp = m + 12;
+      if(mUp <= _upperLim && !_hasClash(mUp) && !_isUsed(mUp)){
+        _resolvedSet.add(mUp);
+        return mUp;
+      }
+
+      // STEP3b: -12 オクターブ下（重複チェック込み）
+      const mDn = m - 12;
+      if(mDn >= _lowerLim && !_hasClash(mDn) && !_isUsed(mDn)){
+        _resolvedSet.add(mDn);
+        return mDn;
+      }
+
+      // STEP4: テンションノート付与
+      for(const ti of _tensionOrder){
+        const pc = (_ri + ti) % 12;
+        // 元の音 m に最も近いオクターブに配置
+        let tMidi = 12 * Math.floor(m / 12) + pc;
+        if(tMidi < m - 6) tMidi += 12;
+        if(tMidi > m + 6) tMidi -= 12;
+        // 音域外なら逆方向に補正
+        if(tMidi > _upperLim) tMidi -= 12;
+        if(tMidi < _lowerLim) tMidi += 12;
+        // 有効範囲内・クラッシュなし・重複なし → 採用・解決済みに登録
+        if(tMidi >= _lowerLim && tMidi <= _upperLim &&
+           !_hasClash(tMidi) &&
+           !_isUsed(tMidi)){
+          _resolvedSet.add(tMidi);
+          return tMidi;
+        }
+      }
+
+      // STEP5: 解決不能 / テンションユニゾン → ミュート
+      return null;
+    }).filter(m => m !== null);
+
+    // BROKEN モード対応: 低→高の昇順を保証（_resolvedSetで重複は防止済み）
+    workMidis = workMidis.sort((a, b) => a - b);
+  }
+
+  // Scene別voicingFlavorでボイシング取得（アダプティブ変換済み）
+  const midis = workMidis;
   if(!midis.length) return;
 
   // 既に保持中のmidi（共通ノード）はスキップするためのSet
@@ -13845,11 +13933,14 @@ function playSceneChord(actx, root, type){
     const hz = midi2hz(Math.max(24, Math.min(108, midi)));
     // scのvolをvelScaleで一時上書き（BROKENのみ音量差）
     // STRINGSは声部別音量: 低声部（5度）ほんのり・トップ（9度）控えめ
+    // 単音残り（片方ミュート）の場合は0.40倍で補正（0.25では埋もれる）
     let scNote;
     if(sceneCurrentName === 'strings'){
-      const _strVol = i === 0
-        ? (sc.vol || 0.18) * 0.25  // 5度: ほんのり
-        : (sc.vol || 0.18) * 0.55; // 9度（トップ）: 控えめ
+      const _strVol = (midis.length === 1)
+        ? (sc.vol || 0.18) * 0.40
+        : i === 0
+          ? (sc.vol || 0.18) * 0.25  // 5度: ほんのり
+          : (sc.vol || 0.18) * 0.55; // 9度（トップ）: 控えめ
       scNote = Object.assign({}, sc, { vol: _strVol });
     } else if(chordPatternMode === 'broken' && velScale !== 1.0){
       scNote = Object.assign({}, sc, { vol: (sc.vol || 0.18) * velScale });
