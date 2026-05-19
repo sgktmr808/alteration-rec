@@ -1524,8 +1524,12 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <option value="pattern">PATTERN</option>
             </select>
           </div>
-          <!-- F4: Kickパターン (仮実装 / Groove再設計まで) -->
-          <div class="kick-preset-row" id="kick-preset-row">
+          <!-- BEACH GROOVE: 浜辺の鼓動（Scene別パターン × movingゾーン） -->
+          <div class="kick-preset-row" id="beach-toggle-row">
+            <div class="kick-btn" id="beach-toggle-btn" title="浜辺の足跡リズム（Scene別パターン）">BEACH<br><span style="font-size:6px;opacity:.6;">浜辺の鼓動</span></div>
+          </div>
+          <!-- F4: 旧Kickパターン (FEATURES.legacyKick=falseで非表示) -->
+          <div class="kick-preset-row" id="kick-preset-row" style="display:none">
             <div class="kick-btn" data-kick="pt1">pt1<br><span style="font-size:6px;opacity:.6;">HOUSE</span></div>
             <div class="kick-btn" data-kick="pt2">pt2<br><span style="font-size:6px;opacity:.6;">AMAPIANO</span></div>
             <div class="kick-btn" data-kick="pt3">pt3<br><span style="font-size:6px;opacity:.6;">GQOM</span></div>
@@ -2323,6 +2327,7 @@ const S={root:'A',type:'m9',history:[{root:'A',type:'m9'}],histIdx:0,voicing:nul
 const FEATURES={
   phraseEngine: false,  // アドリブ/メロディフレーズエンジン
   legacyPad:    false,  // 旧PADシンセエンジン（無効化済み・コード保温）
+  legacyKick:   false,  // 旧Kick pt1〜pt4（無効化済み・新Beach Grooveに置換）
 };
 
 // MAP MODE: 'radial' | 'expand' | 'link' | 'chain' | 'graph' | 'wave' | 'bridge'
@@ -3090,6 +3095,7 @@ function drawFrame(){
   drawAutoOverlay(ctx);
   // ── F4: GROOVE パルスオーバーレイ ──
   if(grooveMode || kickMode) drawGroovePulse(ctx);
+  if(_beachOn && typeof drawBeachPulse === 'function') drawBeachPulse(ctx);
 
   // ── Loop Beach: ガラスのかけら（FXより下に描く） ──
   if(typeof _drawAndUpdateSeaGlass === 'function') _drawAndUpdateSeaGlass(ctx);
@@ -6604,6 +6610,326 @@ function drawAutoOverlay(ctx){
   ctx.fillText(`AUTO  ${autoBpm}BPM`,L.W-10,L.H-8);
 }
 
+// ═══════════════════════════════════════════════════════
+// BEACH GROOVE — 浜辺の鼓動: Scene別リズムサウンドスケープ
+// ═══════════════════════════════════════════════════════
+// Phase 1: 足跡レイヤーのみ・GLASS Sceneのみ実装
+// - 骨格(skeleton): 決定論的に必ず鳴る
+// - 装飾(ornaments): 確率発音・bar4でfillBoost
+// - 4小節フレーズ単位でパターン再選択（連続抑制つき）
+// - movingゾーン → パターン選択
+
+// インラインデフォルトJSON（Phase 1: GLASSのみ）
+const BEACH_GROOVE_DEFAULT = {
+  version: 1,
+  scenes: {
+    glass: {
+      soundDesign: {
+        footstep: {
+          baseFreq: 120,
+          fmRatio: 4.2,
+          fmDepth: 0.15,
+          attack: 0.005,
+          decay: 0.30,
+          noiseMix: 0.05,
+          humidity: 0.35,
+          stereoSwing: 0.4
+        }
+      },
+      behavior: {
+        footstep: { enabled: true, humanize: 0.04, velocityVariation: 0.18 }
+      },
+      // movingゾーン → パターン配列
+      // 各パターン: skeleton[16] (1=骨格・0=休符) + ornaments[{pos, prob}]
+      footstepPatterns: {
+        stopped: [],
+        extraSparse: [
+          { name: "glass-sparse-1", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], ornaments: [] },
+          { name: "glass-sparse-2", skeleton: [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [] },
+          { name: "glass-sparse-3", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0], ornaments: [{ pos:8, prob:0.15 }] }
+        ],
+        halftime: [
+          { name: "glass-half-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:14, prob:0.10 }] },
+          { name: "glass-half-2", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:6, prob:0.12 }] },
+          { name: "glass-half-3", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:11, prob:0.10 }, { pos:14, prob:0.10 }] }
+        ],
+        onBeat: [
+          { name: "glass-beat-1", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:7, prob:0.10 }] },
+          { name: "glass-beat-2", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:10, prob:0.12 }, { pos:14, prob:0.08 }] },
+          { name: "glass-beat-3", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:2, prob:0.10 }, { pos:6, prob:0.10 }, { pos:14, prob:0.12 }] }
+        ],
+        beatPlus: [
+          { name: "glass-bp-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [] },
+          { name: "glass-bp-2", skeleton: [1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0], ornaments: [{ pos:11, prob:0.18 }] },
+          { name: "glass-bp-3", skeleton: [1,0,1,0,1,0,0,0,1,0,0,0,1,0,1,0], ornaments: [] }
+        ]
+      },
+      phraseEvolution: {
+        patternRotation: "weighted-random",
+        bar4FillBoost: 0.20,  // 4小節目の装飾確率を1.2倍に
+        repeatPenalty: 0.6    // 連続して同じパターンが選ばれにくく
+      }
+    }
+  }
+};
+
+let _beachGrooveData = BEACH_GROOVE_DEFAULT;
+let _beachOn = false;
+let _beachTick = 0;                 // 絶対16分ステップ（リセットしない）
+let _beachNextBeat = 0;
+let _beachScheduleTimer = null;
+let _beachPulse = 0;                // 描画用パルス（0〜1）
+let _beachCurrentPattern = null;    // 現在のパターン {name, skeleton, ornaments}
+let _beachCurrentZone = null;       // 現在のゾーン名
+let _beachLastPatternName = null;   // 連続抑制
+const _BEACH_LOOK_AHEAD_MS = 80;
+const _BEACH_SCHEDULE_MS   = 20;
+const _BEACH_PULSE_COL     = 'rgba(140,200,210,0.85)';
+
+// ── movingゾーン判定（Scene別に分岐可能）──
+function _beachZoneForScene(sceneName, mv){
+  // 現状GLASSのみ。他Sceneは将来追加
+  if(mv < -0.7) return 'stopped';
+  if(mv < -0.3) return 'extraSparse';
+  if(mv < +0.3) return 'halftime';
+  if(mv < +0.7) return 'onBeat';
+  return 'beatPlus';
+}
+
+// ── 現在のSceneデータ取得 ──
+function _beachGetSceneData(){
+  const sceneName = (typeof sceneCurrentName !== 'undefined') ? sceneCurrentName : null;
+  if(!sceneName) return null;
+  return _beachGrooveData.scenes[sceneName] || null;
+}
+
+// ── パターン選択（weighted-random + repeatPenalty）──
+function _beachSelectPattern(zoneName, sceneData){
+  if(!sceneData) return null;
+  const patterns = sceneData.footstepPatterns[zoneName];
+  if(!patterns || !patterns.length) return null;
+  const repPen = (sceneData.phraseEvolution && sceneData.phraseEvolution.repeatPenalty) || 0;
+  const weights = patterns.map(p => p.name === _beachLastPatternName ? Math.max(0.0001, 1 - repPen) : 1);
+  const total = weights.reduce((a,b) => a + b, 0);
+  if(total <= 0) return patterns[0];
+  let r = Math.random() * total;
+  for(let i = 0; i < patterns.length; i++){
+    r -= weights[i];
+    if(r <= 0) return patterns[i];
+  }
+  return patterns[patterns.length - 1];
+}
+
+// ── 足跡音色: sine sub + FM bell + 微量noise ──
+function _playBeachFootstep(actx, t, vol, sceneData){
+  const sd = sceneData.soundDesign.footstep;
+  const out = getMasterBus(actx);
+
+  // Sub: ピッチエンベロープ付きsine（柔らかいキック寄り）
+  const sub  = actx.createOscillator();
+  const subG = actx.createGain();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(sd.baseFreq * 1.4, t);
+  sub.frequency.exponentialRampToValueAtTime(Math.max(20, sd.baseFreq * 0.7), t + sd.decay * 0.45);
+  subG.gain.setValueAtTime(0, t);
+  subG.gain.linearRampToValueAtTime(vol * 0.92, t + sd.attack);
+  subG.gain.exponentialRampToValueAtTime(0.001, t + sd.decay);
+  sub.connect(subG); subG.connect(out);
+  sub.start(t); sub.stop(t + sd.decay + 0.05);
+
+  // FM Bell: 高域の透明な光（GLASS世界観）
+  const carrier = actx.createOscillator();
+  const mod     = actx.createOscillator();
+  const modG    = actx.createGain();
+  const bellG   = actx.createGain();
+  carrier.type = 'sine';
+  mod.type     = 'sine';
+  const cFreq  = sd.baseFreq * sd.fmRatio;
+  carrier.frequency.value = cFreq;
+  mod.frequency.value     = cFreq * 2.31;
+  modG.gain.value         = cFreq * sd.fmDepth;
+  mod.connect(modG); modG.connect(carrier.frequency);
+  bellG.gain.setValueAtTime(0, t);
+  bellG.gain.linearRampToValueAtTime(vol * 0.22, t + sd.attack);
+  bellG.gain.exponentialRampToValueAtTime(0.001, t + sd.decay * 0.7);
+  carrier.connect(bellG); bellG.connect(out);
+  carrier.start(t); carrier.stop(t + sd.decay + 0.05);
+  mod.start(t);     mod.stop(t + sd.decay + 0.05);
+
+  // 微量noise: 砂粒の感触
+  if(sd.noiseMix > 0){
+    const bufLen = Math.max(1, Math.floor(actx.sampleRate * 0.12));
+    const buf    = actx.createBuffer(1, bufLen, actx.sampleRate);
+    const ch     = buf.getChannelData(0);
+    for(let i = 0; i < bufLen; i++){
+      ch[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+    }
+    const src = actx.createBufferSource();
+    src.buffer = buf;
+    const flt = actx.createBiquadFilter();
+    flt.type = 'bandpass';
+    flt.frequency.value = 380;
+    flt.Q.value = 0.7;
+    const nG  = actx.createGain();
+    nG.gain.value = vol * sd.noiseMix;
+    src.connect(flt); flt.connect(nG); nG.connect(out);
+    src.start(t); src.stop(t + 0.13);
+  }
+}
+
+// ── Beach Groove 開始/停止/トグル ──
+function startBeach(){
+  if(_beachOn) return;
+  _beachOn = true;
+  _beachTick = 0;
+  _beachCurrentPattern = null;
+  _beachCurrentZone = null;
+  _beachLastPatternName = null;
+
+  const actx = safeGetCtx();
+  if(!actx) return;
+  safeResume(actx, () => {
+    if(_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
+    // ARP/Kickと同じグリッドスナップ式
+    const _sixteenth = (60 / autoBpm) / 4;
+    const _elapsed   = actx.currentTime - _masterClockOrigin;
+    const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+    _beachNextBeat   = _masterClockOrigin + _gridPos;
+    _beachSchedule();
+  });
+  const btn = document.getElementById('beach-toggle-btn');
+  if(btn) btn.classList.add('on');
+  dirty = true;
+}
+
+function stopBeach(){
+  if(_beachScheduleTimer){ clearTimeout(_beachScheduleTimer); _beachScheduleTimer = null; }
+  _beachOn = false;
+  _beachCurrentPattern = null;
+  _beachPulse = 0;
+  const btn = document.getElementById('beach-toggle-btn');
+  if(btn) btn.classList.remove('on');
+  dirty = true;
+}
+
+function toggleBeach(){
+  if(_beachOn) stopBeach(); else startBeach();
+}
+
+// ── 4小節フレーズ管理 + 発音スケジューラー ──
+function _beachSchedule(){
+  if(!_beachOn){ _beachScheduleTimer = null; return; }
+  const actx = safeGetCtx();
+  if(!actx){ _beachScheduleTimer = setTimeout(_beachSchedule, _BEACH_SCHEDULE_MS); return; }
+  safeResume(actx);
+
+  const lookAhead = actx.currentTime + _BEACH_LOOK_AHEAD_MS / 1000;
+  const stepSec   = 60 / autoBpm / 4;
+
+  while(_beachNextBeat < lookAhead){
+    const sceneData = _beachGetSceneData();
+    // Sceneデータがあり、足跡が有効な場合のみ発音判定
+    if(sceneData && sceneData.behavior && sceneData.behavior.footstep && sceneData.behavior.footstep.enabled){
+      const stepInBar   = _beachTick % 16;
+      const barIdx      = Math.floor(_beachTick / 16);
+      const barInPhrase = barIdx % 4;  // 0,1,2,3
+
+      // 4小節フレーズの始まり: 新パターン選択
+      if(stepInBar === 0 && barInPhrase === 0){
+        const mv = (typeof SL !== 'undefined') ? (SL.find(s => s.id === 'moving')?.val ?? 0) : 0;
+        const zone = _beachZoneForScene(sceneCurrentName, mv);
+        _beachCurrentZone = zone;
+        if(zone === 'stopped'){
+          _beachCurrentPattern = null;
+        } else {
+          const p = _beachSelectPattern(zone, sceneData);
+          _beachCurrentPattern = p;
+          if(p) _beachLastPatternName = p.name;
+        }
+      }
+
+      // 現パターンで発音判定
+      const pat = _beachCurrentPattern;
+      if(pat){
+        const beh    = sceneData.behavior.footstep;
+        const hum    = beh.humanize || 0;
+        const velVar = beh.velocityVariation || 0;
+        const isLastBar  = (barInPhrase === 3);
+        const fillBoost  = isLastBar ? ((sceneData.phraseEvolution && sceneData.phraseEvolution.bar4FillBoost) || 0) : 0;
+
+        // タイミングヒューマナイズ（骨格・装飾共通）
+        const tOff = (Math.random() * 2 - 1) * hum * stepSec;
+        const t = _beachNextBeat + tOff;
+
+        // 骨格音
+        const sk = pat.skeleton[stepInBar] || 0;
+        if(sk > 0){
+          const vel = 0.82 * (1 + (Math.random() * 2 - 1) * velVar);
+          _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData);
+          if(stepInBar % 4 === 0){ _beachPulse = vel; dirty = true; }
+        } else if(pat.ornaments && pat.ornaments.length){
+          // 装飾音: ポジション一致時のみ確率判定
+          for(const orn of pat.ornaments){
+            if(orn.pos === stepInBar){
+              const prob = orn.prob * (1 + fillBoost);
+              if(Math.random() < prob){
+                const vel = 0.48 * (1 + (Math.random() * 2 - 1) * velVar);
+                _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData);
+                if(stepInBar % 4 === 0){ _beachPulse = vel * 0.8; dirty = true; }
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    _beachTick++;
+    _beachNextBeat += stepSec;
+  }
+  _beachScheduleTimer = setTimeout(_beachSchedule, _BEACH_SCHEDULE_MS);
+}
+
+// ── Canvas描画: Beach Grooveのパルスとラベル ──
+function drawBeachPulse(ctx){
+  if(!_beachOn || _beachPulse <= 0.01) return;
+  _beachPulse *= 0.78;
+  dirty = true;
+
+  const cx = L.cx, cy = L.cy;
+  const r = 40 + _beachPulse * 22;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = _BEACH_PULSE_COL;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = _beachPulse * 0.50;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // ラベル: BEACH + Scene + ゾーン + BPM
+  ctx.font = 'bold 9px DM Mono,monospace';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = _BEACH_PULSE_COL;
+  ctx.globalAlpha = 0.60;
+  const sceneLbl = (typeof sceneCurrentName !== 'undefined') ? sceneCurrentName.toUpperCase() : '';
+  const zoneLbl  = _beachCurrentZone ? _beachCurrentZone.toUpperCase() : '—';
+  ctx.fillText(`BEACH  ${sceneLbl}  ${zoneLbl}  ${autoBpm}BPM`, 10, L.H - 36);
+  ctx.globalAlpha = 1;
+
+  // 4小節グリッド（ phrase進行を視覚化 ）
+  const barIdx = Math.floor(_beachTick / 16);
+  const barInPhrase = barIdx % 4;
+  const gw = 80, gh = 5, gx = cx - gw/2, gy = cy + L.SR * 0.82;
+  for(let i = 0; i < 4; i++){
+    const x = gx + i * (gw/4), w = gw/4 - 1;
+    const isActive = (i === barInPhrase);
+    const isLast   = (i === 3);
+    ctx.fillStyle = isActive ? _BEACH_PULSE_COL : isLast ? 'rgba(140,200,210,0.28)' : 'rgba(255,255,255,0.06)';
+    ctx.globalAlpha = isActive ? 0.9 : 0.6;
+    ctx.fillRect(x, gy, w, gh);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function moveToChord(root,type){
   // FX: パーティクルとパルスをトリガー
   const hitN=nodeHits.find(n=>n.root===root&&n.type===type);
@@ -7262,7 +7588,7 @@ function storeSavedProgs(progs){
       localStorage.setItem(SAVED_PROGS_KEY,JSON.stringify(data));
       return;
     }catch(e){
-      data=data.slice(1); // 容量超過: 最古のエントリを削除して再試行
+      data=data.slice(0,-1); // 容量超過: 最古のエントリを削除して再試行
     }
   }
   console.warn('storeSavedProgs: 全エントリ削除後も保存失敗');
@@ -17351,10 +17677,18 @@ document.querySelectorAll('.groove-btn').forEach(btn=>{
   btn.addEventListener('click',()=>startGroove(btn.dataset.groove));
 });
 
-// Kickパターンボタン
-document.querySelectorAll('.kick-btn').forEach(btn=>{
+// Kickパターンボタン（FEATURES.legacyKick=falseでUI非表示・このコードは保温）
+document.querySelectorAll('.kick-btn[data-kick]').forEach(btn=>{
   btn.addEventListener('click',()=>startKick(btn.dataset.kick));
 });
+
+// BEACH トグルボタン（新Beach Grooveエンジン）
+(function(){
+  const btn = document.getElementById('beach-toggle-btn');
+  if(btn) btn.addEventListener('click', () => {
+    if(typeof toggleBeach === 'function') toggleBeach();
+  });
+})();
 
 // ── BPMダイヤル UI ──
 (function(){
