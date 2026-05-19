@@ -6936,12 +6936,61 @@ function _spawnSeaGlassShard(){
     }
     if(!okShard) continue;
 
+    // ── SLフェーダー値を取得してカラーを決定 ──
+    const _slGet = id => (typeof SL !== 'undefined') ? (SL.find(s => s.id === id)?.val ?? 0) : 0;
+    const _slWarm    = _slGet('warm');
+    const _slStrange = _slGet('strange');
+    const _slBright  = _slGet('bright');
+    const _slTense   = _slGet('tense');
+    const _slMoving  = _slGet('moving');
+    const _slComplex = _slGet('complex');
+
+    // 色相: warm↑=琥珀(40°) / warm↓=青緑(185°) + strangeでシフト
+    let _hue = 185 + ((_slWarm + 1) / 2) * (40 - 185);
+    _hue += _slStrange * 70;
+    _hue = ((_hue % 360) + 360) % 360;
+    // 彩度: tense↑=鮮やか / tense↓=くすむ (40〜85%)
+    const _sat = Math.round(40 + ((_slTense + 1) / 2) * 45);
+    // 明度: bright↑=明るい / bright↓=暗い (45〜75%)
+    const _lit = Math.round(45 + ((_slBright + 1) / 2) * 30);
+    // 明滅速度: moving↑=速い / moving↓=遅い (0.4〜1.2)
+    const _flickerSpeed = 0.4 + ((_slMoving + 1) / 2) * 0.8;
+    // 光点数: complex↑=多い / complex↓=少ない (1〜5)
+    const _sparkCount = 1 + Math.round(((_slComplex + 1) / 2) * 4);
+
+    // ── ランダム多角形の頂点生成 (8〜12頂点) ──
+    const _nPts = 8 + Math.floor(Math.random() * 5);
+    const _polygon = [];
+    for(let _pi = 0; _pi < _nPts; _pi++){
+      const _baseAngle = (_pi / _nPts) * Math.PI * 2;
+      const _jitter = (Math.random() - 0.5) * (Math.PI / _nPts) * 1.4;
+      const _r = _SEA_GLASS_RADIUS * (0.45 + Math.random() * 0.55);
+      _polygon.push({
+        px: Math.cos(_baseAngle + _jitter) * _r,
+        py: Math.sin(_baseAngle + _jitter) * _r,
+      });
+    }
+
+    // ── スパーク位置（光の点）をランダムに配置 ──
+    const _sparks = [];
+    for(let _si = 0; _si < _sparkCount; _si++){
+      const _sa = Math.random() * Math.PI * 2;
+      const _sr = Math.random() * _SEA_GLASS_RADIUS * 0.6;
+      _sparks.push({ px: Math.cos(_sa) * _sr, py: Math.sin(_sa) * _sr });
+    }
+
     // 配置成功
     _seaGlassShards.push({
       x, y,
       spawnTime: Date.now(),
       opacity: 0,
       id: 'shard_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+      hue: _hue,
+      sat: _sat,
+      lit: _lit,
+      flickerSpeed: _flickerSpeed,
+      polygon: _polygon,
+      sparks: _sparks,
     });
     dirty = true;
     return;
@@ -6953,7 +7002,6 @@ function _spawnSeaGlassShard(){
 function _drawAndUpdateSeaGlass(ctx){
   if(!_seaGlassShards.length) return;
   const now = Date.now();
-  const _animPhase = (now / 1000) % (Math.PI * 2);
 
   for(let i = _seaGlassShards.length - 1; i >= 0; i--){
     const s = _seaGlassShards[i];
@@ -6965,34 +7013,61 @@ function _drawAndUpdateSeaGlass(ctx){
       continue;
     }
 
-    // フェードイン（最初の0.5秒）/ フェードアウト（最後の1秒）
+    // フェードイン（最初の0.5秒）/ フェードアウト（最後の1秒）/ 明滅
     let alpha;
+    const _phase = (now / 1000) % (Math.PI * 2);
     if(age < 500){
       alpha = age / 500;
     } else if(age > _SEA_GLASS_LIFETIME_MS - 1000){
       alpha = (_SEA_GLASS_LIFETIME_MS - age) / 1000;
     } else {
-      // 明滅 0.4〜0.8
-      alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(_animPhase * 0.7));
+      // shard固有の明滅速度を使用
+      alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(_phase * (s.flickerSpeed || 0.7)));
     }
 
-    // 描画: 半透明の青緑円・縁取り
+    // カラー（SL由来、なければデフォルトの青緑）
+    const h   = s.hue != null ? s.hue : 185;
+    const sat = s.sat != null ? s.sat : 55;
+    const lit = s.lit != null ? s.lit : 60;
+
     ctx.save();
     ctx.globalAlpha = alpha;
-    // 外側のぼかし
-    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, _SEA_GLASS_RADIUS);
-    grad.addColorStop(0, 'rgba(150,220,210,0.7)');
-    grad.addColorStop(0.6, 'rgba(120,200,200,0.4)');
-    grad.addColorStop(1, 'rgba(100,180,200,0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, _SEA_GLASS_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-    // 中心の小さな白い光
-    ctx.fillStyle = 'rgba(220,250,250,0.8)';
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.translate(s.x, s.y);
+
+    // ── 多角形パスを描画 ──
+    const poly = s.polygon;
+    if(poly && poly.length >= 3){
+      ctx.beginPath();
+      ctx.moveTo(poly[0].px, poly[0].py);
+      for(let pi = 1; pi < poly.length; pi++){
+        ctx.lineTo(poly[pi].px, poly[pi].py);
+      }
+      ctx.closePath();
+
+      // SLカラーベースのラジアルグラデーション
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, _SEA_GLASS_RADIUS);
+      grad.addColorStop(0,   `hsla(${h},${sat}%,${Math.min(lit+22,95)}%,0.88)`);
+      grad.addColorStop(0.5, `hsla(${h},${sat}%,${lit}%,0.52)`);
+      grad.addColorStop(1,   `hsla(${h},${sat}%,${Math.max(lit-12,15)}%,0.0)`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // 縁取り: shard固有の色より明るいハイライト
+      ctx.strokeStyle = `hsla(${h},${Math.min(sat+15,100)}%,${Math.min(lit+32,95)}%,0.45)`;
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+    }
+
+    // ── スパーク（光の点）: shard固有の位置・数 ──
+    const sparks = s.sparks || [{ px: 0, py: 0 }];
+    const sparkBright = 0.55 + 0.45 * Math.sin(_phase * 1.4 + 0.7);
+    sparks.forEach(sp => {
+      ctx.fillStyle = `hsla(${h},15%,96%,${sparkBright})`;
+      ctx.beginPath();
+      ctx.arc(sp.px, sp.py, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
     ctx.restore();
   }
   // アニメーションを継続させる
@@ -7090,9 +7165,14 @@ function _renderCollectedList(){
       return ch.root + sym;
     }).join(' - ');
     const sceneLbl = (c.scene || 'plain').toUpperCase();
+    // 音色情報が保存されている場合のみ復元ボタンを表示
+    const restoreBtn = c.soundState
+      ? `<div class="saved-restore" onclick="restoreSoundState(_loadCollectedClips().find(x=>x.id==='${c.id}'))" title="Scene/BPM/スライダーを復元">◎</div>`
+      : '';
     return `<div class="saved-item">
       <div class="saved-item-row">
         <div class="saved-play" title="${time}">${chordStr || '—'}</div>
+        ${restoreBtn}
         <div class="saved-del" onclick="_deleteCollectedClip('${c.id}')">×</div>
       </div>
       <div style="font-family:var(--fm);font-size:7px;color:var(--dim);padding:0 8px 4px;letter-spacing:.08em;">
