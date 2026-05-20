@@ -6626,48 +6626,62 @@ const BEACH_GROOVE_DEFAULT = {
     glass: {
       soundDesign: {
         footstep: {
-          baseFreq: 120,
-          fmRatio: 4.2,
-          fmDepth: 0.15,
-          attack: 0.005,
-          decay: 0.30,
-          noiseMix: 0.05,
+          baseFreq: 75,
+          fmRatio: 3.2,
+          fmDepth: 0.06,
+          attack: 0.003,
+          decayLong: 0.42,        // 拍頭の基本decay
+          decayShort: 0.18,       // 裏拍の基本decay
+          shortProbHead: 0.25,    // 拍頭で短くなる確率
+          longProbOff: 0.25,      // 裏拍で長くなる確率
+          noiseMix: 0.12,
+          noiseFreq: 180,
+          lowpassHz: 600,
+          bellLevel: 0.10,
           humidity: 0.35,
           stereoSwing: 0.4
         }
       },
       behavior: {
-        footstep: { enabled: true, humanize: 0.04, velocityVariation: 0.18 }
+        footstep: {
+          enabled: true,
+          humanize: 0.04,
+          velocityVariation: 0.18,
+          syncopationDragProb: 0.30,
+          syncopationDragMin: 0.10,
+          syncopationDragMax: 0.35
+        }
       },
       // movingゾーン → パターン配列
       // 各パターン: skeleton[16] (1=骨格・0=休符) + ornaments[{pos, prob}]
       footstepPatterns: {
         stopped: [],
         extraSparse: [
-          { name: "glass-sparse-1", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], ornaments: [] },
-          { name: "glass-sparse-2", skeleton: [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [] },
-          { name: "glass-sparse-3", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0], ornaments: [{ pos:8, prob:0.15 }] }
+          { name: "glass-sparse-1", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], ornaments: [{ pos:8, prob:0.18 }] },
+          { name: "glass-sparse-2", skeleton: [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:14, prob:0.15 }] },
+          { name: "glass-sparse-3", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0], ornaments: [{ pos:8, prob:0.18 }] },
+          { name: "glass-sparse-4", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0], ornaments: [{ pos:11, prob:0.18 }] }
         ],
         halftime: [
-          { name: "glass-half-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:14, prob:0.10 }] },
-          { name: "glass-half-2", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:6, prob:0.12 }] },
-          { name: "glass-half-3", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:11, prob:0.10 }, { pos:14, prob:0.10 }] }
+          { name: "glass-half-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:14, prob:0.20 }] },
+          { name: "glass-half-2", skeleton: [1,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:11, prob:0.18 }] },
+          { name: "glass-half-3", skeleton: [1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0], ornaments: [{ pos:6, prob:0.20 },{ pos:14, prob:0.18 }] }
         ],
         onBeat: [
-          { name: "glass-beat-1", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:7, prob:0.10 }] },
-          { name: "glass-beat-2", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:10, prob:0.12 }, { pos:14, prob:0.08 }] },
-          { name: "glass-beat-3", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:2, prob:0.10 }, { pos:6, prob:0.10 }, { pos:14, prob:0.12 }] }
+          { name: "glass-beat-1", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:7, prob:0.18 }] },
+          { name: "glass-beat-2", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:10, prob:0.20 },{ pos:14, prob:0.15 }] },
+          { name: "glass-beat-3", skeleton: [1,0,0,0,1,0,0,1,1,0,0,0,1,0,1,0], ornaments: [{ pos:2, prob:0.15 },{ pos:11, prob:0.18 }] }
         ],
         beatPlus: [
-          { name: "glass-bp-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [] },
-          { name: "glass-bp-2", skeleton: [1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0], ornaments: [{ pos:11, prob:0.18 }] },
-          { name: "glass-bp-3", skeleton: [1,0,1,0,1,0,0,0,1,0,0,0,1,0,1,0], ornaments: [] }
+          { name: "glass-bp-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.18 }] },
+          { name: "glass-bp-2", skeleton: [1,0,0,1,1,0,0,0,1,0,1,0,1,0,0,0], ornaments: [{ pos:14, prob:0.20 }] },
+          { name: "glass-bp-3", skeleton: [1,0,1,0,1,0,0,1,1,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.18 }] }
         ]
       },
       phraseEvolution: {
         patternRotation: "weighted-random",
-        bar4FillBoost: 0.20,  // 4小節目の装飾確率を1.2倍に
-        repeatPenalty: 0.6    // 連続して同じパターンが選ばれにくく
+        bar4FillBoost: 0.20,
+        repeatPenalty: 0.6
       }
     }
   }
@@ -6720,47 +6734,70 @@ function _beachSelectPattern(zoneName, sceneData){
   return patterns[patterns.length - 1];
 }
 
-// ── 足跡音色: sine sub + FM bell + 微量noise ──
-function _playBeachFootstep(actx, t, vol, sceneData){
-  const sd = sceneData.soundDesign.footstep;
+// ── 足跡音色: sub sine + 軽いFM bell + filtered noise + Lowpass ──
+// stepInBar を渡してポジション別decayを決定
+function _playBeachFootstep(actx, t, vol, sceneData, stepInBar){
+  const sd  = sceneData.soundDesign.footstep;
   const out = getMasterBus(actx);
 
-  // Sub: ピッチエンベロープ付きsine（柔らかいキック寄り）
+  // ── decayの揺らぎ：拍頭は基本長め・たまに短く / 裏は基本短く・たまに長く ──
+  const isHead = (stepInBar % 4 === 0);
+  let decay;
+  if(isHead){
+    decay = (Math.random() < (sd.shortProbHead ?? 0.25)) ? (sd.decayShort ?? 0.18) : (sd.decayLong ?? 0.42);
+  } else {
+    decay = (Math.random() < (sd.longProbOff ?? 0.25)) ? (sd.decayLong ?? 0.42) : (sd.decayShort ?? 0.18);
+  }
+
+  // ── Lowpass filter（丸い肉感） ──
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = sd.lowpassHz ?? 600;
+  lp.Q.value = 0.6;
+  lp.connect(out);
+
+  // ── Sub: 深いピッチスイープのsine（低域キック寄り） ──
   const sub  = actx.createOscillator();
   const subG = actx.createGain();
   sub.type = 'sine';
-  sub.frequency.setValueAtTime(sd.baseFreq * 1.4, t);
-  sub.frequency.exponentialRampToValueAtTime(Math.max(20, sd.baseFreq * 0.7), t + sd.decay * 0.45);
+  // 深いスイープ: 3.0倍→0.6倍 で「ドゥッ」と落ちる感触
+  sub.frequency.setValueAtTime(sd.baseFreq * 3.0, t);
+  sub.frequency.exponentialRampToValueAtTime(Math.max(18, sd.baseFreq * 0.6), t + decay * 0.40);
   subG.gain.setValueAtTime(0, t);
-  subG.gain.linearRampToValueAtTime(vol * 0.92, t + sd.attack);
-  subG.gain.exponentialRampToValueAtTime(0.001, t + sd.decay);
-  sub.connect(subG); subG.connect(out);
-  sub.start(t); sub.stop(t + sd.decay + 0.05);
+  subG.gain.linearRampToValueAtTime(vol * 1.05, t + sd.attack);
+  subG.gain.exponentialRampToValueAtTime(0.001, t + decay);
+  sub.connect(subG); subG.connect(lp);
+  sub.start(t); sub.stop(t + decay + 0.05);
 
-  // FM Bell: 高域の透明な光（GLASS世界観）
-  const carrier = actx.createOscillator();
-  const mod     = actx.createOscillator();
-  const modG    = actx.createGain();
-  const bellG   = actx.createGain();
-  carrier.type = 'sine';
-  mod.type     = 'sine';
-  const cFreq  = sd.baseFreq * sd.fmRatio;
-  carrier.frequency.value = cFreq;
-  mod.frequency.value     = cFreq * 2.31;
-  modG.gain.value         = cFreq * sd.fmDepth;
-  mod.connect(modG); modG.connect(carrier.frequency);
-  bellG.gain.setValueAtTime(0, t);
-  bellG.gain.linearRampToValueAtTime(vol * 0.22, t + sd.attack);
-  bellG.gain.exponentialRampToValueAtTime(0.001, t + sd.decay * 0.7);
-  carrier.connect(bellG); bellG.connect(out);
-  carrier.start(t); carrier.stop(t + sd.decay + 0.05);
-  mod.start(t);     mod.stop(t + sd.decay + 0.05);
+  // ── FM Bell: 高域の透明な光（控えめ） ──
+  const bellLvl = sd.bellLevel ?? 0.10;
+  if(bellLvl > 0.001){
+    const carrier = actx.createOscillator();
+    const mod     = actx.createOscillator();
+    const modG    = actx.createGain();
+    const bellG   = actx.createGain();
+    carrier.type = 'sine';
+    mod.type     = 'sine';
+    const cFreq  = sd.baseFreq * sd.fmRatio;
+    carrier.frequency.value = cFreq;
+    mod.frequency.value     = cFreq * 2.31;
+    modG.gain.value         = cFreq * sd.fmDepth;
+    mod.connect(modG); modG.connect(carrier.frequency);
+    bellG.gain.setValueAtTime(0, t);
+    bellG.gain.linearRampToValueAtTime(vol * bellLvl, t + sd.attack);
+    bellG.gain.exponentialRampToValueAtTime(0.001, t + decay * 0.55);
+    // ベル成分はLowpassをバイパスして透明感を残す
+    carrier.connect(bellG); bellG.connect(out);
+    carrier.start(t); carrier.stop(t + decay + 0.05);
+    mod.start(t);     mod.stop(t + decay + 0.05);
+  }
 
-  // 微量noise: 砂粒の感触
+  // ── 砂粒の感触: 低めの帯域noise ──
   if(sd.noiseMix > 0){
-    const bufLen = Math.max(1, Math.floor(actx.sampleRate * 0.12));
-    const buf    = actx.createBuffer(1, bufLen, actx.sampleRate);
-    const ch     = buf.getChannelData(0);
+    const noiseDur = Math.min(0.20, decay * 0.55);
+    const bufLen   = Math.max(1, Math.floor(actx.sampleRate * noiseDur));
+    const buf      = actx.createBuffer(1, bufLen, actx.sampleRate);
+    const ch       = buf.getChannelData(0);
     for(let i = 0; i < bufLen; i++){
       ch[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
     }
@@ -6768,12 +6805,12 @@ function _playBeachFootstep(actx, t, vol, sceneData){
     src.buffer = buf;
     const flt = actx.createBiquadFilter();
     flt.type = 'bandpass';
-    flt.frequency.value = 380;
+    flt.frequency.value = sd.noiseFreq ?? 180;
     flt.Q.value = 0.7;
     const nG  = actx.createGain();
     nG.gain.value = vol * sd.noiseMix;
-    src.connect(flt); flt.connect(nG); nG.connect(out);
-    src.start(t); src.stop(t + 0.13);
+    src.connect(flt); flt.connect(nG); nG.connect(lp);
+    src.start(t); src.stop(t + noiseDur + 0.02);
   }
 }
 
@@ -6857,15 +6894,28 @@ function _beachSchedule(){
         const isLastBar  = (barInPhrase === 3);
         const fillBoost  = isLastBar ? ((sceneData.phraseEvolution && sceneData.phraseEvolution.bar4FillBoost) || 0) : 0;
 
-        // タイミングヒューマナイズ（骨格・装飾共通）
-        const tOff = (Math.random() * 2 - 1) * hum * stepSec;
+        // 通常humanize（拍位置±微小オフセット）
+        let tOff = (Math.random() * 2 - 1) * hum * stepSec;
+
+        // ── シンコペーション・タイミング揺らぎ ──
+        // 拍頭以外で 30% 確率に後ろへ 10〜35% ずらす（引きずる感覚）
+        const isSync = (stepInBar % 4 !== 0);
+        if(isSync){
+          const dragProb = beh.syncopationDragProb ?? 0;
+          if(dragProb > 0 && Math.random() < dragProb){
+            const mn = beh.syncopationDragMin ?? 0.10;
+            const mx = beh.syncopationDragMax ?? 0.35;
+            tOff += stepSec * (mn + Math.random() * (mx - mn));
+          }
+        }
+
         const t = _beachNextBeat + tOff;
 
         // 骨格音
         const sk = pat.skeleton[stepInBar] || 0;
         if(sk > 0){
           const vel = 0.82 * (1 + (Math.random() * 2 - 1) * velVar);
-          _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData);
+          _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData, stepInBar);
           if(stepInBar % 4 === 0){ _beachPulse = vel; dirty = true; }
         } else if(pat.ornaments && pat.ornaments.length){
           // 装飾音: ポジション一致時のみ確率判定
@@ -6874,7 +6924,7 @@ function _beachSchedule(){
               const prob = orn.prob * (1 + fillBoost);
               if(Math.random() < prob){
                 const vel = 0.48 * (1 + (Math.random() * 2 - 1) * velVar);
-                _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData);
+                _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData, stepInBar);
                 if(stepInBar % 4 === 0){ _beachPulse = vel * 0.8; dirty = true; }
               }
               break;
