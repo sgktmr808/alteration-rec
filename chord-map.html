@@ -6619,10 +6619,13 @@ function drawAutoOverlay(ctx){
 // - 4小節フレーズ単位でパターン再選択（連続抑制つき）
 // - movingゾーン → パターン選択
 
-// インラインデフォルトJSON（Phase 1: GLASSのみ）
+// インラインデフォルトJSON（Phase 2A: 全6 Scene）
 const BEACH_GROOVE_DEFAULT = {
   version: 1,
   scenes: {
+    // ═══════════════════════════════════════
+    // GLASS PIANO — 月明かりの海岸
+    // ═══════════════════════════════════════
     glass: {
       soundDesign: {
         footstep: {
@@ -6630,10 +6633,10 @@ const BEACH_GROOVE_DEFAULT = {
           fmRatio: 3.2,
           fmDepth: 0.06,
           attack: 0.003,
-          decayLong: 0.42,        // 拍頭の基本decay
-          decayShort: 0.18,       // 裏拍の基本decay
-          shortProbHead: 0.25,    // 拍頭で短くなる確率
-          longProbOff: 0.25,      // 裏拍で長くなる確率
+          decayLong: 0.42,
+          decayShort: 0.18,
+          shortProbHead: 0.25,
+          longProbOff: 0.25,
           noiseMix: 0.12,
           noiseFreq: 180,
           lowpassHz: 600,
@@ -6649,11 +6652,10 @@ const BEACH_GROOVE_DEFAULT = {
           velocityVariation: 0.18,
           syncopationDragProb: 0.30,
           syncopationDragMin: 0.10,
-          syncopationDragMax: 0.35
+          syncopationDragMax: 0.35,
+          swingAmount: 0
         }
       },
-      // movingゾーン → パターン配列
-      // 各パターン: skeleton[16] (1=骨格・0=休符) + ornaments[{pos, prob}]
       footstepPatterns: {
         stopped: [],
         extraSparse: [
@@ -6678,11 +6680,305 @@ const BEACH_GROOVE_DEFAULT = {
           { name: "glass-bp-3", skeleton: [1,0,1,0,1,0,0,1,1,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.18 }] }
         ]
       },
-      phraseEvolution: {
-        patternRotation: "weighted-random",
-        bar4FillBoost: 0.20,
-        repeatPenalty: 0.6
-      }
+      phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.20, repeatPenalty: 0.6 }
+    },
+
+    // ═══════════════════════════════════════
+    // PLAIN ROOM — 静かな砂浜の朝
+    // ═══════════════════════════════════════
+    plain: {
+      soundDesign: {
+        footstep: {
+          baseFreq: 70,
+          fmRatio: 2.5,
+          fmDepth: 0.03,
+          attack: 0.004,
+          decayLong: 0.50,
+          decayShort: 0.20,
+          shortProbHead: 0.20,
+          longProbOff: 0.30,
+          noiseMix: 0.10,
+          noiseFreq: 160,
+          lowpassHz: 500,
+          bellLevel: 0.05,
+          humidity: 0.45,
+          stereoSwing: 0.5
+        }
+      },
+      behavior: {
+        footstep: {
+          enabled: true,
+          humanize: 0.06,
+          velocityVariation: 0.22,
+          syncopationDragProb: 0.40,
+          syncopationDragMin: 0.15,
+          syncopationDragMax: 0.40,
+          swingAmount: 0
+        }
+      },
+      footstepPatterns: {
+        stopped: [],
+        extraSparse: [
+          { name: "plain-sparse-1", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], ornaments: [] },
+          { name: "plain-sparse-2", skeleton: [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [] },
+          { name: "plain-sparse-3", skeleton: [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0], ornaments: [{ pos:8, prob:0.10 }] },
+          { name: "plain-sparse-4", skeleton: [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0], ornaments: [{ pos:12, prob:0.10 }] }
+        ],
+        halftime: [
+          { name: "plain-half-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:14, prob:0.12 }] },
+          { name: "plain-half-2", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:6, prob:0.12 }] },
+          { name: "plain-half-3", skeleton: [1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0], ornaments: [{ pos:14, prob:0.10 }] }
+        ],
+        onBeat: [
+          { name: "plain-beat-1", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:7, prob:0.10 }] },
+          { name: "plain-beat-2", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:10, prob:0.12 }] },
+          { name: "plain-beat-3", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:14, prob:0.10 }] }
+        ],
+        beatPlus: [
+          { name: "plain-bp-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.12 }] },
+          { name: "plain-bp-2", skeleton: [1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0], ornaments: [{ pos:14, prob:0.12 }] },
+          { name: "plain-bp-3", skeleton: [1,0,0,0,1,0,1,0,1,0,0,1,1,0,1,0], ornaments: [] }
+        ]
+      },
+      phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.15, repeatPenalty: 0.6 }
+    },
+
+    // ═══════════════════════════════════════
+    // VELVET ROOTLESS — 夕暮れの砂浜
+    // ═══════════════════════════════════════
+    velvet: {
+      soundDesign: {
+        footstep: {
+          baseFreq: 90,
+          fmRatio: 3.5,
+          fmDepth: 0.08,
+          attack: 0.003,
+          decayLong: 0.45,
+          decayShort: 0.22,
+          shortProbHead: 0.30,
+          longProbOff: 0.30,
+          noiseMix: 0.11,
+          noiseFreq: 200,
+          lowpassHz: 750,
+          bellLevel: 0.13,
+          humidity: 0.40,
+          stereoSwing: 0.45
+        }
+      },
+      behavior: {
+        footstep: {
+          enabled: true,
+          humanize: 0.07,
+          velocityVariation: 0.22,
+          syncopationDragProb: 0.35,
+          syncopationDragMin: 0.12,
+          syncopationDragMax: 0.30,
+          swingAmount: 0.30
+        }
+      },
+      footstepPatterns: {
+        stopped: [],
+        extraSparse: [
+          { name: "velvet-sparse-1", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0], ornaments: [{ pos:10, prob:0.18 }] },
+          { name: "velvet-sparse-2", skeleton: [0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0], ornaments: [{ pos:6, prob:0.18 }] },
+          { name: "velvet-sparse-3", skeleton: [1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0], ornaments: [{ pos:6, prob:0.20 }] },
+          { name: "velvet-sparse-4", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0], ornaments: [] }
+        ],
+        halftime: [
+          { name: "velvet-half-1", skeleton: [1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0], ornaments: [{ pos:11, prob:0.20 }] },
+          { name: "velvet-half-2", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0], ornaments: [{ pos:6, prob:0.22 },{ pos:11, prob:0.18 }] },
+          { name: "velvet-half-3", skeleton: [1,0,0,0,0,0,1,0,1,0,1,0,0,0,0,0], ornaments: [{ pos:14, prob:0.22 }] }
+        ],
+        onBeat: [
+          { name: "velvet-beat-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:10, prob:0.20 }] },
+          { name: "velvet-beat-2", skeleton: [1,0,0,0,1,0,0,1,1,0,1,0,1,0,0,0], ornaments: [{ pos:14, prob:0.22 }] },
+          { name: "velvet-beat-3", skeleton: [1,0,0,0,1,0,1,0,1,0,0,1,1,0,1,0], ornaments: [{ pos:2, prob:0.18 }] }
+        ],
+        beatPlus: [
+          { name: "velvet-bp-1", skeleton: [1,0,0,1,1,0,1,0,1,0,1,0,1,0,1,0], ornaments: [] },
+          { name: "velvet-bp-2", skeleton: [1,0,1,0,1,0,1,0,1,0,0,1,1,0,1,0], ornaments: [{ pos:14, prob:0.22 }] },
+          { name: "velvet-bp-3", skeleton: [1,0,0,0,1,0,1,0,1,0,1,0,1,0,1,1], ornaments: [{ pos:3, prob:0.18 }] }
+        ]
+      },
+      phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.25, repeatPenalty: 0.55 }
+    },
+
+    // ═══════════════════════════════════════
+    // LOVE STAB — 賑わう浜辺の夕方
+    // ═══════════════════════════════════════
+    love: {
+      soundDesign: {
+        footstep: {
+          baseFreq: 80,
+          fmRatio: 3.0,
+          fmDepth: 0.08,
+          attack: 0.002,
+          decayLong: 0.35,
+          decayShort: 0.15,
+          shortProbHead: 0.20,
+          longProbOff: 0.25,
+          noiseMix: 0.13,
+          noiseFreq: 220,
+          lowpassHz: 700,
+          bellLevel: 0.08,
+          humidity: 0.30,
+          stereoSwing: 0.40
+        }
+      },
+      behavior: {
+        footstep: {
+          enabled: true,
+          humanize: 0.05,
+          velocityVariation: 0.20,
+          syncopationDragProb: 0.30,
+          syncopationDragMin: 0.10,
+          syncopationDragMax: 0.30,
+          swingAmount: 0
+        }
+      },
+      footstepPatterns: {
+        stopped: [],
+        extraSparse: [
+          { name: "love-sparse-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:6, prob:0.18 }] },
+          { name: "love-sparse-2", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0], ornaments: [] },
+          { name: "love-sparse-3", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0], ornaments: [{ pos:14, prob:0.18 }] }
+        ],
+        halftime: [
+          { name: "love-half-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.18 }] },
+          { name: "love-half-2", skeleton: [1,0,0,0,0,0,1,0,1,0,1,0,0,0,0,0], ornaments: [{ pos:14, prob:0.20 }] },
+          { name: "love-half-3", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:6, prob:0.18 }] }
+        ],
+        onBeat: [
+          { name: "love-beat-1", skeleton: [1,0,0,0,1,0,0,1,1,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.20 }] },
+          { name: "love-beat-2", skeleton: [1,0,0,1,1,0,0,0,1,0,0,0,1,0,1,1], ornaments: [{ pos:6, prob:0.18 }] },
+          { name: "love-beat-3", skeleton: [1,0,0,0,1,0,1,0,1,0,0,1,1,0,1,0], ornaments: [{ pos:3, prob:0.20 }] }
+        ],
+        beatPlus: [
+          { name: "love-bp-1", skeleton: [1,0,1,0,1,0,1,1,1,0,1,0,1,0,1,0], ornaments: [] },
+          { name: "love-bp-2", skeleton: [1,0,0,1,1,0,1,0,1,0,1,0,1,1,0,1], ornaments: [] },
+          { name: "love-bp-3", skeleton: [1,0,1,0,1,0,0,1,1,0,1,0,1,0,1,1], ornaments: [{ pos:3, prob:0.20 }] }
+        ]
+      },
+      phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.30, repeatPenalty: 0.55 }
+    },
+
+    // ═══════════════════════════════════════
+    // METALLIC PLUCK — 工業的海辺
+    // ═══════════════════════════════════════
+    pluck: {
+      soundDesign: {
+        footstep: {
+          baseFreq: 85,
+          fmRatio: 4.5,
+          fmDepth: 0.12,
+          attack: 0.002,
+          decayLong: 0.32,
+          decayShort: 0.14,
+          shortProbHead: 0.15,
+          longProbOff: 0.15,
+          noiseMix: 0.10,
+          noiseFreq: 280,
+          lowpassHz: 900,
+          bellLevel: 0.15,
+          humidity: 0.20,
+          stereoSwing: 0.30
+        }
+      },
+      behavior: {
+        footstep: {
+          enabled: true,
+          humanize: 0.025,
+          velocityVariation: 0.10,
+          syncopationDragProb: 0.15,
+          syncopationDragMin: 0.08,
+          syncopationDragMax: 0.20,
+          swingAmount: 0
+        }
+      },
+      footstepPatterns: {
+        stopped: [],
+        extraSparse: [
+          { name: "pluck-sparse-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], ornaments: [] },
+          { name: "pluck-sparse-2", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0], ornaments: [] },
+          { name: "pluck-sparse-3", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:14, prob:0.10 }] }
+        ],
+        halftime: [
+          { name: "pluck-half-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0], ornaments: [] },
+          { name: "pluck-half-2", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0], ornaments: [{ pos:14, prob:0.12 }] },
+          { name: "pluck-half-3", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0], ornaments: [] }
+        ],
+        onBeat: [
+          { name: "pluck-beat-1", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], ornaments: [] },
+          { name: "pluck-beat-2", skeleton: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:6, prob:0.12 }] },
+          { name: "pluck-beat-3", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0], ornaments: [] }
+        ],
+        beatPlus: [
+          { name: "pluck-bp-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [] },
+          { name: "pluck-bp-2", skeleton: [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], ornaments: [] },
+          { name: "pluck-bp-3", skeleton: [1,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0], ornaments: [{ pos:2, prob:0.12 }] }
+        ]
+      },
+      phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.10, repeatPenalty: 0.2 }
+    },
+
+    // ═══════════════════════════════════════
+    // BLACK STRINGS — 深い海の岸辺
+    // ═══════════════════════════════════════
+    strings: {
+      soundDesign: {
+        footstep: {
+          baseFreq: 72,
+          fmRatio: 3.8,
+          fmDepth: 0.10,
+          attack: 0.003,
+          decayLong: 0.40,
+          decayShort: 0.16,
+          shortProbHead: 0.20,
+          longProbOff: 0.30,
+          noiseMix: 0.13,
+          noiseFreq: 200,
+          lowpassHz: 750,
+          bellLevel: 0.11,
+          humidity: 0.35,
+          stereoSwing: 0.50
+        }
+      },
+      behavior: {
+        footstep: {
+          enabled: true,
+          humanize: 0.04,
+          velocityVariation: 0.18,
+          syncopationDragProb: 0.30,
+          syncopationDragMin: 0.10,
+          syncopationDragMax: 0.30,
+          swingAmount: 0
+        }
+      },
+      footstepPatterns: {
+        stopped: [],
+        extraSparse: [
+          { name: "strings-sparse-1", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0], ornaments: [{ pos:14, prob:0.20 }] },
+          { name: "strings-sparse-2", skeleton: [1,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0], ornaments: [] },
+          { name: "strings-sparse-3", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.20 }] },
+          { name: "strings-sparse-4", skeleton: [0,0,0,0,1,0,0,0,0,0,1,0,1,0,0,0], ornaments: [{ pos:14, prob:0.20 }] }
+        ],
+        halftime: [
+          { name: "strings-half-1", skeleton: [1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0], ornaments: [{ pos:11, prob:0.22 }] },
+          { name: "strings-half-2", skeleton: [1,0,0,0,0,0,0,0,1,0,1,0,1,0,0,0], ornaments: [{ pos:14, prob:0.20 }] },
+          { name: "strings-half-3", skeleton: [1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0], ornaments: [] }
+        ],
+        onBeat: [
+          { name: "strings-beat-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:11, prob:0.22 }] },
+          { name: "strings-beat-2", skeleton: [1,0,0,0,1,0,0,1,1,0,1,0,1,0,1,0], ornaments: [{ pos:14, prob:0.20 }] },
+          { name: "strings-beat-3", skeleton: [1,0,1,0,1,0,1,0,1,0,0,1,1,0,1,0], ornaments: [{ pos:14, prob:0.18 }] }
+        ],
+        beatPlus: [
+          { name: "strings-bp-1", skeleton: [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], ornaments: [{ pos:3, prob:0.22 }] },
+          { name: "strings-bp-2", skeleton: [1,0,0,1,1,0,1,0,1,0,1,0,1,0,1,1], ornaments: [] },
+          { name: "strings-bp-3", skeleton: [1,0,1,0,1,0,0,1,1,0,1,0,1,0,1,1], ornaments: [{ pos:11, prob:0.20 }] }
+        ]
+      },
+      phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.25, repeatPenalty: 0.55 }
     }
   }
 };
@@ -6896,6 +7192,12 @@ function _beachSchedule(){
 
         // 通常humanize（拍位置±微小オフセット）
         let tOff = (Math.random() * 2 - 1) * hum * stepSec;
+
+        // ── スウィング（VELVET等）：8分裏(step 2,6,10,14)を後ろにシフト ──
+        const swingAmt = beh.swingAmount ?? 0;
+        if(swingAmt > 0 && stepInBar % 4 === 2){
+          tOff += stepSec * swingAmt * 0.5;
+        }
 
         // ── シンコペーション・タイミング揺らぎ ──
         // 拍頭以外で 30% 確率に後ろへ 10〜35% ずらす（引きずる感覚）
