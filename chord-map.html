@@ -3314,6 +3314,49 @@ function getChordEmotionVec(root, type){
   return{brightness:brightFinal, tension:tensionFinal, resolution:resolFinal};
 }
 
+// ── レベル3: ピボット転調検知 ──
+// 2つのコードを含むキーの集合をそれぞれ求め、共通キーがなければ転調と判定
+// （シンプル実装: ダイアトニックトライアド7コードのみ評価）
+function _detectPivotModulation(rootA, typeA, rootB, typeB){
+  // メジャー/マイナーのみ評価（dom7やaltは除外: 既にトーナル前後の境界）
+  const isSimple = t => (t === 'maj' || t === 'min' || t === 'maj7' || t === 'min7' || t === 'dim');
+  if(!isSimple(typeA) || !isSimple(typeB)) return false;
+
+  // 12個のキー（メジャー）で両コードがダイアトニック内にあるかチェック
+  // メジャー: I, ii, iii, IV, V, vi, vii°
+  const MAJ_DEGREES = [
+    { semi: 0,  qual: ['maj','maj7'] },     // I
+    { semi: 2,  qual: ['min','min7'] },     // ii
+    { semi: 4,  qual: ['min','min7'] },     // iii
+    { semi: 5,  qual: ['maj','maj7'] },     // IV
+    { semi: 7,  qual: ['maj','maj7'] },     // V
+    { semi: 9,  qual: ['min','min7'] },     // vi
+    { semi: 11, qual: ['dim'] }              // vii°
+  ];
+
+  function keysContaining(root, type){
+    const ri = ni(root);
+    const keys = new Set();
+    for(let key = 0; key < 12; key++){
+      // key基準でrootの度数を計算
+      const deg = ((ri - key) + 12) % 12;
+      const found = MAJ_DEGREES.find(d => d.semi === deg && d.qual.includes(type));
+      if(found) keys.add(key);
+    }
+    return keys;
+  }
+
+  const keysA = keysContaining(rootA, typeA);
+  const keysB = keysContaining(rootB, typeB);
+  if(keysA.size === 0 || keysB.size === 0) return false;
+
+  // 共通キーがなければ転調
+  for(const k of keysA){
+    if(keysB.has(k)) return false;
+  }
+  return true;
+}
+
 // 感情ベクトル → HSLカラー文字列
 // brightness → 色相（0=赤暖色, 120=緑中間, 240=青寒色）
 // tension    → 彩度 (40%〜90%)
@@ -6468,6 +6511,12 @@ let _beachPanCurrent = 0;            // -1（左）〜+1（右）、各ステッ
 let _beachLastChordNode = null;      // {x, y} 直前コードの座標
 let _beachStumbleArmed = 0;          // 残り何ステップ stumble 候補か
 
+// ── レベル3: 音楽的事件への反応 ──
+let _beachPhraseFillBoost = 0;       // 残り何小節間、装飾確率をUPするか（ピボット転調時）
+let _beachSandGlitchBoost = 0;       // 残り何小節間、砂のグリッチ確率をUPするか（半音進行時）
+let _beachLastTransRoot = null;      // 直前コードのroot（V7→I判定用）
+let _beachLastTransType = null;      // 直前コードのtype
+
 // ── Rare events タイマー ──
 let _beachShellTimer = null;
 let _beachOtherFootstepTimer = null;
@@ -6937,6 +6986,12 @@ function _beachSchedule(){
         if(Math.abs(_beachPanCurrent) < 0.02) _beachPanCurrent = 0;
       }
 
+      // ── レベル3: 小節境界で boost をデクリメント ──
+      if(stepInBar === 0){
+        if(_beachPhraseFillBoost > 0) _beachPhraseFillBoost--;
+        if(_beachSandGlitchBoost > 0) _beachSandGlitchBoost--;
+      }
+
       // 現パターンで発音判定
       const pat = _beachCurrentPattern;
       if(pat){
@@ -6944,7 +6999,10 @@ function _beachSchedule(){
         const hum    = beh.humanize || 0;
         const velVar = beh.velocityVariation || 0;
         const isLastBar  = (barInPhrase === 3);
-        const fillBoost  = isLastBar ? ((sceneData.phraseEvolution && sceneData.phraseEvolution.bar4FillBoost) || 0) : 0;
+        const baseBar4Boost = isLastBar ? ((sceneData.phraseEvolution && sceneData.phraseEvolution.bar4FillBoost) || 0) : 0;
+        // レベル3: ピボット転調直後は装飾確率を追加でUP（4小節間 +0.30）
+        const pivotBoost = (_beachPhraseFillBoost > 0) ? 0.30 : 0;
+        const fillBoost = baseBar4Boost + pivotBoost;
 
         // 通常humanize（拍位置±微小オフセット）
         let tOff = (Math.random() * 2 - 1) * hum * stepSec;
@@ -7021,7 +7079,9 @@ function _beachSchedule(){
         }
         // グリッチバースト: strange↑で確率増
         const strangeVal = (typeof SL !== 'undefined') ? (SL.find(s => s.id === 'strange')?.val ?? 0) : 0;
-        const glitchProb = (sandBeh.glitchProb ?? 0.05) * (1 + Math.max(0, strangeVal) * 1.5);
+        // レベル3: 半音進行直後は砂のグリッチ確率を2.5倍にUP
+        const glitchSemitoneBoost = (_beachSandGlitchBoost > 0) ? 2.5 : 1.0;
+        const glitchProb = (sandBeh.glitchProb ?? 0.05) * (1 + Math.max(0, strangeVal) * 1.5) * glitchSemitoneBoost;
         if(Math.random() < glitchProb && stepInBar % 4 !== 0){
           // 短い3〜4連のスタッター
           const n = 3 + Math.floor(Math.random() * 2);
@@ -7112,6 +7172,47 @@ function moveToChord(root,type){
     _beachStumbleArmed = 2;
   }
   if(hitN) _beachLastChordNode = { x: hitN.x, y: hitN.y };
+
+  // ── レベル3: 音楽的事件への反応 ──
+  if(_beachOn && _beachLastTransRoot !== null){
+    const prevRoot = _beachLastTransRoot;
+    const prevType = _beachLastTransType;
+
+    // (1) V7 → I 完全終止 → 波の寄せ
+    //   dom7コードから完全5度下（or完全4度上）への遷移 + 解決先がmaj/min
+    if(prevType === 'dom7'){
+      const prevRi = ni(prevRoot);
+      const curRi  = ni(root);
+      const diff   = ((curRi - prevRi) + 12) % 12;
+      // 5度下（=完全5度下行=半音で-7=+5 mod12）への解決
+      const isRes  = (diff === 5);
+      const isResTo = (type === 'maj' || type === 'min' || type === 'maj7' || type === 'min7');
+      if(isRes && isResTo){
+        if(typeof _triggerBeachWaveSwell === 'function') _triggerBeachWaveSwell();
+      }
+    }
+
+    // (2) 半音進行 → 砂のグリッチブースト
+    //   root が ±1半音だけ動いた場合
+    {
+      const prevRi = ni(prevRoot);
+      const curRi  = ni(root);
+      const diff   = Math.min(((curRi - prevRi) + 12) % 12, ((prevRi - curRi) + 12) % 12);
+      if(diff === 1){
+        _beachSandGlitchBoost = 2; // 2小節間、砂のグリッチ確率UP
+      }
+    }
+
+    // (3) ピボット転調検知 → 装飾確率4小節間UP
+    //   両方のコードを diatonicSet に含むキーが切り替わったら転調
+    if(typeof _detectPivotModulation === 'function'){
+      if(_detectPivotModulation(prevRoot, prevType, root, type)){
+        _beachPhraseFillBoost = 4; // 4小節間装飾UP
+      }
+    }
+  }
+  _beachLastTransRoot = root;
+  _beachLastTransType = type;
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
   // Q6: モーダルオーバーレイをコード変更時にフェードイン再開
   if(modalMapMode) modalOverlayAlpha=0;
