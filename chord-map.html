@@ -105,33 +105,34 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:var(--bg);
 }
 /* スワイプヒント */
-/* ── Scene切替バー（MAPタブ下部） ── */
-#scene-switcher{
+/* ── マップ下部バー（Scene一覧 + Beach） ── */
+#map-bottom-bar{
   position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
   display:flex;align-items:center;gap:0;z-index:20;
-  background:rgba(0,0,0,0.45);border-radius:20px;
+  background:rgba(0,0,0,0.48);border-radius:20px;
   padding:4px 6px;backdrop-filter:blur(6px);
   border:1px solid rgba(255,255,255,0.08);
+  white-space:nowrap;
 }
-#scene-switcher .ss-prev,
-#scene-switcher .ss-next{
-  font-family:var(--fm);font-size:8px;letter-spacing:.08em;
-  color:rgba(255,255,255,0.28);padding:4px 8px;cursor:pointer;
-  user-select:none;-webkit-user-select:none;
-  transition:color .2s;
+.map-scene-pill{
+  font-family:var(--fm);font-size:8px;letter-spacing:.10em;
+  color:rgba(255,255,255,0.30);padding:4px 8px;border-radius:14px;
+  cursor:pointer;user-select:none;-webkit-user-select:none;
+  transition:color .15s,background .15s;
 }
-#scene-switcher .ss-prev:active,
-#scene-switcher .ss-next:active{ color:rgba(255,255,255,0.7); }
-#scene-switcher .ss-cur{
-  font-family:var(--fm);font-size:9px;letter-spacing:.14em;
-  color:var(--acc);padding:4px 12px;
-  border-left:1px solid rgba(255,255,255,0.1);
-  border-right:1px solid rgba(255,255,255,0.1);
-  min-width:80px;text-align:center;cursor:pointer;
-  user-select:none;-webkit-user-select:none;
+.map-scene-pill.on{
+  color:var(--acc);background:rgba(232,197,71,0.12);
 }
-#scene-switcher .ss-arrow{
-  font-size:7px;color:rgba(255,255,255,0.35);margin:0 2px;
+.map-scene-pill:active{ color:rgba(255,255,255,0.7); }
+#map-beach-btn{
+  font-family:var(--fm);font-size:7px;letter-spacing:.10em;
+  color:rgba(140,200,210,0.45);padding:4px 9px;border-radius:14px;
+  cursor:pointer;user-select:none;-webkit-user-select:none;
+  border-left:1px solid rgba(255,255,255,0.10);margin-left:3px;
+  transition:color .15s,background .15s;
+}
+#map-beach-btn.on{
+  color:rgba(140,200,210,0.95);background:rgba(140,200,210,0.12);
 }
 .swipe-pip{
   position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
@@ -1209,11 +1210,15 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <!-- Q4: COMPASS → CHAIN 転送ボタン (COMPASSモード時のみ表示) -->
         <button id="compass-chain-btn" onclick="compassToChain()">+ CHAIN</button>
 
-        <!-- Scene切替バー -->
-        <div id="scene-switcher">
-          <div class="ss-prev" id="ss-prev" onclick="switchScenePrev()">◀</div>
-          <div class="ss-cur" id="ss-cur" onclick="goToScenePanel()">PLAIN</div>
-          <div class="ss-next" id="ss-next" onclick="switchSceneNext()">▶</div>
+        <!-- Scene一覧バー + Beach Grooveトリガー -->
+        <div id="map-bottom-bar">
+          <div class="map-scene-pill on" data-scene="plain"   onclick="applyScene('plain')"  >PLAIN</div>
+          <div class="map-scene-pill"    data-scene="glass"   onclick="applyScene('glass')"  >GLASS</div>
+          <div class="map-scene-pill"    data-scene="velvet"  onclick="applyScene('velvet')" >VELVET</div>
+          <div class="map-scene-pill"    data-scene="love"    onclick="applyScene('love')"   >LOVE</div>
+          <div class="map-scene-pill"    data-scene="pluck"   onclick="applyScene('pluck')"  >PLUCK</div>
+          <div class="map-scene-pill"    data-scene="strings" onclick="applyScene('strings')">STRINGS</div>
+          <div id="map-beach-btn" onclick="toggleBeach()">BEACH</div>
         </div>
 
         <!-- 上スワイプ促進インジケーター -->
@@ -6089,8 +6094,8 @@ const BEACH_GROOVE_DEFAULT = {
           fmRatio: 3.2,
           fmDepth: 0.06,
           attack: 0.003,
-          decayLong: 0.42,
-          decayShort: 0.18,
+          decayLong: 0.22,
+          decayShort: 0.10,
           shortProbHead: 0.25,
           longProbOff: 0.25,
           noiseMix: 0.12,
@@ -6157,8 +6162,8 @@ const BEACH_GROOVE_DEFAULT = {
           fmRatio: 2.5,
           fmDepth: 0.03,
           attack: 0.004,
-          decayLong: 0.50,
-          decayShort: 0.20,
+          decayLong: 0.26,
+          decayShort: 0.11,
           shortProbHead: 0.20,
           longProbOff: 0.30,
           noiseMix: 0.10,
@@ -6225,8 +6230,8 @@ const BEACH_GROOVE_DEFAULT = {
           fmRatio: 3.5,
           fmDepth: 0.08,
           attack: 0.003,
-          decayLong: 0.45,
-          decayShort: 0.22,
+          decayLong: 0.24,
+          decayShort: 0.12,
           shortProbHead: 0.30,
           longProbOff: 0.30,
           noiseMix: 0.11,
@@ -6293,8 +6298,8 @@ const BEACH_GROOVE_DEFAULT = {
           fmRatio: 3.0,
           fmDepth: 0.08,
           attack: 0.002,
-          decayLong: 0.35,
-          decayShort: 0.15,
+          decayLong: 0.18,
+          decayShort: 0.09,
           shortProbHead: 0.20,
           longProbOff: 0.25,
           noiseMix: 0.13,
@@ -6359,8 +6364,8 @@ const BEACH_GROOVE_DEFAULT = {
           fmRatio: 4.5,
           fmDepth: 0.12,
           attack: 0.002,
-          decayLong: 0.32,
-          decayShort: 0.14,
+          decayLong: 0.17,
+          decayShort: 0.08,
           shortProbHead: 0.15,
           longProbOff: 0.15,
           noiseMix: 0.10,
@@ -6425,8 +6430,8 @@ const BEACH_GROOVE_DEFAULT = {
           fmRatio: 3.8,
           fmDepth: 0.10,
           attack: 0.003,
-          decayLong: 0.40,
-          decayShort: 0.16,
+          decayLong: 0.21,
+          decayShort: 0.09,
           shortProbHead: 0.20,
           longProbOff: 0.30,
           noiseMix: 0.13,
@@ -6607,7 +6612,7 @@ function _playBeachFootstep(actx, t, vol, sceneData, stepInBar, panOverride, vol
   const subG = actx.createGain();
   sub.type = 'sine';
   sub.frequency.setValueAtTime(sd.baseFreq * 3.0, t);
-  sub.frequency.exponentialRampToValueAtTime(Math.max(18, sd.baseFreq * 0.6), t + decay * 0.40);
+  sub.frequency.exponentialRampToValueAtTime(Math.max(20, sd.baseFreq * 0.82), t + decay * 0.20);
   subG.gain.setValueAtTime(0, t);
   subG.gain.linearRampToValueAtTime(vol * 1.05 * vMul, t + sd.attack);
   subG.gain.exponentialRampToValueAtTime(0.001, t + decay);
@@ -6921,6 +6926,8 @@ function startBeach(){
   });
   const btn = document.getElementById('beach-toggle-btn');
   if(btn) btn.classList.add('on');
+  const mapBtn = document.getElementById('map-beach-btn');
+  if(mapBtn) mapBtn.classList.add('on');
   dirty = true;
 }
 
@@ -6933,6 +6940,8 @@ function stopBeach(){
   _beachPulse = 0;
   const btn = document.getElementById('beach-toggle-btn');
   if(btn) btn.classList.remove('on');
+  const mapBtn = document.getElementById('map-beach-btn');
+  if(mapBtn) mapBtn.classList.remove('on');
   dirty = true;
 }
 
@@ -15839,18 +15848,9 @@ const _sceneSwitcherLabel = {
 };
 
 function _updateSceneSwitcher(){
-  const cur  = document.getElementById('ss-cur');
-  const prev = document.getElementById('ss-prev');
-  const next = document.getElementById('ss-next');
-  if(!cur) return;
-  const idx  = _sceneSwitcherOrder.indexOf(sceneCurrentName);
-  const prevScene = _sceneSwitcherOrder[idx - 1];
-  const nextScene = _sceneSwitcherOrder[idx + 1];
-  cur.textContent  = _sceneSwitcherLabel[sceneCurrentName] || sceneCurrentName.toUpperCase();
-  prev.textContent = prevScene ? '◀ ' + _sceneSwitcherLabel[prevScene] : '◀';
-  prev.style.opacity = prevScene ? '1' : '0.2';
-  next.textContent = nextScene ? _sceneSwitcherLabel[nextScene] + ' ▶' : '▶';
-  next.style.opacity = nextScene ? '1' : '0.2';
+  document.querySelectorAll('.map-scene-pill').forEach(el =>
+    el.classList.toggle('on', el.dataset.scene === sceneCurrentName)
+  );
 }
 
 function switchScenePrev(){
