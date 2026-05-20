@@ -394,6 +394,19 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .ai-sus-btn.playing{color:#fff;background:rgba(74,170,114,0.22);border-color:#4aaa72;}
 .ai-sus-btn.dim{opacity:0.35;pointer-events:none;}
 
+/* B-2: LOOPトグルボタン（進行のループ再生） */
+.ai-loop-btn{
+  font-family:var(--fm);font-size:8px;padding:4px 9px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.6);cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+  letter-spacing:.05em;white-space:nowrap;flex-shrink:0;
+}
+.ai-loop-btn:hover{color:#80d4ff;border-color:rgba(128,212,255,0.4);}
+.ai-loop-btn.on{
+  color:#80d4ff;border-color:#80d4ff;background:rgba(128,212,255,0.12);
+}
+
 /* O3: TENSION TIMELINE */
 .ai-wrap.open{max-height:310px;}  /* 拡張: グラフ分 +50px */
 #tension-timeline{
@@ -629,6 +642,20 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   border-color:#9b59b6;color:#9b59b6;
   background:rgba(155,89,182,0.12);
 }
+/* M5: TRITONE SUBSTITUTION トグルボタン */
+#tritone-btn{
+  font-family:var(--fm);font-size:7.5px;padding:3px 7px;
+  border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--dim);background:rgba(13,13,16,0.9);
+  cursor:pointer;letter-spacing:.05em;white-space:nowrap;
+  transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+#tritone-btn.on{
+  border-color:#d4823a;color:#d4823a;
+  background:rgba(212,130,58,0.12);
+}
+#tritone-btn.dim{opacity:0.4;pointer-events:none;}
 #tone-wheel-overlay{
   position:absolute;bottom:12px;left:12px;z-index:10;
   display:none;
@@ -800,18 +827,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   background:var(--surf);cursor:pointer;-webkit-appearance:none;appearance:none;
   flex:1;text-align:center;accent-color:var(--acc);height:26px;}
 .auto-sel.wide{flex:2;}
-/* F4: Grooveプリセットボタン */
-.groove-preset-row{display:flex;gap:4px;width:100%;margin-top:5px;}
-.groove-btn{
-  flex:1;font-family:var(--fm);font-size:7px;letter-spacing:.07em;
-  height:22px;border:1px solid var(--bdr2);border-radius:var(--r);
-  color:var(--dim);background:var(--surf);cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  transition:border-color .12s,color .12s,background .12s;
-  user-select:none;-webkit-user-select:none;
-}
-.groove-btn.on{border-color:#d4823a;color:#d4823a;background:rgba(212,130,58,0.12);}
-.groove-btn:active{opacity:.7;}
+/* BEACH トグルボタン用 (kick-btnクラスを再利用) */
 .kick-preset-row{display:flex;gap:4px;flex-wrap:nowrap;padding:4px 0;}
 .kick-btn{
   font-family:var(--fm);font-size:8px;padding:5px 0;flex:1;
@@ -1182,6 +1198,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
               <div id="triad-space-btn" onclick="toggleTriadSpace()">TRVS</div>
               <div id="bartok-btn" onclick="toggleBartok()">BRTK</div>
               <div id="dim-circle-btn" onclick="toggleDimCircle()">DIMI</div>
+              <div id="tritone-btn" onclick="toggleTritone()" title="トリトン代理（dom7限定）">TRIT</div>
             </div>
           </div>
         </div>
@@ -1195,7 +1212,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         <!-- Scene切替バー -->
         <div id="scene-switcher">
           <div class="ss-prev" id="ss-prev" onclick="switchScenePrev()">◀</div>
-          <div class="ss-cur" id="ss-cur" onclick="switchSceneNext()">PLAIN</div>
+          <div class="ss-cur" id="ss-cur" onclick="goToScenePanel()">PLAIN</div>
           <div class="ss-next" id="ss-next" onclick="switchSceneNext()">▶</div>
         </div>
 
@@ -1296,6 +1313,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                 <div class="ai-play-btn" id="ai-play-btn" onclick="playAiProgression()">▶ PLAY</div>
                 <div class="ai-sus-btn" id="ai-sus-btn" onclick="playAiSusProgression()">→ SUS</div>
                 <div class="ai-save-btn" id="ai-save-btn" onclick="saveAiProgression()">★ SAVE</div>
+                <div class="ai-loop-btn" id="ai-loop-btn" onclick="toggleProgLoop()" title="進行をループ再生">↻ LOOP</div>
               </div>
               <!-- O3: TENSION TIMELINE -->
               <canvas id="tension-timeline"></canvas>
@@ -1527,31 +1545,6 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <!-- BEACH GROOVE: 浜辺の鼓動（Scene別パターン × movingゾーン） -->
           <div class="kick-preset-row" id="beach-toggle-row">
             <div class="kick-btn" id="beach-toggle-btn" title="浜辺の足跡リズム（Scene別パターン）">BEACH<br><span style="font-size:6px;opacity:.6;">浜辺の鼓動</span></div>
-          </div>
-          <!-- F4: 旧Kickパターン (FEATURES.legacyKick=falseで非表示) -->
-          <div class="kick-preset-row" id="kick-preset-row" style="display:none">
-            <div class="kick-btn" data-kick="pt1">pt1<br><span style="font-size:6px;opacity:.6;">HOUSE</span></div>
-            <div class="kick-btn" data-kick="pt2">pt2<br><span style="font-size:6px;opacity:.6;">AMAPIANO</span></div>
-            <div class="kick-btn" data-kick="pt3">pt3<br><span style="font-size:6px;opacity:.6;">GQOM</span></div>
-            <div class="kick-btn" data-kick="pt4">pt4<br><span style="font-size:6px;opacity:.6;">L.TRAP</span></div>
-          </div>
-          <!-- F4: 旧Grooveプリセット (Groove再設計まで非表示) -->
-          <div class="groove-preset-row" id="groove-preset-row" style="display:none">
-            <div style="font-family:var(--fm);font-size:7px;color:var(--dim);width:100%;margin-bottom:2px;letter-spacing:.08em;">HOUSE</div>
-            <div class="groove-btn" data-groove="house">JUNO<br><span style="font-size:6px;opacity:.6;">124</span></div>
-            <div class="groove-btn" data-groove="house_deep">DEEP<br><span style="font-size:6px;opacity:.6;">120</span></div>
-            <div class="groove-btn" data-groove="house_shuffle">SHFL<br><span style="font-size:6px;opacity:.6;">122</span></div>
-            <div class="groove-btn" data-groove="house_garage">GARG<br><span style="font-size:6px;opacity:.6;">126</span></div>
-            <div style="font-family:var(--fm);font-size:7px;color:var(--dim);width:100%;margin-bottom:2px;margin-top:4px;letter-spacing:.08em;">TECHNO</div>
-            <div class="groove-btn" data-groove="techno">TCNO<br><span style="font-size:6px;opacity:.6;">132</span></div>
-            <div class="groove-btn" data-groove="techno_industrial">INDS<br><span style="font-size:6px;opacity:.6;">136</span></div>
-            <div class="groove-btn" data-groove="techno_tribal">TRBL<br><span style="font-size:6px;opacity:.6;">128</span></div>
-            <div class="groove-btn" data-groove="techno_hard">HARD<br><span style="font-size:6px;opacity:.6;">140</span></div>
-            <div style="font-family:var(--fm);font-size:7px;color:var(--dim);width:100%;margin-bottom:2px;margin-top:4px;letter-spacing:.08em;">DRUM & BASS</div>
-            <div class="groove-btn" data-groove="dnb">DnB<br><span style="font-size:6px;opacity:.6;">174</span></div>
-            <div class="groove-btn" data-groove="dnb_jungle">JNGL<br><span style="font-size:6px;opacity:.6;">168</span></div>
-            <div class="groove-btn" data-groove="dnb_liquid">LQID<br><span style="font-size:6px;opacity:.6;">172</span></div>
-            <div class="groove-btn" data-groove="dnb_step">STEP<br><span style="font-size:6px;opacity:.6;">178</span></div>
           </div>
         </div>
 
@@ -2327,7 +2320,6 @@ const S={root:'A',type:'m9',history:[{root:'A',type:'m9'}],histIdx:0,voicing:nul
 const FEATURES={
   phraseEngine: false,  // アドリブ/メロディフレーズエンジン
   legacyPad:    false,  // 旧PADシンセエンジン（無効化済み・コード保温）
-  legacyKick:   false,  // 旧Kick pt1〜pt4（無効化済み・新Beach Grooveに置換）
 };
 
 // MAP MODE: 'radial' | 'expand' | 'link' | 'chain' | 'graph' | 'wave' | 'bridge'
@@ -2338,115 +2330,6 @@ let autoPlay=false;
 let autoBpm=100;
 let autoTimer=null;
 
-// ── F4: GROOVE ENGINE ──
-let grooveMode=null;        // null | 'house' | 'techno' | 'dnb'
-let grooveTimer=null;       // グルーヴループタイマー
-let grooveTick=0;           // ステップカウンタ（0〜15: 16ステップ）
-let groovePulse=0;          // Canvas描画用パルス値（0〜1、減衰）
-let grooveLastKickTime=0;   // 最後のkick発音時刻（AudioContext）
-
-// Grooveプリセット定義（v12 Hybrid準拠）
-const GROOVE_PRESETS={
-  // ── HOUSE ──
-  house:{
-    bpm:124, swing:0.54, pulseCol:'#4aaa72', label:'HOUSE',
-    kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
-    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-    ohhat:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
-    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  house_deep:{
-    bpm:120, swing:0.56, pulseCol:'#4aaa72', label:'DEEP',
-    kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
-    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
-    hihat:[0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
-    ohhat:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-    clap: [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
-  },
-  house_shuffle:{
-    bpm:122, swing:0.60, pulseCol:'#4aaa72', label:'SHFL',
-    kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,1,0],
-    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
-    hihat:[1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1],
-    ohhat:[0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
-    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  house_garage:{
-    bpm:126, swing:0.52, pulseCol:'#4aaa72', label:'GARG',
-    kick: [1,0,0,1, 0,0,1,0, 1,0,0,0, 1,0,0,0],
-    snare:[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
-    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-    ohhat:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
-    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-  },
-  // ── TECHNO ──
-  techno:{
-    bpm:132, swing:0.50, pulseCol:'#d4823a', label:'TCNO',
-    kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-    hihat:[1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
-    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
-  },
-  techno_industrial:{
-    bpm:136, swing:0.50, pulseCol:'#d4823a', label:'INDS',
-    kick: [1,0,1,0, 0,0,1,0, 1,0,0,0, 1,0,1,0],
-    snare:[0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
-    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
-    clap: [0,0,0,0, 0,1,0,0, 0,0,0,0, 0,1,0,0],
-  },
-  techno_tribal:{
-    bpm:128, swing:0.51, pulseCol:'#d4823a', label:'TRBL',
-    kick: [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,0,1,0],
-    snare:[0,0,1,0, 0,0,1,0, 0,1,0,0, 1,0,0,0],
-    hihat:[1,1,0,1, 1,0,1,1, 1,1,0,1, 1,0,1,0],
-    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  techno_hard:{
-    bpm:140, swing:0.50, pulseCol:'#d4823a', label:'HARD',
-    kick: [1,0,0,0, 1,0,0,0, 1,0,1,0, 1,0,0,0],
-    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
-    hihat:[1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
-    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  // ── DRUM & BASS ──
-  dnb:{
-    bpm:174, swing:0.52, pulseCol:'#9a6ad4', label:'DnB',
-    kick: [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
-    snare:[0,0,0,0, 1,0,0,0, 0,1,0,0, 0,0,1,0],
-    hihat:[1,0,1,1, 0,1,1,0, 1,0,1,1, 0,1,0,1],
-    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-  },
-  dnb_jungle:{
-    bpm:168, swing:0.54, pulseCol:'#9a6ad4', label:'JNGL',
-    kick: [1,0,0,1, 0,0,0,0, 1,0,0,0, 0,1,0,0],
-    snare:[0,0,1,0, 0,1,0,0, 1,0,0,1, 0,0,1,0],
-    hihat:[1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1],
-    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-  },
-  dnb_liquid:{
-    bpm:172, swing:0.53, pulseCol:'#9a6ad4', label:'LQID',
-    kick: [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
-    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-    hihat:[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-    ohhat:[0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1],
-    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-  },
-  dnb_step:{
-    bpm:178, swing:0.50, pulseCol:'#9a6ad4', label:'STEP',
-    kick: [1,0,1,0, 0,0,0,1, 1,0,0,0, 0,1,0,0],
-    snare:[0,0,0,0, 1,0,0,1, 0,0,1,0, 1,0,0,0],
-    hihat:[1,1,1,1, 0,1,1,0, 1,1,1,0, 1,0,1,1],
-    ohhat:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-  },
-};
 let autoPhase=0;      // 0..1 animation phase between chords
 let autoPhaseDelta=0; // per-frame increment
 let autoFrom={x:0,y:0,root:'',type:''};  // previous chord position
@@ -3083,6 +2966,10 @@ function drawFrame(){
   if(trvsModes.includes(MAP_MODE)&&dimCircleMode){
     drawDimCircleOverlay(ctx);
   }
+  // ── M5: TRITONE代理オーバーレイ（RADIAL/EXPAND/CHAIN、dom7限定）──
+  if(trvsModes.includes(MAP_MODE)&&tritoneMode){
+    drawTritoneOverlay(ctx);
+  }
   // ── F2: ガイドトーンライン可視化（PHRASE ON時 + RADIAL/EXPAND/CHAINモード）──
   // K3: EXPANDとCHAINもnodeHitsが有効なのでガイドトーンを表示可能
   const gtModes=['radial','expand','chain'];
@@ -3093,8 +2980,7 @@ function drawFrame(){
   }
   // ── AUTO PLAY overlay (always on top) ──
   drawAutoOverlay(ctx);
-  // ── F4: GROOVE パルスオーバーレイ ──
-  if(grooveMode || kickMode) drawGroovePulse(ctx);
+  // ── BEACH GROOVE パルスオーバーレイ ──
   if(_beachOn && typeof drawBeachPulse === 'function') drawBeachPulse(ctx);
 
   // ── Loop Beach: ガラスのかけら（FXより下に描く） ──
@@ -3205,6 +3091,10 @@ function initCanvas(){
     // DIMI: ディミニッシュサークルノードのヒットテスト
     if(dimCircleMode && ['radial','expand','chain'].includes(MAP_MODE)){
       if(hitTestDimCircle(x,y)) return;
+    }
+    // M5: TRITONE代理ノードのヒットテスト
+    if(tritoneMode && ['radial','expand','chain'].includes(MAP_MODE)){
+      if(hitTestTritone(x,y)) return;
     }
     const hit=hitNode(x,y);
     if(hit){
@@ -3406,9 +3296,22 @@ function getChordEmotionVec(root, type){
     const diff=Math.abs(ivs[i+1]-ivs[i]);
     if(diff===1||diff===2)cluster+=0.08;
   }
-  const tensionFinal=Math.min(1.0, tension+cluster);
+  let tensionFinal=Math.min(1.0, tension+cluster);
+  let brightFinal=bright;
+  let resolFinal=resol;
 
-  return{brightness:bright, tension:tensionFinal, resolution:resol};
+  // ── B-1: SLスライダーのバイアスを反映（自分の感情がコード色に映る）──
+  // bright SL  → brightness を ±0.20 シフト
+  // tense SL   → tension    を ±0.20 シフト
+  // warm SL    → resolution を ±0.15 シフト（暖かさ＝解決感の余裕）
+  if(typeof SL !== 'undefined'){
+    const _slGet = id => SL.find(s => s.id === id)?.val ?? 0;
+    brightFinal   = Math.max(0, Math.min(1, brightFinal   + _slGet('bright') * 0.20));
+    tensionFinal  = Math.max(0, Math.min(1, tensionFinal  + _slGet('tense')  * 0.20));
+    resolFinal    = Math.max(0, Math.min(1, resolFinal    + _slGet('warm')   * 0.15));
+  }
+
+  return{brightness:brightFinal, tension:tensionFinal, resolution:resolFinal};
 }
 
 // 感情ベクトル → HSLカラー文字列
@@ -6081,496 +5984,6 @@ function stopAuto(){
   dirty=true;
 }
 
-// ═══════════════════════════════════════════════════════
-// F4: GROOVE ENGINE
-// House/Techno/DnB ループ再生
-// 16ステップシーケンサー + BPMSync + Canvas pulse
-// ═══════════════════════════════════════════════════════
-function grooveStepMs(){
-  if(!grooveMode) return 125;
-  return (60000/autoBpm)/4; // 16分音符1ステップのms（autoBpm基準でARP/Kickと統一）
-}
-
-// K2: Groove専用打楽器合成（pluck()非依存）
-// ─ Kick: ピッチエンベロープ付きサイン波 ─
-function synthKick(ctx, t, vol){
-  // ── サブキック: 深いボディ ──
-  const sub=ctx.createOscillator();
-  const subGain=ctx.createGain();
-  sub.type='sine';
-  sub.frequency.setValueAtTime(80, t);
-  sub.frequency.exponentialRampToValueAtTime(32, t+0.12);
-  subGain.gain.setValueAtTime(vol*1.6, t);
-  subGain.gain.exponentialRampToValueAtTime(0.001, t+0.45);
-  sub.connect(subGain); subGain.connect(ctx.destination);
-  sub.start(t); sub.stop(t+0.5);
-
-  // ── クリック: アタック感 ──
-  const click=ctx.createOscillator();
-  const clickGain=ctx.createGain();
-  click.type='sine';
-  click.frequency.setValueAtTime(500, t);
-  click.frequency.exponentialRampToValueAtTime(60, t+0.015);
-  clickGain.gain.setValueAtTime(vol*1.2, t);
-  clickGain.gain.exponentialRampToValueAtTime(0.001, t+0.04);
-  // 軽い歪み
-  const dist=ctx.createWaveShaper();
-  const c=new Float32Array(256);
-  for(let i=0;i<256;i++){const x=i/128-1; c[i]=x<0?-Math.pow(-x,0.5):Math.pow(x,0.5);}
-  dist.curve=c;
-  click.connect(dist); dist.connect(clickGain); clickGain.connect(ctx.destination);
-  click.start(t); click.stop(t+0.06);
-}
-
-// ─ Snare ─
-function synthSnare(ctx, t, vol){
-  const sr=ctx.sampleRate;
-  // ── ノイズ（スナッピー成分）──
-  const bufLen=Math.ceil(sr*0.22);
-  const buf=ctx.createBuffer(1,bufLen,sr);
-  const data=buf.getChannelData(0);
-  for(let i=0;i<bufLen;i++) data[i]=(Math.random()*2-1);
-  const noise=ctx.createBufferSource(); noise.buffer=buf;
-  const bpf=ctx.createBiquadFilter();
-  bpf.type='bandpass'; bpf.frequency.value=4200; bpf.Q.value=0.7;
-  const noiseGain=ctx.createGain();
-  noiseGain.gain.setValueAtTime(vol*1.0, t);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, t+0.18);
-  noise.connect(bpf); bpf.connect(noiseGain); noiseGain.connect(ctx.destination);
-  noise.start(t); noise.stop(t+0.22);
-
-  // ── ボディトーン ──
-  const osc=ctx.createOscillator();
-  const oscGain=ctx.createGain();
-  osc.type='triangle';
-  osc.frequency.setValueAtTime(240, t);
-  osc.frequency.exponentialRampToValueAtTime(100, t+0.06);
-  oscGain.gain.setValueAtTime(vol*0.65, t);
-  oscGain.gain.exponentialRampToValueAtTime(0.001, t+0.10);
-  osc.connect(oscGain); oscGain.connect(ctx.destination);
-  osc.start(t); osc.stop(t+0.12);
-}
-
-// ─ Hi-hat（金属的倍音構造）─
-function synthHihat(ctx, t, vol, open){
-  const decay=open?0.32:0.06;
-  // 6つの正弦波を混合して金属的なサウンドに
-  const freqs=[205.7, 313.1, 370.2, 458.3, 686.5, 861.2];
-  const gainNode=ctx.createGain();
-  gainNode.gain.setValueAtTime(vol*(open?0.30:0.22), t);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, t+decay);
-  // HPF
-  const hpf=ctx.createBiquadFilter();
-  hpf.type='highpass'; hpf.frequency.value=7000; hpf.Q.value=1.0;
-  gainNode.connect(hpf); hpf.connect(ctx.destination);
-  freqs.forEach(f=>{
-    const o=ctx.createOscillator();
-    o.type='square'; o.frequency.value=f;
-    o.connect(gainNode);
-    o.start(t); o.stop(t+decay+0.02);
-  });
-}
-
-// ─ Clap（複数ノイズバースト）─
-function synthClap(ctx, t, vol){
-  const sr=ctx.sampleRate;
-  // 3つの短いバーストを重ねてリアルなクラップ感に
-  [0, 0.008, 0.018].forEach((offset, i)=>{
-    const bufLen=Math.ceil(sr*0.12);
-    const buf=ctx.createBuffer(1,bufLen,sr);
-    const data=buf.getChannelData(0);
-    for(let j=0;j<bufLen;j++) data[j]=(Math.random()*2-1);
-    const noise=ctx.createBufferSource(); noise.buffer=buf;
-    const bpf=ctx.createBiquadFilter();
-    bpf.type='bandpass'; bpf.frequency.value=1800+i*400; bpf.Q.value=0.9;
-    const g=ctx.createGain();
-    const at=t+offset;
-    g.gain.setValueAtTime(vol*(0.9-i*0.15), at);
-    g.gain.exponentialRampToValueAtTime(0.001, at+0.10);
-    noise.connect(bpf); bpf.connect(g); g.connect(ctx.destination);
-    noise.start(at); noise.stop(at+0.14);
-  });
-}
-
-function playGrooveBeat(ctx, type, hz, t, vol){
-  if(type==='kick')       synthKick(ctx,t,vol);
-  else if(type==='snare') synthSnare(ctx,t,vol);
-  else if(type==='hihat') synthHihat(ctx,t,vol,false);
-  else if(type==='ohhat') synthHihat(ctx,t,vol,true);
-  else if(type==='clap')  synthClap(ctx,t,vol);
-}
-
-// 旧grooveTick_step: _grooveScheduleに置き換え済み（互換性のため残す）
-function grooveTick_step(){
-  // 新スケジューラー（_grooveSchedule）が起動していない場合のみ実行
-  if(_grooveScheduleTimer) return;
-  if(!grooveMode){ grooveTimer = null; return; }
-  _grooveSchedule();
-}
-
-// ── Groove AudioContextスケジューラー ──
-// setTimeoutの代わりにAudioContext.currentTimeベースのルックアヘッドで
-// タイミング精度を大幅改善する
-let _grooveNextBeat = 0;       // 次ステップのAudioContext時刻
-let _grooveLookAheadMs = 80;   // ルックアヘッド幅（ms）
-let _grooveScheduleMs = 20;    // ポーリング間隔（ms）
-let _grooveScheduleTimer = null;
-
-function _grooveSchedule(){
-  if(!grooveMode){ _grooveScheduleTimer = null; return; }
-  const audioCtx = safeGetCtx();
-  if(!audioCtx){ _grooveScheduleTimer = setTimeout(_grooveSchedule, _grooveScheduleMs); return; }
-  safeResume(audioCtx);
-
-  const lookAhead = audioCtx.currentTime + (_grooveLookAheadMs / 1000);
-  const preset = GROOVE_PRESETS[grooveMode];
-  const stepSec = grooveStepMs() / 1000;
-
-  while(_grooveNextBeat < lookAhead){
-    const t = _grooveNextBeat;
-    const step = grooveTick % 16;
-
-    // スウィング: 奇数ステップを少し遅らせる
-    const swingDelay = (step % 2 === 1)
-      ? stepSec * (preset.swing - 0.5) * 0.8
-      : 0;
-    const tSwing = t + swingDelay;
-
-    const ri = ni(S.root);
-    const rootHz = midi2hz(36 + ri);
-
-    if(preset.kick[step]){
-      groovePulse = 1.0;
-      playGrooveBeat(audioCtx, 'kick', rootHz, tSwing, 0.88);
-      dirty = true;
-    }
-    if(preset.snare[step]){
-      playGrooveBeat(audioCtx, 'snare', rootHz, tSwing, 0.70);
-      dirty = true;
-    }
-    if(preset.hihat[step]){
-      playGrooveBeat(audioCtx, 'hihat', rootHz, tSwing, 0.42);
-    }
-    if(preset.ohhat && preset.ohhat[step]){
-      playGrooveBeat(audioCtx, 'ohhat', rootHz, tSwing, 0.38);
-    }
-    if(preset.clap && preset.clap[step]){
-      playGrooveBeat(audioCtx, 'clap', rootHz, tSwing, 0.55);
-    }
-
-    // PHRASEがGROOVEスタイルのとき、4ステップごとにトリガー
-    if(phraseMode !== 'off' && phraseStyle === 'groove' && step % 4 === 0 && !phraseIsPlaying){
-      if(FEATURES.phraseEngine) triggerPhrase(S.root, S.type);
-    }
-
-    grooveTick++;
-    _grooveNextBeat += stepSec;
-  }
-
-  _grooveScheduleTimer = setTimeout(_grooveSchedule, _grooveScheduleMs);
-}
-
-function startGroove(mode){
-  // 同じモードをタップ → OFFトグル
-  if(grooveMode===mode){
-    stopGroove();
-    return;
-  }
-  stopGroove();
-  grooveMode=mode;
-  grooveTick=0;
-  groovePulse=0;
-
-  const preset=GROOVE_PRESETS[mode];
-  autoBpm=preset.bpm;
-  updateBpmDisplay(autoBpm);
-  updateDelayTime();
-  // ARP再起動: 新BPMのグリッドに再スナップ（Grooveとの同期）
-  if(arpOn) startArpScheduler();
-
-  if(phraseMode!=='off'){
-    phraseStyle='groove';
-    document.querySelectorAll('.phrase-style-btn').forEach(b=>{
-      b.classList.toggle('on',b.dataset.style==='groove');
-    });
-  }
-
-  document.querySelectorAll('.groove-btn').forEach(b=>{
-    b.classList.toggle('on',b.dataset.groove===mode);
-  });
-
-  // AudioContextベースのスケジューラーを起動
-  const audioCtx = safeGetCtx();
-  if(audioCtx){
-    safeResume(audioCtx, ()=>{
-      // マスタークロック: 未設定ならここで起点を設定
-      if(_masterClockOrigin === null){
-        _masterClockOrigin = audioCtx.currentTime;
-      }
-      // マスタークロックから次の16分音符グリッドにスナップ
-      const _sixteenth = (60 / autoBpm) / 4;
-      const _elapsed = audioCtx.currentTime - _masterClockOrigin;
-      const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-      _grooveNextBeat = _masterClockOrigin + _gridPos;
-      _grooveSchedule();
-      // AutoPlay再スケジュール: 新BPMの次の1小節グリッドに再スナップ
-      if(autoPlay){
-        clearTimeout(autoTimer);
-        const _bar = (60 / autoBpm) * 4;
-        const _elapsedBar = audioCtx.currentTime - _masterClockOrigin;
-        const _nextBar = Math.ceil(_elapsedBar / _bar) * _bar;
-        const _delayMs = (_masterClockOrigin + _nextBar - audioCtx.currentTime) * 1000;
-        autoTimer = setTimeout(autoStep, Math.max(0, _delayMs));
-      }
-    });
-  } else {
-    _grooveNextBeat = 0;
-    _grooveSchedule();
-  }
-  dirty=true;
-}
-
-function stopGroove(){
-  if(_grooveScheduleTimer){ clearTimeout(_grooveScheduleTimer); _grooveScheduleTimer = null; }
-  if(grooveTimer){ clearTimeout(grooveTimer); grooveTimer = null; } // 旧タイマーも念のため
-  grooveMode=null;
-}
-
-// ════════════════════════════════════════════════════════
-// KICK PATTERNS — キックのみ仮実装（Groove再設計まで）
-// House / Amapiano / Gqom / Latin Trap
-// 8小節128ステップ、bar4-beat4ゴースト、bar8-beat4アクセント
-// 32小節周期でタイミング微変化
-// ════════════════════════════════════════════════════════
-
-let kickMode = null;
-let _kickTick = 0;          // 絶対ステップ数（リセットしない）
-let _kickNextBeat = 0;
-let _kickScheduleTimer = null;
-let _kickPulse = 0;         // 描画用パルス（0〜1）
-const _KICK_LOOK_AHEAD_MS = 80;
-const _KICK_SCHEDULE_MS   = 20;
-
-const _KICK_LABELS = {
-  pt1: 'HOUSE', pt2: 'AMAPIANO', pt3: 'GQOM', pt4: 'L.TRAP'
-};
-const _KICK_COL = 'rgba(128,212,255,0.85)';
-
-// ── キック発音: ジャンル別パラメーター ──
-function _playKickHit(actx, t, vol, genre) {
-  const P = {
-    pt1: { s:82, e:34, pt:0.10, sv:1.5, cv:1.1, dc:0.42 }, // House: tight
-    pt2: { s:76, e:28, pt:0.14, sv:1.7, cv:0.9, dc:0.55 }, // Amapiano: deep
-    pt3: { s:70, e:24, pt:0.18, sv:1.8, cv:0.8, dc:0.62 }, // Gqom: darkest
-    pt4: { s:80, e:38, pt:0.22, sv:1.6, cv:1.0, dc:0.58 }, // L.Trap: 808-like
-  };
-  const p = P[genre] || P.pt1;
-  // Sub: ピッチエンベロープ付きサイン波
-  const sub = actx.createOscillator(), subG = actx.createGain();
-  sub.type = 'sine';
-  sub.frequency.setValueAtTime(p.s, t);
-  sub.frequency.exponentialRampToValueAtTime(p.e, t + p.pt);
-  subG.gain.setValueAtTime(vol * p.sv, t);
-  subG.gain.exponentialRampToValueAtTime(0.001, t + p.dc);
-  sub.connect(subG); subG.connect(getMasterBus(actx));
-  sub.start(t); sub.stop(t + p.dc + 0.05);
-  // Click: アタックトランジェント
-  const clk = actx.createOscillator(), clkG = actx.createGain();
-  clk.type = 'sine';
-  clk.frequency.setValueAtTime(460, t);
-  clk.frequency.exponentialRampToValueAtTime(52, t + 0.012);
-  clkG.gain.setValueAtTime(vol * p.cv, t);
-  clkG.gain.exponentialRampToValueAtTime(0.001, t + 0.032);
-  clk.connect(clkG); clkG.connect(getMasterBus(actx));
-  clk.start(t); clk.stop(t + 0.05);
-}
-
-// ── 128ステップパターン生成（8小節 × 16ステップ）──
-// 値: null=休符 / Number=velocity (0.0〜1.2)
-function _buildKickPattern(mode) {
-  const pat = new Array(128).fill(null);
-  const h = (bar, st, vol) => { pat[bar * 16 + st] = vol; };
-
-  if (mode === 'pt1') { // House: 4-on-the-floor
-    for (let b = 0; b < 8; b++) {
-      h(b, 0, 0.88); h(b, 4, 0.82); h(b, 8, 0.85); h(b, 12, 0.80);
-    }
-    h(3, 14, 0.22);  // bar4 beat4後: ゴーストキック
-    pat[3*16+12] = 1.10; // bar4 beat4: アクセント（4拍目強調）
-    pat[7*16+12] = 1.15; // bar8 beat4: 最大アクセント
-
-  } else if (mode === 'pt2') { // Amapiano: log drum的シンコペーション
-    for (let b = 0; b < 8; b++) {
-      h(b,  0, 0.85); h(b,  2, 0.62);
-      h(b,  8, 0.80); h(b, 13, 0.68);
-    }
-    h(3, 14, 0.20);       // bar4 beat4後: ゴースト
-    pat[7*16+12] = 1.10;  // bar8 beat4: アクセント
-
-  } else if (mode === 'pt3') { // Gqom: dark minimal
-    for (let b = 0; b < 8; b++) {
-      h(b, 0, 0.90);
-      if (b % 2 === 0) { h(b, 7, 0.68); h(b, 8, 0.78); }
-      else             { h(b, 4, 0.62); h(b, 15, 0.58); }
-    }
-    h(3, 14, 0.20);       // bar4 beat4後: ゴースト
-    pat[7*16+12] = 1.12;  // bar8 beat4: アクセント
-
-  } else if (mode === 'pt4') { // Latin Trap: trap + clave
-    for (let b = 0; b < 8; b++) {
-      h(b,  0, 0.88); h(b,  6, 0.70);
-      if (b % 2 === 0) { h(b, 9,  0.62); }
-      else             { h(b, 12, 0.75); }
-    }
-    h(3, 14, 0.22);       // bar4 beat4後: ゴースト
-    pat[7*16+12] = 1.10;  // bar8 beat4: アクセント
-  }
-
-  return pat;
-}
-
-let _kickPattern = null;
-
-function startKick(mode) {
-  if (kickMode === mode) { stopKick(); return; }
-  stopKick();
-  kickMode = mode;
-  _kickTick = 0;
-  _kickPattern = _buildKickPattern(mode);
-
-  const actx = safeGetCtx();
-  if (!actx) return;
-  safeResume(actx, () => {
-    if (_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
-    // ARP/Grooveと同じ式でグリッドにスナップ（F: クロック統一）
-    const _sixteenth = (60 / autoBpm) / 4;
-    const _elapsed = actx.currentTime - _masterClockOrigin;
-    const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-    _kickNextBeat = _masterClockOrigin + _gridPos;
-    _kickSchedule();
-  });
-  document.querySelectorAll('.kick-btn').forEach(b =>
-    b.classList.toggle('on', b.dataset.kick === mode)
-  );
-  dirty = true;
-}
-
-function stopKick() {
-  if (_kickScheduleTimer) { clearTimeout(_kickScheduleTimer); _kickScheduleTimer = null; }
-  kickMode = null; _kickPattern = null; _kickPulse = 0;
-  document.querySelectorAll('.kick-btn').forEach(b => b.classList.remove('on'));
-  dirty = true;
-}
-
-function _kickSchedule() {
-  if (!kickMode) { _kickScheduleTimer = null; return; }
-  const actx = safeGetCtx();
-  if (!actx) { _kickScheduleTimer = setTimeout(_kickSchedule, _KICK_SCHEDULE_MS); return; }
-  safeResume(actx);
-
-  const lookAhead = actx.currentTime + _KICK_LOOK_AHEAD_MS / 1000;
-  const stepSec   = 60 / autoBpm / 4; // 1/16音符・BPM追従
-
-  while (_kickNextBeat < lookAhead) {
-    const step128 = _kickTick % 128; // 8小節内位置
-    const step512 = _kickTick % 512; // 32小節内位置
-
-    // Amapiano: 軽いスウィング（奇数ステップを6%遅らせる）
-    let tOff = 0;
-    if (kickMode === 'pt2' && step128 % 2 === 1) tOff = stepSec * 0.06;
-
-    // 32小節後半（bar17〜32）: タイミング微変化（±3ms）
-    if (step512 >= 256 && step128 % 4 === 2) {
-      tOff += Math.sin(step512 * 0.13) * 0.003;
-    }
-
-    const t   = _kickNextBeat + tOff;
-    const vol = _kickPattern ? _kickPattern[step128] : null;
-
-    if (vol !== null && vol > 0) {
-      _playKickHit(actx, t, vol, kickMode);
-      // 4拍頭（step=0,4,8,12 within bar）でパルス
-      if (step128 % 4 === 0) { _kickPulse = vol; dirty = true; }
-    }
-
-    _kickTick++;
-    _kickNextBeat += stepSec;
-  }
-  _kickScheduleTimer = setTimeout(_kickSchedule, _KICK_SCHEDULE_MS);
-}
-
-// Canvas上のGrooveパルスオーバーレイ描画
-function drawGroovePulse(ctx){
-  // kickMode専用ビジュアル
-  if(kickMode && !grooveMode){
-    if(_kickPulse <= 0.01) return;
-    _kickPulse *= 0.78; dirty = true;
-    const cx=L.cx, cy=L.cy;
-    const r=40+_kickPulse*22;
-    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.strokeStyle=_KICK_COL;
-    ctx.lineWidth=2;
-    ctx.globalAlpha=_kickPulse*0.45;
-    ctx.stroke();ctx.globalAlpha=1;
-    // ラベル
-    ctx.font='bold 9px DM Mono,monospace';
-    ctx.textAlign='left';ctx.textBaseline='top';
-    ctx.fillStyle=_KICK_COL;
-    ctx.globalAlpha=0.60;
-    ctx.fillText(`${_KICK_LABELS[kickMode]}  ${autoBpm} BPM`, 10, L.H-36);
-    ctx.globalAlpha=1;
-    // 8小節グリッド（128ステップ → 8つのセル）
-    const step=_kickTick%128, barIdx=Math.floor(step/16);
-    const gw=120,gh=6,gx=cx-gw/2,gy=cy+L.SR*0.82;
-    for(let i=0;i<8;i++){
-      const x=gx+i*(gw/8), w=gw/8-1;
-      const isActive=(i===barIdx);
-      const hasBar4=(i===3), hasBar8=(i===7);
-      ctx.fillStyle=isActive?_KICK_COL:hasBar4||hasBar8?'rgba(128,212,255,0.28)':'rgba(255,255,255,0.06)';
-      ctx.globalAlpha=isActive?0.9:0.6;
-      ctx.fillRect(x,gy,w,gh);
-    }
-    ctx.globalAlpha=1;
-    return;
-  }
-  if(!grooveMode||groovePulse<=0.01) return;
-  groovePulse*=0.78; // 減衰
-  dirty=true;
-
-  const preset=GROOVE_PRESETS[grooveMode];
-  const cx=L.cx, cy=L.cy;
-  const r=40+groovePulse*22;
-
-  // 中央パルスリング
-  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-  ctx.strokeStyle=preset.pulseCol;
-  ctx.lineWidth=2.5;
-  ctx.globalAlpha=groovePulse*0.55;
-  ctx.stroke();ctx.globalAlpha=1;
-
-  // ラベル（左上）
-  ctx.font='bold 9px DM Mono,monospace';
-  ctx.textAlign='left';ctx.textBaseline='top';
-  ctx.fillStyle=preset.pulseCol;
-  ctx.globalAlpha=0.65;
-  ctx.fillText(`${preset.label}  ${preset.bpm} BPM`, 10, L.H-36);
-  ctx.globalAlpha=1;
-
-  // 16ステップグリッド（中央下部）
-  const step=grooveTick%16;
-  const gw=120, gh=6, gx=cx-gw/2, gy=cy+L.SR*0.82;
-  for(let i=0;i<16;i++){
-    const x=gx+i*(gw/16);
-    const w=gw/16-1;
-    const isKick=GROOVE_PRESETS[grooveMode].kick[i];
-    const isSnare=GROOVE_PRESETS[grooveMode].snare[i];
-    const isActive=(i===step);
-    ctx.fillStyle=isActive?preset.pulseCol:isKick?'rgba(255,255,255,0.25)':isSnare?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.06)';
-    ctx.globalAlpha=isActive?0.9:0.6;
-    ctx.fillRect(x,gy,w,gh);
-  }
-  ctx.globalAlpha=1;
-}
 
 function drawAutoOverlay(ctx){
   if(!autoPlay&&autoFlash<=0.01)return;
@@ -7111,6 +6524,10 @@ function _playBeachFootstep(actx, t, vol, sceneData, stepInBar, panOverride, vol
   const bus = _beachGetMasterBus(actx);
   const vMul = (volMult ?? 1.0);
 
+  // 防御: tが過去/負の値ならcurrentTime+小マージンにクランプ
+  const _now = actx.currentTime;
+  if(!isFinite(t) || t < _now + 0.001) t = _now + 0.002;
+
   // ── 出力先: StereoPannerNode → Beach Bus ──
   const panner = (actx.createStereoPanner ? actx.createStereoPanner() : null);
   const out = panner ? panner : bus;
@@ -7197,6 +6614,9 @@ function _playBeachSand(actx, t, vol, sceneData){
   const sd  = sceneData.soundDesign.sand;
   if(!sd) return;
   const bus = _beachGetMasterBus(actx);
+  // 防御: tが過去/負の値ならcurrentTime+小マージンにクランプ
+  const _now = actx.currentTime;
+  if(!isFinite(t) || t < _now + 0.001) t = _now + 0.002;
   const durSec = (sd.burstMs ?? 50) / 1000;
   const bufLen = Math.max(1, Math.floor(actx.sampleRate * durSec));
   const buf    = actx.createBuffer(1, bufLen, actx.sampleRate);
@@ -7232,6 +6652,9 @@ function _playBeachWave(actx, t, sceneData){
   const sd = sceneData.soundDesign.wave;
   if(!sd) return;
   const bus = _beachGetMasterBus(actx);
+  // 防御: tが過去/負の値ならcurrentTime+小マージンにクランプ
+  const _now = actx.currentTime;
+  if(!isFinite(t) || t < _now + 0.001) t = _now + 0.002;
   // bright SL値で波↔風のスライダー: bright↑で高域寄り（風）、bright↓で低域寄り（波）
   const brightVal = (typeof SL !== 'undefined') ? (SL.find(s => s.id === 'bright')?.val ?? 0) : 0;
   const brightNorm = (brightVal + 1) / 2;  // 0〜1
@@ -7276,6 +6699,9 @@ function _playBeachShell(actx, t, sceneData){
   const sd = sceneData.soundDesign.shell;
   if(!sd) return;
   const bus = _beachGetMasterBus(actx);
+  // 防御: tが過去/負の値ならcurrentTime+小マージンにクランプ
+  const _now = actx.currentTime;
+  if(!isFinite(t) || t < _now + 0.001) t = _now + 0.002;
   const decay = sd.decay ?? 1.2;
   const carrier = actx.createOscillator();
   const mod     = actx.createOscillator();
@@ -7305,7 +6731,7 @@ function _playBeachShell(actx, t, sceneData){
 // ── 潮の呼吸: _beachMasterBus.gain を 4分周期で±15%変調 ──
 function _beachUpdateTideEnvelope(actx){
   if(!_beachMasterBus) return;
-  const now = actx.currentTime;
+  const now = Math.max(0.001, actx.currentTime);
   // 沈黙瞬間中はgain=0
   if(_beachSilenceUntil > now){
     _beachMasterBus.gain.setTargetAtTime(0, now, 0.005);
@@ -7391,20 +6817,23 @@ function _playBeachOtherFootstepSequence(){
   const cfg = sceneData.soundDesign.otherFootstep || { freqMult: 0.85, level: 0.30, distance: 0.55 };
   const seqLen = sceneData.behavior.otherFootstep.sequenceLen || [3, 5];
   const n = seqLen[0] + Math.floor(Math.random() * (seqLen[1] - seqLen[0] + 1));
-  const stepSec = 60 / autoBpm / 4;
+  const stepSec = 60 / Math.max(40, autoBpm || 100) / 4;
   // 別位相: 0.4〜0.7 step 遅れたタイミングからスタート
   const phaseOff = stepSec * (0.4 + Math.random() * 0.3);
   // 遠くから聞こえる: パンは片側に寄せる
   const sidePan = (Math.random() < 0.5 ? -1 : +1) * cfg.distance;
   // 別の足音音色: 周波数を少し変えて遠さを表現
-  const moddedFootstep = JSON.parse(JSON.stringify(sceneData));
+  let moddedFootstep;
+  try {
+    moddedFootstep = JSON.parse(JSON.stringify(sceneData));
+  } catch(e) { return; }
   moddedFootstep.soundDesign.footstep.baseFreq = sceneData.soundDesign.footstep.baseFreq * (cfg.freqMult ?? 0.85);
-  moddedFootstep.soundDesign.footstep.lowpassHz = (sceneData.soundDesign.footstep.lowpassHz ?? 600) * 0.7; // よりこもる
+  moddedFootstep.soundDesign.footstep.lowpassHz = (sceneData.soundDesign.footstep.lowpassHz ?? 600) * 0.7;
   safeResume(actx, () => {
-    const startT = actx.currentTime + 0.1 + phaseOff;
+    const startT = Math.max(actx.currentTime + 0.1, actx.currentTime + 0.1 + phaseOff);
     // ハーフタイム的に2拍ごと
     for(let i = 0; i < n; i++){
-      const t = startT + i * stepSec * 4;  // 2拍ごと
+      const t = startT + i * stepSec * 4;
       _playBeachFootstep(actx, t, 0.55, moddedFootstep, 0, sidePan, cfg.level ?? 0.30);
     }
   });
@@ -7424,15 +6853,18 @@ function startBeach(){
   const actx = safeGetCtx();
   if(!actx) return;
   safeResume(actx, () => {
-    if(_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
+    // _masterClockOrigin がnull/0/過去すぎる場合はcurrentTimeに再設定
+    if(_masterClockOrigin === null || _masterClockOrigin < actx.currentTime - 86400){
+      _masterClockOrigin = actx.currentTime;
+    }
     // Beach Busを起こす（潮の初期値1.0）
     _beachGetMasterBus(actx);
     _beachTideStartTime = actx.currentTime;
     _beachSilenceUntil = 0;
-    const _sixteenth = (60 / autoBpm) / 4;
-    const _elapsed   = actx.currentTime - _masterClockOrigin;
+    const _sixteenth = (60 / Math.max(40, autoBpm || 100)) / 4;
+    const _elapsed   = Math.max(0, actx.currentTime - _masterClockOrigin);
     const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-    _beachNextBeat   = _masterClockOrigin + _gridPos;
+    _beachNextBeat   = Math.max(actx.currentTime + 0.05, _masterClockOrigin + _gridPos);
     _beachSchedule();
     // 稀な飾りタイマー起動
     _scheduleBeachShell();
@@ -7470,7 +6902,12 @@ function _beachSchedule(){
   _beachUpdateTideEnvelope(actx);
 
   const lookAhead = actx.currentTime + _BEACH_LOOK_AHEAD_MS / 1000;
-  const stepSec   = 60 / autoBpm / 4;
+  const stepSec   = 60 / Math.max(40, autoBpm || 100) / 4;
+
+  // _beachNextBeat が大きく過去になった場合は現在に追従（タブ非活性復帰時など）
+  if(_beachNextBeat < actx.currentTime - 1.0){
+    _beachNextBeat = actx.currentTime + 0.05;
+  }
 
   while(_beachNextBeat < lookAhead){
     const sceneData = _beachGetSceneData();
@@ -7686,6 +7123,8 @@ function moveToChord(root,type){
   if(bartokMode) bartokAlpha=0;
   // DIMI: ディミニッシュサークルオーバーレイもコード変更時にフェードイン再開
   if(dimCircleMode) dimCircleAlpha=0;
+  // M5: トリトン代理オーバーレイもコード変更時にフェードイン再開
+  if(tritoneMode) tritoneAlpha=0;
   relCache=null; sncCache=null; invalidate();
   document.getElementById('hdr-chord').textContent=cs(root,type);
   renderPath();
@@ -8267,6 +7706,10 @@ function captureCurrentSoundState(){
       dlyMix:  dlyMix,
       dlyFb:   typeof dlyFb !== 'undefined' ? dlyFb : null,
       arpVol:  arpVol,
+    },
+    // Beach Groove状態（v15.0.0以降）
+    beach: {
+      on: (typeof _beachOn !== 'undefined') ? !!_beachOn : false
     }
   };
 }
@@ -8307,6 +7750,14 @@ function restoreSoundState(entry){
       const avEl = document.getElementById('arp-vol');
       if(avEl) avEl.value = Math.round(ss.mix.arpVol * 100);
     }
+  }
+
+  // Beach Groove状態の復元
+  if(ss.beach && typeof startBeach === 'function' && typeof stopBeach === 'function'){
+    const wantOn = !!ss.beach.on;
+    const isOn   = (typeof _beachOn !== 'undefined') ? !!_beachOn : false;
+    if(wantOn && !isOn) startBeach();
+    else if(!wantOn && isOn) stopBeach();
   }
 }
 
@@ -8371,6 +7822,14 @@ function flashSaveBtn(msg){
 // 保存済み進行をautoMode='pattern'相当でステップ再生
 let savedProgTimer=null; // 再生中タイマー（重複起動防止用）
 
+// B-2: コード進行ループ再生フラグ（SAVED PROGS と AI 進行で共通）
+let _progLoopMode=false;
+function toggleProgLoop(){
+  _progLoopMode=!_progLoopMode;
+  const btn=document.getElementById('ai-loop-btn');
+  if(btn) btn.classList.toggle('on', _progLoopMode);
+}
+
 function playSavedProg(id){
   const progs=loadSavedProgs();
   const entry=progs.find(p=>p.id===id);
@@ -8395,6 +7854,15 @@ function playSavedProg(id){
   let idx=1;
   function step(){
     if(idx>=chords.length){
+      // B-2: ループモード時は最初に戻る
+      if(_progLoopMode){
+        idx=0;
+        moveToChord(chords[0].root,chords[0].type);
+        { const c=_tlCvs(); if(c) drawSavedTimeline(c,chords,0); }
+        idx=1;
+        savedProgTimer=setTimeout(step, interval);
+        return;
+      }
       savedProgTimer=null;
       // Q2: 再生終了でハイライト解除
       { const c=_tlCvs(); if(c) drawSavedTimeline(c,chords,-1); }
@@ -8408,6 +7876,9 @@ function playSavedProg(id){
     savedProgTimer=setTimeout(step, interval);
   }
   if(chords.length>1){
+    savedProgTimer=setTimeout(step, interval);
+  } else if(_progLoopMode){
+    // 1コードのみだがループ ON → 同じコードを繰り返す
     savedProgTimer=setTimeout(step, interval);
   }
 }
@@ -8821,14 +8292,21 @@ function playAiProgression(){
   let idx=1;
   function step(){
     if(idx>=chords.length){
+      // B-2: ループモード時は最初に戻る
+      if(_progLoopMode){
+        idx=0;
+        moveToChord(chords[0].root,chords[0].type);
+        drawTensionTimeline(chords, 0);
+        idx=1;
+        savedProgTimer=setTimeout(step,interval);
+        return;
+      }
       savedProgTimer=null;
-      // O3: 再生終了でハイライト解除
       drawTensionTimeline(chords, -1);
       return;
     }
     const c=chords[idx];
     moveToChord(c.root,c.type);
-    // O3: 再生中コードをハイライト
     drawTensionTimeline(chords, idx);
     idx++;
     savedProgTimer=setTimeout(step,interval);
@@ -8870,6 +8348,15 @@ function playAiSusProgression(){
   let idx=1;
   function step(){
     if(idx>=susChords.length){
+      // B-2: ループモード時は最初に戻る
+      if(_progLoopMode){
+        idx=0;
+        moveToChord(susChords[0].root,susChords[0].type);
+        drawTensionTimeline(aiLastChords,0);
+        idx=1;
+        savedProgTimer=setTimeout(step,interval);
+        return;
+      }
       savedProgTimer=null;
       aiSusPlaying=false;
       if(susBtn){susBtn.textContent='→ SUS';susBtn.classList.remove('playing');}
@@ -10631,6 +10118,122 @@ let dimCircleMode=false;
 let dimCircleAlpha=0; // フェードイン用 0.0〜1.0
 let dimCircleHits=[]; // タップ判定用
 
+// ── M5: TRITONE SUBSTITUTION (TRIT) ──
+// ドミナント7thコードを選択中のとき、トリトン代理コード（root +6半音のdom7）を表示
+let tritoneMode=false;
+let tritoneAlpha=0;    // フェードイン用 0.0〜1.0
+let tritoneHits=[];    // タップ判定用 [{x, y, r, root, type}]
+
+function toggleTritone(){
+  tritoneMode=!tritoneMode;
+  const btn=document.getElementById('tritone-btn');
+  if(btn) btn.classList.toggle('on',tritoneMode);
+  if(tritoneMode) tritoneAlpha=0;
+  else tritoneAlpha=0;
+  invalidate();
+}
+
+// 現在コードのトリトン代理を計算
+function computeTritoneSub(root, type){
+  // dom7以外は対象外
+  if(type!=='dom7') return null;
+  const ri=ni(root);
+  const subRi=(ri+6)%12;
+  return { root: NOTES[subRi], type: 'dom7' };
+}
+
+// トリトン代理オーバーレイ描画
+function drawTritoneOverlay(ctx){
+  // フェードイン
+  tritoneAlpha=Math.min(1, tritoneAlpha + 0.10);
+  if(tritoneAlpha < 0.999) dirty = true;
+  const alpha = tritoneAlpha;
+
+  tritoneHits = [];
+
+  // dom7コードでない場合は何も描かない（ボタンの dim 表示で示唆）
+  const sub = computeTritoneSub(S.root, S.type);
+  const btn = document.getElementById('tritone-btn');
+  if(!sub){
+    if(btn) btn.classList.add('dim');
+    return;
+  }
+  if(btn) btn.classList.remove('dim');
+
+  // 現在コードのノード座標を取得
+  const curNode = (nodeHits && nodeHits.length)
+    ? nodeHits.find(n => n.root === S.root && n.type === S.type)
+    : null;
+  if(!curNode) return;
+
+  // トリトン代理コードの配置位置: 現在コードノードから中央を介した反対側
+  const dx0 = curNode.x - L.cx;
+  const dy0 = curNode.y - L.cy;
+  const dist = Math.sqrt(dx0*dx0 + dy0*dy0);
+  if(dist < 5) return;
+  // 同じ半径で反対側に配置
+  const subX = L.cx - dx0;
+  const subY = L.cy - dy0;
+  const r    = 22;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // ── 弧の接続線（現在コード ← → 代理コード） ──
+  ctx.strokeStyle = 'rgba(212,130,58,0.55)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  // 緩やかな弧で結ぶ
+  const midX = (curNode.x + subX) * 0.5;
+  const midY = (curNode.y + subY) * 0.5;
+  // 中心と反対方向に少し膨らませる
+  const nx = -(subY - curNode.y);
+  const ny =  (subX - curNode.x);
+  const nlen = Math.sqrt(nx*nx + ny*ny) || 1;
+  const bulge = 30;
+  const ctrlX = midX + (nx/nlen) * bulge;
+  const ctrlY = midY + (ny/nlen) * bulge;
+  ctx.beginPath();
+  ctx.moveTo(curNode.x, curNode.y);
+  ctx.quadraticCurveTo(ctrlX, ctrlY, subX, subY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── 中央に⇄シンボル ──
+  ctx.font = 'bold 10px DM Mono,monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(212,130,58,0.85)';
+  ctx.fillText('⇄', ctrlX, ctrlY);
+
+  // ── 代理コードノード描画 ──
+  ctx.fillStyle = 'rgba(212,130,58,0.18)';
+  ctx.strokeStyle = '#d4823a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(subX, subY, r, 0, Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  // ラベル
+  ctx.font = 'bold 11px DM Mono,monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#d4823a';
+  ctx.fillText(cs(sub.root, sub.type), subX, subY - 2);
+
+  // 説明
+  ctx.font = '7px DM Mono,monospace';
+  ctx.fillStyle = 'rgba(212,130,58,0.70)';
+  ctx.fillText('TRITONE', subX, subY + r + 8);
+  ctx.fillText('SUB', subX, subY + r + 16);
+
+  ctx.restore();
+
+  // タップ判定登録
+  tritoneHits.push({ x: subX, y: subY, r: r + 12, root: sub.root, type: sub.type });
+}
+
 function toggleTriadSpace(){
   triadSpaceMode=!triadSpaceMode;
   const btn=document.getElementById('triad-space-btn');
@@ -11199,6 +10802,19 @@ function drawDimCircleOverlay(ctx){
 function hitTestDimCircle(tx,ty){
   if(!dimCircleMode) return false;
   for(const h of dimCircleHits){
+    const dx=tx-h.x, dy=ty-h.y;
+    if(dx*dx+dy*dy<=(h.r+6)*(h.r+6)){
+      moveToChord(h.root,h.type);
+      return true;
+    }
+  }
+  return false;
+}
+
+// M5: TRITONE代理ノードのヒットテスト
+function hitTestTritone(tx,ty){
+  if(!tritoneMode) return false;
+  for(const h of tritoneHits){
     const dx=tx-h.x, dy=ty-h.y;
     if(dx*dx+dy*dy<=(h.r+6)*(h.r+6)){
       moveToChord(h.root,h.type);
@@ -14498,6 +14114,24 @@ function toggleSynthPanel(){
   if(synthPanelOpen) initSynthUI();
 }
 
+// ss-cur タップ: SYNTHパネルを開いて現在のSceneピルへスクロール
+function goToScenePanel(){
+  // 既に開いていなければ開く
+  if(!synthPanelOpen) toggleSynthPanel();
+  // 現在のSceneピルへスクロール（少し遅延・open animation後）
+  setTimeout(() => {
+    const cur = (typeof sceneCurrentName !== 'undefined') ? sceneCurrentName : 'plain';
+    const pill = document.querySelector(`.scene-pill[data-scene="${cur}"]`);
+    if(pill){
+      try { pill.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }); } catch(e){}
+      // 視覚的なハイライト（短いフラッシュ）
+      pill.style.transition = 'box-shadow .2s';
+      pill.style.boxShadow = '0 0 0 3px rgba(232,197,71,0.6)';
+      setTimeout(() => { pill.style.boxShadow = ''; }, 700);
+    }
+  }, 280);
+}
+
 function togglePad(){
   // PADは廃止（synthPanelOpenで制御）
 }
@@ -14533,7 +14167,7 @@ function _scheduleArpMapAction(action){
   if(_arpPendingTimer){clearTimeout(_arpPendingTimer);_arpPendingTimer=null;}
   _arpPendingAction=null;
 
-  const isSync = grooveMode!==null || autoPlay;
+  const isSync = (typeof _beachOn !== 'undefined' && _beachOn) || autoPlay;
   if(!isSync){
     // Groove/Auto停止中: 即時実行
     _executeArpMapAction(action);
@@ -15612,8 +15246,8 @@ function playScene(root, type){
     if((arpOn || arpSolo) && typeof updateArpChord === 'function') updateArpChord(root, type);
   };
 
-  // Groove再生中: 次の1拍頭（4分音符）までコードチェンジをクオンタイズ
-  if(grooveMode && _masterClockOrigin !== null && actx.state === 'running'){
+  // BEACH再生中: 次の1拍頭（4分音符）までコードチェンジをクオンタイズ
+  if((typeof _beachOn !== 'undefined' && _beachOn) && _masterClockOrigin !== null && actx.state === 'running'){
     const _beat = 60 / autoBpm; // 1拍（秒）
     const _elapsed = actx.currentTime - _masterClockOrigin;
     const _nextBeat = Math.ceil(_elapsed / _beat) * _beat;
@@ -18407,16 +18041,6 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
   autoStepIdx=0;
 });
 
-// F4: Grooveプリセットボタン
-document.querySelectorAll('.groove-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>startGroove(btn.dataset.groove));
-});
-
-// Kickパターンボタン（FEATURES.legacyKick=falseでUI非表示・このコードは保温）
-document.querySelectorAll('.kick-btn[data-kick]').forEach(btn=>{
-  btn.addEventListener('click',()=>startKick(btn.dataset.kick));
-});
-
 // BEACH トグルボタン（新Beach Grooveエンジン）
 (function(){
   const btn = document.getElementById('beach-toggle-btn');
@@ -18459,9 +18083,6 @@ document.querySelectorAll('.kick-btn[data-kick]').forEach(btn=>{
     // ディレイタイムをBPMに追従
     updateDelayTime();
     // ARP動作中: arpNextBeatが過去になっていた場合のみ補正
-    // ※ ディレイ更新はupdateDelayTime()で完結
-    // ※ buildDelayNodes再構築はバッファフラッシュによるポップノイズの原因のため除去
-    // ③ arpScheduleTimer → arpOn で判断（setTimeoutはハンドルが一瞬nullになるため）
     if(arpOn){
       const actx=safeGetCtx();
       if(actx){
@@ -18473,32 +18094,20 @@ document.querySelectorAll('.kick-btn[data-kick]').forEach(btn=>{
         }
       }
     }
-    // Kick動作中: _kickNextBeatをARPと同じグリッドへ再スナップ（F: クロック統一）
-    if(kickMode && _kickScheduleTimer){
+    // BEACH動作中: _beachNextBeat を再スナップ
+    if(typeof _beachOn !== 'undefined' && _beachOn && _beachScheduleTimer){
       const actx=safeGetCtx();
       if(actx && _masterClockOrigin !== null){
-        if(_kickNextBeat < actx.currentTime){
+        if(_beachNextBeat < actx.currentTime){
           const _sixteenth = (60 / autoBpm) / 4;
           const _elapsed = actx.currentTime - _masterClockOrigin;
           const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-          _kickNextBeat = _masterClockOrigin + _gridPos;
-        }
-      }
-    }
-    // Groove動作中: _grooveNextBeatを次の16分音符グリッドへ再スナップ（④ BPM変更同期）
-    if(grooveMode && _grooveScheduleTimer){
-      const actx=safeGetCtx();
-      if(actx && _masterClockOrigin !== null){
-        if(_grooveNextBeat < actx.currentTime){
-          const _sixteenth = (60 / autoBpm) / 4;
-          const _elapsed = actx.currentTime - _masterClockOrigin;
-          const _gridPos = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-          _grooveNextBeat = _masterClockOrigin + _gridPos;
+          _beachNextBeat = _masterClockOrigin + _gridPos;
         }
       }
     }
   }
-  // F4: グローバル公開（grooveから呼び出せるように）
+  // グローバル公開
   window.updateBpmDisplay=function(bpm){ setBpm(bpm); };
   // ── ダイヤルドラッグ操作（上ドラッグ=BPM増・下ドラッグ=BPM減）──
   {
