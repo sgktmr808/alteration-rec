@@ -6643,7 +6643,11 @@ const BEACH_GROOVE_DEFAULT = {
           bellLevel: 0.10,
           humidity: 0.35,
           stereoSwing: 0.4
-        }
+        },
+        sand: { filterFreq: 2200, filterQ: 1.0, burstMs: 50, level: 0.06 },
+        wave: { freqLow: 250, freqHigh: 3500, swellMs: 1800, level: 0.10, brightBias: 0.6 },
+        shell: { freq: 3200, decay: 1.2, level: 0.04 },
+        otherFootstep: { freqMult: 0.85, level: 0.30, distance: 0.55 }
       },
       behavior: {
         footstep: {
@@ -6654,7 +6658,11 @@ const BEACH_GROOVE_DEFAULT = {
           syncopationDragMin: 0.10,
           syncopationDragMax: 0.35,
           swingAmount: 0
-        }
+        },
+        sand:  { enabled: false },
+        wave:  { enabled: true, barProb: 0.18 },
+        shell: { enabled: true, intervalSecMin: 60,  intervalSecMax: 180 },
+        otherFootstep: { enabled: true, intervalSecMin: 120, intervalSecMax: 300, sequenceLen: [3,5] }
       },
       footstepPatterns: {
         stopped: [],
@@ -6703,7 +6711,11 @@ const BEACH_GROOVE_DEFAULT = {
           bellLevel: 0.05,
           humidity: 0.45,
           stereoSwing: 0.5
-        }
+        },
+        sand: { filterFreq: 1800, filterQ: 0.9, burstMs: 60, level: 0.07 },
+        wave: { freqLow: 220, freqHigh: 2800, swellMs: 2000, level: 0.10, brightBias: 0.45 },
+        shell: { freq: 2800, decay: 1.4, level: 0.05 },
+        otherFootstep: { freqMult: 0.85, level: 0.32, distance: 0.60 }
       },
       behavior: {
         footstep: {
@@ -6714,7 +6726,11 @@ const BEACH_GROOVE_DEFAULT = {
           syncopationDragMin: 0.15,
           syncopationDragMax: 0.40,
           swingAmount: 0
-        }
+        },
+        sand:  { enabled: true,  baseDensity: 0.15, glitchProb: 0.05 },
+        wave:  { enabled: true,  barProb: 0.20 },
+        shell: { enabled: true,  intervalSecMin: 80,  intervalSecMax: 200 },
+        otherFootstep: { enabled: true, intervalSecMin: 120, intervalSecMax: 300, sequenceLen: [3,5] }
       },
       footstepPatterns: {
         stopped: [],
@@ -6763,7 +6779,11 @@ const BEACH_GROOVE_DEFAULT = {
           bellLevel: 0.13,
           humidity: 0.40,
           stereoSwing: 0.45
-        }
+        },
+        sand: { filterFreq: 2800, filterQ: 1.1, burstMs: 55, level: 0.07 },
+        wave: { freqLow: 200, freqHigh: 2400, swellMs: 2200, level: 0.10, brightBias: 0.40 },
+        shell: { freq: 2600, decay: 1.6, level: 0.05 },
+        otherFootstep: { freqMult: 0.90, level: 0.32, distance: 0.55 }
       },
       behavior: {
         footstep: {
@@ -6774,7 +6794,11 @@ const BEACH_GROOVE_DEFAULT = {
           syncopationDragMin: 0.12,
           syncopationDragMax: 0.30,
           swingAmount: 0.30
-        }
+        },
+        sand:  { enabled: true,  baseDensity: 0.35, glitchProb: 0.08, applySwing: true },
+        wave:  { enabled: true,  barProb: 0.15 },
+        shell: { enabled: true,  intervalSecMin: 120, intervalSecMax: 250 },
+        otherFootstep: { enabled: true, intervalSecMin: 150, intervalSecMax: 350, sequenceLen: [3,5] }
       },
       footstepPatterns: {
         stopped: [],
@@ -6823,7 +6847,10 @@ const BEACH_GROOVE_DEFAULT = {
           bellLevel: 0.08,
           humidity: 0.30,
           stereoSwing: 0.40
-        }
+        },
+        sand: { filterFreq: 3200, filterQ: 1.0, burstMs: 45, level: 0.08 },
+        wave: { freqLow: 180, freqHigh: 2800, swellMs: 1500, level: 0.10, brightBias: 0.50 },
+        otherFootstep: { freqMult: 0.90, level: 0.30, distance: 0.50 }
       },
       behavior: {
         footstep: {
@@ -6834,7 +6861,11 @@ const BEACH_GROOVE_DEFAULT = {
           syncopationDragMin: 0.10,
           syncopationDragMax: 0.30,
           swingAmount: 0
-        }
+        },
+        sand:  { enabled: true,  baseDensity: 0.55, glitchProb: 0.10 },
+        wave:  { enabled: true,  barProb: 0.25 },
+        shell: { enabled: false },
+        otherFootstep: { enabled: true, intervalSecMin: 180, intervalSecMax: 400, sequenceLen: [3,5] }
       },
       footstepPatterns: {
         stopped: [],
@@ -6882,7 +6913,10 @@ const BEACH_GROOVE_DEFAULT = {
           bellLevel: 0.15,
           humidity: 0.20,
           stereoSwing: 0.30
-        }
+        },
+        sand: { filterFreq: 3800, filterQ: 1.4, burstMs: 35, level: 0.07 },
+        wave: { freqLow: 1500, freqHigh: 6000, swellMs: 1300, level: 0.07, brightBias: 0.75 },
+        otherFootstep: { freqMult: 0.95, level: 0.28, distance: 0.45 }
       },
       behavior: {
         footstep: {
@@ -6893,7 +6927,11 @@ const BEACH_GROOVE_DEFAULT = {
           syncopationDragMin: 0.08,
           syncopationDragMax: 0.20,
           swingAmount: 0
-        }
+        },
+        sand:  { enabled: true,  baseDensity: 0.45, glitchProb: 0.15 },
+        wave:  { enabled: true,  barProb: 0.10 },
+        shell: { enabled: false },
+        otherFootstep: { enabled: true, intervalSecMin: 180, intervalSecMax: 400, sequenceLen: [3,5] }
       },
       footstepPatterns: {
         stopped: [],
@@ -6941,7 +6979,10 @@ const BEACH_GROOVE_DEFAULT = {
           bellLevel: 0.11,
           humidity: 0.35,
           stereoSwing: 0.50
-        }
+        },
+        sand: { filterFreq: 2600, filterQ: 1.1, burstMs: 55, level: 0.08 },
+        wave: { freqLow: 120, freqHigh: 2200, swellMs: 2400, level: 0.12, brightBias: 0.35 },
+        otherFootstep: { freqMult: 0.85, level: 0.34, distance: 0.60 }
       },
       behavior: {
         footstep: {
@@ -6952,7 +6993,11 @@ const BEACH_GROOVE_DEFAULT = {
           syncopationDragMin: 0.10,
           syncopationDragMax: 0.30,
           swingAmount: 0
-        }
+        },
+        sand:  { enabled: true,  baseDensity: 0.50, glitchProb: 0.08 },
+        wave:  { enabled: true,  barProb: 0.25 },
+        shell: { enabled: false },
+        otherFootstep: { enabled: true, intervalSecMin: 150, intervalSecMax: 350, sequenceLen: [3,5] }
       },
       footstepPatterns: {
         stopped: [],
@@ -6980,6 +7025,10 @@ const BEACH_GROOVE_DEFAULT = {
       },
       phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.25, repeatPenalty: 0.55 }
     }
+  },
+  global: {
+    tide:    { periodSec: 240, depth: 0.15 },   // 4分周期で±15%音量変調
+    silence: { ms: 400 }                          // ガラス採取時の沈黙時間
   }
 };
 
@@ -6995,6 +7044,29 @@ let _beachLastPatternName = null;   // 連続抑制
 const _BEACH_LOOK_AHEAD_MS = 80;
 const _BEACH_SCHEDULE_MS   = 20;
 const _BEACH_PULSE_COL     = 'rgba(140,200,210,0.85)';
+
+// ── Beach Bus（全レイヤー共通の出力ゲイン: 潮の呼吸・沈黙瞬間に使う） ──
+let _beachMasterBus = null;          // GainNode
+let _beachTideStartTime = 0;         // 潮の周期計算の起点
+let _beachSilenceUntil = 0;          // この時刻まで沈黙（_beachMasterBus.gain=0）
+
+// ── コード遷移パン（A）と稀な躓き（H） ──
+let _beachPanCurrent = 0;            // -1（左）〜+1（右）、各ステップで0に減衰
+let _beachLastChordNode = null;      // {x, y} 直前コードの座標
+let _beachStumbleArmed = 0;          // 残り何ステップ stumble 候補か
+
+// ── Rare events タイマー ──
+let _beachShellTimer = null;
+let _beachOtherFootstepTimer = null;
+let _beachOtherFootstepActive = false;   // もう一人の足跡シーケンス進行中フラグ
+
+function _beachGetMasterBus(actx){
+  if(_beachMasterBus && _beachMasterBus.context === actx) return _beachMasterBus;
+  _beachMasterBus = actx.createGain();
+  _beachMasterBus.gain.value = 1.0;
+  _beachMasterBus.connect(getMasterBus(actx));
+  return _beachMasterBus;
+}
 
 // ── movingゾーン判定（Scene別に分岐可能）──
 function _beachZoneForScene(sceneName, mv){
@@ -7031,10 +7103,22 @@ function _beachSelectPattern(zoneName, sceneData){
 }
 
 // ── 足跡音色: sub sine + 軽いFM bell + filtered noise + Lowpass ──
-// stepInBar を渡してポジション別decayを決定
-function _playBeachFootstep(actx, t, vol, sceneData, stepInBar){
+// stepInBar: ポジション別decay用
+// panOverride: 指定があればこのパン値を使用（otherFootstep用）
+// volMult:     全体音量倍率（otherFootstep用、デフォルト1.0）
+function _playBeachFootstep(actx, t, vol, sceneData, stepInBar, panOverride, volMult){
   const sd  = sceneData.soundDesign.footstep;
-  const out = getMasterBus(actx);
+  const bus = _beachGetMasterBus(actx);
+  const vMul = (volMult ?? 1.0);
+
+  // ── 出力先: StereoPannerNode → Beach Bus ──
+  const panner = (actx.createStereoPanner ? actx.createStereoPanner() : null);
+  const out = panner ? panner : bus;
+  if(panner){
+    const panVal = (panOverride !== undefined) ? panOverride : _beachPanCurrent;
+    panner.pan.value = Math.max(-1, Math.min(1, panVal));
+    panner.connect(bus);
+  }
 
   // ── decayの揺らぎ：拍頭は基本長め・たまに短く / 裏は基本短く・たまに長く ──
   const isHead = (stepInBar % 4 === 0);
@@ -7056,11 +7140,10 @@ function _playBeachFootstep(actx, t, vol, sceneData, stepInBar){
   const sub  = actx.createOscillator();
   const subG = actx.createGain();
   sub.type = 'sine';
-  // 深いスイープ: 3.0倍→0.6倍 で「ドゥッ」と落ちる感触
   sub.frequency.setValueAtTime(sd.baseFreq * 3.0, t);
   sub.frequency.exponentialRampToValueAtTime(Math.max(18, sd.baseFreq * 0.6), t + decay * 0.40);
   subG.gain.setValueAtTime(0, t);
-  subG.gain.linearRampToValueAtTime(vol * 1.05, t + sd.attack);
+  subG.gain.linearRampToValueAtTime(vol * 1.05 * vMul, t + sd.attack);
   subG.gain.exponentialRampToValueAtTime(0.001, t + decay);
   sub.connect(subG); subG.connect(lp);
   sub.start(t); sub.stop(t + decay + 0.05);
@@ -7080,9 +7163,8 @@ function _playBeachFootstep(actx, t, vol, sceneData, stepInBar){
     modG.gain.value         = cFreq * sd.fmDepth;
     mod.connect(modG); modG.connect(carrier.frequency);
     bellG.gain.setValueAtTime(0, t);
-    bellG.gain.linearRampToValueAtTime(vol * bellLvl, t + sd.attack);
+    bellG.gain.linearRampToValueAtTime(vol * bellLvl * vMul, t + sd.attack);
     bellG.gain.exponentialRampToValueAtTime(0.001, t + decay * 0.55);
-    // ベル成分はLowpassをバイパスして透明感を残す
     carrier.connect(bellG); bellG.connect(out);
     carrier.start(t); carrier.stop(t + decay + 0.05);
     mod.start(t);     mod.stop(t + decay + 0.05);
@@ -7104,10 +7186,228 @@ function _playBeachFootstep(actx, t, vol, sceneData, stepInBar){
     flt.frequency.value = sd.noiseFreq ?? 180;
     flt.Q.value = 0.7;
     const nG  = actx.createGain();
-    nG.gain.value = vol * sd.noiseMix;
+    nG.gain.value = vol * sd.noiseMix * vMul;
     src.connect(flt); flt.connect(nG); nG.connect(lp);
     src.start(t); src.stop(t + noiseDur + 0.02);
   }
+}
+
+// ── 砂粒の発音: 短いフィルタードノイズバースト ──
+function _playBeachSand(actx, t, vol, sceneData){
+  const sd  = sceneData.soundDesign.sand;
+  if(!sd) return;
+  const bus = _beachGetMasterBus(actx);
+  const durSec = (sd.burstMs ?? 50) / 1000;
+  const bufLen = Math.max(1, Math.floor(actx.sampleRate * durSec));
+  const buf    = actx.createBuffer(1, bufLen, actx.sampleRate);
+  const ch     = buf.getChannelData(0);
+  for(let i = 0; i < bufLen; i++){
+    // 短いアタックと指数的減衰
+    const env = Math.exp(-i / bufLen * 3.5);
+    ch[i] = (Math.random() * 2 - 1) * env;
+  }
+  const src = actx.createBufferSource();
+  src.buffer = buf;
+  // Random pan for sand grains（中央寄り ±0.4）
+  const panner = (actx.createStereoPanner ? actx.createStereoPanner() : null);
+  const flt = actx.createBiquadFilter();
+  flt.type = 'bandpass';
+  // 周波数を少しランダム化（毎粒違う粒子感）
+  flt.frequency.value = (sd.filterFreq ?? 2800) * (0.85 + Math.random() * 0.30);
+  flt.Q.value = sd.filterQ ?? 1.0;
+  const g = actx.createGain();
+  g.gain.value = vol * (sd.level ?? 0.07);
+  src.connect(flt); flt.connect(g);
+  if(panner){
+    panner.pan.value = (Math.random() * 2 - 1) * 0.4;
+    g.connect(panner); panner.connect(bus);
+  } else {
+    g.connect(bus);
+  }
+  src.start(t); src.stop(t + durSec + 0.02);
+}
+
+// ── 波・風のスウェル: ゆっくり立ち上がりゆっくり消える ──
+function _playBeachWave(actx, t, sceneData){
+  const sd = sceneData.soundDesign.wave;
+  if(!sd) return;
+  const bus = _beachGetMasterBus(actx);
+  // bright SL値で波↔風のスライダー: bright↑で高域寄り（風）、bright↓で低域寄り（波）
+  const brightVal = (typeof SL !== 'undefined') ? (SL.find(s => s.id === 'bright')?.val ?? 0) : 0;
+  const brightNorm = (brightVal + 1) / 2;  // 0〜1
+  const bias = sd.brightBias ?? 0.5;
+  const mix = brightNorm * 0.5 + bias * 0.5; // brightと固定biasの平均
+  const freq = (sd.freqLow ?? 200) + ((sd.freqHigh ?? 3500) - (sd.freqLow ?? 200)) * mix;
+  const swellSec = (sd.swellMs ?? 1800) / 1000;
+  const lvl = sd.level ?? 0.10;
+  // 持続的なノイズソース
+  const bufLen = Math.max(1, Math.floor(actx.sampleRate * swellSec));
+  const buf    = actx.createBuffer(1, bufLen, actx.sampleRate);
+  const ch     = buf.getChannelData(0);
+  for(let i = 0; i < bufLen; i++){
+    ch[i] = Math.random() * 2 - 1;
+  }
+  const src = actx.createBufferSource();
+  src.buffer = buf;
+  const flt = actx.createBiquadFilter();
+  flt.type = 'bandpass';
+  flt.frequency.value = freq;
+  flt.Q.value = 1.3;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(lvl, t + swellSec * 0.4);
+  g.gain.exponentialRampToValueAtTime(0.001, t + swellSec);
+  // ゆっくり動くstereo pan（波が動く感触）
+  const panner = (actx.createStereoPanner ? actx.createStereoPanner() : null);
+  if(panner){
+    const startPan = (Math.random() * 2 - 1) * 0.6;
+    const endPan   = -startPan;
+    panner.pan.setValueAtTime(startPan, t);
+    panner.pan.linearRampToValueAtTime(endPan, t + swellSec);
+  }
+  src.connect(flt); flt.connect(g);
+  if(panner){ g.connect(panner); panner.connect(bus); }
+  else { g.connect(bus); }
+  src.start(t); src.stop(t + swellSec + 0.05);
+}
+
+// ── 貝殻: 高音のFMベル（極めて静か・気づきにくい） ──
+function _playBeachShell(actx, t, sceneData){
+  const sd = sceneData.soundDesign.shell;
+  if(!sd) return;
+  const bus = _beachGetMasterBus(actx);
+  const decay = sd.decay ?? 1.2;
+  const carrier = actx.createOscillator();
+  const mod     = actx.createOscillator();
+  const modG    = actx.createGain();
+  const g       = actx.createGain();
+  carrier.type = 'sine';
+  mod.type     = 'sine';
+  carrier.frequency.value = sd.freq ?? 2800;
+  mod.frequency.value     = (sd.freq ?? 2800) * 1.41;  // tritone的に不協
+  modG.gain.value         = (sd.freq ?? 2800) * 0.08;
+  mod.connect(modG); modG.connect(carrier.frequency);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(sd.level ?? 0.04, t + 0.04);
+  g.gain.exponentialRampToValueAtTime(0.001, t + decay);
+  const panner = (actx.createStereoPanner ? actx.createStereoPanner() : null);
+  carrier.connect(g);
+  if(panner){
+    panner.pan.value = (Math.random() * 2 - 1) * 0.7;
+    g.connect(panner); panner.connect(bus);
+  } else {
+    g.connect(bus);
+  }
+  carrier.start(t); carrier.stop(t + decay + 0.05);
+  mod.start(t);     mod.stop(t + decay + 0.05);
+}
+
+// ── 潮の呼吸: _beachMasterBus.gain を 4分周期で±15%変調 ──
+function _beachUpdateTideEnvelope(actx){
+  if(!_beachMasterBus) return;
+  const now = actx.currentTime;
+  // 沈黙瞬間中はgain=0
+  if(_beachSilenceUntil > now){
+    _beachMasterBus.gain.setTargetAtTime(0, now, 0.005);
+    return;
+  }
+  const cfg = (_beachGrooveData.global && _beachGrooveData.global.tide) || { periodSec: 240, depth: 0.15 };
+  const phase = ((now - _beachTideStartTime) / cfg.periodSec) * Math.PI * 2;
+  const target = 1 + Math.sin(phase) * cfg.depth;
+  // 緩やかに追従（突発的にならないように）
+  _beachMasterBus.gain.setTargetAtTime(target, now, 0.5);
+}
+
+// ── 沈黙の瞬間: ガラス採取時に呼ばれる ──
+function _silenceBeachBriefly(){
+  const actx = safeGetCtx();
+  if(!actx || !_beachMasterBus) return;
+  const ms = (_beachGrooveData.global && _beachGrooveData.global.silence && _beachGrooveData.global.silence.ms) || 400;
+  _beachSilenceUntil = actx.currentTime + ms / 1000;
+}
+
+// ── 波の寄せ: ガラス出現時に呼ばれる ──
+function _triggerBeachWaveSwell(){
+  if(!_beachOn) return;
+  const actx = safeGetCtx();
+  if(!actx) return;
+  const sceneData = _beachGetSceneData();
+  if(!sceneData || !sceneData.behavior || !sceneData.behavior.wave || !sceneData.behavior.wave.enabled) return;
+  safeResume(actx, () => {
+    _playBeachWave(actx, actx.currentTime + 0.05, sceneData);
+  });
+}
+
+// ── 稀な飾り: 貝殻のスケジューリング ──
+function _scheduleBeachShell(){
+  if(!_beachOn) return;
+  const sceneData = _beachGetSceneData();
+  if(!sceneData || !sceneData.behavior || !sceneData.behavior.shell || !sceneData.behavior.shell.enabled){
+    // 次のSceneでまた有効になる可能性があるので、適度な間隔で再チェック
+    _beachShellTimer = setTimeout(_scheduleBeachShell, 60000);
+    return;
+  }
+  const min = sceneData.behavior.shell.intervalSecMin ?? 60;
+  const max = sceneData.behavior.shell.intervalSecMax ?? 180;
+  const wait = (min + Math.random() * (max - min)) * 1000;
+  _beachShellTimer = setTimeout(() => {
+    if(!_beachOn) return;
+    const actx = safeGetCtx();
+    if(actx){
+      safeResume(actx, () => {
+        const sd2 = _beachGetSceneData();
+        if(sd2 && sd2.behavior && sd2.behavior.shell && sd2.behavior.shell.enabled){
+          _playBeachShell(actx, actx.currentTime + 0.05, sd2);
+        }
+      });
+    }
+    _scheduleBeachShell();
+  }, wait);
+}
+
+// ── 稀な飾り: もう一人の足跡（別位相3〜5音シーケンス） ──
+function _scheduleBeachOtherFootstep(){
+  if(!_beachOn) return;
+  const sceneData = _beachGetSceneData();
+  if(!sceneData || !sceneData.behavior || !sceneData.behavior.otherFootstep || !sceneData.behavior.otherFootstep.enabled){
+    _beachOtherFootstepTimer = setTimeout(_scheduleBeachOtherFootstep, 60000);
+    return;
+  }
+  const min = sceneData.behavior.otherFootstep.intervalSecMin ?? 120;
+  const max = sceneData.behavior.otherFootstep.intervalSecMax ?? 300;
+  const wait = (min + Math.random() * (max - min)) * 1000;
+  _beachOtherFootstepTimer = setTimeout(() => {
+    if(!_beachOn){ return; }
+    _playBeachOtherFootstepSequence();
+    _scheduleBeachOtherFootstep();
+  }, wait);
+}
+
+function _playBeachOtherFootstepSequence(){
+  const actx = safeGetCtx();
+  if(!actx) return;
+  const sceneData = _beachGetSceneData();
+  if(!sceneData) return;
+  const cfg = sceneData.soundDesign.otherFootstep || { freqMult: 0.85, level: 0.30, distance: 0.55 };
+  const seqLen = sceneData.behavior.otherFootstep.sequenceLen || [3, 5];
+  const n = seqLen[0] + Math.floor(Math.random() * (seqLen[1] - seqLen[0] + 1));
+  const stepSec = 60 / autoBpm / 4;
+  // 別位相: 0.4〜0.7 step 遅れたタイミングからスタート
+  const phaseOff = stepSec * (0.4 + Math.random() * 0.3);
+  // 遠くから聞こえる: パンは片側に寄せる
+  const sidePan = (Math.random() < 0.5 ? -1 : +1) * cfg.distance;
+  // 別の足音音色: 周波数を少し変えて遠さを表現
+  const moddedFootstep = JSON.parse(JSON.stringify(sceneData));
+  moddedFootstep.soundDesign.footstep.baseFreq = sceneData.soundDesign.footstep.baseFreq * (cfg.freqMult ?? 0.85);
+  moddedFootstep.soundDesign.footstep.lowpassHz = (sceneData.soundDesign.footstep.lowpassHz ?? 600) * 0.7; // よりこもる
+  safeResume(actx, () => {
+    const startT = actx.currentTime + 0.1 + phaseOff;
+    // ハーフタイム的に2拍ごと
+    for(let i = 0; i < n; i++){
+      const t = startT + i * stepSec * 4;  // 2拍ごと
+      _playBeachFootstep(actx, t, 0.55, moddedFootstep, 0, sidePan, cfg.level ?? 0.30);
+    }
+  });
 }
 
 // ── Beach Groove 開始/停止/トグル ──
@@ -7118,17 +7418,25 @@ function startBeach(){
   _beachCurrentPattern = null;
   _beachCurrentZone = null;
   _beachLastPatternName = null;
+  _beachPanCurrent = 0;
+  _beachStumbleArmed = 0;
 
   const actx = safeGetCtx();
   if(!actx) return;
   safeResume(actx, () => {
     if(_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
-    // ARP/Kickと同じグリッドスナップ式
+    // Beach Busを起こす（潮の初期値1.0）
+    _beachGetMasterBus(actx);
+    _beachTideStartTime = actx.currentTime;
+    _beachSilenceUntil = 0;
     const _sixteenth = (60 / autoBpm) / 4;
     const _elapsed   = actx.currentTime - _masterClockOrigin;
     const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
     _beachNextBeat   = _masterClockOrigin + _gridPos;
     _beachSchedule();
+    // 稀な飾りタイマー起動
+    _scheduleBeachShell();
+    _scheduleBeachOtherFootstep();
   });
   const btn = document.getElementById('beach-toggle-btn');
   if(btn) btn.classList.add('on');
@@ -7137,6 +7445,8 @@ function startBeach(){
 
 function stopBeach(){
   if(_beachScheduleTimer){ clearTimeout(_beachScheduleTimer); _beachScheduleTimer = null; }
+  if(_beachShellTimer){ clearTimeout(_beachShellTimer); _beachShellTimer = null; }
+  if(_beachOtherFootstepTimer){ clearTimeout(_beachOtherFootstepTimer); _beachOtherFootstepTimer = null; }
   _beachOn = false;
   _beachCurrentPattern = null;
   _beachPulse = 0;
@@ -7155,6 +7465,9 @@ function _beachSchedule(){
   const actx = safeGetCtx();
   if(!actx){ _beachScheduleTimer = setTimeout(_beachSchedule, _BEACH_SCHEDULE_MS); return; }
   safeResume(actx);
+
+  // ── 潮の呼吸を更新 ──
+  _beachUpdateTideEnvelope(actx);
 
   const lookAhead = actx.currentTime + _BEACH_LOOK_AHEAD_MS / 1000;
   const stepSec   = 60 / autoBpm / 4;
@@ -7181,6 +7494,12 @@ function _beachSchedule(){
         }
       }
 
+      // ── パン減衰（コード遷移時に変化したパンを徐々に中央へ） ──
+      if(stepInBar % 4 === 0){
+        _beachPanCurrent *= 0.55; // 拍頭で減衰
+        if(Math.abs(_beachPanCurrent) < 0.02) _beachPanCurrent = 0;
+      }
+
       // 現パターンで発音判定
       const pat = _beachCurrentPattern;
       if(pat){
@@ -7200,7 +7519,6 @@ function _beachSchedule(){
         }
 
         // ── シンコペーション・タイミング揺らぎ ──
-        // 拍頭以外で 30% 確率に後ろへ 10〜35% ずらす（引きずる感覚）
         const isSync = (stepInBar % 4 !== 0);
         if(isSync){
           const dragProb = beh.syncopationDragProb ?? 0;
@@ -7213,14 +7531,21 @@ function _beachSchedule(){
 
         const t = _beachNextBeat + tOff;
 
+        // ── 稀な躓き（H）: コード遷移後の1〜2ステップで5%確率にスキップ ──
+        let stumbleSkip = false;
+        if(_beachStumbleArmed > 0){
+          if(Math.random() < 0.05) stumbleSkip = true;
+          _beachStumbleArmed--;
+        }
+
         // 骨格音
         const sk = pat.skeleton[stepInBar] || 0;
-        if(sk > 0){
+        if(sk > 0 && !stumbleSkip){
           const vel = 0.82 * (1 + (Math.random() * 2 - 1) * velVar);
           _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData, stepInBar);
           if(stepInBar % 4 === 0){ _beachPulse = vel; dirty = true; }
-        } else if(pat.ornaments && pat.ornaments.length){
-          // 装飾音: ポジション一致時のみ確率判定
+        } else if(pat.ornaments && pat.ornaments.length && !stumbleSkip){
+          // 装飾音
           for(const orn of pat.ornaments){
             if(orn.pos === stepInBar){
               const prob = orn.prob * (1 + fillBoost);
@@ -7232,6 +7557,48 @@ function _beachSchedule(){
               break;
             }
           }
+        }
+      }
+
+      // ── 砂レイヤー ──
+      if(sceneData.behavior.sand && sceneData.behavior.sand.enabled){
+        const sandBeh = sceneData.behavior.sand;
+        const baseDensity = sandBeh.baseDensity ?? 0.30;
+        // SL値で密度を調整（tense: ±20%、moving: ±15%）
+        const tenseVal  = (typeof SL !== 'undefined') ? (SL.find(s => s.id === 'tense')?.val ?? 0) : 0;
+        const movingVal = (typeof SL !== 'undefined') ? (SL.find(s => s.id === 'moving')?.val ?? 0) : 0;
+        const densityMul = 1 + tenseVal * 0.20 + movingVal * 0.15;
+        const density = baseDensity * Math.max(0.1, densityMul);
+        // ポジション重み: 拍頭は抑え、裏拍を強調
+        let posWeight;
+        if(stepInBar % 4 === 0) posWeight = 0.25;  // 拍頭は控えめ
+        else if(stepInBar % 4 === 2) posWeight = 1.0;  // 8分裏は強め
+        else posWeight = 0.55;  // 他の16分
+        // スウィング適用（VELVET）
+        let sandTOff = (Math.random() * 2 - 1) * 0.02 * stepSec;
+        if(sandBeh.applySwing && (sceneData.behavior.footstep.swingAmount ?? 0) > 0 && stepInBar % 4 === 2){
+          sandTOff += stepSec * sceneData.behavior.footstep.swingAmount * 0.5;
+        }
+        if(Math.random() < density * posWeight){
+          _playBeachSand(actx, _beachNextBeat + sandTOff, 0.7, sceneData);
+        }
+        // グリッチバースト: strange↑で確率増
+        const strangeVal = (typeof SL !== 'undefined') ? (SL.find(s => s.id === 'strange')?.val ?? 0) : 0;
+        const glitchProb = (sandBeh.glitchProb ?? 0.05) * (1 + Math.max(0, strangeVal) * 1.5);
+        if(Math.random() < glitchProb && stepInBar % 4 !== 0){
+          // 短い3〜4連のスタッター
+          const n = 3 + Math.floor(Math.random() * 2);
+          for(let i = 0; i < n; i++){
+            _playBeachSand(actx, _beachNextBeat + sandTOff + i * 0.018, 0.5, sceneData);
+          }
+        }
+      }
+
+      // ── 波・風アクセント: 小節境界で確率判定 ──
+      if(stepInBar === 0 && sceneData.behavior.wave && sceneData.behavior.wave.enabled){
+        const waveProb = sceneData.behavior.wave.barProb ?? 0.15;
+        if(Math.random() < waveProb){
+          _playBeachWave(actx, _beachNextBeat + 0.02, sceneData);
         }
       }
     }
@@ -7297,6 +7664,17 @@ function moveToChord(root,type){
   S.history=S.history.slice(0,S.histIdx+1);S.history.push({root,type});S.histIdx=S.history.length-1;
   // Loop Beach: パターン検知（AUTO中はスキップ）
   if(typeof _checkPatternDetection === 'function') _checkPatternDetection();
+
+  // ── Beach Groove: コード遷移ステレオ定位（A）と稀な躓き（H） ──
+  if(_beachOn && hitN && _beachLastChordNode){
+    const dx = hitN.x - _beachLastChordNode.x;
+    const W = (L && L.W) ? L.W : 400;
+    // dx / (W/2) を ±0.7 にクランプ
+    _beachPanCurrent = Math.max(-0.7, Math.min(0.7, (dx / (W * 0.5)) * 0.6));
+    // 稀な躓き: 次の1〜2ステップで5%確率に発動
+    _beachStumbleArmed = 2;
+  }
+  if(hitN) _beachLastChordNode = { x: hitN.x, y: hitN.y };
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
   // Q6: モーダルオーバーレイをコード変更時にフェードイン再開
   if(modalMapMode) modalOverlayAlpha=0;
@@ -7671,6 +8049,8 @@ function _spawnSeaGlassShard(){
       sparks: _sparks,
     });
     dirty = true;
+    // ── Beach Groove: ガラス出現と同時に波が寄せる（B） ──
+    if(typeof _triggerBeachWaveSwell === 'function') _triggerBeachWaveSwell();
     return;
   }
   // 候補が見つからなければ出現しない
@@ -7768,6 +8148,9 @@ function _hitTestSeaGlass(x, y){
 
 // ── ガラスを採取してClipとして保存 ──
 function _collectSeaGlass(shard){
+  // ── Beach Groove: 採取の瞬間の小さな沈黙（C） ──
+  if(typeof _silenceBeachBriefly === 'function') _silenceBeachBriefly();
+
   const hist = (S && S.history && S.histIdx >= 0)
     ? S.history.slice(0, S.histIdx + 1)
     : [];
