@@ -7212,9 +7212,12 @@ function _beachSchedule(){
     const sceneData = _beachGetSceneData();
     // Sceneデータがあり、足跡が有効な場合のみ発音判定
     if(sceneData && sceneData.behavior && sceneData.behavior.footstep && sceneData.behavior.footstep.enabled){
+      // 足音グリッドは _beachTick（_beachNextBeatと同一の起点基準）を使う。
+      // これにより「発音時刻」と「位置ラベル」が常に一致する（BPM変更直後も乖離しない）。
+      // 共有現在地源 musicalPos はサインベース整合・ARP・B/C で用いる。
       const stepInBar   = _beachTick % 16;
       const barIdx      = Math.floor(_beachTick / 16);
-      const barInPhrase = barIdx % 4;  // 0,1,2,3
+      const barInPhrase = barIdx % 4;  // 0,1,2,3（足音フレーズ＝4小節を維持）
 
       // 4小節フレーズの始まり: 新パターン選択
       if(stepInBar === 0 && barInPhrase === 0){
@@ -7365,6 +7368,19 @@ function _beachSineStep(actx, stepSec){
   if(!sbAll) return;
   const cfg = sbAll[sceneCurrentName];
   if(!cfg || !cfg.enabled || !cfg.cell || cfg.cell.length === 0) return;
+
+  // [A-3] フレーム拍頭でセルを共有フレームに整合させる。
+  // 検出は足音と同一の _beachTick グリッドで行い、サインベースと足音の一致を保証する。
+  // セルのbar-1を共有フレームのbar-1に合わせる（cell長がフレームを割り切る
+  // GLASS/PLAIN/VELVET/LOVE/PLUCK は初回の一度だけ補正、以降は無音切れなし）。
+  // STRINGSは3小節セル×4小節足音の意図的phasingを保持するため除外。
+  const _frB = _frameBars();
+  const _tickInBar   = _beachTick % 16;
+  const _barInFrame  = Math.floor(_beachTick / 16) % _frB;
+  if(sceneCurrentName !== 'strings' && _tickInBar === 0 && _barInFrame === 0){
+    _beachSineSegRemain = 0;
+    _beachSineCellPos   = 0;
+  }
 
   // セグメント進行中なら残量を減らすだけ
   if(_beachSineSegRemain > 0){ _beachSineSegRemain--; return; }
@@ -11634,6 +11650,68 @@ let _stringsGhostStep  = 0;     // 残留層のステップ数カウント
 let _stringsGhostNextBeat = 0;  // 残留層の次発音時刻
 let _masterClockOrigin=null; // マスタークロック起点（ファーストタップ時に一度だけ設定）
 
+// ════════════════════════════════════════════════════════════════════
+// ── 音楽的クロック（テンポ蓄積器）[A-0] ──
+// 起点からの「16分ステップ数」を連続量として保持し、BPM変更をまたいでも
+// 連続させる。これが三層（CHORD/ARP/Beach）が共有する唯一の現在地源。
+// musicalPos(t) は任意の時刻t（過去・未来・BPM変更越し）で正しい位置を返す。
+// 起点は _masterClockOrigin と常に一致させる（最初のコード＝決定2）。
+// ════════════════════════════════════════════════════════════════════
+let _mclkOriginTime = null;  // 直近アンカーのAudioContext時刻
+let _mclkBaseStep   = 0;     // そのアンカー時点での累積16分ステップ数（float）
+
+// Scene別 収束フレーム（小節数）＝全層が必ず同じ拍頭で再会する単位
+// STRINGS=12: 足音4小節 × サインベース3小節 が12小節で再会（設計されたphasing）
+const _CONVERGENCE_FRAME = {
+  plain: 4, glass: 4, velvet: 4, love: 2, pluck: 2, strings: 12
+};
+function _frameBars(){
+  return _CONVERGENCE_FRAME[(typeof sceneCurrentName!=='undefined')?sceneCurrentName:'plain'] || 4;
+}
+
+// _masterClockOrigin が設定済みで音楽的クロック未起動なら、同一起点で起動する。
+// （BPM変更前は必ずbpm一定なので base=0 起点で正しい）
+function _mclkSync(){
+  if(_mclkOriginTime === null && _masterClockOrigin !== null){
+    _mclkOriginTime = _masterClockOrigin;
+    _mclkBaseStep   = 0;
+  }
+}
+// BPM変更時：旧テンポで進んだ分を確定加算し、アンカーを現在時刻に更新する。
+// setBpm内で autoBpm を書き換える「前」に呼ぶこと。
+function _mclkReanchor(t, oldBpm){
+  _mclkSync();
+  if(_mclkOriginTime === null) return;
+  const oldSixteenth = (60 / Math.max(40, oldBpm || 100)) / 4;
+  _mclkBaseStep += (t - _mclkOriginTime) / oldSixteenth;
+  _mclkOriginTime = t;
+}
+// 任意時刻tの音楽的位置を返す（唯一の現在地源）
+function musicalPos(t){
+  _mclkSync();
+  const sixteenth = (60 / Math.max(40, (typeof autoBpm!=='undefined'?autoBpm:100) || 100)) / 4;
+  const stepFloat = (_mclkOriginTime === null)
+    ? 0
+    : _mclkBaseStep + (t - _mclkOriginTime) / sixteenth;
+  const absStep    = Math.floor(stepFloat);
+  const frameBars  = _frameBars();
+  const frameSteps = 16 * frameBars;
+  const mod = (n, m) => ((n % m) + m) % m;
+  return {
+    sixteenth,
+    stepFloat,
+    absStep,
+    stepInBar:  mod(absStep, 16),
+    beatInBar:  Math.floor(mod(absStep, 16) / 4),
+    barAbs:     Math.floor(absStep / 16),
+    barInFrame: mod(Math.floor(absStep / 16), frameBars),
+    frameAbs:   Math.floor(absStep / frameSteps),
+    barPhase:   mod(stepFloat, 16) / 16,            // 小節内位相 0..1
+    framePhase: mod(stepFloat, frameSteps) / frameSteps, // フレーズ内位相 0..1
+    frameBars
+  };
+}
+
 // ── タップテンポ ──
 // 中央コードノードを叩いてBPMを設定する（4タップ平均・2秒リセット）
 let _tapTempoTimes = []; // タップ時刻記録（最大4件・performance.now基準）
@@ -14416,6 +14494,10 @@ function scheduleArpNotes(){
   while(arpNextBeat<lookAhead){
     const t=arpNextBeat;
     const dest = dlyDestination || actx.destination;
+
+    // [A-2] 共有現在地を参照可能にする（読むだけ・挙動は変えない）。
+    // フレーズ文法が「今フレーズの何小節目か」を知れる状態にし、B/Cの土台とする。
+    _phraseState.pos = musicalPos(t);
 
     // ── フレーズ文法パス ──
     if(_usePhraseGrammar && arpSeq.length > 0){
@@ -18535,6 +18617,11 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
   }
   function setBpm(v){
     v=Math.max(40,Math.min(180,Math.round(v/4)*4));
+    // [A-0] 音楽的クロック再アンカー: 旧BPMで進んだ分を確定してからBPMを更新
+    if(v !== autoBpm){
+      const _bctx = (typeof safeGetCtx==='function') ? safeGetCtx() : null;
+      if(_bctx) _mclkReanchor(_bctx.currentTime, autoBpm);
+    }
     autoBpm=v;
     updateDial(v);
     // ディレイタイムをBPMに追従
