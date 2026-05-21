@@ -6919,6 +6919,8 @@ function startBeach(){
     const _elapsed   = Math.max(0, actx.currentTime - _masterClockOrigin);
     const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
     _beachNextBeat   = Math.max(actx.currentTime + 0.05, _masterClockOrigin + _gridPos);
+    // マスタークロック上の現在16分位置にTickを合わせる（ARP/コードと位相を揃える）
+    _beachTick       = Math.round(_elapsed / _sixteenth);
     _beachSchedule();
     // 稀な飾りタイマー起動
     _scheduleBeachShell();
