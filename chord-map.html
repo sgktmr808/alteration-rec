@@ -6925,7 +6925,7 @@ function startBeach(){
     const _sixteenth = (60 / Math.max(40, autoBpm || 100)) / 4;
     const _elapsed   = Math.max(0, actx.currentTime - _masterClockOrigin);
     const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-    _beachNextBeat   = Math.max(actx.currentTime + 0.05, _masterClockOrigin + _gridPos);
+    _beachNextBeat   = Math.max(actx.currentTime + 0.01, _masterClockOrigin + _gridPos);
     // マスタークロック上の現在16分位置にTickを合わせる（ARP/コードと位相を揃える）
     // Math.ceil で _beachNextBeat の計算と一致させる
     _beachTick       = Math.ceil(_elapsed / _sixteenth);
@@ -13386,9 +13386,10 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         ? Math.max(0.4, 1.0 - Math.max(0, _movingVal) * 0.5)
         : 1.0;
 
-      // jitter ±3%（タイミングの精度を保つ）
+      // jitter ±3%（ノート発音時刻にのみ適用・arpNextBeatには蓄積させない）
       const jitter = 0.97 + Math.random() * 0.06;
-      const stepRatio = step.r * _rMul * jitter * densityMul;
+      const stepRatio = step.r * _rMul * densityMul;
+      const noteOffsetRatio = (jitter - 1.0) * step.r * _rMul;
 
       ps.plainCellPos++;
 
@@ -13413,7 +13414,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       }
 
       if(step.rest){
-        return { midi: null, stepRatio };
+        return { midi: null, stepRatio, noteOffsetRatio };
       }
 
       // 旋律シーケンスから次の音を取得
@@ -13430,7 +13431,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const _movingBoost = 1.0 + Math.max(0, _movingVal) * 0.15;
       const velMul = step.vel * _movingBoost;
 
-      return { midi, stepRatio, velMul };
+      return { midi, stepRatio, velMul, noteOffsetRatio };
     }
 
     // ────────────────────────────────────────────
@@ -13939,12 +13940,13 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const _burstVelBoost = burstRatio * 0.20; // バースト中は最大+0.20
       const velMul  = Math.max(0.5, _arcVel + _burstVelBoost + (Math.random() - 0.5) * _warmVal * 0.15);
 
-      // ── ステップ: 16分音符（1.0）・わずかなjitter ──
+      // ── ステップ: 16分音符（1.0）・わずかなjitter（ノート時刻にのみ適用）──
       const jitter = 1.0 + (Math.random() - 0.5) * 0.04;
-      const stepRatio = 1.0 * densityMul * jitter;
+      const stepRatio = 1.0 * densityMul;
+      const noteOffsetRatio = (jitter - 1.0) * 1.0;
 
       if(midi !== null) ps.lastMidi = midi;
-      return { midi, stepRatio, velMul };
+      return { midi, stepRatio, velMul, noteOffsetRatio };
     }
 
     default:
@@ -14134,7 +14136,8 @@ function scheduleArpNotes(){
         const stepSec = Math.max(_sixteenth * 0.2, _sixteenth * result.stepRatio);
         if(result.midi !== null){
           _phraseState.notesSinceChord++;
-          _playSceneArpNote(actx, result.midi, t, dest, result.velMul, result.gateOverride);
+          const noteOffset = (result.noteOffsetRatio ?? 0) * _sixteenth;
+          _playSceneArpNote(actx, result.midi, t + noteOffset, dest, result.velMul, result.gateOverride);
         }
         arpNextBeat += stepSec;
         continue;
@@ -14162,10 +14165,10 @@ function scheduleArpNotes(){
           }
           _arpRhythmJitter = rhythm.map(v => {
             const jitter = 0.85 + Math.random() * 0.30;
-            return Math.max(v * jitter, 0.25);
+            return (jitter - 1.0) * v;  // ノートオフセット比率のみ保持（stepには加算しない）
           });
         }
-        stepRatio = _arpRhythmJitter[rIdx] * densityMul;
+        stepRatio = rhythm[rIdx] * densityMul;  // グリッド厳守
       } else {
         stepRatio = rhythm[rIdx] * densityMul;
       }
@@ -14179,12 +14182,16 @@ function scheduleArpNotes(){
       const isRest = restProb > 0 && Math.random() < restProb;
       if(!isRest){
         const item = arpSeq[arpStep % arpSeq.length];
+        // _arpRhythmJitter はオフセット比率（stepには加算しない）
+        const _noteOff = (_arpRhythmJitter && _arpRhythmJitter[(_arpRhythmStep - 1) % _arpRhythmJitter.length] != null)
+          ? _arpRhythmJitter[(_arpRhythmStep - 1) % _arpRhythmJitter.length] * _sixteenth
+          : 0;
         if(Array.isArray(item)){
           item.forEach((midi, i) => {
-            _playSceneArpNote(actx, midi, t + i * 0.012, dest);
+            _playSceneArpNote(actx, midi, t + _noteOff + i * 0.012, dest);
           });
         } else {
-          _playSceneArpNote(actx, item, t, dest);
+          _playSceneArpNote(actx, item, t + _noteOff, dest);
         }
       }
       arpStep++;
