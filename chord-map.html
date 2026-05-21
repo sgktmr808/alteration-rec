@@ -6920,7 +6920,8 @@ function startBeach(){
     const _gridPos   = Math.ceil(_elapsed / _sixteenth) * _sixteenth;
     _beachNextBeat   = Math.max(actx.currentTime + 0.05, _masterClockOrigin + _gridPos);
     // マスタークロック上の現在16分位置にTickを合わせる（ARP/コードと位相を揃える）
-    _beachTick       = Math.round(_elapsed / _sixteenth);
+    // Math.ceil で _beachNextBeat の計算と一致させる
+    _beachTick       = Math.ceil(_elapsed / _sixteenth);
     _beachSchedule();
     // 稀な飾りタイマー起動
     _scheduleBeachShell();
@@ -6964,9 +6965,16 @@ function _beachSchedule(){
   const lookAhead = actx.currentTime + _BEACH_LOOK_AHEAD_MS / 1000;
   const stepSec   = 60 / Math.max(40, autoBpm || 100) / 4;
 
-  // _beachNextBeat が大きく過去になった場合は現在に追従（タブ非活性復帰時など）
-  if(_beachNextBeat < actx.currentTime - 1.0){
-    _beachNextBeat = actx.currentTime + 0.05;
+  // _beachNextBeat が大きく過去になった場合はマスタークロックグリッドに再スナップ
+  if(_beachNextBeat < actx.currentTime - 0.5){
+    if(_masterClockOrigin !== null){
+      const _rElapsed = Math.max(0, actx.currentTime - _masterClockOrigin);
+      const _rGrid    = Math.ceil(_rElapsed / stepSec) * stepSec;
+      _beachNextBeat  = _masterClockOrigin + _rGrid;
+      _beachTick      = Math.ceil(_rElapsed / stepSec);
+    } else {
+      _beachNextBeat = actx.currentTime + 0.05;
+    }
   }
 
   while(_beachNextBeat < lookAhead){
