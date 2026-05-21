@@ -6106,7 +6106,7 @@ const BEACH_GROOVE_DEFAULT = {
           stereoSwing: 0.4
         },
         sand: { filterFreq: 2200, filterQ: 1.0, burstMs: 50, level: 0.06 },
-        wave: { freqLow: 250, freqHigh: 3500, swellMs: 1800, level: 0.10, brightBias: 0.6 },
+        wave: { freqLow: 250, freqHigh: 3500, swellBars: 2.0, level: 0.10, brightBias: 0.6 },
         shell: { freq: 3200, decay: 1.2, level: 0.04 },
         otherFootstep: { freqMult: 0.85, level: 0.30, distance: 0.55 }
       },
@@ -6174,7 +6174,7 @@ const BEACH_GROOVE_DEFAULT = {
           stereoSwing: 0.5
         },
         sand: { filterFreq: 1800, filterQ: 0.9, burstMs: 60, level: 0.07 },
-        wave: { freqLow: 220, freqHigh: 2800, swellMs: 2000, level: 0.10, brightBias: 0.45 },
+        wave: { freqLow: 220, freqHigh: 2800, swellBars: 1.5, level: 0.10, brightBias: 0.45 },
         shell: { freq: 2800, decay: 1.4, level: 0.05 },
         otherFootstep: { freqMult: 0.85, level: 0.32, distance: 0.60 }
       },
@@ -6242,7 +6242,7 @@ const BEACH_GROOVE_DEFAULT = {
           stereoSwing: 0.45
         },
         sand: { filterFreq: 2800, filterQ: 1.1, burstMs: 55, level: 0.07 },
-        wave: { freqLow: 200, freqHigh: 2400, swellMs: 2200, level: 0.10, brightBias: 0.40 },
+        wave: { freqLow: 200, freqHigh: 2400, swellBars: 1.5, level: 0.10, brightBias: 0.40 },
         shell: { freq: 2600, decay: 1.6, level: 0.05 },
         otherFootstep: { freqMult: 0.90, level: 0.32, distance: 0.55 }
       },
@@ -6310,7 +6310,7 @@ const BEACH_GROOVE_DEFAULT = {
           stereoSwing: 0.40
         },
         sand: { filterFreq: 3200, filterQ: 1.0, burstMs: 45, level: 0.08 },
-        wave: { freqLow: 180, freqHigh: 2800, swellMs: 1500, level: 0.10, brightBias: 0.50 },
+        wave: { freqLow: 180, freqHigh: 2800, swellBars: 1.0, level: 0.10, brightBias: 0.50 },
         otherFootstep: { freqMult: 0.90, level: 0.30, distance: 0.50 }
       },
       behavior: {
@@ -6376,7 +6376,7 @@ const BEACH_GROOVE_DEFAULT = {
           stereoSwing: 0.30
         },
         sand: { filterFreq: 3800, filterQ: 1.4, burstMs: 35, level: 0.07 },
-        wave: { freqLow: 1500, freqHigh: 6000, swellMs: 1300, level: 0.07, brightBias: 0.75 },
+        wave: { freqLow: 1500, freqHigh: 6000, swellBars: 0.75, level: 0.07, brightBias: 0.75 },
         otherFootstep: { freqMult: 0.95, level: 0.28, distance: 0.45 }
       },
       behavior: {
@@ -6442,7 +6442,7 @@ const BEACH_GROOVE_DEFAULT = {
           stereoSwing: 0.50
         },
         sand: { filterFreq: 2600, filterQ: 1.1, burstMs: 55, level: 0.08 },
-        wave: { freqLow: 120, freqHigh: 2200, swellMs: 2400, level: 0.12, brightBias: 0.35 },
+        wave: { freqLow: 120, freqHigh: 2200, swellBars: 2.0, level: 0.12, brightBias: 0.35 },
         otherFootstep: { freqMult: 0.85, level: 0.34, distance: 0.60 }
       },
       behavior: {
@@ -6715,7 +6715,8 @@ function _playBeachWave(actx, t, sceneData){
   const bias = sd.brightBias ?? 0.5;
   const mix = brightNorm * 0.5 + bias * 0.5; // brightと固定biasの平均
   const freq = (sd.freqLow ?? 200) + ((sd.freqHigh ?? 3500) - (sd.freqLow ?? 200)) * mix;
-  const swellSec = (sd.swellMs ?? 1800) / 1000;
+  const barSec    = (60 / Math.max(40, autoBpm || 100)) * 4; // 1小節
+  const swellSec  = barSec * (sd.swellBars ?? 1.5);          // BPM連動（デフォルト1.5小節）
   const lvl = sd.level ?? 0.10;
   // 持続的なノイズソース
   const bufLen = Math.max(1, Math.floor(actx.sampleRate * swellSec));
@@ -6884,7 +6885,13 @@ function _playBeachOtherFootstepSequence(){
   moddedFootstep.soundDesign.footstep.baseFreq = sceneData.soundDesign.footstep.baseFreq * (cfg.freqMult ?? 0.85);
   moddedFootstep.soundDesign.footstep.lowpassHz = (sceneData.soundDesign.footstep.lowpassHz ?? 600) * 0.7;
   safeResume(actx, () => {
-    const startT = Math.max(actx.currentTime + 0.1, actx.currentTime + 0.1 + phaseOff);
+    const barSec = stepSec * 16; // 1小節 = 16ステップ
+    // 次の小節頭をマスタークロックグリッドから計算
+    const _elapsed = Math.max(0, actx.currentTime - (_masterClockOrigin ?? actx.currentTime));
+    const _nextBar = Math.ceil(_elapsed / barSec) * barSec;
+    const barStart = (_masterClockOrigin ?? actx.currentTime) + _nextBar;
+    // phaseOff は小節内ヒューマナイズとして保持（有機感を維持）
+    const startT = Math.max(actx.currentTime + 0.05, barStart + phaseOff);
     // ハーフタイム的に2拍ごと
     for(let i = 0; i < n; i++){
       const t = startT + i * stepSec * 4;
