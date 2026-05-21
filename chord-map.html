@@ -1212,12 +1212,12 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 
         <!-- Scene一覧バー + Beach Grooveトリガー -->
         <div id="map-bottom-bar">
-          <div class="map-scene-pill on" data-scene="plain"   onclick="applyScene('plain')"  >PLAIN</div>
-          <div class="map-scene-pill"    data-scene="glass"   onclick="applyScene('glass')"  >GLASS</div>
-          <div class="map-scene-pill"    data-scene="velvet"  onclick="applyScene('velvet')" >VELVET</div>
-          <div class="map-scene-pill"    data-scene="love"    onclick="applyScene('love')"   >LOVE</div>
-          <div class="map-scene-pill"    data-scene="pluck"   onclick="applyScene('pluck')"  >PLUCK</div>
-          <div class="map-scene-pill"    data-scene="strings" onclick="applyScene('strings')">STRINGS</div>
+          <div class="map-scene-pill on" data-scene="plain"   onclick="applyScene('plain',false,true)"  >PLAIN</div>
+          <div class="map-scene-pill"    data-scene="glass"   onclick="applyScene('glass',false,true)"  >GLASS</div>
+          <div class="map-scene-pill"    data-scene="velvet"  onclick="applyScene('velvet',false,true)" >VELVET</div>
+          <div class="map-scene-pill"    data-scene="love"    onclick="applyScene('love',false,true)"   >LOVE</div>
+          <div class="map-scene-pill"    data-scene="pluck"   onclick="applyScene('pluck',false,true)"  >PLUCK</div>
+          <div class="map-scene-pill"    data-scene="strings" onclick="applyScene('strings',false,true)">STRINGS</div>
           <div id="map-beach-btn" onclick="toggleBeach()">BEACH</div>
         </div>
 
@@ -2958,8 +2958,8 @@ function drawFrame(){
   if(MAP_MODE==='radial'&&modalMapMode){
     drawModalOverlay(ctx);
   }
-  // ── R2: TRIAD SPACE オーバーレイ（RADIAL/EXPAND/CHAIN）──
-  const trvsModes=['radial','expand','chain'];
+  // ── R2: TRIAD SPACE オーバーレイ（RADIAL/EXPAND/CHAIN/COMPASS）──
+  const trvsModes=['radial','expand','chain','compass'];
   if(trvsModes.includes(MAP_MODE)&&triadSpaceMode){
     drawTriadSpaceOverlay(ctx);
   }
@@ -2983,6 +2983,19 @@ function drawFrame(){
     // F3: フォーム位置インジケーター（右下に小さく）
     drawFormPosIndicator(ctx);
   }
+  // ── Scene遷移オーバーレイ ──
+  if(_sceneTransAlpha > 0.005){
+    ctx.fillStyle=`rgba(6,8,12,${_sceneTransAlpha})`;
+    ctx.fillRect(0,0,L.W,L.H);
+    if(_sceneTransRipple){
+      const rp=_sceneTransRipple;
+      ctx.beginPath();ctx.arc(rp.x,rp.y,Math.max(1,rp.r),0,Math.PI*2);
+      ctx.strokeStyle=`rgba(140,200,210,${rp.alpha})`;
+      ctx.lineWidth=1.5;ctx.stroke();
+    }
+    dirty=true;
+  }
+
   // ── AUTO PLAY overlay (always on top) ──
   drawAutoOverlay(ctx);
   // ── BEACH GROOVE パルスオーバーレイ ──
@@ -2990,6 +3003,24 @@ function drawFrame(){
 
   // ── Loop Beach: ガラスのかけら（FXより下に描く） ──
   if(typeof _drawAndUpdateSeaGlass === 'function') _drawAndUpdateSeaGlass(ctx);
+
+  // ── 進行名ラベル（全モード共通）──
+  if(chainProgLabel.alpha>0.005){
+    if(!chainProgLabel.timer) chainProgLabel.alpha*=0.94;
+    const a=chainProgLabel.alpha;
+    const label=chainProgLabel.text;
+    const lx=L.cx, ly=L.H-22;
+    ctx.font='bold 11px DM Mono,monospace';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    const tw=ctx.measureText(label).width;
+    ctx.beginPath();
+    ctx.roundRect(lx-tw/2-10,ly-9,tw+20,18,6);
+    ctx.fillStyle=`rgba(13,13,16,${a*0.72})`;ctx.fill();
+    ctx.strokeStyle=`rgba(232,197,71,${a*0.5})`;ctx.lineWidth=0.8;ctx.stroke();
+    ctx.fillStyle=`rgba(232,197,71,${a})`;
+    ctx.fillText(label,lx,ly);
+    dirty=true;
+  }
 
   // ── COSMIC FX (topmost) ──
   fxDrawAndUpdate(ctx);
@@ -6489,7 +6520,51 @@ const BEACH_GROOVE_DEFAULT = {
   },
   global: {
     tide:    { periodSec: 240, depth: 0.15 },   // 4分周期で±15%音量変調
-    silence: { ms: 400 }                          // ガラス採取時の沈黙時間
+    silence: { ms: 400 },                         // ガラス採取時の沈黙時間
+    // ── サインベース（波の振幅・海の呼吸）──
+    // cell: {deg=半音度(コードトーン基準), dur=16分ステップ数, rest=休符}
+    // octave: ルートから何オクターブ下げるか / mutPool: 変異候補の音度
+    sineBass: {
+      glass: {
+        enabled: true, octave: -2, gainBase: 0.16,
+        cell: [ {deg:0,dur:16}, {rest:true,dur:8}, {deg:7,dur:6}, {rest:true,dur:2} ],
+        mutPool: [0,7,12], lfoProb: 0.18, riseProb: 0.03,
+        attack: 0.10, release: 0.6
+      },
+      plain: {
+        enabled: true, octave: -2, gainBase: 0.18,
+        cell: [ {deg:0,dur:8}, {rest:true,dur:4}, {deg:0,dur:6}, {deg:12,dur:6}, {rest:true,dur:8} ],
+        mutPool: [0,7,12], lfoProb: 0.18, riseProb: 0.03,
+        attack: 0.06, release: 0.45
+      },
+      velvet: {
+        enabled: true, octave: -2, gainBase: 0.19,
+        cell: [ {deg:0,dur:8}, {deg:3,dur:8}, {deg:0,dur:8}, {deg:7,dur:8},
+                {deg:3,dur:8}, {rest:true,dur:8}, {deg:0,dur:8}, {rest:true,dur:8} ],
+        mutPool: [0,3,5,7,10], lfoProb: 0.22, riseProb: 0.04,
+        attack: 0.07, release: 0.5
+      },
+      love: {
+        enabled: true, octave: -1, gainBase: 0.20,
+        cell: [ {deg:0,dur:4}, {deg:7,dur:4}, {deg:0,dur:4}, {deg:4,dur:4} ],
+        mutPool: [0,4,7,10,12], lfoProb: 0.25, riseProb: 0.05,
+        attack: 0.04, release: 0.30
+      },
+      pluck: {
+        enabled: true, octave: -2, gainBase: 0.17,
+        cell: [ {deg:0,dur:2}, {rest:true,dur:2}, {deg:7,dur:2}, {rest:true,dur:2},
+                {deg:0,dur:4}, {rest:true,dur:4} ],
+        mutPool: [0,5,7,12], lfoProb: 0.20, riseProb: 0.04,
+        attack: 0.03, release: 0.22
+      },
+      strings: {
+        enabled: true, octave: -2, gainBase: 0.18,
+        cell: [ {deg:0,dur:8}, {deg:2,dur:4}, {deg:3,dur:4}, {deg:5,dur:8},
+                {deg:3,dur:4}, {deg:2,dur:4}, {deg:0,dur:8}, {rest:true,dur:8} ],
+        mutPool: [0,2,3,5,7,10], lfoProb: 0.20, riseProb: 0.04,
+        attack: 0.08, release: 0.55
+      }
+    }
   }
 };
 
@@ -6526,6 +6601,16 @@ let _beachLastTransType = null;      // 直前コードのtype
 let _beachShellTimer = null;
 let _beachOtherFootstepTimer = null;
 let _beachOtherFootstepActive = false;   // もう一人の足跡シーケンス進行中フラグ
+
+// ── サインベース（波の振幅・海の呼吸）──
+let _beachSineCellPos    = 0;     // セル内位置
+let _beachSineCycleCount = 0;     // セル反復回数（長期変容用）
+let _beachSineCellPhase  = 0;     // 位相オフセット（Reich的フェイジング）
+let _beachSineCellMut    = null;  // セルの変異状態（1音度差し替え）{idx, degree}
+let _beachSineLfoActive  = false; // 現フレーズでLFO発動中か
+let _beachSineLfoPattern = null;  // 'triplet' | 'dotted8th'
+let _beachSineLastNode   = null;  // 現在鳴っているサインベースのノード（重複停止用）
+let _beachSineSegRemain  = 0;     // 現セグメントの残り16分ステップ数
 
 function _beachGetMasterBus(actx){
   if(_beachMasterBus && _beachMasterBus.context === actx) return _beachMasterBus;
@@ -6783,6 +6868,138 @@ function _playBeachShell(actx, t, sceneData){
   mod.start(t);     mod.stop(t + decay + 0.05);
 }
 
+// ── サインベース: コードトーン配列を取得（コードルート基準）──
+function _beachSineGetChordTones(){
+  const root = (typeof S !== 'undefined' && S.root) ? S.root : 'C';
+  const type = (typeof S !== 'undefined' && S.type) ? S.type : 'major';
+  const ri   = (typeof ni === 'function') ? ni(root) : 0;
+  const ivs  = (typeof CT !== 'undefined' && CT[type]) ? CT[type].iv : [0,4,7];
+  const rootMidi = 48 + (ri % 12);
+  return { rootMidi, ivs };
+}
+
+// ── サインベース: 音度をスケール/コードトーンにスナップ ──
+function _beachSineSnapDegree(deg, ivs){
+  // deg(半音) をコードトーン集合に最も近い形へ。0/12はそのまま（ルート/オクターブ）
+  if(deg === 0 || deg === 12) return deg;
+  const pc = ((deg % 12) + 12) % 12;
+  // コードトーンに含まれればそのまま
+  if(ivs.includes(pc)) return deg;
+  // 含まれなければ最も近いコードトーンへ
+  let best = 0, bestDist = 99;
+  for(const iv of ivs){
+    const d = Math.min(((iv - pc) + 12) % 12, ((pc - iv) + 12) % 12);
+    if(d < bestDist){ bestDist = d; best = iv; }
+  }
+  return best + (deg >= 12 ? 12 : 0);
+}
+
+// ── サインベース1音を発音 ──
+function _playBeachSineBass(actx, t, degree, cfg, durSec, slVals){
+  const bus = _beachGetMasterBus(actx);
+  if(!bus) return;
+  const { rootMidi, ivs } = _beachSineGetChordTones();
+
+  // moving: 音度の広がり（+で拡張・-で収束）
+  const mv = slVals.moving;
+  let deg = degree;
+  if(mv < -0.3 && deg !== 0 && deg !== 12){
+    // 収束: ルート or 5度へ寄せる
+    deg = (Math.abs(deg - 7) < Math.abs(deg)) ? 7 : 0;
+  } else if(mv > 0.4 && deg > 0 && deg < 12){
+    // 拡張: オクターブ上の同音へ広げる確率
+    if(Math.random() < (mv - 0.4) * 0.8) deg += 12;
+  }
+  deg = _beachSineSnapDegree(deg, ivs);
+
+  // ピッチ算出（octaveシフト適用）
+  const midi = rootMidi + deg + (cfg.octave || -2) * 12;
+  let freq = 440 * Math.pow(2, (midi - 69) / 12);
+  freq = Math.max(20, freq);
+
+  // ── tense: 天候（穏やか↔嵐）──
+  const tense = slVals.tense;
+  const stormy = Math.max(0, tense); // 0〜1
+  // bright: 深さ↔水面（フィルターcutoff）
+  const bright = slVals.bright;
+
+  const osc = actx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, t);
+
+  // 倍音（嵐で微量追加・並行三角波を低ゲインで）
+  let harmOsc = null, harmGain = null;
+  if(stormy > 0.15){
+    harmOsc = actx.createOscillator();
+    harmOsc.type = 'triangle';
+    harmOsc.frequency.setValueAtTime(freq, t);
+    harmGain = actx.createGain();
+    harmGain.gain.value = stormy * 0.18; // 最大でも気配程度
+  }
+
+  // ピッチ揺らぎ（嵐で微かなデチューン）
+  if(stormy > 0.3){
+    const wob = stormy * 6; // 最大±6cent相当
+    osc.detune.setValueAtTime(0, t);
+    osc.detune.linearRampToValueAtTime((Math.random()-0.5)*wob, t + durSec*0.5);
+    osc.detune.linearRampToValueAtTime((Math.random()-0.5)*wob, t + durSec);
+  }
+
+  // 昂り（稀なグライド）
+  const riseProb = (cfg.riseProb || 0.04) * (1 + Math.max(0, tense) * 1.5);
+  if(Math.random() < riseProb){
+    const semis = 1 + Math.floor(Math.random() * (1 + Math.max(0, tense)));
+    const tgt = freq * Math.pow(2, semis / 12);
+    osc.frequency.linearRampToValueAtTime(tgt, t + Math.min(0.3, durSec * 0.6));
+    if(harmOsc) harmOsc.frequency.linearRampToValueAtTime(tgt, t + Math.min(0.3, durSec * 0.6));
+  }
+
+  // ローパス（bright: 深さ↔水面）
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass';
+  const cutoff = 200 + (bright + 1) * 350; // 200〜900Hz
+  lp.frequency.setValueAtTime(cutoff, t);
+  lp.Q.value = 0.7;
+
+  // メインゲイン（attack/release エンベロープ）
+  const g = actx.createGain();
+  const atk = cfg.attack || 0.06;
+  const rel = cfg.release || 0.4;
+  const peak = (cfg.gainBase || 0.18);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + atk);
+  const sustainEnd = t + Math.max(atk + 0.05, durSec - rel);
+  g.gain.setValueAtTime(peak, sustainEnd);
+  g.gain.exponentialRampToValueAtTime(0.0008, t + durSec);
+
+  // ── LFO→VCA（波の振幅）──
+  if(_beachSineLfoActive && durSec > 0.4){
+    const beatSec = durSec; // 簡易: 音価内で脈動
+    const pat = _beachSineLfoPattern;
+    const lfoDepth = 0.45 + Math.max(0, tense) * 0.35; // 嵐で深く
+    // 3連符 or 付点8分の周期で gain をうねらせる
+    const subdiv = (pat === 'triplet') ? 3 : 2;
+    const period = (pat === 'triplet') ? durSec / 3 : durSec * 0.375; // 付点8分相当
+    let pt = t + atk;
+    let up = false;
+    while(pt < t + durSec - 0.02){
+      const lvl = up ? peak : peak * (1 - lfoDepth);
+      g.gain.linearRampToValueAtTime(Math.max(0.0008, lvl), pt);
+      pt += period;
+      up = !up;
+    }
+  }
+
+  // 接続
+  osc.connect(lp);
+  if(harmOsc && harmGain){ harmOsc.connect(harmGain); harmGain.connect(lp); }
+  lp.connect(g);
+  g.connect(bus);
+
+  osc.start(t); osc.stop(t + durSec + 0.1);
+  if(harmOsc){ harmOsc.start(t); harmOsc.stop(t + durSec + 0.1); }
+}
+
 // ── 潮の呼吸: _beachMasterBus.gain を 4分周期で±15%変調 ──
 function _beachUpdateTideEnvelope(actx){
   if(!_beachMasterBus) return;
@@ -6910,6 +7127,13 @@ function startBeach(){
   _beachLastPatternName = null;
   _beachPanCurrent = 0;
   _beachStumbleArmed = 0;
+  // サインベース状態リセット
+  _beachSineCellPos    = 0;
+  _beachSineCycleCount = 0;
+  _beachSineCellPhase  = 0;
+  _beachSineCellMut    = null;
+  _beachSineSegRemain  = 0;
+  _beachSineLfoActive  = false;
 
   const actx = safeGetCtx();
   if(!actx) return;
@@ -7126,10 +7350,90 @@ function _beachSchedule(){
       }
     }
 
+    // ── サインベース（波の振幅・海の呼吸）セル進行 ──
+    _beachSineStep(actx, stepSec);
+
     _beachTick++;
     _beachNextBeat += stepSec;
   }
   _beachScheduleTimer = setTimeout(_beachSchedule, _BEACH_SCHEDULE_MS);
+}
+
+// ── サインベース: 1ステップ進行（セルベース・足音とは独立した音価管理）──
+function _beachSineStep(actx, stepSec){
+  const sbAll = (_beachGrooveData.global && _beachGrooveData.global.sineBass) || null;
+  if(!sbAll) return;
+  const cfg = sbAll[sceneCurrentName];
+  if(!cfg || !cfg.enabled || !cfg.cell || cfg.cell.length === 0) return;
+
+  // セグメント進行中なら残量を減らすだけ
+  if(_beachSineSegRemain > 0){ _beachSineSegRemain--; return; }
+
+  // SLスライダー値を取得
+  const slVals = {
+    moving:  (typeof sv === 'function') ? sv('moving')  : 0,
+    tense:   (typeof sv === 'function') ? sv('tense')   : 0,
+    bright:  (typeof sv === 'function') ? sv('bright')  : 0,
+    complex: (typeof sv === 'function') ? sv('complex') : 0,
+  };
+
+  const cell = cfg.cell;
+  const cellLen = cell.length;
+  // 位相シフト適用
+  const idx = (_beachSineCellPos + _beachSineCellPhase) % cellLen;
+  const seg = cell[idx];
+
+  // セル先頭セグメント到達時にLFO発動判定（セグメント開始に同期）
+  if(_beachSineCellPos === 0){
+    const lfoProb = (cfg.lfoProb || 0.2) * (1 + Math.max(0, slVals.moving) * 0.8);
+    _beachSineLfoActive  = Math.random() < lfoProb;
+    _beachSineLfoPattern = (Math.random() < 0.5) ? 'triplet' : 'dotted8th';
+  }
+
+  // 次セグメントの長さ（16分ステップ）
+  const dur = Math.max(1, seg.dur || 4);
+  _beachSineSegRemain = dur - 1;
+
+  // セル位置を進める
+  _beachSineCellPos++;
+  if(_beachSineCellPos >= cellLen){
+    _beachSineCellPos = 0;
+    _beachSineCycleCount++;
+    // ── 長期変容 ──
+    const sg = (typeof sv === 'function') ? sv('strange') : 0;
+    const phaseAt = sg > 0.4 ? 6 : 12;
+    if(_beachSineCycleCount % phaseAt === 0){
+      _beachSineCellPhase = (_beachSineCellPhase + 1) % cellLen;
+    }
+    // 8サイクルに1回: 1音度を変異プールから差し替え
+    if(_beachSineCycleCount % 8 === 0 && cfg.mutPool && cfg.mutPool.length){
+      const mIdx = Math.floor(Math.random() * cellLen);
+      const mDeg = cfg.mutPool[Math.floor(Math.random() * cfg.mutPool.length)];
+      _beachSineCellMut = { idx: mIdx, degree: mDeg };
+    }
+  }
+
+  // 休符判定（complexで密度調整）
+  let isRest = !!seg.rest;
+  const cx = slVals.complex;
+  if(!isRest && cx < -0.3){
+    // 簡素化: 弱い位置を休符化（最強拍以外を間引く）
+    if((_beachTick % 16) % 4 !== 0 && Math.random() < (-cx - 0.3) * 1.2) isRest = true;
+  } else if(isRest && cx > 0.4){
+    // 密度UP: 休符を発音化
+    if(Math.random() < (cx - 0.4) * 0.9) isRest = false;
+  }
+  if(isRest) return;
+
+  // 音度決定（変異適用）
+  let deg = (seg.deg != null) ? seg.deg : 0;
+  if(_beachSineCellMut && _beachSineCellMut.idx === idx){
+    deg = _beachSineCellMut.degree;
+  }
+
+  // 発音（音価秒数 = dur × stepSec）
+  const durSec = dur * stepSec;
+  _playBeachSineBass(actx, _beachNextBeat, deg, cfg, durSec, slVals);
 }
 
 // ── Canvas描画: Beach Grooveのパルスとラベル ──
@@ -9034,7 +9338,14 @@ function drawExpand(ctx){
     const retType=getReturnType(node, expandTree.root, expandTree.type);
     const isReturn=!!retType;
     const retInfo=retType?RETURN_TYPES[retType]:null;
-    const col=node.depth===0?'#e8c547':isReturn?retInfo.col:(RHEX[node.rtype]||'#888');
+    // MAP-C: EMOモード時はEMO感情ベクトルで着色
+    let col;
+    if(emoMapMode && node.depth > 0 && !isReturn){
+      const ev=getChordEmotionVec(node.root,node.type);
+      col=emoToHsl(ev,1.0);
+    } else {
+      col=node.depth===0?'#e8c547':isReturn?retInfo.col:(RHEX[node.rtype]||'#888');
+    }
     const isTop=node.opacity>0.82;
     const nr=node.depth===0?27:isReturn?17:isTop?15:12;
     const isExpanded=node.children.length>0;
@@ -9350,27 +9661,6 @@ function drawChain(ctx,rels){
     ctx.fillText(i+1,p.x,p.y-32);
   });
 
-  // ══ 4. 進行名ラベルオーバーレイ ══
-  if(chainProgLabel.alpha>0.005){
-    // タイマー終了後はフェードアウト
-    if(!chainProgLabel.timer){
-      chainProgLabel.alpha*=0.94;
-    }
-    const a=chainProgLabel.alpha;
-    const label=chainProgLabel.text;
-    const lx=L.cx, ly=L.H-22;
-    ctx.font='bold 11px DM Mono,monospace';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    // 背景ピル
-    const tw=ctx.measureText(label).width;
-    ctx.beginPath();
-    ctx.roundRect(lx-tw/2-10, ly-9, tw+20, 18, 6);
-    ctx.fillStyle=`rgba(13,13,16,${a*0.72})`;ctx.fill();
-    ctx.strokeStyle=`rgba(232,197,71,${a*0.5})`;ctx.lineWidth=0.8;ctx.stroke();
-    // テキスト
-    ctx.fillStyle=`rgba(232,197,71,${a})`;
-    ctx.fillText(label,lx,ly);
-  }
 
   dirty=true; // パーティクルが動く間は常に再描画
 }
@@ -15887,7 +16177,49 @@ function switchSceneNext(){
   if(idx < _sceneSwitcherOrder.length - 1) applyScene(_sceneSwitcherOrder[idx + 1]);
 }
 
-function applyScene(name, changeBpm=false){
+// ── Scene遷移演出 ──
+let _sceneTransAlpha  = 0;
+let _sceneTransRipple = null; // {x,y,r,maxR,alpha}
+
+function triggerSceneTransition(){
+  const dur = 1200;
+  const startT = performance.now();
+  const cx = typeof L !== 'undefined' ? L.cx : window.innerWidth  / 2;
+  const cy = typeof L !== 'undefined' ? L.cy : window.innerHeight / 2;
+  const maxR = Math.max(
+    typeof L !== 'undefined' ? Math.max(L.W, L.H) : Math.max(window.innerWidth, window.innerHeight),
+    400
+  ) * 0.75;
+  _sceneTransRipple = { x:cx, y:cy, r:0, maxR, alpha:0.55 };
+
+  // Beach の潮を一瞬引かせる
+  if(typeof _beachOn !== 'undefined' && _beachOn && typeof _silenceBeachBriefly === 'function'){
+    _silenceBeachBriefly();
+  }
+
+  function tick(){
+    const t = Math.min(1, (performance.now() - startT) / dur);
+    // sinカーブ: t=0.5でピーク
+    _sceneTransAlpha = Math.sin(Math.PI * t) * 0.62;
+    // リップル: 線形展開 + フェードアウト
+    if(_sceneTransRipple){
+      _sceneTransRipple.r     = t * maxR;
+      _sceneTransRipple.alpha = (1 - t) * 0.55;
+    }
+    if(typeof dirty !== 'undefined') dirty = true;
+    if(t < 1){
+      requestAnimationFrame(tick);
+    } else {
+      _sceneTransAlpha  = 0;
+      _sceneTransRipple = null;
+      if(typeof dirty !== 'undefined') dirty = true;
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+function applyScene(name, changeBpm=false, animate=false){
+  if(animate) triggerSceneTransition();
   const _prevSceneName = sceneCurrentName; // 変容判定用に前のScene名を保持
   sceneCurrentName = name;
   // SYNTHパネルからの切替時のみBPM・dlyTypeをSceneプリセット値に変更
