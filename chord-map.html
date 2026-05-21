@@ -6898,6 +6898,11 @@ function _beachSineSnapDegree(deg, ivs){
 function _playBeachSineBass(actx, t, degree, cfg, durSec, slVals){
   const bus = _beachGetMasterBus(actx);
   if(!bus) return;
+  // 防御: tが過去/負/非有限ならcurrentTime+小マージンにクランプ（osc.start RangeError対策）
+  {
+    const _now = actx.currentTime;
+    if(!isFinite(t) || t < _now + 0.001) t = _now + 0.002;
+  }
   const { rootMidi, ivs } = _beachSineGetChordTones();
 
   // moving: 音度の広がり（+で拡張・-で収束）
@@ -12627,6 +12632,11 @@ function _findRMHotspot(root, type, complexVal){
 // ── Scene別ARPノート発音（Arp Ghost対応）──
 function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
   velMul = (velMul !== undefined) ? velMul : 1.0;
+  // 発音時刻ガード: 負・NaN・Infinityを防ぐ（OscillatorNode.start()のRangeError対策）。
+  // スケジューラ起点直後やタイミング揺らぎで過去/非有限になりうるため、現在時刻にクランプ。
+  if(!Number.isFinite(startTime) || startTime < actx.currentTime) startTime = actx.currentTime;
+  // velMulも非有限を防ぐ（音量包絡のexponentialRampエラー対策）
+  if(!Number.isFinite(velMul) || velMul < 0) velMul = 0;
   // Pattern GrammarのARP系パターン選択中はそのパラメーターで上書き
   const sc = _getPatternArpSc() || SCENE_PRESETS[sceneCurrentName] || SCENE_PRESETS.plain;
   const hz = midi2hz(Math.max(24, Math.min(108, midi)));
