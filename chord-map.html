@@ -7011,7 +7011,10 @@ function _beachUpdateTideEnvelope(actx){
   }
   const cfg = (_beachGrooveData.global && _beachGrooveData.global.tide) || { periodSec: 240, depth: 0.15 };
   const phase = ((now - _beachTideStartTime) / cfg.periodSec) * Math.PI * 2;
-  const target = 1 + Math.sin(phase) * cfg.depth;
+  let target = 1 + Math.sin(phase) * cfg.depth;
+  // [B-2b] 共有呼吸：フレーム境界手前の谷をBeach層にも掛ける（ARP/コードと同一の谷）。
+  // 潮（長周期）と呼吸（フレーズ周期）は乗算で重なる。
+  target *= breathGain(now);
   // 緩やかに追従（突発的にならないように）
   _beachMasterBus.gain.setTargetAtTime(target, now, 0.5);
 }
@@ -7257,14 +7260,11 @@ function _beachSchedule(){
         const pivotBoost = (_beachPhraseFillBoost > 0) ? 0.30 : 0;
         const fillBoost = baseBar4Boost + pivotBoost;
 
-        // 通常humanize（拍位置±微小オフセット）
-        let tOff = (Math.random() * 2 - 1) * hum * stepSec;
-
-        // ── スウィング（VELVET等）：8分裏(step 2,6,10,14)を後ろにシフト ──
-        const swingAmt = beh.swingAmount ?? 0;
-        if(swingAmt > 0 && stepInBar % 4 === 2){
-          tOff += stepSec * swingAmt * 0.5;
-        }
+        // [B-1c] 共有グルーヴ・オフセット（全層共通のポケット）。
+        // 既存の独立swingはこれに統合済み（_GROOVE_PARAMSへ移行）。
+        // humanizeはランダム成分なので半分に絞り、共有ポケットを主役にする。
+        let tOff = (Math.random() * 2 - 1) * hum * 0.5 * stepSec;
+        tOff += grooveOffset(stepInBar) * stepSec;
 
         // ── シンコペーション・タイミング揺らぎ ──
         const isSync = (stepInBar % 4 !== 0);
@@ -11712,6 +11712,78 @@ function musicalPos(t){
   };
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ── 共有グルーヴ・テンプレート [B-1] ──
+// 三層（CHORD/ARP/Beach）が「同じノリ」で押し引きするための単一の関数。
+// 系統的なずれ（スウィング・レイドバック・拍の重み）をここに集約し、
+// 全層が同一の grooveOffset(stepInBar) を発音時刻に加える＝ポケット。
+// 位置ごとに一定で蓄積しないため「ドリフト」ではない（位相は保たれる）。
+// 戻り値は「16分1つ分に対する比率」。発音側で sixteenth を掛けて秒に変換する。
+// ════════════════════════════════════════════════════════════════════
+// Scene別グルーヴ・パラメータ
+//   swing:  8分裏(step%4===2)を後ろへ。0..1（16分の半分を上限の目安）
+//   pocket: 裏拍(step%4!==0)を後ろへ緩める深さ。16分比率
+//   拍頭(step%4===0)は常にオフセット0＝コード本体と同一グリッドにジャスト。
+//   これにより全層の拍頭が和声（浜辺そのもの）と完全に揃い、結果的なずれが出ない。
+//   ノリは「揺るがない拍頭に対し裏拍がどう緩むか」だけに宿る。
+//   既存の足音 swingAmount をこの swing に統合する（散在値の一元化）。
+const _GROOVE_PARAMS = {
+  plain:   { swing: 0.00, pocket: 0.010 },
+  glass:   { swing: 0.00, pocket: 0.016 }, // 遅い・裏拍を深めに緩める
+  velvet:  { swing: 0.30, pocket: 0.012 }, // 既存swing0.30を継承
+  love:    { swing: 0.00, pocket: 0.004 }, // 推進系・浅い
+  pluck:   { swing: 0.00, pocket: 0.003 }, // 推進系・最も浅い（テクノの締まり）
+  strings: { swing: 0.00, pocket: 0.010 },
+};
+function _grooveParams(scene){
+  return _GROOVE_PARAMS[scene || sceneCurrentName] || _GROOVE_PARAMS.plain;
+}
+// 共有グルーヴ・オフセット（16分比率）。全層がこれを発音時刻に加える。
+// stepInBar: 0..15。scene省略時は現Scene。
+// 拍頭は必ず0を返す＝コードと同一グリッド。裏拍のみ緩める。
+function grooveOffset(stepInBar, scene){
+  if((stepInBar % 4) === 0) return 0;      // 拍頭：全層ジャスト（基準点）
+  const p = _grooveParams(scene);
+  let r = p.pocket;                        // 裏拍：ポケット
+  if(p.swing > 0 && (stepInBar % 4) === 2) // 8分裏をさらに後ろへ（スウィング）
+    r += p.swing * 0.5;
+  return r;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ── 共有された呼吸点（余韻）[B-2] ──
+// 収束フレームの境界手前で全層がわずかに引き、新フレーズ拍頭で一斉に戻る。
+// 波が引いた隙間に余韻が生まれ、また満ちる——コンセプトの比喩そのもの。
+// breathGain(t): 発音時刻tの音量係数（0..1, 1=通常）。Beachバス・ARP/コードの
+// ベロシティに共通で掛けることで、全層が同じ谷を共有する。
+// 谷はフレーム末尾の一部だけに現れ、拍頭で1.0へ戻る（硬い沈黙にはしない）。
+// Scene別の深さ（決定4）：遅いSceneは深く、推進系は浅く。
+// ════════════════════════════════════════════════════════════════════
+const _BREATH_PARAMS = {
+  // depth: 谷の深さ（最大減衰量0..1）  span: 境界手前の何割で引き始めるか(framePhase)
+  glass:   { depth: 0.30, span: 0.18 }, // 深い・ゆっくり引く
+  velvet:  { depth: 0.24, span: 0.16 },
+  plain:   { depth: 0.18, span: 0.12 },
+  strings: { depth: 0.18, span: 0.12 },
+  love:    { depth: 0.08, span: 0.08 }, // 推進系・浅い
+  pluck:   { depth: 0.06, span: 0.06 }, // 最も浅い（駆動を保つ）
+};
+function _breathParams(scene){
+  return _BREATH_PARAMS[scene || sceneCurrentName] || _BREATH_PARAMS.plain;
+}
+// 呼吸の音量係数（1=通常, <1=引き）。framePhaseが終端spanに入ると
+// cos半周で滑らかに谷へ沈み、境界(=次の拍頭)で1.0へ戻る。
+function breathGain(t){
+  if(_mclkOriginTime === null) return 1.0;
+  const p  = _breathParams();
+  const fp = musicalPos(t).framePhase; // 0..1（フレーズ内位相）
+  if(fp < 1 - p.span) return 1.0;       // 末尾span手前までは通常
+  const x = (fp - (1 - p.span)) / p.span; // 0→1（境界へ向かう）
+  // 0で1.0 → 中ほどで最も沈む → 1(境界)直前で戻り始める
+  const dip = Math.sin(x * Math.PI);   // 0→1→0 の山。これを減衰に使う
+  return 1.0 - p.depth * dip;
+}
+
 // ── タップテンポ ──
 // 中央コードノードを叩いてBPMを設定する（4タップ平均・2秒リセット）
 let _tapTempoTimes = []; // タップ時刻記録（最大4件・performance.now基準）
@@ -13755,7 +13827,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         : 1.0;
 
       // jitter ±3%（ノート発音時刻にのみ適用・arpNextBeatには蓄積させない）
-      const jitter = 0.97 + Math.random() * 0.06;
+      const jitter = 0.985 + Math.random() * 0.03; // [B-1b] ±1.5%に縮小（共有グルーヴ優先）
       const stepRatio = step.r * _rMul * densityMul;
       const noteOffsetRatio = (jitter - 1.0) * step.r * _rMul;
 
@@ -14309,7 +14381,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const velMul  = Math.max(0.5, _arcVel + _burstVelBoost + (Math.random() - 0.5) * _warmVal * 0.15);
 
       // ── ステップ: 16分音符（1.0）・わずかなjitter（ノート時刻にのみ適用）──
-      const jitter = 1.0 + (Math.random() - 0.5) * 0.04;
+      const jitter = 1.0 + (Math.random() - 0.5) * 0.02; // [B-1b] ±1%に縮小（共有グルーヴ優先）
       const stepRatio = 1.0 * densityMul;
       const noteOffsetRatio = (jitter - 1.0) * 1.0;
 
@@ -14508,8 +14580,13 @@ function scheduleArpNotes(){
         const stepSec = Math.max(_sixteenth * 0.2, _sixteenth * result.stepRatio);
         if(result.midi !== null){
           _phraseState.notesSinceChord++;
+          // [B-1b] 共有グルーヴ・オフセット（全層共通のポケット）＋ 既存の微小jitter
+          const _stepInBar = _phraseState.pos ? _phraseState.pos.stepInBar : 0;
+          const grv = grooveOffset(_stepInBar) * _sixteenth;
           const noteOffset = (result.noteOffsetRatio ?? 0) * _sixteenth;
-          _playSceneArpNote(actx, result.midi, t + noteOffset, dest, result.velMul, result.gateOverride);
+          // [B-2b] 共有呼吸：フレーム境界手前で音量を引く（全層共通の谷）
+          const _bv = breathGain(t);
+          _playSceneArpNote(actx, result.midi, t + grv + noteOffset, dest, (result.velMul ?? 1) * _bv, result.gateOverride);
         }
         arpNextBeat += stepSec;
         continue;
