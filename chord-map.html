@@ -7020,6 +7020,96 @@ function _debrisPick(scene){
   return chosen;
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ── デブリの空間（距離と残像）[C-4 / 空間] ──
+// 各デブリを ドライ / リバーブ / ディレイ残像 のいずれか（排他）で鳴らす。
+// 「あれは一体何だったんだろう」＝意識の残像。同じデブリも二度と同じに響かない。
+//   ドライ55% : 目の前。直接音のみ
+//   リバーブ35%: 深さ・長さを都度変化（緩い相関: 深い→長い傾向）
+//   ディレイ10%: 分割を重み付き抽選・FB都度変化（リバーブとは同時に出ない）
+// ════════════════════════════════════════════════════════════════════
+// リバーブはバッファ生成が重いので少数をプールし、send量で深さを連続変化させる。
+// プールは (size,damp) の代表点。発音ごとに近い1つを選びsend量を都度変える。
+let _debrisReverbPool = null; // [{size, damp, conv}]
+function _debrisGetReverbPool(actx){
+  if(_debrisReverbPool) return _debrisReverbPool;
+  const pts = [
+    { size:0.05, damp:0.6 }, // 極端に短い反射
+    { size:0.25, damp:0.5 }, // 浅い
+    { size:0.55, damp:0.35 },// 中
+    { size:0.90, damp:0.2 }, // 深く長い大空間
+  ];
+  _debrisReverbPool = pts.map(p=>{
+    const conv = actx.createConvolver();
+    conv.buffer = _buildReverbBuffer(actx, p.size, p.damp);
+    return { size:p.size, damp:p.damp, conv };
+  });
+  return _debrisReverbPool;
+}
+// Scene別の空間傾向（ウェット寄り/ドライ寄り）。確率の基準を動かす。
+const _DEBRIS_SPACE_SCENE = {
+  glass:   { dry:0.40, reverb:0.50, delay:0.10 }, // 冷たい残響・ウェット多め
+  velvet:  { dry:0.48, reverb:0.42, delay:0.10 },
+  plain:   { dry:0.55, reverb:0.35, delay:0.10 },
+  strings: { dry:0.45, reverb:0.45, delay:0.10 },
+  love:    { dry:0.62, reverb:0.28, delay:0.10 }, // 推進・ドライ寄り
+  pluck:   { dry:0.68, reverb:0.22, delay:0.10 }, // 最もドライ
+};
+// デブリ1発分の出力ノードを返す。dest=_beachMasterBus。
+// 戻り値のノードに voice.play が接続する。
+function _debrisSpaceNode(actx, t, bus){
+  const sp = _DEBRIS_SPACE_SCENE[sceneCurrentName] || _DEBRIS_SPACE_SCENE.plain;
+  const roll = Math.random();
+  const inGain = actx.createGain(); inGain.gain.value = 1.0;
+
+  if(roll < sp.dry){
+    // ── ドライ: 直接音のみ ──
+    inGain.connect(bus);
+    return inGain;
+  } else if(roll < sp.dry + sp.reverb){
+    // ── リバーブ: 深さ・長さを都度変化（緩い相関）──
+    const pool = _debrisGetReverbPool(actx);
+    // 深さ係数 0..1 を都度抽選。これでプール選択(長さ)とsend量(深さ)を緩く相関させる。
+    const depth = Math.random();
+    // 深いほど長いバッファへ寄せる（緩い相関）。indexを深さで重み付け選択。
+    const idx = Math.min(pool.length-1, Math.floor(depth * pool.length * 0.999));
+    const rv = pool[idx];
+    const dry = actx.createGain(); dry.gain.value = 1 - depth * 0.5; // 深いほど直接音やや減
+    const wet = actx.createGain(); wet.gain.value = 0.25 + depth * 0.6; // 0.25〜0.85
+    inGain.connect(dry); dry.connect(bus);
+    inGain.connect(rv.conv); rv.conv.connect(wet); wet.connect(bus);
+    return inGain;
+  } else {
+    // ── ディレイ残像: 分割を重み付き抽選・FB都度変化（リバーブと排他）──
+    // 分割の重み: 1/8d,1/8 多め / 1/16 次 / 1/8t,1/32 少 / 1/64 稀
+    const sixteenth = (60 / Math.max(40, autoBpm)) / 4; // 1/16秒
+    const quarter = sixteenth * 4;
+    const divs = [
+      { t: quarter*0.75, w:28 }, // 1/8d（付点8分）
+      { t: quarter*0.5,  w:28 }, // 1/8
+      { t: sixteenth,    w:22 }, // 1/16
+      { t: quarter/3,    w:10 }, // 1/8t（3連8分）
+      { t: sixteenth*0.5,w:8  }, // 1/32
+      { t: sixteenth*0.25,w:4 }, // 1/64
+    ];
+    let tot=0; for(const d of divs) tot+=d.w;
+    let rr=Math.random()*tot, dt=divs[0].t;
+    for(const d of divs){ rr-=d.w; if(rr<0){ dt=d.t; break; } }
+    const delay = actx.createDelay(1.5);
+    delay.delayTime.value = Math.min(1.4, dt);
+    // FB: 極端に短いのは無し（必ず数回返る）。少し長めもあり。
+    const fb = actx.createGain(); fb.gain.value = 0.25 + Math.random() * 0.30; // 0.25〜0.55
+    // 尾を暗く（残像が遠ざかる）
+    const lp = actx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 1800;
+    const wet = actx.createGain(); wet.gain.value = 0.5;
+    inGain.connect(bus);              // 直接音も少し残す
+    inGain.connect(delay);
+    delay.connect(lp); lp.connect(fb); fb.connect(delay); // フィードバックループ
+    lp.connect(wet); wet.connect(bus);
+    return inGain;
+  }
+}
+
 // ── サインベース: 音度をスケール/コードトーンにスナップ ──
 function _beachSineSnapDegree(deg, ivs){
   // deg(半音) をコードトーン集合に最も近い形へ。0/12はそのまま（ルート/オクターブ）
@@ -7540,7 +7630,9 @@ function _beachSchedule(){
             if(voice){
               const _grv = grooveOffset(_sib) * stepSec; // ポケット
               const _bv  = breathGain(_beachNextBeat);    // 呼吸
-              voice.play(actx, _beachGetMasterBus(actx), _beachNextBeat + _grv, _bv);
+              // [空間] 各デブリをドライ/リバーブ/ディレイ残像のいずれかで鳴らす
+              const _spaceNode = _debrisSpaceNode(actx, _beachNextBeat + _grv, _beachGetMasterBus(actx));
+              voice.play(actx, _spaceNode, _beachNextBeat + _grv, _bv);
               _driftLastBar = _barAbs;
             }
           }
