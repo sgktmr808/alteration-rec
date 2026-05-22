@@ -13886,7 +13886,22 @@ function _resetPhraseState(){
 
 // GLASS専用: 間隔パターン（長・長・中・短・長・中の繰り返し）
 // baseSec倍率として使用
-const _GLASS_INTERVAL_PATTERN = [4.0, 3.5, 2.0, 1.0, 3.0, 1.5, 5.0, 2.5];
+// GLASS ARP 間隔パターン（16分ステップ単位・全整数＝グリッドに乗る）。
+// 「漂う孤独」は非整数の無秩序ではなく、広い余白・休符・残響・高低対話で出す。
+// movingでB↔Cをモーフィング: moving=0で案B（ぽつんと漂う）、moving=-1で案C（ほぼ瞑想）。
+const _GLASS_INTERVAL_B = [4, 6, 3, 8, 2, 5, 4, 6]; // 平均4.75 既定
+const _GLASS_INTERVAL_C = [8, 4, 8, 6, 4, 8, 5, 6]; // 平均6.13 最も孤独
+// moving(−1〜) から間隔パターンを生成（負側のみモーフィング・整数に丸める）。
+function _glassIntervalPattern(moving){
+  const m = Math.max(-1, Math.min(0, moving || 0)); // 0〜−1（正側は案B固定）
+  const x = -m; // 0(案B)〜1(案C)
+  const out = [];
+  for(let i = 0; i < _GLASS_INTERVAL_B.length; i++){
+    const v = _GLASS_INTERVAL_B[i] + (_GLASS_INTERVAL_C[i] - _GLASS_INTERVAL_B[i]) * x;
+    out.push(Math.max(1, Math.round(v))); // 整数グリッドに乗せる
+  }
+  return out;
+}
 
 // PLAIN旋律シーケンス構築:
 // Shape of My Heart × Rej 的設計。
@@ -14326,9 +14341,13 @@ function _phraseNext(notes, baseSec, sc, densityMul){
     // GLASS: 孤立した1〜2音・意図的な間隔パターン
     // ────────────────────────────────────────────
     case 'glass': {
-      const intervalPattern = _GLASS_INTERVAL_PATTERN;
+      // [E-GLASS] movingでB→Cモーフィングした整数間隔パターンを使う。
+      // moving=0で案B（ぽつんと漂う・既定）、moving=-1で案C（ほぼ瞑想）。
+      // 整数グリッドに乗るので他層（足音・サインベース・デブリ）と整合する。
+      const _glassMoving = (typeof sv === 'function') ? sv('moving') : 0;
+      const intervalPattern = _glassIntervalPattern(_glassMoving);
       const iIdx = ps.glassIntervalIdx % intervalPattern.length;
-      const stepRatio = intervalPattern[iIdx] * densityMul * _slGlassIntervalScale;
+      const stepRatio = intervalPattern[iIdx] * densityMul;
       ps.glassIntervalIdx++;
 
       // 確率的な完全スキップ（より孤独な光）
@@ -16354,8 +16373,8 @@ function _applySL_glass(sc, bright, tense, warm, moving, strange){
   else                    _slArpPattern = null;
   // moving↑: arpWetを減らして残響を薄く（光の粒が散る）
   _slArpWet = Math.max(0.10, (sc.arpWet || 0.62) * (1.0 - Math.max(0, moving) * 0.40));
-  // moving↓: インターバルスケール拡大（孤独な光・坂本的静寂）
-  _slGlassIntervalScale = 1.0 + Math.max(0, -moving) * 0.9; // 1.0〜1.9倍
+  // [E-GLASS] moving↓の「孤独を深める」役割は間隔のB→Cモーフィング(case 'glass')が担う。
+  // 旧 _slGlassIntervalScale（×1.0〜1.9の間隔拡大）は廃止（二重適用の解消）。
   _arpOut = null; // arpWet変化を次の発音に反映するため再構築
 }
 
