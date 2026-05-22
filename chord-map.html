@@ -6878,6 +6878,95 @@ function _beachSineGetChordTones(){
   return { rootMidi, ivs };
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ── 流木声（浜辺に流れ着く欠片）[C-4] ──
+// ARPの隙間に応える中音域の声。モーダル合成（減衰する共鳴）の打音を、
+// 現コードの3rd/7thに調律して鳴らす＝質感（流木）と色（和声）を一音で運ぶ。
+// 環境の声であり前景を奪わない。2小節に一度・最も長い隙間にのみ現れる。
+// ════════════════════════════════════════════════════════════════════
+// Scene別パラメータ: gain(音量) decay(余韻秒) bright(共鳴の明るさ係数) oct(オクターブ)
+const _DRIFT_PARAMS = {
+  glass:   { gain: 0.16, decay: 1.6, bright: 0.9, oct: 0 }, // 静寂・長い余韻
+  velvet:  { gain: 0.17, decay: 1.3, bright: 1.0, oct: 0 },
+  plain:   { gain: 0.18, decay: 1.1, bright: 1.1, oct: 0 },
+  strings: { gain: 0.16, decay: 1.4, bright: 0.95, oct: 0 },
+  love:    { gain: 0.19, decay: 0.8, bright: 1.3, oct: 0 }, // 推進・短く明るい
+  pluck:   { gain: 0.20, decay: 0.7, bright: 1.4, oct: 0 }, // 最も打音的
+};
+function _driftParams(scene){
+  return _DRIFT_PARAMS[scene || sceneCurrentName] || _DRIFT_PARAMS.plain;
+}
+// 現コードの3rdまたは7th（無ければ近い色音）のMIDIを返す。中音域に配置。
+function _driftPickColorMidi(){
+  const { rootMidi, ivs } = _beachSineGetChordTones();
+  // 3rd候補(3,4) / 7th候補(10,11) を優先的に拾う
+  const thirds  = ivs.filter(iv => iv === 3 || iv === 4);
+  const sevenths= ivs.filter(iv => iv === 10 || iv === 11);
+  let pool = [];
+  if(sevenths.length) pool.push(sevenths[0]);
+  if(thirds.length)   pool.push(thirds[0]);
+  // どちらも無ければルート以外の最初の構成音、それも無ければ完全5度
+  if(pool.length === 0){
+    const others = ivs.filter(iv => iv !== 0);
+    pool = others.length ? [others[0]] : [7];
+  }
+  const iv = pool[Math.floor(Math.random() * pool.length)];
+  // 中音域: rootMidi(約C3)＋2オクターブ＋色音 → 概ねC5前後
+  return rootMidi + 24 + iv;
+}
+// 流木打音を1回発音（モーダル合成: 共鳴する数本の減衰サイン＋ノイズ立ち上がり）
+function _playDriftwood(actx, t, midi, velMul){
+  const bus = _beachGetMasterBus(actx);
+  if(!bus) return;
+  // 時刻ガード（他の発音と同じRangeError対策）
+  { const _now = actx.currentTime; if(!isFinite(t) || t < _now + 0.001) t = _now + 0.002; }
+  const p = _driftParams();
+  const vMul = (velMul ?? 1.0);
+  const baseHz = 440 * Math.pow(2, (midi + p.oct * 12 - 69) / 12);
+
+  const out = actx.createGain();
+  out.gain.value = p.gain * vMul;
+  // ステレオ配置（環境として少し広げる）
+  let node = out;
+  if(actx.createStereoPanner){
+    const pan = actx.createStereoPanner();
+    pan.pan.value = (Math.random() * 2 - 1) * 0.4;
+    out.connect(pan); pan.connect(bus); node = out;
+  } else {
+    out.connect(bus);
+  }
+
+  // モーダル: 木の共鳴を数本の倍音比（やや非整数＝木質感）で
+  const partials = [
+    { ratio: 1.0,  gain: 1.0,  decay: p.decay },
+    { ratio: 2.76, gain: 0.5,  decay: p.decay * 0.6 },  // 非整数＝木の鳴り
+    { ratio: 5.40, gain: 0.25, decay: p.decay * 0.35 },
+  ];
+  for(const pt of partials){
+    const osc = actx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = baseHz * pt.ratio;
+    const g = actx.createGain();
+    const peak = pt.gain * p.bright;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + 0.004); // 速い立ち上がり＝打音
+    g.gain.exponentialRampToValueAtTime(0.0001, t + pt.decay);
+    osc.connect(g); g.connect(out);
+    osc.start(t); osc.stop(t + pt.decay + 0.05);
+  }
+  // ノイズの立ち上がり（流木が触れる瞬間の質感）
+  const nlen = 0.03;
+  const nbuf = actx.createBuffer(1, Math.ceil(actx.sampleRate * nlen), actx.sampleRate);
+  const nd = nbuf.getChannelData(0);
+  for(let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+  const nsrc = actx.createBufferSource(); nsrc.buffer = nbuf;
+  const nbp = actx.createBiquadFilter(); nbp.type = 'bandpass';
+  nbp.frequency.value = baseHz * 2.5; nbp.Q.value = 0.8;
+  const ng = actx.createGain(); ng.gain.value = 0.18 * p.bright;
+  nsrc.connect(nbp); nbp.connect(ng); ng.connect(out);
+  nsrc.start(t); nsrc.stop(t + nlen + 0.02);
+}
+
 // ── サインベース: 音度をスケール/コードトーンにスナップ ──
 function _beachSineSnapDegree(deg, ivs){
   // deg(半音) をコードトーン集合に最も近い形へ。0/12はそのまま（ルート/オクターブ）
@@ -6970,7 +7059,14 @@ function _playBeachSineBass(actx, t, degree, cfg, durSec, slVals){
   const g = actx.createGain();
   const atk = cfg.attack || 0.06;
   const rel = cfg.release || 0.4;
-  const peak = (cfg.gainBase || 0.18);
+  let peak = (cfg.gainBase || 0.18);
+  // [C-3] 呼応：この音が立つ瞬間にARPが隙間（休符が続いている）なら、
+  // 海のうねりとして音量を持ち上げて応える。新しい音は足さず、今立つ音を強める。
+  // ARPがliveで休符ラン2以上のとき、ラン長に応じて最大+40%（上限で頭打ち）。
+  if(_arpIsLive(actx) && _arpRestRun >= 2){
+    const swell = Math.min(0.40, (_arpRestRun - 1) * 0.12);
+    peak *= (1 + swell);
+  }
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(peak, t + atk);
   const sustainEnd = t + Math.max(atk + 0.05, durSec - rel);
@@ -7291,10 +7387,17 @@ function _beachSchedule(){
           _beachStumbleArmed--;
         }
 
+        // [C-2] 呼応：ARPが密なほど足音が場所を空ける（音は抜かずベロシティで静まる）。
+        // ARPがliveなときのみ作用。Scene性格は問わず控えめ（最大-35%）。
+        let _respMul = 1.0;
+        if(_arpIsLive(actx)){
+          _respMul = 1.0 - _arpActivity * 0.35;
+        }
+
         // 骨格音
         const sk = pat.skeleton[stepInBar] || 0;
         if(sk > 0 && !stumbleSkip){
-          const vel = 0.82 * (1 + (Math.random() * 2 - 1) * velVar);
+          const vel = 0.82 * (1 + (Math.random() * 2 - 1) * velVar) * _respMul;
           _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData, stepInBar);
           if(stepInBar % 4 === 0){ _beachPulse = vel; dirty = true; }
         } else if(pat.ornaments && pat.ornaments.length && !stumbleSkip){
@@ -7303,7 +7406,7 @@ function _beachSchedule(){
             if(orn.pos === stepInBar){
               const prob = orn.prob * (1 + fillBoost);
               if(Math.random() < prob){
-                const vel = 0.48 * (1 + (Math.random() * 2 - 1) * velVar);
+                const vel = 0.48 * (1 + (Math.random() * 2 - 1) * velVar) * _respMul;
                 _playBeachFootstep(actx, t, Math.max(0.1, vel), sceneData, stepInBar);
                 if(stepInBar % 4 === 0){ _beachPulse = vel * 0.8; dirty = true; }
               }
@@ -7360,6 +7463,21 @@ function _beachSchedule(){
 
     // ── サインベース（波の振幅・海の呼吸）セル進行 ──
     _beachSineStep(actx, stepSec);
+
+    // ── 流木声（ARPの隙間に応える）[C-4b] ──
+    // ARPがliveで連続休符が閾値に達した時点（隙間が「確かな間」と確定した瞬間）に発動。
+    // 2小節ブロックに一度だけ。応えが沈黙の少し後に来るのは、呼応として自然。
+    if(_arpIsLive(actx) && _arpRestRun === _DRIFT_GAP_STEPS){
+      const _fpos = musicalPos(_beachNextBeat);
+      const _bar2 = Math.floor(Math.floor(_fpos.absStep / 16) / 2); // 2小節ブロック番号
+      if(_bar2 !== _driftLastFrameAbs){
+        const _grv  = grooveOffset(_fpos.stepInBar) * stepSec; // ポケット
+        const _bv   = breathGain(_beachNextBeat);              // 呼吸
+        const _midi = _driftPickColorMidi();
+        _playDriftwood(actx, _beachNextBeat + _grv, _midi, _bv);
+        _driftLastFrameAbs = _bar2; // この2小節ブロックは発音済み
+      }
+    }
 
     _beachTick++;
     _beachNextBeat += stepSec;
@@ -11789,6 +11907,37 @@ function breathGain(t){
   return 1.0 - p.depth * dip;
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ── 共有アクティビティ信号（真の呼応の土台）[C-1] ──
+// ARPが「今どれだけ密か」「今どれだけ長く休んでいるか」を環境層に伝える。
+// 環境（足音・サインベース・流木声）はこれを読んで場所を空け、隙間に応える。
+// ARPスケジューラが1ステップ進むたびに _arpSignalTick(isNote) を呼ぶ。
+// ════════════════════════════════════════════════════════════════════
+let _arpActivity   = 0;    // 0..1 直近の発音密度（平滑値）
+let _arpRestRun    = 0;    // 連続休符のステップ数（隙間判定用）
+let _arpSignalLastT = 0;   // 最後に信号を更新した時刻（OFF検出用）
+
+// ARPが1ステップ進むたびに呼ぶ。isNote=true:発音 / false:休符。
+function _arpSignalTick(isNote, t){
+  // 発音=1.0/休符=0.0 を指数移動平均で平滑化（跳ねさせない＝ポンピング防止）
+  const target = isNote ? 1.0 : 0.0;
+  _arpActivity += (target - _arpActivity) * 0.25; // 時定数 ~4ステップ
+  _arpRestRun = isNote ? 0 : (_arpRestRun + 1);
+  _arpSignalLastT = (t !== undefined) ? t : _arpSignalLastT;
+}
+// ARPが実際に動いているか（応答対象が存在するか）。
+// arpOn かつ 直近で信号更新があれば true。OFF時は環境を現状維持にする。
+function _arpIsLive(actx){
+  if(typeof arpOn !== 'undefined' && !arpOn && (typeof arpSolo === 'undefined' || !arpSolo)) return false;
+  if(!actx || _arpSignalLastT === 0) return false;
+  return (actx.currentTime - _arpSignalLastT) < 1.0; // 1秒以内に更新あり
+}
+
+// ── 流木声トリガ管理 [C-4] ──
+// 連続休符が閾値に達した「最も長い隙間」に、2小節に一度だけ応える。
+let _driftLastFrameAbs = -1;   // 最後に流木を鳴らした2小節ブロック（レート制限用）
+const _DRIFT_GAP_STEPS = 3;    // 隙間とみなす最小連続休符ステップ数（決定b）
+
 // ── タップテンポ ──
 // 中央コードノードを叩いてBPMを設定する（4タップ平均・2秒リセット）
 let _tapTempoTimes = []; // タップ時刻記録（最大4件・performance.now基準）
@@ -14597,6 +14746,9 @@ function scheduleArpNotes(){
           // [B-2b] 共有呼吸：フレーム境界手前で音量を引く（全層共通の谷）
           const _bv = breathGain(t);
           _playSceneArpNote(actx, result.midi, t + grv + noteOffset, dest, (result.velMul ?? 1) * _bv, result.gateOverride);
+          _arpSignalTick(true, t);  // [C-1] 発音を信号に記録
+        } else {
+          _arpSignalTick(false, t); // [C-1] 休符を信号に記録
         }
         arpNextBeat += stepSec;
         continue;
@@ -14639,6 +14791,7 @@ function scheduleArpNotes(){
 
     if(arpSeq.length > 0){
       const isRest = restProb > 0 && Math.random() < restProb;
+      _arpSignalTick(!isRest, t); // [C-1] 発音/休符を信号に記録
       if(!isRest){
         const item = arpSeq[arpStep % arpSeq.length];
         // _arpRhythmJitter はオフセット比率（stepには加算しない）
