@@ -6879,92 +6879,136 @@ function _beachSineGetChordTones(){
 }
 
 // ════════════════════════════════════════════════════════════════════
-// ── 流木声（浜辺に流れ着く欠片）[C-4] ──
-// ARPの隙間に応える中音域の声。モーダル合成（減衰する共鳴）の打音を、
-// 現コードの3rd/7thに調律して鳴らす＝質感（流木）と色（和声）を一音で運ぶ。
-// 環境の声であり前景を奪わない。2小節に一度・最も長い隙間にのみ現れる。
+// ── 浜辺のデブリ・システム（流木・小石・貝・金属片…）[C-4 / 折衷案] ──
+// ARPの隙間に応える環境音。14種のデブリを、重み付き・Scene語彙・気分で抽選。
+// ARPが灯っている間、その呼吸(密度)に合わせて濃淡しながら漂う。
+//   ARP密 → 退く / ARP疎・隙間 → 満ちる / ARP OFF → 静まる
+// 発音は16分シンコペ位置に限定。色(3rd/7th)は裸では鳴らさず滲ませる程度。
+// 語彙はBeach Grooveの砂グリッチ（ノイズ・粒子・濾過）と地続き。
 // ════════════════════════════════════════════════════════════════════
-// Scene別パラメータ: gain(音量) decay(余韻秒) bright(共鳴の明るさ係数) oct(オクターブ)
-const _DRIFT_PARAMS = {
-  glass:   { gain: 0.16, decay: 1.6, bright: 0.9, oct: 0 }, // 静寂・長い余韻
-  velvet:  { gain: 0.17, decay: 1.3, bright: 1.0, oct: 0 },
-  plain:   { gain: 0.18, decay: 1.1, bright: 1.1, oct: 0 },
-  strings: { gain: 0.16, decay: 1.4, bright: 0.95, oct: 0 },
-  love:    { gain: 0.19, decay: 0.8, bright: 1.3, oct: 0 }, // 推進・短く明るい
-  pluck:   { gain: 0.20, decay: 0.7, bright: 1.4, oct: 0 }, // 最も打音的
-};
-function _driftParams(scene){
-  return _DRIFT_PARAMS[scene || sceneCurrentName] || _DRIFT_PARAMS.plain;
-}
-// 現コードの3rdまたは7th（無ければ近い色音）のMIDIを返す。中音域に配置。
-function _driftPickColorMidi(){
+function _driftHz(midiOffset){
   const { rootMidi, ivs } = _beachSineGetChordTones();
-  // 3rd候補(3,4) / 7th候補(10,11) を優先的に拾う
   const thirds  = ivs.filter(iv => iv === 3 || iv === 4);
   const sevenths= ivs.filter(iv => iv === 10 || iv === 11);
   let pool = [];
   if(sevenths.length) pool.push(sevenths[0]);
   if(thirds.length)   pool.push(thirds[0]);
-  // どちらも無ければルート以外の最初の構成音、それも無ければ完全5度
-  if(pool.length === 0){
-    const others = ivs.filter(iv => iv !== 0);
-    pool = others.length ? [others[0]] : [7];
-  }
+  if(pool.length === 0){ const o = ivs.filter(iv => iv !== 0); pool = o.length ? [o[0]] : [7]; }
   const iv = pool[Math.floor(Math.random() * pool.length)];
-  // 中音域: rootMidi(約C3)＋2オクターブ＋色音 → 概ねC5前後
-  return rootMidi + 24 + iv;
+  const midi = rootMidi + 24 + iv + (midiOffset || 0); // 中音域C5前後
+  return 440 * Math.pow(2, (midi - 69) / 12);
 }
-// 流木打音を1回発音（モーダル合成: 共鳴する数本の減衰サイン＋ノイズ立ち上がり）
-function _playDriftwood(actx, t, midi, velMul){
-  const bus = _beachGetMasterBus(actx);
-  if(!bus) return;
-  // 時刻ガード（他の発音と同じRangeError対策）
-  { const _now = actx.currentTime; if(!isFinite(t) || t < _now + 0.001) t = _now + 0.002; }
-  const p = _driftParams();
-  const vMul = (velMul ?? 1.0);
-  const baseHz = 440 * Math.pow(2, (midi + p.oct * 12 - 69) / 12);
-
-  const out = actx.createGain();
-  out.gain.value = p.gain * vMul;
-  // ステレオ配置（環境として少し広げる）
-  let node = out;
-  if(actx.createStereoPanner){
-    const pan = actx.createStereoPanner();
-    pan.pan.value = (Math.random() * 2 - 1) * 0.4;
-    out.connect(pan); pan.connect(bus); node = out;
-  } else {
-    out.connect(bus);
+// ── 音響ヘルパ（試聴版と同一）──
+function _dbGrain(actx, dest, t, opt){
+  const dur = (opt.burstMs ?? 50) / 1000;
+  const len = Math.max(1, Math.floor(actx.sampleRate * dur));
+  const b = actx.createBuffer(1, len, actx.sampleRate);
+  const d = b.getChannelData(0);
+  const k = opt.decayK ?? 3.5;
+  for(let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / len * k);
+  const s = actx.createBufferSource(); s.buffer = b;
+  const f = actx.createBiquadFilter(); f.type = opt.type || 'bandpass';
+  f.frequency.value = (opt.freq ?? 2600) * (0.85 + Math.random() * 0.30); f.Q.value = opt.q ?? 1.0;
+  const g = actx.createGain(); g.gain.value = (opt.gain ?? 0.5) * (opt.vMul ?? 1);
+  s.connect(f); f.connect(g);
+  if(actx.createStereoPanner){ const p = actx.createStereoPanner(); p.pan.value = (opt.pan ?? (Math.random()*2-1)) * 0.5; g.connect(p); p.connect(dest); }
+  else g.connect(dest);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+function _dbNoiseSwell(actx, dest, t, opt){
+  const dur = opt.dur ?? 0.4;
+  const len = Math.max(1, Math.floor(actx.sampleRate * dur));
+  const b = actx.createBuffer(1, len, actx.sampleRate); const d = b.getChannelData(0);
+  for(let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const s = actx.createBufferSource(); s.buffer = b;
+  const f = actx.createBiquadFilter(); f.type = opt.type || 'bandpass';
+  f.frequency.setValueAtTime(opt.f0 ?? 1200, t);
+  if(opt.f1) f.frequency.linearRampToValueAtTime(opt.f1, t + dur);
+  f.Q.value = opt.q ?? 3;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime((opt.gain ?? 0.12) * (opt.vMul ?? 1), t + (opt.atk ?? dur * 0.4));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g);
+  if(actx.createStereoPanner){ const p = actx.createStereoPanner(); p.pan.value = (opt.pan ?? 0) * 0.6; g.connect(p); p.connect(dest); }
+  else g.connect(dest);
+  s.start(t); s.stop(t + dur + 0.03);
+}
+function _dbTint(actx, dest, t, baseHz, opt){
+  const o = actx.createOscillator(); o.type = 'sine'; o.frequency.value = baseHz;
+  const g = actx.createGain();
+  const peak = Math.max(0.0002, (opt.gain ?? 0.05) * (opt.vMul ?? 1));
+  const dec = opt.decay ?? 0.4;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + (opt.atk ?? 0.01));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = opt.lp ?? 1800; lp.Q.value = 0.4;
+  o.connect(lp); lp.connect(g); g.connect(dest);
+  o.start(t); o.stop(t + dec + 0.05);
+}
+// ── 14種のデブリ定義。fam=系統(気分用)、w=基本重み(目立たない=高)。──
+const _DEBRIS = [
+  { id:'sand',   fam:'particle', w:1.5, play:(a,d,t,v)=>{ const n=3+(Math.random()*2|0); for(let i=0;i<n;i++) _dbGrain(a,d,t+i*0.018,{burstMs:50,freq:2600,q:1.0,gain:0.5,vMul:v}); } },
+  { id:'coarse', fam:'particle', w:3.0, play:(a,d,t,v)=>_dbGrain(a,d,t,{burstMs:90,freq:900,q:0.5,gain:0.55,decayK:2.2,vMul:v}) },
+  { id:'pebble', fam:'particle', w:1.5, play:(a,d,t,v)=>{ const n=5+(Math.random()*3|0); let o=0; for(let i=0;i<n;i++){ o+=0.015+Math.random()*0.035; _dbGrain(a,d,t+o,{burstMs:28,freq:3400,q:1.4,gain:0.32,vMul:v}); } } },
+  { id:'wetsand',fam:'particle', w:3.0, play:(a,d,t,v)=>{ const n=2+(Math.random()*2|0); for(let i=0;i<n;i++) _dbGrain(a,d,t+i*0.03,{burstMs:80,freq:600,q:0.8,gain:0.5,decayK:1.6,type:'lowpass',vMul:v}); } },
+  { id:'thud',   fam:'impact',   w:0.4, play:(a,d,t,v)=>{ _dbGrain(a,d,t,{burstMs:55,freq:380,q:0.6,gain:0.6,decayK:4,type:'lowpass',vMul:v}); _dbGrain(a,d,t+0.004,{burstMs:25,freq:1200,q:0.5,gain:0.22,vMul:v}); } },
+  { id:'hollow', fam:'impact',   w:1.5, play:(a,d,t,v)=>{ const f=_driftHz(0); _dbGrain(a,d,t,{burstMs:40,freq:1400,q:1.5,gain:0.5,decayK:5,vMul:v}); _dbTint(a,d,t,f,{gain:0.035,decay:0.18,lp:1600,atk:0.006,vMul:v}); } },
+  { id:'creak',  fam:'creak',    w:0.4, play:(a,d,t,v)=>_dbNoiseSwell(a,d,t,{dur:0.5,f0:700,f1:1300,q:6,gain:0.10,atk:0.25,vMul:v}) },
+  { id:'rope',   fam:'creak',    w:1.5, play:(a,d,t,v)=>_dbNoiseSwell(a,d,t,{dur:0.3,f0:500,f1:350,q:2,gain:0.13,atk:0.08,vMul:v}) },
+  { id:'misty',  fam:'tinted',   w:3.0, play:(a,d,t,v)=>{ const f=_driftHz(0); _dbGrain(a,d,t,{burstMs:45,freq:f*1.5,q:1.2,gain:0.32,decayK:4,vMul:v}); _dbTint(a,d,t,f,{gain:0.06,decay:0.5,lp:1500,atk:0.02,vMul:v}); } },
+  { id:'buried', fam:'tinted',   w:3.0, play:(a,d,t,v)=>{ const f=_driftHz(-12); _dbGrain(a,d,t,{burstMs:60,freq:f*1.2,q:0.8,gain:0.22,decayK:3,vMul:v}); _dbTint(a,d,t,f,{gain:0.03,decay:0.7,lp:900,atk:0.03,vMul:v}); } },
+  { id:'washed', fam:'water',    w:1.5, play:(a,d,t,v)=>{ _dbNoiseSwell(a,d,t,{dur:0.22,f0:1000,f1:600,q:1.2,gain:0.10,atk:0.10,vMul:v}); _dbGrain(a,d,t+0.14,{burstMs:35,freq:1500,q:1.5,gain:0.4,decayK:4,vMul:v}); } },
+  { id:'drip',   fam:'water',    w:1.5, play:(a,d,t,v)=>{ const f=_driftHz(12); _dbNoiseSwell(a,d,t,{dur:0.13,f0:2400,f1:900,q:5,gain:0.12,atk:0.01,vMul:v}); _dbTint(a,d,t,f,{gain:0.04,decay:0.12,lp:2500,atk:0.004,vMul:v}); } },
+  { id:'metal',  fam:'metal',    w:0.4, play:(a,d,t,v)=>{ const f=_driftHz(0); _dbGrain(a,d,t,{burstMs:20,freq:f*2,q:1.5,gain:0.28,decayK:5,vMul:v}); _dbTint(a,d,t,f*1.5,{gain:0.04,decay:0.6,lp:2200,atk:0.003,vMul:v}); _dbTint(a,d,t,f*2.41,{gain:0.025,decay:0.4,lp:2800,atk:0.003,vMul:v}); } },
+  { id:'shard',  fam:'metal',    w:0.4, play:(a,d,t,v)=>{ for(let i=0;i<6;i++) _dbGrain(a,d,t+i*0.008,{burstMs:18,freq:1100,q:1.2,gain:0.30-i*0.02,decayK:6,vMul:v}); } },
+];
+// ── Scene別の系統重み（語彙）。1.0=標準、0=出さない ──
+const _DEBRIS_SCENE_FAM = {
+  glass:   { particle:0.8, impact:0.2, creak:0.3, tinted:1.4, water:1.2, metal:0.0 },
+  velvet:  { particle:1.0, impact:0.5, creak:0.6, tinted:1.3, water:1.0, metal:0.1 },
+  plain:   { particle:1.0, impact:1.0, creak:1.0, tinted:1.0, water:1.0, metal:0.6 },
+  strings: { particle:0.7, impact:0.4, creak:1.4, tinted:1.2, water:0.8, metal:0.2 },
+  love:    { particle:1.3, impact:1.0, creak:0.3, tinted:0.6, water:1.1, metal:0.7 },
+  pluck:   { particle:1.3, impact:1.1, creak:0.2, tinted:0.4, water:0.6, metal:1.3 },
+};
+// ── Scene別の頻度・追従強度 ──
+//   minIntervalBars: 最小発音間隔 / followStrength: ARP密度への追従(1=強く退く)
+const _DEBRIS_SCENE_FREQ = {
+  glass:   { minIntervalBars:4, baseProb:0.55, follow:1.0 },
+  velvet:  { minIntervalBars:4, baseProb:0.55, follow:0.9 },
+  plain:   { minIntervalBars:3, baseProb:0.60, follow:0.8 },
+  strings: { minIntervalBars:4, baseProb:0.55, follow:0.9 },
+  love:    { minIntervalBars:2, baseProb:0.65, follow:0.5 },
+  pluck:   { minIntervalBars:2, baseProb:0.65, follow:0.4 }, // 並走・退きにくい
+};
+// ── 気分(クラスタリング)状態 ──
+let _debrisMoodFam = null;  // 現在の系統
+let _debrisMoodLeft = 0;    // この系統をあと何回維持するか
+// Scene語彙で重み付けしたデブリ集合から、気分を加味して1つ抽選
+function _debrisPick(scene){
+  const famW = _DEBRIS_SCENE_FAM[scene] || _DEBRIS_SCENE_FAM.plain;
+  // 気分の更新: 残り0なら新しい系統へ移ろう
+  if(_debrisMoodLeft <= 0 || _debrisMoodFam === null || (famW[_debrisMoodFam] ?? 0) <= 0){
+    // 系統を重み付き抽選（Scene語彙×その系統の代表的出やすさ）
+    const fams = ['particle','impact','creak','tinted','water','metal'];
+    let tot=0; const acc=[];
+    for(const fm of fams){ const w=Math.max(0,famW[fm]??0); tot+=w; acc.push([fm,tot]); }
+    if(tot<=0) return null;
+    let r=Math.random()*tot, chosen=acc[0][0];
+    for(const [fm,c] of acc){ if(r<c){ chosen=fm; break; } }
+    _debrisMoodFam=chosen;
+    _debrisMoodLeft=2+(Math.random()*3|0); // 2〜4回 同系統を維持
   }
-
-  // モーダル: 木の共鳴を数本の倍音比（やや非整数＝木質感）で
-  const partials = [
-    { ratio: 1.0,  gain: 1.0,  decay: p.decay },
-    { ratio: 2.76, gain: 0.5,  decay: p.decay * 0.6 },  // 非整数＝木の鳴り
-    { ratio: 5.40, gain: 0.25, decay: p.decay * 0.35 },
-  ];
-  for(const pt of partials){
-    const osc = actx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = baseHz * pt.ratio;
-    const g = actx.createGain();
-    const peak = pt.gain * p.bright;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + 0.004); // 速い立ち上がり＝打音
-    g.gain.exponentialRampToValueAtTime(0.0001, t + pt.decay);
-    osc.connect(g); g.connect(out);
-    osc.start(t); osc.stop(t + pt.decay + 0.05);
-  }
-  // ノイズの立ち上がり（流木が触れる瞬間の質感）
-  const nlen = 0.03;
-  const nbuf = actx.createBuffer(1, Math.ceil(actx.sampleRate * nlen), actx.sampleRate);
-  const nd = nbuf.getChannelData(0);
-  for(let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
-  const nsrc = actx.createBufferSource(); nsrc.buffer = nbuf;
-  const nbp = actx.createBiquadFilter(); nbp.type = 'bandpass';
-  nbp.frequency.value = baseHz * 2.5; nbp.Q.value = 0.8;
-  const ng = actx.createGain(); ng.gain.value = 0.18 * p.bright;
-  nsrc.connect(nbp); nbp.connect(ng); ng.connect(out);
-  nsrc.start(t); nsrc.stop(t + nlen + 0.02);
+  _debrisMoodLeft--;
+  // 現系統内のデブリを基本重みで抽選
+  const inFam=_DEBRIS.filter(x=>x.fam===_debrisMoodFam);
+  if(inFam.length===0) return null;
+  let tot=0; const acc=[];
+  for(const x of inFam){ tot+=x.w; acc.push([x,tot]); }
+  let r=Math.random()*tot, chosen=inFam[0];
+  for(const [x,c] of acc){ if(r<c){ chosen=x; break; } }
+  return chosen;
 }
 
 // ── サインベース: 音度をスケール/コードトーンにスナップ ──
@@ -7464,18 +7508,34 @@ function _beachSchedule(){
     // ── サインベース（波の振幅・海の呼吸）セル進行 ──
     _beachSineStep(actx, stepSec);
 
-    // ── 流木声（ARPの隙間に応える）[C-4b] ──
-    // ARPがliveで連続休符が閾値に達した時点（隙間が「確かな間」と確定した瞬間）に発動。
-    // 2小節ブロックに一度だけ。応えが沈黙の少し後に来るのは、呼応として自然。
-    if(_arpIsLive(actx) && _arpRestRun === _DRIFT_GAP_STEPS){
-      const _fpos = musicalPos(_beachNextBeat);
-      const _bar2 = Math.floor(Math.floor(_fpos.absStep / 16) / 2); // 2小節ブロック番号
-      if(_bar2 !== _driftLastFrameAbs){
-        const _grv  = grooveOffset(_fpos.stepInBar) * stepSec; // ポケット
-        const _bv   = breathGain(_beachNextBeat);              // 呼吸
-        const _midi = _driftPickColorMidi();
-        _playDriftwood(actx, _beachNextBeat + _grv, _midi, _bv);
-        _driftLastFrameAbs = _bar2; // この2小節ブロックは発音済み
+    // ── 浜辺のデブリ（折衷案: ARPの呼吸に合わせて漂う）[C-4b] ──
+    // 16分シンコペ位置(step 3,7,11,15を主・1,5,9,13を従)でのみ判定。
+    // 発音確率 = Scene基本 × (1 − arpActivity×follow) × レート制限。
+    // ARPが灯っている間だけ漂い、密なら退き、隙間で満ちる。ARP OFFで静まる。
+    {
+      const _sib = _beachTick % 16;
+      const _isSyncPrimary = (_sib === 3 || _sib === 7 || _sib === 11 || _sib === 15);
+      const _isSyncSub     = (_sib === 1 || _sib === 5 || _sib === 9  || _sib === 13);
+      if((_isSyncPrimary || _isSyncSub) && _arpIsLive(actx)){
+        const fq = _DEBRIS_SCENE_FREQ[sceneCurrentName] || _DEBRIS_SCENE_FREQ.plain;
+        const _barAbs = Math.floor(_beachTick / 16);
+        const _sinceLast = _barAbs - _driftLastBar;
+        if(_sinceLast >= fq.minIntervalBars){
+          // 密度連動: ARPが密なほど確率を下げる（隙間で満ちる）
+          const dens = 1 - Math.min(1, _arpActivity * fq.follow);
+          // 従の位置は主の半分の確率（食いの最弱点を主役に）
+          let prob = fq.baseProb * dens * (_isSyncPrimary ? 1.0 : 0.5);
+          // この判定はステップ毎に走るので、間隔を満たした後の各シンコペ位置で抽選
+          if(Math.random() < prob * 0.5){ // 0.5: ステップ頻度に対する全体スケール
+            const voice = _debrisPick(sceneCurrentName);
+            if(voice){
+              const _grv = grooveOffset(_sib) * stepSec; // ポケット
+              const _bv  = breathGain(_beachNextBeat);    // 呼吸
+              voice.play(actx, _beachGetMasterBus(actx), _beachNextBeat + _grv, _bv);
+              _driftLastBar = _barAbs;
+            }
+          }
+        }
       }
     }
 
@@ -11935,8 +11995,7 @@ function _arpIsLive(actx){
 
 // ── 流木声トリガ管理 [C-4] ──
 // 連続休符が閾値に達した「最も長い隙間」に、2小節に一度だけ応える。
-let _driftLastFrameAbs = -1;   // 最後に流木を鳴らした2小節ブロック（レート制限用）
-const _DRIFT_GAP_STEPS = 3;    // 隙間とみなす最小連続休符ステップ数（決定b）
+let _driftLastBar = -999;      // 最後にデブリを鳴らした絶対小節（Scene別最小間隔のレート制限用）
 
 // ── タップテンポ ──
 // 中央コードノードを叩いてBPMを設定する（4タップ平均・2秒リセット）
