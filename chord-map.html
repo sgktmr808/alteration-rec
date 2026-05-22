@@ -12478,12 +12478,22 @@ function buildPadVoicing(root, type, voicingType){
 function _buildVelvetLine(ri, ivs, center, range){
   const rootMidi = 12*(center+1) + ri;
   const has3 = ivs.indexOf(4) >= 0;          // 長3度の有無（11thのavoid note判定）
-  // 色音（テンション）: 9th・13th(=6)は常用。11thは長3度が無いときのみ（衝突回避）
-  const tens = [2, 9];
-  if(!has3) tens.push(5);
-  // プールのピッチクラス＝コードトーン∪テンション
+  // コードトーンのピッチクラス（パッドが保持する音＝協和判定の基準）
+  const chordPC = ivs.map(iv => ((iv % 12) + 12) % 12);
+  // 候補テンション: 9th・13th(=6)。11thは長3度が無いときのみ（avoid note回避）。
+  // 協和フィルタ：パッド保持音(コードトーン)から半音(m2/b9)以内の候補は濁るので除外。
+  //   例) 7thコードの13th(9)は♭7(10)と半音で隣接→自動的に外れる。
+  const minDistToChord = (pc) => {
+    let d = 12;
+    for(const c of chordPC){ const dd = Math.min((pc - c + 12) % 12, (c - pc + 12) % 12); if(dd < d) d = dd; }
+    return d;
+  };
+  const tensCand = [2, 9];
+  if(!has3) tensCand.push(5);
+  const tens = tensCand.filter(t => minDistToChord(t) >= 2);   // ←コード依存の協和テンションのみ
+  // プールのピッチクラス＝コードトーン∪協和テンション（全て持続しても濁らない）
   const colorPC = new Set();
-  ivs.forEach(iv => colorPC.add(((iv % 12) + 12) % 12));
+  chordPC.forEach(pc => colorPC.add(pc));
   tens.forEach(t => colorPC.add(t));
   // 選択重み：root/5thは「素直な綴り」なので薄く、色音を前へ（内声が立つ）
   const weightOf = (pc) => {
@@ -12515,11 +12525,17 @@ function _buildVelvetLine(ri, ivs, center, range){
   let pendingResolve = 0, leapDir = 0, guard = 0;
   while(seq.length < LEN && guard++ < 300){
     const r = Math.random();
-    // 1) 囲い込み：色音へ半音上→半音下→解決（小粋の核）
+    // 1) ダイアトニック囲い込み：対象の色音を、プール内の最寄り上下音で挟んで解決。
+    //    生の半音(クロマ)ではなくコードトーン/協和テンションで囲うので、持続しても濁らない。
+    //    「囲んで着地する」小粋な所作は保つ。
     if(r < 0.22 && tensMidi.length){
       const near = tensMidi.filter(m => Math.abs(m - prev) <= 9);
       const target = (near.length ? near : tensMidi)[Math.floor(Math.random() * (near.length ? near.length : tensMidi.length))];
-      seq.push(target + 1); seq.push(target - 1); seq.push(target);
+      const above = pool.filter(m => m > target).sort((a,b)=>a-b)[0];      // 直上の協和音
+      const below = pool.filter(m => m < target).sort((a,b)=>b-a)[0];      // 直下の協和音
+      if(above != null) seq.push(above);
+      if(below != null) seq.push(below);
+      seq.push(target);
       prev = target; pendingResolve = 0; leapDir = 0;
       continue;
     }
