@@ -6545,10 +6545,12 @@ const BEACH_GROOVE_DEFAULT = {
         attack: 0.07, release: 0.5
       },
       love: {
-        enabled: true, octave: -1, gainBase: 0.20,
-        cell: [ {deg:0,dur:4}, {deg:7,dur:4}, {deg:0,dur:4}, {deg:4,dur:4} ],
-        mutPool: [0,4,7,10,12], lfoProb: 0.25, riseProb: 0.05,
-        attack: 0.04, release: 0.30
+        enabled: true, octave: -2, gainBase: 0.20,
+        // cellはLOVEではmovingモーフィング生成器が上書きする（_loveSineGenerateCell）。
+        // 下のcellはフォールバック（生成器が無効な場合のみ使用）。
+        cell: [ {deg:0,dur:16}, {rest:true,dur:2}, {deg:7,dur:8}, {deg:0,dur:8}, {deg:10,dur:10}, {deg:12,dur:4} ],
+        mutPool: [0,7,10,12], lfoProb: 0.25, riseProb: 0.05,
+        attack: 0.10, release: 0.45
       },
       pluck: {
         enabled: true, octave: -2, gainBase: 0.17,
@@ -6611,6 +6613,13 @@ let _beachSineLfoActive  = false; // 現フレーズでLFO発動中か
 let _beachSineLfoPattern = null;  // 'triplet' | 'dotted8th'
 let _beachSineLastNode   = null;  // 現在鳴っているサインベースのノード（重複停止用）
 let _beachSineSegRemain  = 0;     // 現セグメントの残り16分ステップ数
+
+// ── LOVE サインベース モーフィング [E-LOVE] ──
+// moving軸(−1〜+1)で3案を連続補間した48stepセルを生成。
+// −1=案3(二極/静) / 0=案1(ペダル+二段/催眠・既定) / +1=案2(昇る波/動)。
+// ループ頭で次のmoving値を読んで再生成（途中で構造が変わらない）。
+let _loveSineCell     = null;   // 生成済みセル（キャッシュ）
+let _loveSineCellMoving = null; // そのセルを生成したときのmoving値
 
 function _beachGetMasterBus(actx){
   if(_beachMasterBus && _beachMasterBus.context === actx) return _beachMasterBus;
@@ -7545,6 +7554,86 @@ function _beachSchedule(){
   _beachScheduleTimer = setTimeout(_beachSchedule, _BEACH_SCHEDULE_MS);
 }
 
+// ── LOVE サインベース モーフィング生成器 [E-LOVE] ──
+// moving(−1〜+1)で3案を連続補間。3案を「制御点」で正規化し線形補間する。
+//   P0=前半安定区(deg/長さ) P1=中間の動き P2=後半の色音 P3=ループ末の抜け
+// 返り値: 48step分のセル配列 [{deg,dur} | {rest,dur}]
+function _loveSineGenerateCell(moving){
+  // 3案の制御点（音度deg・前半安定区の長さ・休符量・後半の鋭さ）
+  // 静(案3,m=-1) / 催眠(案1,m=0) / 動(案2,m=+1)
+  const A = { // 案3 二極を漂う（静）
+    stableLen:14, p1:7,  p2:12, p3:7,  restAmt:0.10, midMove:10, splitP2:false
+  };
+  const B = { // 案1 ペダル+二段の滲み出し（催眠・既定）
+    stableLen:16, p1:7,  p2:10, p3:12, restAmt:0.18, midMove:7,  splitP2:false
+  };
+  const C = { // 案2 昇る波（動）
+    stableLen:12, p1:7,  p2:10, p3:0,  restAmt:0.06, midMove:7,  splitP2:true
+  };
+  // moving<0: A→B を補間、moving>0: B→C を補間（Bが中央=既定）
+  const m = Math.max(-1, Math.min(1, moving || 0));
+  const lerp = (a,b,x)=> a + (b-a)*x;
+  let s;
+  if(m <= 0){ const x = m + 1; // -1→0 を 0→1
+    s = { stableLen:Math.round(lerp(A.stableLen,B.stableLen,x)),
+          p1:Math.round(lerp(A.p1,B.p1,x)), p2:Math.round(lerp(A.p2,B.p2,x)),
+          p3:Math.round(lerp(A.p3,B.p3,x)), restAmt:lerp(A.restAmt,B.restAmt,x),
+          midMove:Math.round(lerp(A.midMove,B.midMove,x)),
+          splitP2:(x>0.5?B.splitP2:A.splitP2) };
+  } else { const x = m; // 0→1
+    s = { stableLen:Math.round(lerp(B.stableLen,C.stableLen,x)),
+          p1:Math.round(lerp(B.p1,C.p1,x)), p2:Math.round(lerp(B.p2,C.p2,x)),
+          p3:Math.round(lerp(B.p3,C.p3,x)), restAmt:lerp(B.restAmt,C.restAmt,x),
+          midMove:Math.round(lerp(B.midMove,C.midMove,x)),
+          splitP2:(x>0.5?C.splitP2:B.splitP2) };
+  }
+  // ── 48stepを構築 ──
+  // 前半: 安定区(stableLen) ＋ 呼吸の小休符(restAmtに応じ0〜3step)
+  const TOTAL = 48;
+  const cell = [];
+  let used = 0;
+  const restLen = Math.round(s.restAmt * 14); // restAmt 0.06→1, 0.18→3 程度
+  // [前半 安定区]
+  cell.push({ deg:0, dur:s.stableLen }); used += s.stableLen;
+  if(restLen > 0){ cell.push({ rest:true, dur:restLen }); used += restLen; }
+  // [中間 第一の動き] p1へ持ち上がる
+  const midLen = 8;
+  cell.push({ deg:s.p1, dur:midLen }); used += midLen;
+  // [安定回帰 or 中間補助] midMoveがあれば短く挟む（静/動で経路を変える）
+  if(s.midMove !== s.p1){
+    const auxLen = 4;
+    cell.push({ deg:s.midMove, dur:auxLen }); used += auxLen;
+  }
+  // [後半 第二の動き] p2（色音）。splitP2なら p2→さらに下降を分割
+  const remainBefore = TOTAL - used - 4; // p3に最低4step残す
+  if(s.splitP2 && remainBefore >= 8){
+    const half = Math.floor(remainBefore/2);
+    cell.push({ deg:s.p2, dur:half }); used += half;
+    cell.push({ deg:5,    dur:remainBefore-half }); used += (remainBefore-half); // sus的4thへ下降
+  } else {
+    const p2len = Math.max(4, remainBefore);
+    cell.push({ deg:s.p2, dur:p2len }); used += p2len;
+  }
+  // [ループ末 抜け] 残り全部を p3 に
+  const tail = TOTAL - used;
+  if(tail > 0){ cell.push({ deg:s.p3, dur:tail }); used += tail; }
+  // 合計が48に満たない/超える場合は最後のセグメントで調整
+  let sum = cell.reduce((a,c)=>a+c.dur,0);
+  if(sum !== TOTAL){ cell[cell.length-1].dur += (TOTAL - sum); }
+  // 安全: dur>=1
+  for(const c of cell){ if(c.dur < 1) c.dur = 1; }
+  // [機能回避] 補間中間でも3度(3,4)を踏まないよう、許可音度へ最近接スナップ。
+  // 許可: 0(root) 5(4th/sus) 7(5th) 10(短7th) 12(oct)＝機能を断定しない色音のみ。
+  const ALLOWED = [0,5,7,10,12];
+  for(const c of cell){
+    if(c.rest || c.deg == null) continue;
+    let best = ALLOWED[0], bd = 99;
+    for(const a of ALLOWED){ const d = Math.abs(a - c.deg); if(d < bd){ bd = d; best = a; } }
+    c.deg = best;
+  }
+  return cell;
+}
+
 // ── サインベース: 1ステップ進行（セルベース・足音とは独立した音価管理）──
 function _beachSineStep(actx, stepSec){
   const sbAll = (_beachGrooveData.global && _beachGrooveData.global.sineBass) || null;
@@ -7555,12 +7644,13 @@ function _beachSineStep(actx, stepSec){
   // [A-3] フレーム拍頭でセルを共有フレームに整合させる。
   // 検出は足音と同一の _beachTick グリッドで行い、サインベースと足音の一致を保証する。
   // セルのbar-1を共有フレームのbar-1に合わせる（cell長がフレームを割り切る
-  // GLASS/PLAIN/VELVET/LOVE/PLUCK は初回の一度だけ補正、以降は無音切れなし）。
-  // STRINGSは3小節セル×4小節足音の意図的phasingを保持するため除外。
+  // GLASS/PLAIN/VELVET/PLUCK は初回の一度だけ補正、以降は無音切れなし）。
+  // STRINGS(3小節)とLOVE(3小節モーフ)はフレーム2/4小節を割り切らないため除外
+  // ＝意図的phasing/長尺ループを保持する。
   const _frB = _frameBars();
   const _tickInBar   = _beachTick % 16;
   const _barInFrame  = Math.floor(_beachTick / 16) % _frB;
-  if(sceneCurrentName !== 'strings' && _tickInBar === 0 && _barInFrame === 0){
+  if(sceneCurrentName !== 'strings' && sceneCurrentName !== 'love' && _tickInBar === 0 && _barInFrame === 0){
     _beachSineSegRemain = 0;
     _beachSineCellPos   = 0;
   }
@@ -7576,7 +7666,19 @@ function _beachSineStep(actx, stepSec){
     complex: (typeof sv === 'function') ? sv('complex') : 0,
   };
 
-  const cell = cfg.cell;
+  // [E-LOVE] LOVEはmovingで3案をモーフィングした生成セルを使う。
+  // ループ頭(cellPos==0)で次のmoving値を読んで再生成＝途中で構造が変わらない。
+  // movingを動かしても今の周回は完走し、次の頭から滑らかに反映される。
+  let cell;
+  if(sceneCurrentName === 'love'){
+    if(_loveSineCell === null || _beachSineCellPos === 0){
+      _loveSineCell = _loveSineGenerateCell(slVals.moving);
+      _loveSineCellMoving = slVals.moving;
+    }
+    cell = _loveSineCell;
+  } else {
+    cell = cfg.cell;
+  }
   const cellLen = cell.length;
   // 位相シフト適用
   const idx = (_beachSineCellPos + _beachSineCellPhase) % cellLen;
@@ -7584,7 +7686,9 @@ function _beachSineStep(actx, stepSec){
 
   // セル先頭セグメント到達時にLFO発動判定（セグメント開始に同期）
   if(_beachSineCellPos === 0){
-    const lfoProb = (cfg.lfoProb || 0.2) * (1 + Math.max(0, slVals.moving) * 0.8);
+    // LOVEはmovingをモーフィング主軸に使うため、LFO確率へのmoving加算を外す（二重適用回避）
+    const lfoMovingMul = (sceneCurrentName === 'love') ? 1 : (1 + Math.max(0, slVals.moving) * 0.8);
+    const lfoProb = (cfg.lfoProb || 0.2) * lfoMovingMul;
     _beachSineLfoActive  = Math.random() < lfoProb;
     _beachSineLfoPattern = (Math.random() < 0.5) ? 'triplet' : 'dotted8th';
   }
