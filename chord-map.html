@@ -12466,6 +12466,99 @@ function buildPadVoicing(root, type, voicingType){
 }
 
 // ── ARPシーケンス生成 ──
+// ════════════════════════════════════════════════════════════════════
+// ── VELVET「なぞらない線」[E-VELVET] ──
+// コードを順に綴る（輪郭なぞり）のをやめ、声部進行で歩く線を生成する。
+// ・ルートレス：根音を弱め、内声と緊張音(9/11/13)を前に出す
+// ・囲い込み(enclosure)：色音へ半音上下から挟んで解決＝ジャズ・ラインの小粋
+// ・意志的な跳躍→順次解決：予測可能なup走査をやめ、跳んで戻る輪郭
+// ・同音反復を避ける（なぞらない）。コードチェンジごとに新しい線を生成。
+// 走り続けるアルペジオのまま、視点を持たせる。
+// ════════════════════════════════════════════════════════════════════
+function _buildVelvetLine(ri, ivs, center, range){
+  const rootMidi = 12*(center+1) + ri;
+  const has3 = ivs.indexOf(4) >= 0;          // 長3度の有無（11thのavoid note判定）
+  // 色音（テンション）: 9th・13th(=6)は常用。11thは長3度が無いときのみ（衝突回避）
+  const tens = [2, 9];
+  if(!has3) tens.push(5);
+  // プールのピッチクラス＝コードトーン∪テンション
+  const colorPC = new Set();
+  ivs.forEach(iv => colorPC.add(((iv % 12) + 12) % 12));
+  tens.forEach(t => colorPC.add(t));
+  // 選択重み：root/5thは「素直な綴り」なので薄く、色音を前へ（内声が立つ）
+  const weightOf = (pc) => {
+    if(pc === 0) return 0.40;                // root（ルートレス＝薄く）
+    if(pc === 7) return 0.70;                // 5th
+    if(pc === 3 || pc === 4) return 0.85;    // 3rd（内声に残すが主役にしない）
+    return 1.40;                             // 9/11/13 等の色音
+  };
+  // 実音プール（中域中心・range内）
+  let pool = [];
+  for(let oct = -range; oct <= range; oct++){
+    colorPC.forEach(pc => {
+      let m = rootMidi + oct*12 + pc;
+      const octRoot = rootMidi + oct*12;
+      if(m < octRoot) m += 12;
+      pool.push(m);
+    });
+  }
+  pool = [...new Set(pool)].filter(m => m >= 33 && m <= 93).sort((a,b)=>a-b);
+  if(pool.length === 0) return [rootMidi];
+  const isTens = (m) => tens.indexOf(((m - rootMidi) % 12 + 12) % 12) >= 0;
+  const tensMidi = pool.filter(isTens);
+
+  const LEN = 16;
+  const seq = [];
+  let prev = tensMidi.length ? tensMidi[Math.floor(tensMidi.length/2)]
+                             : pool[Math.floor(pool.length/2)];
+  seq.push(prev);
+  let pendingResolve = 0, leapDir = 0, guard = 0;
+  while(seq.length < LEN && guard++ < 300){
+    const r = Math.random();
+    // 1) 囲い込み：色音へ半音上→半音下→解決（小粋の核）
+    if(r < 0.22 && tensMidi.length){
+      const near = tensMidi.filter(m => Math.abs(m - prev) <= 9);
+      const target = (near.length ? near : tensMidi)[Math.floor(Math.random() * (near.length ? near.length : tensMidi.length))];
+      seq.push(target + 1); seq.push(target - 1); seq.push(target);
+      prev = target; pendingResolve = 0; leapDir = 0;
+      continue;
+    }
+    // 2) 意志的な跳躍（6th/7th相当）→次で順次に解決
+    if(pendingResolve === 0 && r < 0.34){
+      const cands = pool.filter(m => { const d = Math.abs(m - prev); return d >= 7 && d <= 11; });
+      if(cands.length){
+        const nxt = cands[Math.floor(Math.random() * cands.length)];
+        leapDir = (nxt > prev) ? -1 : +1;   // 解決は跳躍と逆方向へ
+        seq.push(nxt); prev = nxt; pendingResolve = 1;
+        continue;
+      }
+    }
+    // 3) 跳躍後の順次解決
+    if(pendingResolve > 0){
+      const cands = pool.filter(m => { const d = (m - prev) * leapDir; return d > 0 && d <= 3; });
+      if(cands.length){
+        cands.sort((a,b) => Math.abs(a - prev) - Math.abs(b - prev));
+        seq.push(cands[0]); prev = cands[0]; pendingResolve = 0;
+        continue;
+      }
+      pendingResolve = 0;
+    }
+    // 4) 既定＝声部進行：近い音へ重み付き移動（同音反復は避ける＝なぞらない）
+    const win = pool.filter(m => m !== prev && Math.abs(m - prev) <= 5);
+    const choices = win.length ? win : pool.filter(m => m !== prev);
+    if(choices.length === 0){ break; }
+    const weights = choices.map(m => {
+      const pc = ((m - rootMidi) % 12 + 12) % 12;
+      return weightOf(pc) / (Math.abs(m - prev) + 1.0);   // 近いほど・色音ほど
+    });
+    const tot = weights.reduce((a,b)=>a+b, 0);
+    let x = Math.random() * tot, chosen = choices[choices.length - 1];
+    for(let j = 0; j < choices.length; j++){ x -= weights[j]; if(x <= 0){ chosen = choices[j]; break; } }
+    seq.push(chosen); prev = chosen;
+  }
+  return seq.length ? seq : [rootMidi];
+}
+
 function buildArpSeq(root, type){
   const ri=ni(root);
   const ivs=CT[type]?.iv??[0,4,7];
@@ -12473,6 +12566,12 @@ function buildArpSeq(root, type){
   // SLのcomplex値でoctaveRangeを動的調整
   const effectiveOctRange = _slArpOctRange !== null ? _slArpOctRange : arpOctRange;
   const range=effectiveOctRange-1;  // 0=±0oct, 1=±1oct, 2=±2oct
+
+  // [E-VELVET] VELVETは輪郭なぞりをやめ、声部進行で歩く線を使う（Scene固有）。
+  // arpPatternに依らずScene本来の性格として常にこの線を返す。
+  if(sceneCurrentName === 'velvet'){
+    return _buildVelvetLine(ri, ivs, center, range);
+  }
 
   // 基準オクターブのルート音
   const rootMidi=12*(center+1)+ri; // C3=48, C4=60 ...
@@ -15552,7 +15651,9 @@ const SCENE_PRESETS = {
     arpAttack:0.02, arpDecay:0.80, arpSustain:0.40,
     arpGate:800, arpVol:0.28, arpWet:0.50, arpGhost:0.10,
     arpOctRange:2,
-    arpRhythm:[1.0, 0.5, 1.0, 1.5], arpRestProb:0.12,
+    // [E-VELVET] リズムの息（下地）：均等な綴りをやめ、短い音が長い音へ食い込む押し引きで「語る」。
+    // 0.5→1.5 が先取り→居残りの呼吸。1.0の歩行に時々 0.5 の間を挟む。走り続けたまま息をする。
+    arpRhythm:[1.0, 0.5, 1.5, 1.0, 1.0, 0.5, 1.5, 1.0], arpRestProb:0.12,
   },
 
   // 3. GLASS PIANO — 坂本龍一的。透明、硬質、冷たい残響
