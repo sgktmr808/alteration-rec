@@ -6282,38 +6282,43 @@ const BEACH_GROOVE_DEFAULT = {
           enabled: true,
           humanize: 0.07,
           velocityVariation: 0.22,
-          syncopationDragProb: 0.35,
+          // [E-VELVET足音] 主因だったランダム大ドラッグと8分スウィングを撤去。
+          // ポケットは _GROOVE_PARAMS.velvet の一定オフセットへ一元化（毎回同じだけ後ろ）。
+          syncopationDragProb: 0,
           syncopationDragMin: 0.12,
           syncopationDragMax: 0.30,
-          swingAmount: 0.30
+          swingAmount: 0
         },
-        sand:  { enabled: true,  baseDensity: 0.35, glitchProb: 0.08, applySwing: true },
+        sand:  { enabled: true,  baseDensity: 0.35, glitchProb: 0.08, applySwing: false },
         wave:  { enabled: true,  barProb: 0.15 },
         shell: { enabled: true,  intervalSecMin: 120, intervalSecMax: 250 },
         otherFootstep: { enabled: true, intervalSecMin: 150, intervalSecMax: 350, sequenceLen: [3,5] }
       },
+      // [E-VELVET足音] 1/16シンコペ基準に再構成。署名＝step11（3拍目の付点8分休符後）。
+      // 拍頭0,4,8,12は四つ打ちの土台、署名スキップ＝11,15,7,3（デブリ語彙と整合）。
+      // SL(moving)上昇で土台が立ち上がり、最大でも6打に抑えて深さを保つ。
       footstepPatterns: {
         stopped: [],
         extraSparse: [
-          { name: "velvet-sparse-1", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0], ornaments: [{ pos:10, prob:0.18 }] },
-          { name: "velvet-sparse-2", skeleton: [0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0], ornaments: [{ pos:6, prob:0.18 }] },
-          { name: "velvet-sparse-3", skeleton: [1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0], ornaments: [{ pos:6, prob:0.20 }] },
-          { name: "velvet-sparse-4", skeleton: [1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0], ornaments: [] }
+          { name: "velvet-sparse-1", skeleton: [1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0], ornaments: [{ pos:13, prob:0.16 }] },
+          { name: "velvet-sparse-2", skeleton: [1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0], ornaments: [] },
+          { name: "velvet-sparse-3", skeleton: [0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1], ornaments: [{ pos:9, prob:0.16 }] },
+          { name: "velvet-sparse-4", skeleton: [1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0], ornaments: [{ pos:5, prob:0.16 }] }
         ],
         halftime: [
-          { name: "velvet-half-1", skeleton: [1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0], ornaments: [{ pos:11, prob:0.20 }] },
-          { name: "velvet-half-2", skeleton: [1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0], ornaments: [{ pos:6, prob:0.22 },{ pos:11, prob:0.18 }] },
-          { name: "velvet-half-3", skeleton: [1,0,0,0,0,0,1,0,1,0,1,0,0,0,0,0], ornaments: [{ pos:14, prob:0.22 }] }
+          { name: "velvet-half-1", skeleton: [1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1], ornaments: [{ pos:5, prob:0.18 }] },
+          { name: "velvet-half-2", skeleton: [1,0,0,0,0,0,0,1,1,0,0,1,0,0,0,0], ornaments: [{ pos:13, prob:0.18 }] },
+          { name: "velvet-half-3", skeleton: [1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0], ornaments: [{ pos:15, prob:0.20 }] }
         ],
         onBeat: [
-          { name: "velvet-beat-1", skeleton: [1,0,0,0,1,0,1,0,1,0,0,0,1,0,1,0], ornaments: [{ pos:10, prob:0.20 }] },
-          { name: "velvet-beat-2", skeleton: [1,0,0,0,1,0,0,1,1,0,1,0,1,0,0,0], ornaments: [{ pos:14, prob:0.22 }] },
-          { name: "velvet-beat-3", skeleton: [1,0,0,0,1,0,1,0,1,0,0,1,1,0,1,0], ornaments: [{ pos:2, prob:0.18 }] }
+          { name: "velvet-beat-1", skeleton: [1,0,0,0,1,0,0,0,1,0,0,1,1,0,0,0], ornaments: [{ pos:15, prob:0.18 }] },
+          { name: "velvet-beat-2", skeleton: [1,0,0,0,1,0,0,1,1,0,0,1,1,0,0,0], ornaments: [{ pos:13, prob:0.18 }] },
+          { name: "velvet-beat-3", skeleton: [1,0,0,0,1,0,0,0,1,0,0,1,1,0,0,1], ornaments: [{ pos:5, prob:0.16 }] }
         ],
         beatPlus: [
-          { name: "velvet-bp-1", skeleton: [1,0,0,1,1,0,1,0,1,0,1,0,1,0,1,0], ornaments: [] },
-          { name: "velvet-bp-2", skeleton: [1,0,1,0,1,0,1,0,1,0,0,1,1,0,1,0], ornaments: [{ pos:14, prob:0.22 }] },
-          { name: "velvet-bp-3", skeleton: [1,0,0,0,1,0,1,0,1,0,1,0,1,0,1,1], ornaments: [{ pos:3, prob:0.18 }] }
+          { name: "velvet-bp-1", skeleton: [1,0,0,0,1,0,0,0,1,0,0,1,1,0,0,1], ornaments: [] },
+          { name: "velvet-bp-2", skeleton: [1,0,0,1,1,0,0,0,1,0,0,1,1,0,0,0], ornaments: [{ pos:13, prob:0.18 }] },
+          { name: "velvet-bp-3", skeleton: [1,0,0,0,1,0,0,1,1,0,0,1,1,0,0,0], ornaments: [{ pos:15, prob:0.18 }] }
         ]
       },
       phraseEvolution: { patternRotation: "weighted-random", bar4FillBoost: 0.25, repeatPenalty: 0.55 }
@@ -12287,7 +12292,7 @@ function musicalPos(t){
 const _GROOVE_PARAMS = {
   plain:   { swing: 0.00, pocket: 0.010 },
   glass:   { swing: 0.00, pocket: 0.016 }, // 遅い・裏拍を深めに緩める
-  velvet:  { swing: 0.30, pocket: 0.012 }, // 既存swing0.30を継承
+  velvet:  { swing: 0.00, pocket: 0.070 }, // [E-VELVET足音] 8分swing撤去・一定ポケット約12ms(@88)
   love:    { swing: 0.00, pocket: 0.004 }, // 推進系・浅い
   pluck:   { swing: 0.00, pocket: 0.003 }, // 推進系・最も浅い（テクノの締まり）
   strings: { swing: 0.00, pocket: 0.010 },
