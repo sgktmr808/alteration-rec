@@ -6543,10 +6543,13 @@ const BEACH_GROOVE_DEFAULT = {
         attack: 0.06, release: 0.45
       },
       velvet: {
+        // [E-VELVET-SINE] このcellはフォールバック。実際は _buildVelvetSineCell が
+        // movingモーフィング生成器として上書きする（_beachSineStep内のvelvet分岐）。
+        // mutPoolから三度(3)を除去＝変異でも機能=三度を再導入しない（ルートレス色のみ）。
         enabled: true, octave: -2, gainBase: 0.19,
-        cell: [ {deg:0,dur:8}, {deg:3,dur:8}, {deg:0,dur:8}, {deg:7,dur:8},
-                {deg:3,dur:8}, {rest:true,dur:8}, {deg:0,dur:8}, {rest:true,dur:8} ],
-        mutPool: [0,3,5,7,10], lfoProb: 0.22, riseProb: 0.04,
+        cell: [ {deg:7,dur:12}, {deg:9,dur:8}, {deg:5,dur:8}, {deg:10,dur:8},
+                {deg:7,dur:8}, {rest:true,dur:6}, {deg:2,dur:8}, {deg:0,dur:6} ],
+        mutPool: [0,2,5,7,9,10], lfoProb: 0.22, riseProb: 0.04,
         attack: 0.07, release: 0.5
       },
       love: {
@@ -6632,6 +6635,14 @@ let _loveSineCellMoving = null; // そのセルを生成したときのmoving値
 // 共通の地（B案・重心）を選び、収束フレーム頭でのみヒステリシス付きで移ろう。
 let _stringsSineCell       = null;  // 生成済みセル（キャッシュ）
 let _stringsSineCellMoving = null;  // そのセルを生成したときのmoving値
+
+// ── VELVET サインベース モーフィング [E-VELVET-SINE] ──
+// moving軸を Moving(+1)=歩く線（ルートレス・内声・三度回避） ↔ Static(−1)=5thの地
+// に割り当て、間を補間。VELVETの人物像（rootless・内声で語る・壁伝いに歩かない）に
+// 合わせ「機能=三度の断定」から離脱させる。地は各コードの5thに佇む（コード追従）。
+// ループ頭で次のmoving値を読んで再生成（途中で構造が変わらない）。
+let _velvetSineCell        = null;  // 生成済みセル（キャッシュ）
+let _velvetSineCellMoving  = null;  // そのセルを生成したときのmoving値
 let _stringsPedalPC        = null;  // 現ペダルの絶対ピッチクラス(0..11) / null=未確定
 let _stringsPedalPrevPC    = null;  // 直前のペダルPC（リロケート時のグライド元）
 let _stringsPedalGlide     = false; // 次のペダル発音で旧→新へグライドするか
@@ -7174,6 +7185,13 @@ function _playBeachSineBass(actx, t, degree, cfg, durSec, slVals, absMidi, glide
     if(glideFrom != null){
       glideFromFreq = Math.max(20, 440 * Math.pow(2, (glideFrom - 69) / 12));
     }
+  } else if(sceneCurrentName === 'velvet'){
+    // [E-VELVET-SINE] 生成器がmovingモーフィングを担うため、ここでのmoving収束/拡張は掛けない。
+    // 既定の _beachSineSnapDegree（最寄りコードトーン＝三度を作りうる）も使わず、
+    // VELVET専用スナップで「三度を作らず・m2も作らない」許容音度へ収める（線の意見を保つ）。
+    const deg = _velvetSineSnapDegree(degree, ivs);
+    midi = rootMidi + deg + (cfg.octave || -2) * 12;
+    freq = Math.max(20, 440 * Math.pow(2, (midi - 69) / 12));
   } else {
     // moving: 音度の広がり（+で拡張・-で収束）
     const mv = slVals.moving;
@@ -7876,6 +7894,82 @@ function _stringsPickPedal(){
   }
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ── VELVET サインベース「歩く線 ↔ 5thの地」モーフィング [E-VELVET-SINE] ──
+// VELVET＝ベルベットを着る人物。rootless・内声で語る・壁伝いに歩かない。
+// ARPは E-VELVET で「なぞらない線」へ離脱済み。浜辺(Sineベース)も同じ言語へ。
+// movingで +1=歩く線（声部進行・色音・三度回避） ↔ −1=5thの地（佇み）を補間。
+// ════════════════════════════════════════════════════════════════════
+
+// 歩く線の基本コンター（+1極・64step）。degは「コードトーン基準の半音度」。
+// 5thを起点に色音(9/13/sus/m7)を声部進行で渡り歩き、rootは束の間の弱い着地のみ。
+// 発音時 _velvetSineSnapDegree で現コードに対し協和な許容音度へ収める。
+const _VELVET_SINE_LINE = [
+  {deg:7,  dur:12}, {deg:9,  dur:8}, {deg:5,  dur:8}, {deg:10, dur:8},
+  {deg:7,  dur:8},  {rest:true, dur:6}, {deg:2, dur:8}, {deg:0, dur:6}
+];
+
+// 5thの地を16step以下のホールドへ分割して積む（保持中もコード追従＝協和を保つ）。
+function _velvetPushGround(arr, len){
+  let r = len;
+  while(r > 0){ const d = Math.min(16, r); arr.push({deg:7, dur:d}); r -= d; }
+}
+
+// moving(−1〜+1)で「歩く線 ↔ 5thの地」を補間した64stepセルを生成。
+//   +1: 歩く線そのまま / −1: 5thを佇むホールド＋息
+//   中間: 頭に5thの地を置き、残りに線を圧縮。fzが上がるほど高い色音が地(5th)へ凍る。
+function _buildVelvetSineCell(moving){
+  const m  = Math.max(-1, Math.min(1, moving || 0));
+  const fz = (1 - m) / 2;            // 0(線/Moving) .. 1(地/Static)
+  const TOTAL = 64;
+  if(fz <= 0.02) return _VELVET_SINE_LINE.map(s => ({...s}));   // ほぼMoving端
+  if(fz >= 0.98){                                               // ほぼStatic端
+    const c = []; _velvetPushGround(c, TOTAL - 8); c.push({rest:true, dur:8}); return c;
+  }
+  // 中間：線を圧縮し、その実長から地のホールド長を逆算（合計を常に正確に64へ）
+  const t = 1 - fz * 0.875;            // 線の圧縮率 1(fz≈0)→0.125(fz≈1)
+  const scaled = _VELVET_SINE_LINE.map(s => ({...s, dur: Math.max(1, Math.round(s.dur * t))}));
+  // fzが高いほど線の動きを地(5th/4th)へ凍らせる＝歩みが佇みへ溶ける
+  if(fz > 0.5){
+    for(const s of scaled){
+      if(s.rest || s.deg == null) continue;
+      if(s.deg === 9 || s.deg === 10) s.deg = 7;   // 高い色 → 5th
+      else if(s.deg === 2) s.deg = 5;              // 9th → 4th(sus)
+      // 0(root)は束の間の着地として残す
+    }
+  }
+  let L = scaled.reduce((a,c)=>a+c.dur,0);
+  if(L > TOTAL) L = TOTAL;                          // 安全クランプ（t≤1なので通常不要）
+  const groundLen = TOTAL - L;                      // 残りを5thの地で満たす
+  const cell = []; _velvetPushGround(cell, groundLen);
+  return cell.concat(scaled);
+}
+
+// VELVET専用スナップ：現コードに対し「三度を作らず・m2(半音衝突)も作らない」
+// 許容音度へ寄せる。許容パレット＝ルートレス色 [0(root) 2(9) 5(4/sus) 7(5) 9(13)
+// 10(m7) 12(oct)]。三度(3,4)は除外。各候補は「コードトーン(三度を除く)」
+// または「全コードトーンから半音以上離れている(協和テンション)」場合のみ採用。
+function _velvetSineSnapDegree(deg, ivs){
+  const chordPC = ivs.map(iv => ((iv % 12) + 12) % 12);
+  const minDist = (pc) => {
+    let d = 12;
+    for(const c of chordPC){ const dd = Math.min((pc - c + 12) % 12, (c - pc + 12) % 12); if(dd < d) d = dd; }
+    return d;
+  };
+  const PALETTE = [0,2,5,7,9,10,12];
+  const allowed = PALETTE.filter(p => {
+    const pc = ((p % 12) + 12) % 12;
+    if(pc === 3 || pc === 4) return false;                 // 三度は絶対に作らない
+    const isTone = chordPC.indexOf(pc) >= 0;
+    return isTone || minDist(pc) >= 2;                     // コードトーン(非三度) or 協和テンション
+  });
+  if(allowed.length === 0) return 7;                        // 安全網：5th
+  const base = ((deg % 12) + 12) % 12;
+  let best = allowed[0], bd = 99;
+  for(const a of allowed){ const d = Math.min((a - base + 12) % 12, (base - a + 12) % 12); if(d < bd){ bd = d; best = a; } }
+  return (deg >= 12 ? best + 12 : best);
+}
+
 // ── サインベース: 1ステップ進行（セルベース・足音とは独立した音価管理）──
 function _beachSineStep(actx, stepSec){
   const sbAll = (_beachGrooveData.global && _beachGrooveData.global.sineBass) || null;
@@ -7936,6 +8030,13 @@ function _beachSineStep(actx, stepSec){
       _stringsSineCellMoving = slVals.moving;
     }
     cell = _stringsSineCell;
+  } else if(sceneCurrentName === 'velvet'){
+    // [E-VELVET-SINE] movingで「歩く線 ↔ 5thの地」を補間。ループ頭で再生成＝周回途中で構造を変えない。
+    if(_velvetSineCell === null || _beachSineCellPos === 0){
+      _velvetSineCell = _buildVelvetSineCell(slVals.moving);
+      _velvetSineCellMoving = slVals.moving;
+    }
+    cell = _velvetSineCell;
   } else {
     cell = cfg.cell;
   }
@@ -7946,8 +8047,8 @@ function _beachSineStep(actx, stepSec){
 
   // セル先頭セグメント到達時にLFO発動判定（セグメント開始に同期）
   if(_beachSineCellPos === 0){
-    // LOVEはmovingをモーフィング主軸に使うため、LFO確率へのmoving加算を外す（二重適用回避）
-    const lfoMovingMul = (sceneCurrentName === 'love') ? 1 : (1 + Math.max(0, slVals.moving) * 0.8);
+    // LOVE/VELVETはmovingをモーフィング主軸に使うため、LFO確率へのmoving加算を外す（二重適用回避）
+    const lfoMovingMul = (sceneCurrentName === 'love' || sceneCurrentName === 'velvet') ? 1 : (1 + Math.max(0, slVals.moving) * 0.8);
     const lfoProb = (cfg.lfoProb || 0.2) * lfoMovingMul;
     _beachSineLfoActive  = Math.random() < lfoProb;
     _beachSineLfoPattern = (Math.random() < 0.5) ? 'triplet' : 'dotted8th';
