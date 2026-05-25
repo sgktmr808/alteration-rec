@@ -6525,6 +6525,9 @@ const BEACH_GROOVE_DEFAULT = {
   },
   global: {
     tide:    { periodSec: 240, depth: 0.15 },   // 4分周期で±15%音量変調
+    // [E-1] 大きな潮：数分かけて全体がゆっくり姿を変えるマクロ潮位。
+    // 和声・スケール・ピッチには触れず、テクスチャ（潮の振幅・動きの活性）だけを移ろわせる。
+    macroTide: { periodSec: 360, depthLo: 0.10, depthHi: 0.20 }, // 6分で一巡。潮の深さ自体を呼吸させる
     silence: { ms: 400 },                         // ガラス採取時の沈黙時間
     // ── サインベース（波の振幅・海の呼吸）──
     // cell: {deg=半音度(コードトーン基準), dur=16分ステップ数, rest=休符}
@@ -6594,6 +6597,7 @@ const _BEACH_PULSE_COL     = 'rgba(140,200,210,0.85)';
 // ── Beach Bus（全レイヤー共通の出力ゲイン: 潮の呼吸・沈黙瞬間に使う） ──
 let _beachMasterBus = null;          // GainNode
 let _beachTideStartTime = 0;         // 潮の周期計算の起点
+let _beachMacroActivity = 1.0;       // [E-1] マクロ潮位の動き活性 0.5..1.5（満ち=動く/引き=静まる）。Sine長期変容が読む
 let _beachSilenceUntil = 0;          // この時刻まで沈黙（_beachMasterBus.gain=0）
 
 // ── コード遷移パン（A）と稀な躓き（H） ──
@@ -7316,8 +7320,21 @@ function _beachUpdateTideEnvelope(actx){
     return;
   }
   const cfg = (_beachGrooveData.global && _beachGrooveData.global.tide) || { periodSec: 240, depth: 0.15 };
+
+  // [E-1] 大きな潮：マクロ潮位（数分で一巡）。strangeで一巡を速められる（手動でも動かせる）。
+  // 0..1 の macroPhase を作り、(a) tideの深さ自体を呼吸させ、(b) 動きの活性を更新する。
+  const mc = (_beachGrooveData.global && _beachGrooveData.global.macroTide)
+             || { periodSec: 360, depthLo: 0.10, depthHi: 0.20 };
+  const sgM = (typeof sv === 'function') ? Math.max(0, sv('strange')) : 0;
+  const macroPeriod = mc.periodSec / (1 + sgM * 1.5);     // strange↑で最短≈144s
+  const macroNorm = (Math.sin(((now - _beachTideStartTime) / macroPeriod) * Math.PI * 2) + 1) / 2; // 0..1
+  // (a) 潮の深さ自体を macro で呼吸させる（満ちる時間帯は深く満ち引き、凪ぐ時間帯は浅く）
+  const tideDepth = mc.depthLo + (mc.depthHi - mc.depthLo) * macroNorm;
+  // (b) 動きの活性：満ち(1)で動きやすく、引き(0)で静まる。Sine長期変容が読む共有値。
+  _beachMacroActivity = 0.5 + macroNorm;                   // 0.5..1.5
+
   const phase = ((now - _beachTideStartTime) / cfg.periodSec) * Math.PI * 2;
-  let target = 1 + Math.sin(phase) * cfg.depth;
+  let target = 1 + Math.sin(phase) * tideDepth;
   // [B-2b] 共有呼吸：フレーム境界手前の谷をBeach層にも掛ける（ARP/コードと同一の谷）。
   // 潮（長周期）と呼吸（フレーズ周期）は乗算で重なる。
   target *= breathGain(now);
@@ -7443,8 +7460,7 @@ function startBeach(){
   _beachSineCellMut    = null;
   _beachSineSegRemain  = 0;
   _beachSineLfoActive  = false;
-
-  const actx = safeGetCtx();
+  _beachMacroActivity  = 1.0;          // [E-1] マクロ潮位の活性を中立にリセット
   if(!actx) return;
   safeResume(actx, () => {
     // _masterClockOrigin がnull/0/過去すぎる場合はcurrentTimeに再設定
@@ -8066,11 +8082,14 @@ function _beachSineStep(actx, stepSec){
     // ── 長期変容 ──
     const sg = (typeof sv === 'function') ? sv('strange') : 0;
     const phaseAt = sg > 0.4 ? 6 : 12;
-    if(_beachSineCycleCount % phaseAt === 0){
+    // [E-1] マクロ潮位に連動：満ち潮(activity>1)では位相シフト/変異が起きやすく、
+    // 引き潮(activity<1)では静まる。和声は不変のまま「動きの濃淡」だけが数分で移ろう。
+    const act = (typeof _beachMacroActivity === 'number') ? _beachMacroActivity : 1.0; // 0.5..1.5
+    if(_beachSineCycleCount % phaseAt === 0 && Math.random() < act){
       _beachSineCellPhase = (_beachSineCellPhase + 1) % cellLen;
     }
-    // 8サイクルに1回: 1音度を変異プールから差し替え
-    if(_beachSineCycleCount % 8 === 0 && cfg.mutPool && cfg.mutPool.length){
+    // 8サイクルに1回: 1音度を変異プールから差し替え（引き潮では確率的に見送る＝凪ぐ）
+    if(_beachSineCycleCount % 8 === 0 && cfg.mutPool && cfg.mutPool.length && Math.random() < act){
       const mIdx = Math.floor(Math.random() * cellLen);
       const mDeg = cfg.mutPool[Math.floor(Math.random() * cfg.mutPool.length)];
       _beachSineCellMut = { idx: mIdx, degree: mDeg };
