@@ -6139,6 +6139,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand: { filterFreq: 2200, filterQ: 1.0, burstMs: 50, level: 0.06 },
         wave: { freqLow: 250, freqHigh: 3500, swellBars: 2.0, level: 0.10, brightBias: 0.6 },
         shell: { freq: 3200, decay: 1.2, level: 0.04 },
+        spray: { baseHz: 6800, decayMs: 35, level: 0.04 },
         otherFootstep: { freqMult: 0.85, level: 0.30, distance: 0.55 }
       },
       behavior: {
@@ -6154,6 +6155,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: false },
         wave:  { enabled: true, barProb: 0.18 },
         shell: { enabled: true, intervalSecMin: 60,  intervalSecMax: 180 },
+        spray: { enabled: true, baseProb: 0.20, positions: [8], baseLockDeg: 0.05 },
         otherFootstep: { enabled: true, intervalSecMin: 120, intervalSecMax: 300, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6207,6 +6209,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand: { filterFreq: 1800, filterQ: 0.9, burstMs: 60, level: 0.07 },
         wave: { freqLow: 220, freqHigh: 2800, swellBars: 1.5, level: 0.10, brightBias: 0.45 },
         shell: { freq: 2800, decay: 1.4, level: 0.05 },
+        spray: { baseHz: 6500, decayMs: 22, level: 0.05 },
         otherFootstep: { freqMult: 0.85, level: 0.32, distance: 0.60 }
       },
       behavior: {
@@ -6222,6 +6225,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.15, glitchProb: 0.05 },
         wave:  { enabled: true,  barProb: 0.20 },
         shell: { enabled: true,  intervalSecMin: 80,  intervalSecMax: 200 },
+        spray: { enabled: true, baseProb: 0.40, positions: [2, 6, 10, 14], baseLockDeg: 0.35 },
         otherFootstep: { enabled: true, intervalSecMin: 120, intervalSecMax: 300, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6275,6 +6279,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand: { filterFreq: 2800, filterQ: 1.1, burstMs: 55, level: 0.07 },
         wave: { freqLow: 200, freqHigh: 2400, swellBars: 1.5, level: 0.10, brightBias: 0.40 },
         shell: { freq: 2600, decay: 1.6, level: 0.05 },
+        spray: { baseHz: 6000, decayMs: 30, level: 0.045 },
         otherFootstep: { freqMult: 0.90, level: 0.32, distance: 0.55 }
       },
       behavior: {
@@ -6292,6 +6297,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.35, glitchProb: 0.08, applySwing: false },
         wave:  { enabled: true,  barProb: 0.15 },
         shell: { enabled: true,  intervalSecMin: 120, intervalSecMax: 250 },
+        spray: { enabled: true, baseProb: 0.35, positions: [6, 14], baseLockDeg: 0.20 },
         otherFootstep: { enabled: true, intervalSecMin: 150, intervalSecMax: 350, sequenceLen: [3,5] }
       },
       // [E-VELVET足音] 1/16シンコペ基準に再構成。署名＝step11（3拍目の付点8分休符後）。
@@ -6347,6 +6353,7 @@ const BEACH_GROOVE_DEFAULT = {
         },
         sand: { filterFreq: 3200, filterQ: 1.0, burstMs: 45, level: 0.08 },
         wave: { freqLow: 180, freqHigh: 2800, swellBars: 1.0, level: 0.10, brightBias: 0.50 },
+        spray: { baseHz: 7000, decayMs: 15, level: 0.055 },
         otherFootstep: { freqMult: 0.90, level: 0.30, distance: 0.50 }
       },
       behavior: {
@@ -6362,6 +6369,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.55, glitchProb: 0.10 },
         wave:  { enabled: true,  barProb: 0.25 },
         shell: { enabled: false },
+        spray: { enabled: true, baseProb: 0.55, positions: [2, 6, 10, 14], baseLockDeg: 0.65 },
         otherFootstep: { enabled: true, intervalSecMin: 180, intervalSecMax: 400, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6413,6 +6421,7 @@ const BEACH_GROOVE_DEFAULT = {
         },
         sand: { filterFreq: 3800, filterQ: 1.4, burstMs: 35, level: 0.07 },
         wave: { freqLow: 1500, freqHigh: 6000, swellBars: 0.75, level: 0.07, brightBias: 0.75 },
+        spray: { baseHz: 7500, decayMs: 12, level: 0.055 },
         otherFootstep: { freqMult: 0.95, level: 0.28, distance: 0.45 }
       },
       behavior: {
@@ -6428,6 +6437,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.45, glitchProb: 0.15 },
         wave:  { enabled: true,  barProb: 0.10 },
         shell: { enabled: false },
+        spray: { enabled: true, baseProb: 0.60, positions: [2, 6, 10, 14], baseLockDeg: 0.70 },
         otherFootstep: { enabled: true, intervalSecMin: 180, intervalSecMax: 400, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6479,6 +6489,7 @@ const BEACH_GROOVE_DEFAULT = {
         },
         sand: { filterFreq: 2600, filterQ: 1.1, burstMs: 55, level: 0.08 },
         wave: { freqLow: 120, freqHigh: 2200, swellBars: 2.0, level: 0.12, brightBias: 0.35 },
+        spray: { baseHz: 5500, decayMs: 40, level: 0.04 },
         otherFootstep: { freqMult: 0.85, level: 0.34, distance: 0.60 }
       },
       behavior: {
@@ -6494,6 +6505,7 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.50, glitchProb: 0.08 },
         wave:  { enabled: true,  barProb: 0.25 },
         shell: { enabled: false },
+        spray: { enabled: true, baseProb: 0.25, positions: [2, 10], baseLockDeg: 0.10 },
         otherFootstep: { enabled: true, intervalSecMin: 150, intervalSecMax: 350, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6999,6 +7011,49 @@ function _dbTint(actx, dest, t, baseHz, opt){
   o.connect(lp); lp.connect(g); g.connect(dest);
   o.start(t); o.stop(t + dec + 0.05);
 }
+// ── 飛沫スプレー（高域の結晶質アクセント）[G-1] ──
+// インハーモニックなsine倍音群（プリズム的分光）+ 薄いHPFノイズで
+// 「結晶質の輝き〜HiHat的アクセント」を表現。
+// lockDeg(0..1): 0=広く散乱した煌めき / 1=タイトなHH感
+function _playBeachSpray(actx, t, cfg, lockDeg, volMul){
+  const bus = _beachGetMasterBus(actx);
+  const now = actx.currentTime;
+  if(!isFinite(t) || t < now + 0.001) t = now + 0.002;
+  const baseHz  = cfg.baseHz  ?? 6500;
+  const baseVol = (cfg.level  ?? 0.05) * (volMul ?? 1);
+  const baseDec = (cfg.decayMs ?? 22) / 1000;
+  // lockDegが高いほど短く・中央寄り・単純になる
+  const decay     = baseDec * (1 - lockDeg * 0.55);
+  const panSpread = 0.8 - lockDeg * 0.55;
+  // インハーモニック倍音群（プリズム的分光）
+  const RATIOS = [1.0, 1.41, 1.73, 2.31, 3.17];
+  for(let i = 0; i < RATIOS.length; i++){
+    const freq = baseHz * RATIOS[i] * (0.97 + Math.random() * 0.06);
+    if(freq > actx.sampleRate / 2 - 200) continue; // Nyquist安全
+    const gain = baseVol * (1 - i * 0.14);
+    const pan  = (Math.random() * 2 - 1) * panSpread;
+    const o = actx.createOscillator(); o.type = 'sine';
+    o.frequency.value = freq;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    if(actx.createStereoPanner){
+      const p = actx.createStereoPanner(); p.pan.value = pan;
+      o.connect(g); g.connect(p); p.connect(bus);
+    } else { o.connect(g); g.connect(bus); }
+    o.start(t); o.stop(t + decay + 0.02);
+  }
+  // 薄いHPFノイズ（spray感）
+  const noiseDecMs = Math.max(5, cfg.decayMs * 0.6 * (1 - lockDeg * 0.4));
+  const noiseFreq  = baseHz * (1.1 + lockDeg * 0.3);
+  _dbGrain(actx, bus, t, {
+    burstMs: noiseDecMs, freq: noiseFreq, type: 'highpass',
+    q: 0.7, gain: baseVol * 0.28, decayK: 4.5 + lockDeg * 2,
+    pan: (Math.random() * 2 - 1) * panSpread * 0.7
+  });
+}
+
 // ── 14種のデブリ定義。fam=系統(気分用)、w=基本重み(目立たない=高)。──
 const _DEBRIS = [
   { id:'sand',   fam:'particle', w:1.5, play:(a,d,t,v)=>{ const n=3+(Math.random()*2|0); for(let i=0;i<n;i++) _dbGrain(a,d,t+i*0.018,{burstMs:50,freq:2600,q:1.0,gain:0.5,vMul:v}); } },
@@ -7721,6 +7776,32 @@ function _beachSchedule(){
               _driftLastBar = _barAbs;
             }
           }
+        }
+      }
+    }
+
+    // ── 飛沫スプレー（高域の結晶質アクセント）[G-1] ──
+    // 8分裏等のScene別ポジションで中確率に発火。
+    // lockDeg（Scene基本値 + ARP密度 + moving）で煌めき↔HH的アクセントをなめらかに遷移。
+    if(sceneData && sceneData.behavior && sceneData.behavior.spray &&
+       sceneData.behavior.spray.enabled && sceneData.soundDesign && sceneData.soundDesign.spray){
+      const spBeh = sceneData.behavior.spray;
+      const spCfg = sceneData.soundDesign.spray;
+      const _sib  = _beachTick % 16;
+      if(spBeh.positions && spBeh.positions.includes(_sib)){
+        const movV    = (typeof sv === 'function') ? sv('moving')  : 0;
+        const brightV = (typeof sv === 'function') ? sv('bright')  : 0;
+        const lockDeg = Math.min(1, Math.max(0,
+          (spBeh.baseLockDeg ?? 0.3) + _arpActivity * 0.20 + movV * 0.15
+        ));
+        const prob = (spBeh.baseProb ?? 0.40)
+                     * (1 + brightV * 0.30)
+                     * (1 + _arpActivity * 0.25);
+        if(Math.random() < prob){
+          const jitter = (Math.random() * 2 - 1) * stepSec * (0.04 - lockDeg * 0.03);
+          const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + jitter;
+          const _bv = breathGain(_st);
+          _playBeachSpray(actx, _st, spCfg, lockDeg, _bv);
         }
       }
     }
