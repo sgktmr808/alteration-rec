@@ -7062,6 +7062,14 @@ function _sprayInitBuffers(actx){
         L[i] = sL * norm;
         R[i] = sR * norm;
       }
+      // 末尾フェード（src.stop時の波形断ち切りクリックを防ぐ）
+      // exp減衰は漸近的に0へ近づくだけで末尾に振幅が残るため、線形に0へ落とす。
+      const fadeLen = Math.min(len, Math.floor(sr * 0.004)); // 4ms
+      for(let i = len - fadeLen; i < len; i++){
+        const f = (len - 1 - i) / fadeLen; // 1 → 0 へ線形
+        L[i] *= f;
+        R[i] *= f;
+      }
       variants.push(buf);
     }
     cache[name] = variants;
