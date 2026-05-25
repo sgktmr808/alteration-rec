@@ -6611,6 +6611,8 @@ let _beachMasterBus = null;          // GainNode
 let _beachTideStartTime = 0;         // 潮の周期計算の起点
 let _beachMacroActivity = 1.0;       // [E-1] マクロ潮位の動き活性 0.5..1.5（満ち=動く/引き=静まる）。Sine長期変容が読む
 let _beachChordChangedBar = -999;    // [F-1] 最後にコードが変わった絶対小節（SineとDebrisが時差で反応するため）
+let _sprayBufferCache = null;        // [G-1opt] { sceneName: [AudioBuffer×N] } 事前焼きしたスプレー波形
+let _sprayBufferSR    = 0;           // [G-1opt] 焼いた時のsampleRate（変化時のみ再生成）
 let _beachSilenceUntil = 0;          // この時刻まで沈黙（_beachMasterBus.gain=0）
 
 // ── コード遷移パン（A）と稀な躓き（H） ──
@@ -7015,43 +7017,90 @@ function _dbTint(actx, dest, t, baseHz, opt){
 // インハーモニックなsine倍音群（プリズム的分光）+ 薄いHPFノイズで
 // 「結晶質の輝き〜HiHat的アクセント」を表現。
 // lockDeg(0..1): 0=広く散乱した煌めき / 1=タイトなHH感
-function _playBeachSpray(actx, t, cfg, lockDeg, volMul){
+// ── [G-1opt] スプレー波形の事前焼き ──
+// インハーモニック倍音群 + 高域ノイズ（白色の一次差分＝簡易HPF）を
+// AudioBufferへ直接書き込む。発火ごとにOscillatorNodeを生成する負荷を排除。
+// Scene×バリアントで複数焼き、再生時にランダム選択して単調さを防ぐ。
+function _sprayInitBuffers(actx){
+  if(_sprayBufferCache && _sprayBufferSR === actx.sampleRate) return; // 焼き済み
+  const sr = actx.sampleRate;
+  const RATIOS = [1.0, 1.41, 1.73, 2.31, 3.17];
+  const VARIANTS = 4;
+  const cache = {};
+  const scenes = (_beachGrooveData && _beachGrooveData.scenes) || {};
+  for(const name in scenes){
+    const cfg = scenes[name].soundDesign && scenes[name].soundDesign.spray;
+    if(!cfg) continue;
+    const baseHz = cfg.baseHz ?? 6500;
+    const decSec = (cfg.decayMs ?? 22) / 1000;
+    const bufDur = Math.min(0.14, decSec * 2.2); // 余韻を含む長さ
+    const len = Math.max(1, Math.floor(sr * bufDur));
+    const variants = [];
+    for(let v = 0; v < VARIANTS; v++){
+      const buf = actx.createBuffer(2, len, sr);
+      const L = buf.getChannelData(0);
+      const R = buf.getChannelData(1);
+      // バリアントごとに倍音周波数を固定ランダム化（L/R別＝ステレオ拡がり）
+      const fL = RATIOS.map(r => baseHz * r * (0.97 + Math.random() * 0.06));
+      const fR = RATIOS.map(r => baseHz * r * (0.97 + Math.random() * 0.06));
+      let pnL = 0, pnR = 0;
+      const tc = decSec * 0.5; // 倍音の自然な減衰時定数（やや緩め）
+      for(let i = 0; i < len; i++){
+        const tt = i / sr;
+        const env = Math.exp(-tt / tc);
+        let sL = 0, sR = 0;
+        for(let k = 0; k < RATIOS.length; k++){
+          if(fL[k] < sr/2 - 200) sL += Math.sin(2*Math.PI*fL[k]*tt) * (1 - k*0.14);
+          if(fR[k] < sr/2 - 200) sR += Math.sin(2*Math.PI*fR[k]*tt) * (1 - k*0.14);
+        }
+        // 高域ノイズ：白色の一次差分（簡易ハイパス）
+        const nL = Math.random()*2-1, nR = Math.random()*2-1;
+        sL += (nL - pnL) * 0.6;
+        sR += (nR - pnR) * 0.6;
+        pnL = nL; pnR = nR;
+        const norm = env / (RATIOS.length + 0.6); // 倍音数+ノイズ分で正規化
+        L[i] = sL * norm;
+        R[i] = sR * norm;
+      }
+      variants.push(buf);
+    }
+    cache[name] = variants;
+  }
+  _sprayBufferCache = cache;
+  _sprayBufferSR = sr;
+}
+
+// ── 飛沫スプレー再生（事前焼きバッファをBufferSourceで再生）[G-1opt] ──
+// 19ノード/発火 → 3ノード/発火。timbre=バッファ、envelope/pan/音程=再生時。
+function _playBeachSpray(actx, t, sceneName, cfg, lockDeg, volMul){
+  const cache = _sprayBufferCache && _sprayBufferCache[sceneName];
+  if(!cache || !cache.length) return;
   const bus = _beachGetMasterBus(actx);
   const now = actx.currentTime;
   if(!isFinite(t) || t < now + 0.001) t = now + 0.002;
-  const baseHz  = cfg.baseHz  ?? 6500;
-  const baseVol = (cfg.level  ?? 0.05) * (volMul ?? 1);
-  const baseDec = (cfg.decayMs ?? 22) / 1000;
-  // lockDegが高いほど短く・中央寄り・単純になる
-  const decay     = baseDec * (1 - lockDeg * 0.55);
+  const buf = cache[(Math.random() * cache.length) | 0];
+  const baseVol  = (cfg.level ?? 0.05) * (volMul ?? 1);
+  const bakedDec = (cfg.decayMs ?? 22) / 1000;
+  const decay    = Math.max(0.01, bakedDec * (1 - lockDeg * 0.55)); // lockDeg高=短い
   const panSpread = 0.8 - lockDeg * 0.55;
-  // インハーモニック倍音群（プリズム的分光）
-  const RATIOS = [1.0, 1.41, 1.73, 2.31, 3.17];
-  for(let i = 0; i < RATIOS.length; i++){
-    const freq = baseHz * RATIOS[i] * (0.97 + Math.random() * 0.06);
-    if(freq > actx.sampleRate / 2 - 200) continue; // Nyquist安全
-    const gain = baseVol * (1 - i * 0.14);
-    const pan  = (Math.random() * 2 - 1) * panSpread;
-    const o = actx.createOscillator(); o.type = 'sine';
-    o.frequency.value = freq;
-    const g = actx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), t + 0.002);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-    if(actx.createStereoPanner){
-      const p = actx.createStereoPanner(); p.pan.value = pan;
-      o.connect(g); g.connect(p); p.connect(bus);
-    } else { o.connect(g); g.connect(bus); }
-    o.start(t); o.stop(t + decay + 0.02);
+
+  const src = actx.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = 0.97 + Math.random() * 0.06; // 微妙な音程ゆらぎ
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, baseVol), t + 0.002); // 2ms attack
+  g.gain.exponentialRampToValueAtTime(0.0001, t + decay);                    // lockDeg連動decay
+  src.connect(g);
+  if(actx.createStereoPanner){
+    const p = actx.createStereoPanner();
+    p.pan.value = (Math.random()*2-1) * panSpread;
+    g.connect(p); p.connect(bus);
+  } else {
+    g.connect(bus);
   }
-  // 薄いHPFノイズ（spray感）
-  const noiseDecMs = Math.max(5, cfg.decayMs * 0.6 * (1 - lockDeg * 0.4));
-  const noiseFreq  = baseHz * (1.1 + lockDeg * 0.3);
-  _dbGrain(actx, bus, t, {
-    burstMs: noiseDecMs, freq: noiseFreq, type: 'highpass',
-    q: 0.7, gain: baseVol * 0.28, decayK: 4.5 + lockDeg * 2,
-    pan: (Math.random() * 2 - 1) * panSpread * 0.7
-  });
+  src.start(t);
+  src.stop(t + decay + 0.03);
 }
 
 // ── 14種のデブリ定義。fam=系統(気分用)、w=基本重み(目立たない=高)。──
@@ -7528,6 +7577,7 @@ function startBeach(){
     }
     // Beach Busを起こす（潮の初期値1.0）
     _beachGetMasterBus(actx);
+    _sprayInitBuffers(actx);   // [G-1opt] スプレー波形を事前焼き（焼き済みなら即return）
     _beachTideStartTime = actx.currentTime;
     _beachSilenceUntil = 0;
     const _sixteenth = (60 / Math.max(40, autoBpm || 100)) / 4;
@@ -7801,7 +7851,7 @@ function _beachSchedule(){
           const jitter = (Math.random() * 2 - 1) * stepSec * (0.04 - lockDeg * 0.03);
           const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + jitter;
           const _bv = breathGain(_st);
-          _playBeachSpray(actx, _st, spCfg, lockDeg, _bv);
+          _playBeachSpray(actx, _st, sceneCurrentName, spCfg, lockDeg, _bv);
         }
       }
     }
