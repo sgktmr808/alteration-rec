@@ -12471,6 +12471,7 @@ let dlyMix=0.52;      // ウェット多め
 let arpTimer=null;
 let arpStep=0;
 let arpSeq=[];             // 現在のアルペジオノート列（MIDI）
+let _arpSeqKey=null;       // [perf] 直近のbuildArpSeq入力キー。同一なら再構築をスキップ（ドラッグ中の負荷削減）
 let arpNextBeat=0;         // 次の発音予定AudioContext時刻
 
 // ── STRINGS フェイジング残留層 ──
@@ -16932,12 +16933,33 @@ function applySLToArp(){
 
 // ARPシーケンス再構築（パターン変更時）
 function _rebuildArpIfNeeded(){
-  if(arpOn && S && S.root){
-    const prevPat = arpPattern;
-    if(_slArpPattern) arpPattern = _slArpPattern;
-    arpSeq = buildArpSeq(S.root, S.type);
-    arpPattern = prevPat;
+  if(!(arpOn && S && S.root)) return;
+
+  const effPat = _slArpPattern || arpPattern;
+
+  // [perf] 非決定パターン（Math.randomで毎回内容が変わる）は間引けない＝常に再構築。
+  const nonDeterministic = (effPat === 'shimmer' || effPat === 'random' ||
+                            effPat === 'rand' || effPat === 'randoct');
+
+  if(!nonDeterministic){
+    // buildArpSeqの出力を決める全入力からキーを生成（機械走査で依存を確定済み:
+    // sceneCurrentName / S.root / S.type / arpPattern / octRange / octCenter。
+    // CTは定数テーブルのため不変＝キー不要）。前回と同一なら再構築をスキップ。
+    const key = [
+      sceneCurrentName, S.root, S.type, effPat,
+      (_slArpOctRange !== null ? _slArpOctRange : arpOctRange),
+      arpOctCenter
+    ].join('|');
+    if(key === _arpSeqKey) return;   // 同一 → 冗長な再構築を回避
+    _arpSeqKey = key;
+  } else {
+    _arpSeqKey = null;               // 非決定時は次回の決定的判定を確実に再構築させる
   }
+
+  const prevPat = arpPattern;
+  if(_slArpPattern) arpPattern = _slArpPattern;
+  arpSeq = buildArpSeq(S.root, S.type);
+  arpPattern = prevPat;
 }
 
 // ── PLAIN: サティ的・余白・水の粒感 ──
