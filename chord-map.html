@@ -7461,6 +7461,8 @@ function startBeach(){
   _beachSineSegRemain  = 0;
   _beachSineLfoActive  = false;
   _beachMacroActivity  = 1.0;          // [E-1] マクロ潮位の活性を中立にリセット
+
+  const actx = safeGetCtx();
   if(!actx) return;
   safeResume(actx, () => {
     // _masterClockOrigin がnull/0/過去すぎる場合はcurrentTimeに再設定
