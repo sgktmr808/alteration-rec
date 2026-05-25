@@ -14818,15 +14818,22 @@ function _phraseNext(notes, baseSec, sc, densityMul){
       const cellIdx = (ps.plainCellPos + ps.plainCellPhase) % _CELL_LEN;
       const step = _PLAIN_CELL[cellIdx];
 
-      // SL:moving → 長い休符を短縮
-      const _rMul = step.rest
-        ? Math.max(0.4, 1.0 - Math.max(0, _movingVal) * 0.5)
-        : 1.0;
+      // SL:moving → グリッド上の発音/休符の比率で密度を制御（時間軸は歪めない）。
+      // 旧実装は休符の音価(_rMul)を縮めてarpNextBeatに累積させ、ARPが足音グリッドから
+      // ドリフトしていた（PLAINのズレの原因）。音価ではなく取捨選択で密度を変える。
+      let _isRest = step.rest;
+      if(_movingVal > 0 && step.rest){
+        // 密に：長い休符ほど発音に変わりやすい（サティ的な呼吸の隙間が埋まる）
+        if(Math.random() < _movingVal * 0.5 * Math.min(1, step.r / 2)) _isRest = false;
+      } else if(_movingVal < 0 && !step.rest && step.vel < 0.8){
+        // 疎に：弱拍のみ間引く（アクセントは残す＝旋律の芯を保ち、余白が増える）
+        if(Math.random() < (-_movingVal) * 0.6) _isRest = true;
+      }
 
       // jitter ±3%（ノート発音時刻にのみ適用・arpNextBeatには蓄積させない）
       const jitter = 0.985 + Math.random() * 0.03; // [B-1b] ±1.5%に縮小（共有グルーヴ優先）
-      const stepRatio = step.r * _rMul * densityMul;
-      const noteOffsetRatio = (jitter - 1.0) * step.r * _rMul;
+      const stepRatio = step.r * densityMul;             // グリッド厳守（_rMul廃止＝ドリフト断つ）
+      const noteOffsetRatio = (jitter - 1.0) * step.r;   // jitterのみ（時間軸を歪めない）
 
       ps.plainCellPos++;
 
@@ -14850,7 +14857,7 @@ function _phraseNext(notes, baseSec, sc, densityMul){
         }
       }
 
-      if(step.rest){
+      if(_isRest){
         return { midi: null, stepRatio, noteOffsetRatio };
       }
 
