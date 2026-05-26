@@ -18878,7 +18878,7 @@ function setMode(mode){
   updateSaveBtnVisibility();
   // 島カルーセルを現在モードへ同期（ボタンクリック等での切替にも追従）
   const _ii=_MODE_SEQ.indexOf(mode);
-  if(_ii>=0 && !_modeSwipe){ _islandSnapTarget=_ii; _islandSnapping=true; invalidate(); }
+  if(_ii>=0){ _islandSnapTarget=_ii; _islandSnapping=true; invalidate(); }
 }
 document.querySelectorAll('.mode-btn').forEach(b=>{
   b.addEventListener('click',()=>setMode(b.dataset.mode));
