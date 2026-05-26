@@ -770,7 +770,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 .pivot-step-dot.done{background:rgba(74,144,212,0.45);border-color:rgba(74,144,212,0.45);}
 
 /* MODE BUTTONS */
-.mode-bar{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:10;align-items:flex-end;}
+.mode-bar{position:absolute;top:8px;right:8px;display:none;flex-direction:column;gap:3px;z-index:10;align-items:flex-end;}
 .mode-row{display:flex;gap:3px;}
 /* 可視化モードは島カルーセル（上の海）へ移行したため、旧モードボタンは非表示 */
 .mode-btn{display:none !important;}
@@ -2337,6 +2337,24 @@ let _islandSnapTarget=0;     // スナップ先インデックス
 const _MODE_LABELS={radial:'RADIAL',expand:'EXPAND',link:'LINK',chain:'CHAIN',compass:'COMP',graph:'GRAPH',wave:'WAVE',bridge:'BRIDGE',pivot:'PIVOT'};
 const _MODE_SEQ=['radial','expand','link','chain','compass','graph','wave','bridge','pivot'];
 
+// ── 下の海：オプション島（独立トグル。流して眺め、タップで点灯）──
+let _optScroll=0;
+let _optSnapping=false;
+let _optSnapTarget=0;
+// 各オプション島：表示名・トグル関数・ON状態を読むゲッター・無効判定
+const _OPT_ISLANDS=[
+  {label:'EMO',  toggle:'toggleEmoMap',     isOn:()=>typeof emoMapMode!=='undefined'&&emoMapMode},
+  {label:'MODE', toggle:'toggleModalMap',   isOn:()=>typeof modalMapMode!=='undefined'&&modalMapMode},
+  {label:'TWHL', toggle:'toggleToneWheel',  isOn:()=>typeof toneWheelOpen!=='undefined'&&toneWheelOpen},
+  {label:'AUGM', toggle:'toggleAugMod',     isOn:()=>typeof augModMapMode!=='undefined'&&augModMapMode},
+  {label:'SCRG', toggle:'toggleScaleRing',  isOn:()=>typeof scaleRingMode!=='undefined'&&scaleRingMode},
+  {label:'TRVS', toggle:'toggleTriadSpace', isOn:()=>typeof triadSpaceMode!=='undefined'&&triadSpaceMode},
+  {label:'BRTK', toggle:'toggleBartok',     isOn:()=>typeof bartokMode!=='undefined'&&bartokMode},
+  {label:'DIMI', toggle:'toggleDimCircle',  isOn:()=>typeof dimCircleMode!=='undefined'&&dimCircleMode},
+  {label:'TRIT', toggle:'toggleTritone',    isOn:()=>typeof tritoneMode!=='undefined'&&tritoneMode,
+   disabled:()=>{ try{ return !computeTritoneSub(S.root,S.type); }catch(e){ return false; } }},
+];
+
 // ── AUTO PLAY ──
 let autoPlay=false;
 let autoBpm=100;
@@ -3034,8 +3052,79 @@ function drawFrame(){
 
   // ── 島カルーセル（可視化モード／上の海・最前面）──
   drawIslandCarousel(ctx);
+  // ── オプション島（下の海・最前面）──
+  drawOptIslands(ctx);
 }
 
+// ── 下の海：オプション島描画 ──
+// コード円の下に独立トグルのオプションを島として描く。
+// 横スクロール(_optScroll)で流れ、ON中の島は青く灯る。タップで点灯/消灯。
+function drawOptIslands(ctx){
+  const {cx,cy,SR}=L;
+  if(_optSnapping){
+    const d=_optSnapTarget-_optScroll;
+    if(Math.abs(d)<0.002){ _optScroll=_optSnapTarget; _optSnapping=false; }
+    else { _optScroll+=d*0.22; dirty=true; }
+  }
+  const baseY = cy + SR + 30;            // 焦点島の基準Y（コード円の下）
+  const maxI = _OPT_ISLANDS.length-1;
+  for(let d=-2; d<=2; d++){
+    const fi=_optScroll+d;
+    const i=Math.round(fi);
+    if(i<0||i>maxI) continue;
+    const off=i-_optScroll;
+    const ad=Math.abs(off);
+    if(ad>2.2) continue;
+    const x=cx+off*_ISLAND_SPACING;
+    const depth=Math.min(ad/2,1);
+    const y=baseY + depth*40*0.5;         // 下向き：奥ほど下へ持ち上がる
+    const rr=30-12*depth*0.5;
+    let alpha;
+    if(ad<=1) alpha=1.0-0.30*depth;
+    else alpha=Math.max(0,0.55*(2.2-ad)/1.2);
+    if(alpha<=0.01) continue;
+    const isl=_OPT_ISLANDS[i];
+    const on=isl.isOn();
+    const disabled=isl.disabled?isl.disabled():false;
+    const centered=(i===Math.round(_optScroll))&&ad<0.5;
+    // 反射
+    ctx.beginPath();
+    ctx.ellipse(x,y+rr*0.7,rr*0.82,rr*0.13,0,0,Math.PI*2);
+    ctx.fillStyle=`rgba(140,160,200,${0.05*alpha})`; ctx.fill();
+    // 島本体
+    const seed=((i+100)*2654435761)>>>0;
+    _islandSilhouette(ctx,x,y,rr,seed,0.56);
+    if(disabled){
+      // 無効（TRIT非dom7時など）：霞ませて点線
+      ctx.fillStyle=`rgba(24,28,38,${0.30*alpha})`;
+      ctx.strokeStyle=`rgba(110,122,150,${0.30*alpha})`; ctx.lineWidth=1.0;
+      ctx.setLineDash([2,3]);
+    }else if(on){
+      // 点灯：青く灯る
+      ctx.fillStyle=`rgba(34,40,54,${0.85*alpha})`;
+      ctx.strokeStyle=`rgba(140,155,208,${0.85*alpha})`; ctx.lineWidth=1.8;
+    }else{
+      ctx.fillStyle=`rgba(28,33,44,${0.60*alpha})`;
+      ctx.strokeStyle=`rgba(140,156,188,${0.50*alpha})`; ctx.lineWidth=1.2;
+    }
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+    // 点灯の灯
+    if(on&&!disabled){
+      ctx.beginPath(); ctx.arc(x,y-rr*0.18,1.8,0,Math.PI*2);
+      ctx.fillStyle=`rgba(140,155,208,${alpha})`; ctx.fill();
+    }
+    // 名前（本体のみ）
+    if(ad<=1.05){
+      ctx.font=`${centered?10:8}px DM Mono,monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      if(disabled) ctx.fillStyle=`rgba(170,178,196,${0.4*alpha})`;
+      else if(on)  ctx.fillStyle=`rgba(195,205,238,${alpha})`;
+      else         ctx.fillStyle=`rgba(200,208,228,${0.8*alpha})`;
+      ctx.fillText(isl.label,x,y+rr*0.16);
+    }
+  }
+}
 function deg2r(d){return(d-90)*Math.PI/180;}
 
 // ── 島カルーセル描画 ──────────────────────────────
@@ -3391,6 +3480,85 @@ function initCanvas(){
   });
   canvas.addEventListener('pointercancel', e => {
     if(_modeSwipe && e.pointerId === _modeSwipe.pointerId) _endIslandSwipe();
+  });
+
+  // ── 下の海：オプション島（スクロール＋タップ点灯）──
+  let _optSwipe = null;
+  function _inLowerSea(x, y){
+    return y > L.cy + L.SR + 4;                  // コード円より下だけ
+  }
+  // 下の海でタップされた島のインデックスを返す（無ければ -1）
+  function _optIslandAt(x, y){
+    const {cx,cy,SR}=L;
+    const maxI=_OPT_ISLANDS.length-1;
+    let best=-1, bestD=1e9;
+    for(let d=-2; d<=2; d++){
+      const i=Math.round(_optScroll+d);
+      if(i<0||i>maxI) continue;
+      const off=i-_optScroll, ad=Math.abs(off);
+      if(ad>1.2) continue;                        // 本体（見えている島）のみタップ可
+      const depth=Math.min(ad/2,1);
+      const ix=cx+off*_ISLAND_SPACING;
+      const iy=(cy+SR+30)+depth*40*0.5;
+      const rr=30-12*depth*0.5;
+      const dd=Math.hypot(x-ix,y-iy);
+      if(dd<rr+6 && dd<bestD){ bestD=dd; best=i; }
+    }
+    return best;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if(window._isCtrlScreen) return;
+    if(_sliderDragging) return;
+    if(_centerDown) return;
+    const {x, y} = canvasXY(e);
+    if(!_inLowerSea(x, y)) return;
+    _optSwipe = { startX:x, startY:y, startScroll:_optScroll, moved:false, pointerId:e.pointerId };
+  });
+  canvas.addEventListener('pointermove', e => {
+    if(_sliderDragging){ _optSwipe=null; return; }
+    if(!_optSwipe || e.pointerId!==_optSwipe.pointerId) return;
+    const {x, y} = canvasXY(e);
+    const dx=x-_optSwipe.startX, dy=y-_optSwipe.startY;
+    if(!_optSwipe.moved){
+      if(Math.abs(dy)>Math.abs(dx) && Math.abs(dy)>8){ _optSwipe=null; return; }
+      if(Math.abs(dx)<6) return;
+      _optSwipe.moved=true; _optSnapping=false;
+    }
+    let s=_optSwipe.startScroll - dx/_ISLAND_DRAG_PER;
+    const maxI=_OPT_ISLANDS.length-1;
+    if(s<0) s=s*0.35; else if(s>maxI) s=maxI+(s-maxI)*0.35;
+    _optScroll=s; invalidate();
+  });
+  function _endOptSwipe(x, y){
+    if(!_optSwipe) return;
+    const moved=_optSwipe.moved;
+    _optSwipe=null;
+    if(moved){
+      // スクロール確定：最寄りへスナップ
+      const maxI=_OPT_ISLANDS.length-1;
+      let t=Math.round(_optScroll); t=Math.max(0,Math.min(maxI,t));
+      _optSnapTarget=t; _optSnapping=true; invalidate();
+    }else{
+      // タップ点灯：触れた島のトグルを呼ぶ
+      const i=_optIslandAt(x,y);
+      if(i>=0){
+        const isl=_OPT_ISLANDS[i];
+        const disabled=isl.disabled?isl.disabled():false;
+        if(!disabled && typeof window[isl.toggle]==='function'){
+          window[isl.toggle]();
+        }
+        invalidate();
+      }
+    }
+  }
+  canvas.addEventListener('pointerup', e => {
+    if(_optSwipe && e.pointerId===_optSwipe.pointerId){
+      const {x,y}=canvasXY(e); _endOptSwipe(x,y);
+    }
+  });
+  canvas.addEventListener('pointercancel', e => {
+    if(_optSwipe && e.pointerId===_optSwipe.pointerId){ _optSwipe=null; }
   });
 
 }
