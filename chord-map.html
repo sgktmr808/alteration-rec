@@ -772,9 +772,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 /* MODE BUTTONS */
 .mode-bar{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:10;align-items:flex-end;}
 .mode-row{display:flex;gap:3px;}
-.mode-btn{font-family:var(--fm);font-size:7.5px;padding:3px 6px;
-  border:1px solid var(--bdr2);border-radius:var(--r);color:var(--dim);
-  background:rgba(13,13,16,0.9);cursor:pointer;letter-spacing:.05em;white-space:nowrap;transition:border-color .15s,color .15s;}
+/* 可視化モードは島カルーセル（上の海）へ移行したため、旧モードボタンは非表示 */
+.mode-btn{display:none !important;}
 .mode-btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-a);}
 
 /* ── アイコンボタン行 ── */
@@ -2330,6 +2329,14 @@ const FEATURES={
 // MAP MODE: 'radial' | 'expand' | 'link' | 'chain' | 'graph' | 'wave' | 'bridge'
 let MAP_MODE='radial';
 
+// ── 島カルーセル（上の海に浮かぶ可視化モード）──
+// _islandScroll: 連続スクロール位置（単位=島インデックス、小数可）。焦点=この四捨五入値。
+let _islandScroll=0;
+let _islandSnapping=false;   // 指を離したあと焦点へイージング中か
+let _islandSnapTarget=0;     // スナップ先インデックス
+const _MODE_LABELS={radial:'RADIAL',expand:'EXPAND',link:'LINK',chain:'CHAIN',compass:'COMP',graph:'GRAPH',wave:'WAVE',bridge:'BRIDGE',pivot:'PIVOT'};
+const _MODE_SEQ=['radial','expand','link','chain','compass','graph','wave','bridge','pivot'];
+
 // ── AUTO PLAY ──
 let autoPlay=false;
 let autoBpm=100;
@@ -3024,9 +3031,99 @@ function drawFrame(){
 
   // ── COSMIC FX (topmost) ──
   fxDrawAndUpdate(ctx);
+
+  // ── 島カルーセル（可視化モード／上の海・最前面）──
+  drawIslandCarousel(ctx);
 }
 
 function deg2r(d){return(d-90)*Math.PI/180;}
+
+// ── 島カルーセル描画 ──────────────────────────────
+// 上の海（コード円の上）に可視化モードを「島」として描く。
+// 横スクロール(_islandScroll)で島が流れ、浜辺正面(中央)の島が選択中モード。
+// 仕様: 3個見え（焦点＋左右1）／緩い遠近／端は沖へフェード／左右(赤道)は侵さない。
+const _ISLAND_SPACING=86;   // 島の横間隔(px)
+function _islandSilhouette(ctx,ix,iy,rr,seed,squish){
+  // 決定的な不定形シルエット（Catmull-Rom風の閉曲線）
+  const n=11; const pts=[];
+  let s=seed>>>0;
+  const rnd=()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+  for(let i=0;i<n;i++){
+    const a=2*Math.PI*i/n; const rad=rr*(0.76+0.36*rnd());
+    pts.push([ix+rad*Math.cos(a), iy+rad*Math.sin(a)*squish]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=0;i<n;i++){
+    const p0=pts[(i-1+n)%n],p1=pts[i],p2=pts[(i+1)%n],p3=pts[(i+2)%n];
+    for(const t of [0.5,1.0]){
+      const t2=t*t,t3=t2*t;
+      const xx=0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3);
+      const yy=0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3);
+      ctx.lineTo(xx,yy);
+    }
+  }
+  ctx.closePath();
+}
+function drawIslandCarousel(ctx){
+  const {cx,cy,SR}=L;
+  // スナップのイージング（指を離した後、焦点へ吸い寄せ）
+  if(_islandSnapping){
+    const d=_islandSnapTarget-_islandScroll;
+    if(Math.abs(d)<0.002){ _islandScroll=_islandSnapTarget; _islandSnapping=false; }
+    else { _islandScroll+=d*0.22; dirty=true; }
+  }
+  const baseY = cy - SR - 30;          // 焦点島の基準Y（コード円の上）
+  const maxI = _MODE_SEQ.length-1;
+  // 焦点±2まで描く（±2は沖へ消えゆく気配）。3個見え＝±1が本体、±2はフェード。
+  for(let d=-2; d<=2; d++){
+    const fi = _islandScroll + d;                 // 連続インデックス（中央=_islandScroll）
+    const i = Math.round(fi);
+    if(i<0 || i>maxI) continue;
+    const off = i - _islandScroll;                // 中央からのずれ（-..+、0が正面）
+    const ad = Math.abs(off);
+    if(ad>2.2) continue;
+    const x = cx + off*_ISLAND_SPACING;
+    const depth = Math.min(ad/2, 1);              // 0(手前)..1(沖)
+    const y = baseY - depth*40 * 0.5;             // 遠近ふつう：奥ほど少し上(持ち上がる)
+    const rr = 30 - 12*depth*0.5;                 // 奥ほど小さい（遠近ふつう=0.5係数）
+    // フェード：本体(ad<=1)は不透明、外側(ad>1)は沖へ消える
+    let alpha;
+    if(ad<=1) alpha = 1.0 - 0.30*depth;
+    else alpha = Math.max(0, 0.55*(2.2-ad)/1.2);  // ad=1.0で~0.55 → ad=2.2で0
+    if(alpha<=0.01) continue;
+    const mode=_MODE_SEQ[i];
+    const isFocus = (i===Math.round(_islandScroll)) && ad<0.5;
+    // 海面の反射
+    ctx.beginPath();
+    ctx.ellipse(x, y+rr*0.7, rr*0.82, rr*0.13, 0, 0, Math.PI*2);
+    ctx.fillStyle=`rgba(140,160,200,${0.05*alpha})`; ctx.fill();
+    // 島本体
+    const seed=(i*2654435761)>>>0;
+    _islandSilhouette(ctx,x,y,rr,seed,0.56);
+    if(isFocus){
+      ctx.fillStyle=`rgba(38,42,52,${0.92*alpha})`;
+      ctx.strokeStyle=`rgba(232,197,71,${0.85*alpha})`; ctx.lineWidth=2.0;
+    }else{
+      ctx.fillStyle=`rgba(28,33,44,${0.60*alpha})`;
+      ctx.strokeStyle=`rgba(140,156,188,${0.50*alpha})`; ctx.lineWidth=1.2;
+    }
+    ctx.fill(); ctx.stroke();
+    // 焦点の灯
+    if(isFocus){
+      ctx.beginPath(); ctx.arc(x, y-rr*0.18, 1.8, 0, Math.PI*2);
+      ctx.fillStyle=`rgba(232,197,71,${alpha})`; ctx.fill();
+    }
+    // 名前（本体のみ。沖の島は名を伏せる＝霧）
+    if(ad<=1.05){
+      ctx.font=`${isFocus?10:8}px DM Mono,monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=isFocus?`rgba(232,197,71,${alpha})`:`rgba(200,208,228,${0.8*alpha})`;
+      ctx.fillText(_MODE_LABELS[mode], x, y+rr*0.16);
+    }
+  }
+}
+
 
 // ═══════════════════════
 // CANVAS INTERACTION
@@ -3228,44 +3325,72 @@ function initCanvas(){
 
   // ── モード切り替えスワイプ（左右）──
   // MAPタブ表示中・サークル外側・上下移動量より左右が大きいときのみ反応
-  const _modeOrder = ['radial','link','chain','pivot','expand','wave','bridge'];
+  // 島カルーセル：表示順（上の海に浮かぶ可視化モードの島々）
+  const _modeOrder = ['radial','expand','link','chain','compass','graph','wave','bridge','pivot'];
   let _modeSwipe = null;
+
+  // 上の海ゾーン判定：コード円より上（島の帯）でのみカルーセルを受け付ける。
+  // 左右（赤道）とサークル内はメイン操作（コードタップ）に温存。
+  function _inUpperSea(x, y){
+    if(y >= L.cy - L.SR - 4) return false;       // コード円より上だけ
+    return true;
+  }
+  const _ISLAND_DRAG_PER = 96;  // この px ドラッグで島1つ分送る
 
   canvas.addEventListener('pointerdown', e => {
     if(window._isCtrlScreen) return;
-    if(_sliderDragging) return; // スライダー操作中はモード切替を無視
-    if(_centerDown) return;     // 中央ノードロングプレス中はスワイプ無視
+    if(_sliderDragging) return;
+    if(_centerDown) return;
     const {x, y} = canvasXY(e);
-    const dist = distFromCenter(x, y);
-    if(dist < L.SR - 10) return; // サークル内はコード操作に任せる
-    // SLスライダー付近（外周）はスワイプ開始を抑制
-    if(Math.abs(dist - L.SR) < 28) return;
-    _modeSwipe = { startX: x, startY: y, startIdx: _modeOrder.indexOf(MAP_MODE), pointerId: e.pointerId };
+    if(!_inUpperSea(x, y)) return;               // 上の海ゾーン外は無視
+    _modeSwipe = {
+      startX: x, startY: y,
+      startScroll: _islandScroll,
+      moved: false,
+      pointerId: e.pointerId
+    };
   });
 
   canvas.addEventListener('pointermove', e => {
-    if(_sliderDragging){ _modeSwipe = null; return; } // スライダー操作中はキャンセル
+    if(_sliderDragging){ _modeSwipe = null; return; }
     if(!_modeSwipe || e.pointerId !== _modeSwipe.pointerId) return;
     const {x, y} = canvasXY(e);
     const dx = x - _modeSwipe.startX;
     const dy = y - _modeSwipe.startY;
-    if(Math.abs(dy) > Math.abs(dx)) return; // 上下が大きければコントロールに任せる
-    if(Math.abs(dx) < 40) return; // 閾値
-    const steps = Math.round(-dx / 60);
-    const newIdx = Math.max(0, Math.min(_modeOrder.length - 1, _modeSwipe.startIdx + steps));
-    const newMode = _modeOrder[newIdx];
-    if(newMode !== MAP_MODE){
-      document.querySelectorAll('.mode-btn').forEach(b =>
-        b.classList.toggle('on', b.dataset.mode === newMode)
-      );
-      MAP_MODE = newMode;
-      relCache = null;
-      invalidate();
+    if(!_modeSwipe.moved){
+      if(Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8){ _modeSwipe = null; return; } // 縦が勝てば手放す
+      if(Math.abs(dx) < 6) return;               // 微小は無視
+      _modeSwipe.moved = true;
+      _islandSnapping = false;                   // 慣性スナップ停止
     }
+    // 連続スクロール：右へドラッグ→前の島へ（スクロール値は減少）
+    let s = _modeSwipe.startScroll - dx / _ISLAND_DRAG_PER;
+    // 端は弾性的に少しだけ越えられる（行き過ぎは戻る）
+    const maxI = _modeOrder.length - 1;
+    if(s < 0) s = s * 0.35;
+    else if(s > maxI) s = maxI + (s - maxI) * 0.35;
+    _islandScroll = s;
+    invalidate();
   });
 
+  function _endIslandSwipe(){
+    if(!_modeSwipe) return;
+    _modeSwipe = null;
+    // 最寄りの島へスナップして確定
+    const maxI = _modeOrder.length - 1;
+    let target = Math.round(_islandScroll);
+    target = Math.max(0, Math.min(maxI, target));
+    _islandSnapTarget = target;
+    _islandSnapping = true;
+    const newMode = _modeOrder[target];
+    if(newMode !== MAP_MODE) setMode(newMode);   // 公式の切替（各モード初期化を伴う）
+    invalidate();
+  }
   canvas.addEventListener('pointerup', e => {
-    if(_modeSwipe && e.pointerId === _modeSwipe.pointerId) _modeSwipe = null;
+    if(_modeSwipe && e.pointerId === _modeSwipe.pointerId) _endIslandSwipe();
+  });
+  canvas.addEventListener('pointercancel', e => {
+    if(_modeSwipe && e.pointerId === _modeSwipe.pointerId) _endIslandSwipe();
   });
 
 }
@@ -6155,7 +6280,8 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: false },
         wave:  { enabled: true, barProb: 0.18 },
         shell: { enabled: true, intervalSecMin: 60,  intervalSecMax: 180 },
-        spray: { enabled: true, baseProb: 0.20, positions: [8], baseLockDeg: 0.05 },
+        spray: { enabled: true, baseProb: 0.20, positions: [8], baseLockDeg: 0.05, offGuard: 0.4,
+                 tail: { mode: 'light', prob: 0.08, decayMul: 5, volMul: 0.65 } },
         otherFootstep: { enabled: true, intervalSecMin: 120, intervalSecMax: 300, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6225,7 +6351,8 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.15, glitchProb: 0.05 },
         wave:  { enabled: true,  barProb: 0.20 },
         shell: { enabled: true,  intervalSecMin: 80,  intervalSecMax: 200 },
-        spray: { enabled: true, baseProb: 0.40, positions: [2, 6, 10, 14], baseLockDeg: 0.35 },
+        spray: { enabled: true, baseProb: 0.40, positions: [2, 6, 10, 14], baseLockDeg: 0.35, offGuard: 0.3,
+                 tail: { mode: 'light', prob: 0.05, decayMul: 4, volMul: 0.7 } },
         otherFootstep: { enabled: true, intervalSecMin: 120, intervalSecMax: 300, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6297,7 +6424,8 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.35, glitchProb: 0.08, applySwing: false },
         wave:  { enabled: true,  barProb: 0.15 },
         shell: { enabled: true,  intervalSecMin: 120, intervalSecMax: 250 },
-        spray: { enabled: true, baseProb: 0.35, positions: [6, 14], baseLockDeg: 0.20 },
+        spray: { enabled: true, baseProb: 0.35, positions: [6, 14], baseLockDeg: 0.20, offGuard: 0.35,
+                 tail: { mode: 'light', prob: 0.06, decayMul: 4, volMul: 0.7 } },
         otherFootstep: { enabled: true, intervalSecMin: 150, intervalSecMax: 350, sequenceLen: [3,5] }
       },
       // [E-VELVET足音] 1/16シンコペ基準に再構成。署名＝step11（3拍目の付点8分休符後）。
@@ -6369,7 +6497,8 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.55, glitchProb: 0.10 },
         wave:  { enabled: true,  barProb: 0.25 },
         shell: { enabled: false },
-        spray: { enabled: true, baseProb: 0.55, positions: [2, 6, 10, 14], baseLockDeg: 0.65 },
+        spray: { enabled: true, baseProb: 0.55, positions: [2, 6, 10, 14], baseLockDeg: 0.65, offGuard: 0.2,
+                 tail: { mode: 'openhat', positions: [6, 14], prob: 0.70, chokeRatio: 1.0, openAmount: 0.5, volMul: 0.95 } },
         otherFootstep: { enabled: true, intervalSecMin: 180, intervalSecMax: 400, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6437,7 +6566,8 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.45, glitchProb: 0.15 },
         wave:  { enabled: true,  barProb: 0.10 },
         shell: { enabled: false },
-        spray: { enabled: true, baseProb: 0.60, positions: [2, 6, 10, 14], baseLockDeg: 0.70 },
+        spray: { enabled: true, baseProb: 0.60, positions: [2, 6, 10, 14], baseLockDeg: 0.70, offGuard: 0.2,
+                 tail: { mode: 'openhat', positions: [6, 14], prob: 0.80, chokeRatio: 0.85, openAmount: 0.55, volMul: 1.0 } },
         otherFootstep: { enabled: true, intervalSecMin: 180, intervalSecMax: 400, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -6505,7 +6635,8 @@ const BEACH_GROOVE_DEFAULT = {
         sand:  { enabled: true,  baseDensity: 0.50, glitchProb: 0.08 },
         wave:  { enabled: true,  barProb: 0.25 },
         shell: { enabled: false },
-        spray: { enabled: true, baseProb: 0.25, positions: [2, 10], baseLockDeg: 0.10 },
+        spray: { enabled: true, baseProb: 0.25, positions: [2, 10], baseLockDeg: 0.10, offGuard: 0.4,
+                 tail: { mode: 'light', prob: 0.06, decayMul: 4, volMul: 0.7 } },
         otherFootstep: { enabled: true, intervalSecMin: 150, intervalSecMax: 350, sequenceLen: [3,5] }
       },
       footstepPatterns: {
@@ -7080,7 +7211,7 @@ function _sprayInitBuffers(actx){
 
 // ── 飛沫スプレー再生（事前焼きバッファをBufferSourceで再生）[G-1opt] ──
 // 19ノード/発火 → 3ノード/発火。timbre=バッファ、envelope/pan/音程=再生時。
-function _playBeachSpray(actx, t, sceneName, cfg, lockDeg, volMul){
+function _playBeachSpray(actx, t, sceneName, cfg, lockDeg, volMul, decayOverride){
   const cache = _sprayBufferCache && _sprayBufferCache[sceneName];
   if(!cache || !cache.length) return;
   const bus = _beachGetMasterBus(actx);
@@ -7089,7 +7220,11 @@ function _playBeachSpray(actx, t, sceneName, cfg, lockDeg, volMul){
   const buf = cache[(Math.random() * cache.length) | 0];
   const baseVol  = (cfg.level ?? 0.05) * (volMul ?? 1);
   const bakedDec = (cfg.decayMs ?? 22) / 1000;
-  const decay    = Math.max(0.01, bakedDec * (1 - lockDeg * 0.55)); // lockDeg高=短い
+  // [TAIL] decayOverride が来たらそれを使う（テール＝長い反射光 / オープンハット）。
+  // 無ければ従来通り lockDeg連動（lockDeg高=短い＝クローズド寄り）。
+  const decay    = (typeof decayOverride === 'number' && decayOverride > 0)
+    ? Math.max(0.01, decayOverride)
+    : Math.max(0.01, bakedDec * (1 - lockDeg * 0.55));
   const panSpread = 0.8 - lockDeg * 0.55;
 
   const src = actx.createBufferSource();
@@ -7849,17 +7984,62 @@ function _beachSchedule(){
       if(spBeh.positions && spBeh.positions.includes(_sib)){
         const movV    = (typeof sv === 'function') ? sv('moving')  : 0;
         const brightV = (typeof sv === 'function') ? sv('bright')  : 0;
+        const _arpLive = _arpIsLive(actx);
         const lockDeg = Math.min(1, Math.max(0,
-          (spBeh.baseLockDeg ?? 0.3) + _arpActivity * 0.20 + movV * 0.15
+          (spBeh.baseLockDeg ?? 0.3) + (_arpLive ? _arpActivity * 0.20 : 0) + movV * 0.15
         ));
-        const prob = (spBeh.baseProb ?? 0.40)
-                     * (1 + brightV * 0.30)
-                     * (1 + _arpActivity * 0.25);
-        if(Math.random() < prob){
-          const jitter = (Math.random() * 2 - 1) * stepSec * (0.04 - lockDeg * 0.03);
-          const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + jitter;
+        // [A-1] コードチェンジ後0〜3小節、飛沫確率を1.3倍（新しい和声が波飛沫を上げる）
+        const _barsSinceChordSp = Math.floor(_beachTick / 16) - _beachChordChangedBar;
+        const _chordRippleSp = (_barsSinceChordSp >= 0 && _barsSinceChordSp <= 3) ? 1.3 : 1.0;
+        const tail = spBeh.tail;
+
+        // [TAIL/light] 静的シーンの「水面を滑る長い反射光」。
+        //   ARPに依らず稀に立つ（凪いだ水面ほど鏡の反射がぽつぽつ立つ＝ARPオフでも残す）。
+        //   通常より長いdecay・やや小音量・やや開いた(低lock=広pan)。
+        let _fired = false;
+        if(tail && tail.mode === 'light' && Math.random() < (tail.prob ?? 0.06)){
+          const _bakedDec = (spCfg.decayMs ?? 22) / 1000;
+          const _decay = _bakedDec * (tail.decayMul ?? 4);
+          const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + (Math.random() * 2 - 1) * stepSec * 0.03;
           const _bv = breathGain(_st);
-          _playBeachSpray(actx, _st, sceneCurrentName, spCfg, lockDeg, _bv);
+          _playBeachSpray(actx, _st, sceneCurrentName, spCfg,
+            Math.max(0, lockDeg - 0.2), _bv * (tail.volMul ?? 0.7), _decay);
+          _fired = true;
+        }
+
+        // [TAIL/openhat] 推進シーン（PLUCK/LOVE）のオープンハイハット。
+        //   指定裏拍でクローズドを「開いた」発音に置換。長さは次のダウンビート手前で
+        //   自然に消えるグリッド相対decay（ソース管理なしの擬似チョーク・グリッド同期）。
+        //   ARP稼働時のみ（推進シーンはARP駆動＝ARPオフなら土台ごと止む）。
+        if(!_fired && _arpLive && tail && tail.mode === 'openhat' &&
+           tail.positions && tail.positions.includes(_sib)){
+          if(Math.random() < (tail.prob ?? 0.8)){
+            const _stepsToNextBeat = 4 - (_sib % 4);   // 次の4分(ダウンビート)までの16分数
+            const _decay = Math.max(0.08, _stepsToNextBeat * stepSec * (tail.chokeRatio ?? 0.9));
+            const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + (Math.random() * 2 - 1) * stepSec * 0.02;
+            const _bv = breathGain(_st);
+            _playBeachSpray(actx, _st, sceneCurrentName, spCfg,
+              Math.max(0, lockDeg - (tail.openAmount ?? 0.5)), _bv * (tail.volMul ?? 1.0), _decay);
+            _fired = true;
+          }
+        }
+
+        // ── 通常 spray（クローズド/煌めき）──
+        // [A-2] ARPガード：ARPオフ時は波が引く＝確率を offGuard 倍に減衰（消しはしない）。
+        //   光(light)は上で別途処理済みなので、ここは「波の飛沫」側の制御。
+        if(!_fired){
+          const _arpAtten = _arpLive ? 1.0 : (spBeh.offGuard ?? 0.3);
+          const prob = (spBeh.baseProb ?? 0.40)
+                       * (1 + brightV * 0.30)
+                       * (1 + (_arpLive ? _arpActivity * 0.25 : 0))
+                       * _chordRippleSp
+                       * _arpAtten;
+          if(Math.random() < prob){
+            const jitter = (Math.random() * 2 - 1) * stepSec * (0.04 - lockDeg * 0.03);
+            const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + jitter;
+            const _bv = breathGain(_st);
+            _playBeachSpray(actx, _st, sceneCurrentName, spCfg, lockDeg, _bv);
+          }
         }
       }
     }
@@ -8227,18 +8407,28 @@ function _beachSineStep(actx, stepSec){
     _beachSineCycleCount++;
     // ── 長期変容 ──
     const sg = (typeof sv === 'function') ? sv('strange') : 0;
-    const phaseAt = sg > 0.4 ? 6 : 12;
-    // [E-1] マクロ潮位に連動：満ち潮(activity>1)では位相シフト/変異が起きやすく、
-    // 引き潮(activity<1)では静まる。和声は不変のまま「動きの濃淡」だけが数分で移ろう。
     const act = (typeof _beachMacroActivity === 'number') ? _beachMacroActivity : 1.0; // 0.5..1.5
-    if(_beachSineCycleCount % phaseAt === 0 && Math.random() < act){
+    const _actC = Math.max(0.5, Math.min(1.5, act));
+
+    // [E-1] 位相シフト（Reich的フェイジング＝聴こえる変化）はマクロ潮位に連動。
+    //   満ち引きは「間隔」で制御し（actが1.0を超えても天井にぶつからない）、
+    //   有機的な揺らぎは固定確率ゲートで残す（決定論化＝時計仕掛けを避ける）。
+    //     act=0.5（引き潮）: phaseAt≈24（まれ）
+    //     act=1.0（中立）  : phaseAt=12
+    //     act=1.5（満ち潮）: phaseAt=8 （頻繁）
+    const phaseBase = sg > 0.4 ? 6 : 12;
+    const phaseAt   = Math.max(2, Math.round(phaseBase / _actC));
+    if(_beachSineCycleCount % phaseAt === 0 && Math.random() < 0.6){
       _beachSineCellPhase = (_beachSineCellPhase + 1) % cellLen;
     }
-    // 8サイクルに1回: 1音度を変異プールから差し替え（引き潮では確率的に見送る＝凪ぐ）
-    // [F-1] コードチェンジ後0〜2小節は変異確率を1.5倍（新しい和声に着地していく過程）
+
+    // [E-1] 変異（内声1音の差し替え）は知覚閾下に近く、満ち引き連動が体感されにくい。
+    //   よって潮位連動はせず固定間隔（8サイクル）に戻す。ただし旧 `Math.random() < act`
+    //   の満ち潮天井（act>1でrandom上限1.0に頭打ち）バグだけは潰し、固定確率ゲートにする。
+    //   [F-1] コードチェンジ後0〜2小節は変異確率を1.5倍（新しい和声に着地していく過程）。
     const _barsSinceChord = Math.floor(_beachTick / 16) - _beachChordChangedBar;
     const _chordRippleMut = (_barsSinceChord >= 0 && _barsSinceChord <= 2) ? 1.5 : 1.0;
-    if(_beachSineCycleCount % 8 === 0 && cfg.mutPool && cfg.mutPool.length && Math.random() < act * _chordRippleMut){
+    if(_beachSineCycleCount % 8 === 0 && cfg.mutPool && cfg.mutPool.length && Math.random() < 0.7 * _chordRippleMut){
       const mIdx = Math.floor(Math.random() * cellLen);
       const mDeg = cfg.mutPool[Math.floor(Math.random() * cfg.mutPool.length)];
       _beachSineCellMut = { idx: mIdx, degree: mDeg };
@@ -18686,6 +18876,9 @@ function setMode(mode){
   }
   relCache=null; sncCache=null; invalidate();
   updateSaveBtnVisibility();
+  // 島カルーセルを現在モードへ同期（ボタンクリック等での切替にも追従）
+  const _ii=_MODE_SEQ.indexOf(mode);
+  if(_ii>=0 && !_modeSwipe){ _islandSnapTarget=_ii; _islandSnapping=true; invalidate(); }
 }
 document.querySelectorAll('.mode-btn').forEach(b=>{
   b.addEventListener('click',()=>setMode(b.dataset.mode));
