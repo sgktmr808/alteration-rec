@@ -689,10 +689,10 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 /* ── S9 PIVOT: 目標キー選択オーバーレイ ── */
 /* PIVOT: 上バー（表示系）/ 下バー（操作系）。PIVOTモード時のみ .on で表示 */
 #pivot-bar-top{
-  position:absolute;top:44px;left:8px;right:8px;z-index:11;
-  display:none;flex-direction:column;gap:4px;align-items:center;
+  position:absolute;top:36px;left:8px;right:8px;z-index:11;
+  display:none;flex-direction:column;gap:2px;align-items:center;
   background:rgba(13,13,16,0.9);border:1px solid rgba(74,144,212,0.35);
-  border-radius:8px;padding:8px 10px;
+  border-radius:8px;padding:5px 10px;
 }
 #pivot-bar-top.on{display:flex;}
 #pivot-bar-bottom{
@@ -2335,8 +2335,7 @@ let _islandSnapTarget=0;     // スナップ先インデックス
 const _MODE_LABELS={radial:'RADIAL',expand:'EXPAND',link:'LINK',chain:'CHAIN',compass:'COMP',graph:'GRAPH',wave:'WAVE',bridge:'BRIDGE',pivot:'PIVOT'};
 const _MODE_SEQ=['radial','expand','link','chain','compass','graph','wave','bridge','pivot'];
 
-// ── 下の海：オプション島（独立トグル。流して眺め、タップで点灯）──
-let _optScroll=0;
+// ── 下の海：オプション島（独立トグル。流して眺め、タップで点灯）──let _optScroll=0;
 let _optSnapping=false;
 let _optSnapTarget=0;
 // 各オプション島：表示名・トグル関数・ON状態を読むゲッター・無効判定
@@ -3071,7 +3070,7 @@ function drawOptIslands(ctx){
     if(Math.abs(d)<0.002){ _optScroll=_optSnapTarget; _optSnapping=false; }
     else { _optScroll+=d*0.22; dirty=true; }
   }
-  const baseY = cy + SR + 100;            // 焦点島の基準Y（コード円の下・スライダーから離す）
+  const baseY = cy + SR + 40;            // 焦点島の基準Y（コード円のすぐ下に密着）
   const maxI = _OPT_ISLANDS.length-1;
   for(let d=-2; d<=2; d++){
     const fi=_optScroll+d;
@@ -3165,63 +3164,72 @@ function drawToneWheelInMap(ctx){
   if(MAP_MODE!=='radial') return;
   if(typeof TW_CHORD_RING==='undefined') return;
   const {cx,cy,MR}=L;
-  // 半径帯：中央の現在コード(〜MR*0.16)の外〜コードセル内縁(MR*0.64)の手前まで
-  const R_IN  = MR*0.20;
-  const R_OUT = MR*0.44;   // Major/minor 内輪 外縁
-  const R_SUS = MR*0.60;   // Sus 外輪 外縁
+  // 半径帯を最大化（中央の現在コード〜コードセル内縁MR*0.64の手前）
+  const R_IN  = MR*0.24;
+  const R_OUT = MR*0.48;   // Major/minor 内輪 外縁
+  const R_SUS = MR*0.62;   // Sus 外輪 外縁
   const N = TW_N;
   const step = Math.PI*2/N;
   const rot = (typeof twRotation!=='undefined') ? twRotation : 0;
+  const hot = _twRotating;            // 回転中ハイライト
+  const hl = hot ? 1 : 0;
 
   ctx.save();
-  // 背景の淡いガイド
+  // 背景円（回転中は明るく前面に）
   ctx.beginPath(); ctx.arc(cx,cy,R_SUS,0,Math.PI*2);
-  ctx.strokeStyle='rgba(74,144,212,0.12)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle=`rgba(74,144,212,${0.05+0.08*hl})`; ctx.fill();
+  ctx.strokeStyle=`rgba(74,144,212,${0.18+0.42*hl})`; ctx.lineWidth=1+hl; ctx.stroke();
 
   // 内輪 Major/minor
   TW_CHORD_RING.forEach((chord,i)=>{
     const a=rot+i*step, aN=a+step;
     const isMajor=(chord.type==='major'||chord.type==='');
     const isActive=(chord.root===S.root&&chord.type===S.type);
-    const baseCol=isMajor?'rgba(232,197,71,':'rgba(74,144,212,';
+    const baseCol=isMajor?'232,197,71':'74,144,212';
     ctx.beginPath();
     ctx.moveTo(cx+R_IN*Math.cos(a),cy+R_IN*Math.sin(a));
     ctx.arc(cx,cy,R_OUT,a,aN);
     ctx.arc(cx,cy,R_IN,aN,a,true);
     ctx.closePath();
-    ctx.fillStyle=isActive?baseCol+'0.34)':baseCol+'0.05)';
+    ctx.fillStyle=isActive?`rgba(${baseCol},0.40)`:`rgba(${baseCol},${0.05+0.05*hl})`;
     ctx.fill();
-    ctx.strokeStyle=isActive?baseCol+'0.70)':'rgba(255,255,255,0.05)';
-    ctx.lineWidth=isActive?1.4:0.4; ctx.stroke();
-    // ラベル（アクティブと一定間隔のみ：密集回避）
-    if(isActive || i%2===0){
+    ctx.strokeStyle=isActive?`rgba(${baseCol},0.80)`:`rgba(255,255,255,${0.05+0.18*hl})`;
+    ctx.lineWidth=isActive?1.6:0.4+hl*0.5; ctx.stroke();
+    // ラベル：アクティブ＋回転中は全表示、通常時は1つおき（密集回避）
+    if(isActive || hot || i%2===0){
       const midA=a+step/2, midR=(R_IN+R_OUT)/2;
       const tx=cx+midR*Math.cos(midA), ty=cy+midR*Math.sin(midA);
       ctx.save(); ctx.translate(tx,ty); ctx.rotate(midA+Math.PI/2);
-      ctx.font=isActive?'bold 6px DM Mono,monospace':'5px DM Mono,monospace';
+      ctx.font=isActive?'bold 8px DM Mono,monospace':`${7}px DM Mono,monospace`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillStyle=isActive?(isMajor?'#e8c547':'#4a90d4'):'rgba(180,185,200,0.35)';
+      ctx.fillStyle=isActive?(isMajor?'#e8c547':'#4a90d4'):`rgba(205,210,228,${0.4+0.4*hl})`;
       ctx.fillText(chord.root+(isMajor?'':'m'),0,0);
       ctx.restore();
     }
   });
-  // 外輪 Sus
+  // 外輪 Sus（控えめ）
   if(typeof TW_SUS_RING!=='undefined'){
     TW_SUS_RING.forEach((sus,i)=>{
       const a=rot+i*step, aN=a+step;
-      const isSus4=sus.type==='sus4';
       const isActiveSus=(sus.root===S.root&&sus.type===S.type);
-      const susCol=isSus4?'rgba(74,170,114,':'rgba(154,106,212,';
+      const isSus4=sus.type==='sus4';
+      const susCol=isSus4?'74,170,114':'154,106,212';
       ctx.beginPath();
       ctx.moveTo(cx+R_OUT*Math.cos(a),cy+R_OUT*Math.sin(a));
       ctx.arc(cx,cy,R_SUS,a,aN);
       ctx.arc(cx,cy,R_OUT,aN,a,true);
       ctx.closePath();
-      ctx.fillStyle=isActiveSus?susCol+'0.30)':susCol+'0.04)';
+      ctx.fillStyle=isActiveSus?`rgba(${susCol},0.30)`:`rgba(${susCol},${0.03+0.04*hl})`;
       ctx.fill();
-      ctx.strokeStyle=isActiveSus?susCol+'0.70)':'rgba(255,255,255,0.04)';
-      ctx.lineWidth=isActiveSus?1.3:0.3; ctx.stroke();
+      ctx.strokeStyle=isActiveSus?`rgba(${susCol},0.70)`:`rgba(255,255,255,${0.03+0.10*hl})`;
+      ctx.lineWidth=isActiveSus?1.3:0.3+hl*0.3; ctx.stroke();
     });
+  }
+  // 回転中インジケーター
+  if(hot){
+    ctx.font='8px DM Mono,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(74,144,212,0.9)';
+    ctx.fillText('\u25D0 ROTATING', cx, cy+R_SUS+12);
   }
   ctx.restore();
 }
@@ -3262,9 +3270,9 @@ function drawIslandCarousel(ctx){
     if(Math.abs(d)<0.002){ _islandScroll=_islandSnapTarget; _islandSnapping=false; }
     else { _islandScroll+=d*0.22; dirty=true; }
   }
-  // 通常は円から離す(SR+100)。PIVOTモード時は円に寄せ(SR+58)、上端に表示バーの帯を作る。
-  const _pivotTight = (MAP_MODE==='pivot');
-  const baseY = cy - SR - (_pivotTight ? 58 : 100);  // 焦点島の基準Y（コード円の上）
+  // 島の内縁が円外周(SR)のすぐ外に接するように配置（図で干渉なしを確認）。
+  const ISLAND_GAP = 40;               // 円外周から島中心まで（島半径30+余白10）
+  const baseY = cy - SR - ISLAND_GAP;  // 焦点島の基準Y（コード円のすぐ上）
   const maxI = _MODE_SEQ.length-1;
   // 焦点±2まで描く（±2は沖へ消えゆく気配）。3個見え＝±1が本体、±2はフェード。
   for(let d=-2; d<=2; d++){
@@ -3365,6 +3373,17 @@ function initCanvas(){
     const dist=distFromCenter(x,y);
     const angle=angleFromCenter(x,y);
 
+    // Tone Wheel（マップ統合）：中央リング帯のドラッグ＝回転候補。RADIAL・TWHL ON時。
+    if(typeof toneWheelOpen!=='undefined' && toneWheelOpen && MAP_MODE==='radial'){
+      const rIn=L.MR*0.24, rOut=L.MR*0.62;
+      if(dist>=rIn && dist<=rOut){
+        _twMapDrag={ startAngle:angle, startRot:twRotation, moved:false, pointerId:e.pointerId };
+        canvas.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;   // メイン処理を抑止（回転 or タップ選択はmove/upで判定）
+      }
+    }
+
     // Slider ring hit
     if(Math.abs(dist-L.SR)<24){
       const idx=hitSlider(angle);
@@ -3444,6 +3463,18 @@ function initCanvas(){
 
   canvas.addEventListener('pointermove',e=>{
     const{x,y}=canvasXY(e);
+    // Tone Wheel回転（マップ統合）
+    if(_twMapDrag && e.pointerId===_twMapDrag.pointerId){
+      const ang=angleFromCenter(x,y);
+      let delta=ang-_twMapDrag.startAngle;
+      if(!_twMapDrag.moved && Math.abs(delta)>0.04){ _twMapDrag.moved=true; _twRotating=true; }
+      if(_twMapDrag.moved){
+        twRotation=_twMapDrag.startRot+delta;
+        invalidate();
+      }
+      e.preventDefault();
+      return;
+    }
     fxAddTrail(x,y);invalidate();
     // 中央ノードロングプレス中に動いたらキャンセル
     if(_centerDown && _centerLongPressTimer && _centerDownPos){
@@ -3486,7 +3517,15 @@ function initCanvas(){
   });
 
 
-  canvas.addEventListener('pointerup',()=>{
+  canvas.addEventListener('pointerup',(e)=>{
+    // Tone Wheel（マップ統合）操作の終了
+    if(_twMapDrag && (!e || e.pointerId===_twMapDrag.pointerId)){
+      const wasMoved=_twMapDrag.moved;
+      _twMapDrag=null; _twRotating=false;
+      if(wasMoved){ invalidate(); return; }   // 回転確定
+      // 動かさず離した＝タップ選択
+      if(e){ const{x,y}=canvasXY(e); if(hitTestToneWheelInMap(x,y)){ invalidate(); return; } }
+    }
     _sliderDragging = false; // スライダー操作終了
     // 中央ノード: 短押し（タップ）処理
     if(_centerDown){
@@ -3605,7 +3644,7 @@ function initCanvas(){
       if(ad>1.2) continue;                        // 本体（見えている島）のみタップ可
       const depth=Math.min(ad/2,1);
       const ix=cx+off*_ISLAND_SPACING;
-      const iy=(cy+SR+100)+depth*40*0.5;
+      const iy=(cy+SR+40)+depth*40*0.5;
       const rr=30-12*depth*0.5;
       const dd=Math.hypot(x-ix,y-iy);
       if(dd<rr+6 && dd<bestD){ bestD=dd; best=i; }
@@ -17968,6 +18007,9 @@ let toneWheelOpen=false;
 let twRotation=0;      // 現在の回転角（ラジアン）
 let twDragStart=null;  // {angle, rotation}
 let twCanvas=null, twCtx=null;
+// マップ円統合版Tone Wheelの回転ドラッグ状態
+let _twMapDrag=null;   // {startAngle, startRot, moved, pointerId}
+let _twRotating=false; // 回転中ハイライト
 
 function toggleToneWheel(){
   toneWheelOpen=!toneWheelOpen;
