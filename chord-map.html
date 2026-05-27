@@ -18391,25 +18391,9 @@ function playPivotProg(){
     updatePivotStepIndicator(c.stepIdx);
     // prog-bar更新
     updatePivotProgBar(idx);
-    // コード音を鳴らす（moveToChordは使わず音だけ）
-    const actx=safeGetCtx();
-    if(actx){
-      safeResume(actx,()=>{
-        stopPhraseNow();
-        // ボイシング再生（drawChordのロジックを流用）
-        const ri=ni(c.root);
-        if(ri>=0){
-          const ivs=CT[c.type]?.iv??[0,4,7];
-          const t=actx.currentTime||Date.now()/1000;
-          // ベース音
-          if(typeof pluck==='function') pluck(actx,midi2hz(36+ri),t,0.5);
-          ivs.forEach((iv,j)=>{
-            const midi=60+(ri+iv)%12;
-            if(typeof pluck==='function') pluck(actx,midi2hz(midi),t+j*0.04,0.38);
-          });
-        }
-      });
-    }
+    // コード音を鳴らす（現在シーンの音響エンジンを使用）
+    stopPhraseNow();
+    notifySynth(c.root, c.type);
     invalidate();
     idx++;
     pivotProgTimer=setTimeout(step,interval);
