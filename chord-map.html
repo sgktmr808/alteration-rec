@@ -670,16 +670,8 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 #tone-wheel-canvas{ display:block; cursor:grab; touch-action:none; }
 
 /* ── S7 モーダルグラフパネル（右下） ── */
-#modal-graph-overlay{
-  position:absolute;bottom:12px;right:12px;z-index:10;
-  display:none;
-  background:rgba(13,13,16,0.88);
-  border:1px solid rgba(154,106,212,0.35);
-  border-radius:8px;
-  padding:6px;
-  flex-direction:column;gap:4px;align-items:center;
-}
-#modal-graph-overlay.on{ display:flex; }
+#modal-graph-overlay{ display:none !important; }
+#modal-graph-overlay.on{ display:none !important; }
 #modal-graph-canvas{ display:block; touch-action:none; cursor:pointer; }
 #modal-graph-header{
   display:flex;align-items:center;justify-content:space-between;
@@ -8857,8 +8849,6 @@ function moveToChord(root,type){
   if(MAP_MODE==='chain'){_chainPosKey='';} // CHAINストリームを次フレームで再構築
   // Q6: モーダルオーバーレイをコード変更時にフェードイン再開
   if(modalMapMode) modalOverlayAlpha=0;
-  // S7グラフ: コード変更時に現在モードをハイライト更新
-  if(modalMapMode) updateModalGraphHighlight();
   // R2: トライアッドスペースオーバーレイもコード変更時にフェードイン再開
   if(triadSpaceMode) triadSpaceAlpha=0;
   // BRTK: バルトーク軸オーバーレイもコード変更時にフェードイン再開
@@ -11802,12 +11792,7 @@ function toggleModalMap(){
   const btn=document.getElementById('modal-map-btn');
   if(btn) btn.classList.toggle('on',modalMapMode);
   if(modalMapMode) modalOverlayAlpha=0;  // ON時はゼロからフェードイン
-  // S7グラフパネルも連動
-  const mgOv=document.getElementById('modal-graph-overlay');
-  if(mgOv){
-    mgOv.classList.toggle('on',modalMapMode);
-    if(modalMapMode) initModalGraph();
-  }
+  // Modal Graphの別パネルは廃止。旋法情報はマップ円内のdrawModalOverlayに一本化。
   invalidate();
 }
 
@@ -12119,188 +12104,6 @@ function drawTriadSpaceOverlay(ctx){
 
 
 
-// ═══════════════════════════════════════════════════════════════
-// S7 MODAL GRAPH — フルUIパネル (右下キャンバス)
-// 13モードをブライトネス軸で縦配置、1音差エッジを接続線で描画
-// 現在コードのモードをハイライト、タップで moveToChord()
-// ═══════════════════════════════════════════════════════════════
-
-let mgCanvas=null, mgCtx=null;
-let mgHits=[]; // [{mode, x, y, r}] — タップ判定用
-
-// ブライトネス値でモードを縦ソート（明るい=上、暗い=下）
-const MG_MODES_SORTED=Object.entries(MODAL_DATA)
-  .sort((a,b)=>b[1].brightness-a[1].brightness)
-  .map(([k])=>k);
-
-// 親スケール別の横オフセット
-const MG_PARENT_COL={
-  'Maj': 0,
-  'Me':  1,
-  'Ar':  2,
-};
-
-function initModalGraph(){
-  mgCanvas=document.getElementById('modal-graph-canvas');
-  if(!mgCanvas)return;
-  mgCtx=mgCanvas.getContext('2d');
-  drawModalGraph();
-
-  // イベント登録（重複防止のためcloneAndReplace）
-  const nc=mgCanvas.cloneNode(true);
-  mgCanvas.parentNode.replaceChild(nc,mgCanvas);
-  mgCanvas=nc; mgCtx=mgCanvas.getContext('2d');
-
-  mgCanvas.addEventListener('pointerdown',e=>{
-    e.stopPropagation();
-    const rect=mgCanvas.getBoundingClientRect();
-    const scaleX=mgCanvas.width/rect.width;
-    const scaleY=mgCanvas.height/rect.height;
-    const tx=(e.clientX-rect.left)*scaleX;
-    const ty=(e.clientY-rect.top)*scaleY;
-    const hit=mgHits.find(h=>{
-      const dx=tx-h.x,dy=ty-h.y;
-      return dx*dx+dy*dy<=(h.r+6)*(h.r+6);
-    });
-    if(hit){
-      // そのモードの代表コードタイプでmoveToChord
-      const mdata=MODAL_DATA[hit.mode];
-      if(mdata&&mdata.types.length>0){
-        moveToChord(S.root, mdata.types[0]);
-      }
-    }
-  });
-}
-
-function drawModalGraph(){
-  if(!mgCanvas||!mgCtx)return;
-  const W=mgCanvas.width, H=mgCanvas.height;
-  const ctx=mgCtx;
-  ctx.clearRect(0,0,W,H);
-
-  mgHits=[];
-
-  // レイアウト定数
-  const PAD_T=16, PAD_B=12, PAD_L=28, PAD_R=16;
-  const colW=(W-PAD_L-PAD_R)/3; // 3列（Maj/Me/Ar）
-  const rowH=(H-PAD_T-PAD_B)/(MG_MODES_SORTED.length-1||1);
-  const NODE_R=14;
-
-  // 現在モード
-  const curMode=guessMode(S.type)||'Ionian';
-
-  // 各モードの座標を計算
-  const modePos={};
-  MG_MODES_SORTED.forEach((mode,i)=>{
-    const md=MODAL_DATA[mode];
-    const col=MG_PARENT_COL[md.parent]??0;
-    const x=PAD_L+col*colW+colW/2;
-    const y=PAD_T+i*rowH;
-    modePos[mode]={x,y};
-    mgHits.push({mode,x,y,r:NODE_R});
-  });
-
-  // ── エッジ描画（1音差接続） ──
-  Object.entries(MODAL_GRAPH_S7).forEach(([modeA,edges])=>{
-    const posA=modePos[modeA];
-    if(!posA)return;
-    edges.forEach(e=>{
-      const posB=modePos[e.mode];
-      if(!posB)return;
-      const colA=MG_PARENT_COL[MODAL_DATA[modeA]?.parent]??0;
-      const colB=MG_PARENT_COL[MODAL_DATA[e.mode]?.parent]??0;
-      const isCross=(colA!==colB);
-      ctx.beginPath();
-      ctx.moveTo(posA.x,posA.y);
-      ctx.lineTo(posB.x,posB.y);
-      ctx.strokeStyle=isCross?'rgba(255,255,255,0.12)':'rgba(255,255,255,0.18)';
-      ctx.lineWidth=isCross?0.8:1.2;
-      ctx.setLineDash(isCross?[3,4]:[]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // 方向矢印ラベル（変化音）
-      const mx=(posA.x+posB.x)/2;
-      const my=(posA.y+posB.y)/2;
-      ctx.font='5px var(--fm,monospace)';
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillStyle='rgba(255,255,255,0.25)';
-      ctx.fillText(e.change, mx, my);
-    });
-  });
-
-  // ── 親スケール列ヘッダー ──
-  const parentLabels=[
-    {col:0,label:'Maj',col_hex:'rgba(212,74,106,0.55)'},
-    {col:1,label:'Me', col_hex:'rgba(74,144,212,0.55)'},
-    {col:2,label:'Ar', col_hex:'rgba(74,170,114,0.55)'},
-  ];
-  parentLabels.forEach(p=>{
-    const x=PAD_L+p.col*colW+colW/2;
-    ctx.font='bold 6px var(--fm,monospace)';
-    ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillStyle=p.col_hex;
-    ctx.fillText(p.label,x,1);
-  });
-
-  // ── ノード描画 ──
-  MG_MODES_SORTED.forEach(mode=>{
-    const md=MODAL_DATA[mode];
-    const {x,y}=modePos[mode];
-    const isCur=(mode===curMode);
-    const col=md.color||'#9a6ad4';
-
-    // ブライトネスインジケーター（左端の細い縦バー）
-    const bv=(md.brightness+1)/2; // 0〜1
-    ctx.beginPath();
-    ctx.arc(PAD_L-10,y,3,0,Math.PI*2);
-    const bCol=bv>0.5?`rgba(232,197,71,${0.3+bv*0.5})`:`rgba(74,144,212,${0.3+(1-bv)*0.5})`;
-    ctx.fillStyle=bCol;
-    ctx.fill();
-
-    // ノード外リング
-    ctx.beginPath();
-    ctx.arc(x,y,NODE_R+(isCur?3:0),0,Math.PI*2);
-    ctx.strokeStyle=isCur?col:'rgba(255,255,255,0.15)';
-    ctx.lineWidth=isCur?2:0.8;
-    ctx.stroke();
-
-    // ノード塗り
-    ctx.beginPath();
-    ctx.arc(x,y,NODE_R,0,Math.PI*2);
-    const fillAlpha=isCur?0.35:0.08;
-    ctx.fillStyle=isCur
-      ?col.replace('#',`rgba(`)+',' // ダミー、下で正しく設定
-      :'rgba(255,255,255,0.05)';
-    if(isCur){
-      const [r,g,b]=hexToRgb(col).split(',');
-      ctx.fillStyle=`rgba(${r},${g},${b},0.30)`;
-    }
-    ctx.fill();
-
-    // モード名
-    ctx.font=`${isCur?'bold ':''} ${isCur?7:6}px var(--fm,monospace)`;
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle=isCur?col:'rgba(255,255,255,0.55)';
-    const displayName=MODAL_DISPLAY[mode]||mode;
-    ctx.fillText(displayName.length>10?displayName.slice(0,9)+'…':displayName,x,y);
-
-    // テンション表示（現在モードのみ）
-    if(isCur && md.tension!==undefined){
-      ctx.font='5px var(--fm,monospace)';
-      ctx.fillStyle='rgba(255,255,255,0.40)';
-      ctx.fillText(`♯${Math.round(md.tension*10)}`, x, y+NODE_R+6);
-    }
-  });
-
-  // 現在モード名をヘッダーに更新
-  const curEl=document.getElementById('modal-graph-cur');
-  if(curEl) curEl.textContent=MODAL_DISPLAY[curMode]||curMode;
-}
-
-function updateModalGraphHighlight(){
-  // コード変更時に再描画
-  drawModalGraph();
-}
 
 // ═══════════════════════════════════════════════════════════════
 
