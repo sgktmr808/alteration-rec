@@ -2618,7 +2618,11 @@ function drawFrame(){
     const frac=idx/Math.max(cnt-1,1);
     const pull=node.mb/40;
     const rExtra = cnt>=3 ? (idx%2===0?0:6) : 0; // 交互に±6px
-    const r=mr+(MR-mr)*(0.15+frac*0.85)*(1-pull*0.25)+rExtra;
+    // TWHL統合：RADIALでTone Wheel ON時、コードセルを外帯へ寄せ中央にリングの場所を空ける
+    // （中央の現在コード自身は別途固定描画なので影響しない）
+    const _twOn = (MAP_MODE==='radial' && typeof toneWheelOpen!=='undefined' && toneWheelOpen);
+    const mrEff = _twOn ? MR*0.64 : mr;
+    const r=mrEff+(MR-mrEff)*(0.15+frac*0.85)*(1-pull*0.25)+rExtra;
     // Wobble: ±1.5px organic drift per node
     FX.wobbleTick+=0.00015;
     const wSeed=ri2*1.7+idx*0.9;
@@ -3050,6 +3054,9 @@ function drawFrame(){
   // ── COSMIC FX (topmost) ──
   fxDrawAndUpdate(ctx);
 
+  // ── Tone Wheel をマップ円中央へ統合描画（RADIAL・TWHL ON時）──
+  drawToneWheelInMap(ctx);
+
   // ── 島カルーセル（可視化モード／上の海・最前面）──
   drawIslandCarousel(ctx);
   // ── オプション島（下の海・最前面）──
@@ -3066,7 +3073,7 @@ function drawOptIslands(ctx){
     if(Math.abs(d)<0.002){ _optScroll=_optSnapTarget; _optSnapping=false; }
     else { _optScroll+=d*0.22; dirty=true; }
   }
-  const baseY = cy + SR + 30;            // 焦点島の基準Y（コード円の下）
+  const baseY = cy + SR + 100;            // 焦点島の基準Y（コード円の下・スライダーから離す）
   const maxI = _OPT_ISLANDS.length-1;
   for(let d=-2; d<=2; d++){
     const fi=_optScroll+d;
@@ -3127,6 +3134,101 @@ function drawOptIslands(ctx){
 }
 function deg2r(d){return(d-90)*Math.PI/180;}
 
+// Tone Wheel（マップ円中央統合版）のタップ判定。該当時 moveToChord して true。
+function hitTestToneWheelInMap(x,y){
+  if(typeof TW_CHORD_RING==='undefined') return false;
+  const {cx,cy,MR}=L;
+  const R_IN=MR*0.20, R_OUT=MR*0.44, R_SUS=MR*0.60;
+  const dx=x-cx, dy=y-cy;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<R_IN || dist>R_SUS) return false;   // 帯の外（中央コードや外側はノード側へ）
+  const rot=(typeof twRotation!=='undefined')?twRotation:0;
+  const rawA=Math.atan2(dy,dx);
+  const slotA=(rawA-rot+Math.PI*2)%(Math.PI*2);
+  const idx=Math.round(slotA/(Math.PI*2/TW_N))%TW_N;
+  if(dist>R_OUT){
+    if(typeof TW_SUS_RING!=='undefined'){
+      const sus=TW_SUS_RING[idx];
+      if(sus){ moveToChord(sus.root,sus.type); invalidate(); return true; }
+    }
+  }else{
+    const c=TW_CHORD_RING[idx];
+    if(c){ moveToChord(c.root,c.type); invalidate(); return true; }
+  }
+  return false;
+}
+
+// 中央の現在コードの外側・コードセルの内側の半径帯に、同心リングとして溶け込ませる。
+// 既存の TW_CHORD_RING / TW_SUS_RING / twRotation を流用。
+// ── Tone Wheel をマップ円中央に統合描画（RADIAL限定）──
+// 中央の現在コードの外側・コードセルの内側の半径帯に同心リングとして溶け込ませる。
+function drawToneWheelInMap(ctx){
+  if(typeof toneWheelOpen==='undefined' || !toneWheelOpen) return;
+  if(MAP_MODE!=='radial') return;
+  if(typeof TW_CHORD_RING==='undefined') return;
+  const {cx,cy,MR}=L;
+  // 半径帯：中央の現在コード(〜MR*0.16)の外〜コードセル内縁(MR*0.64)の手前まで
+  const R_IN  = MR*0.20;
+  const R_OUT = MR*0.44;   // Major/minor 内輪 外縁
+  const R_SUS = MR*0.60;   // Sus 外輪 外縁
+  const N = TW_N;
+  const step = Math.PI*2/N;
+  const rot = (typeof twRotation!=='undefined') ? twRotation : 0;
+
+  ctx.save();
+  // 背景の淡いガイド
+  ctx.beginPath(); ctx.arc(cx,cy,R_SUS,0,Math.PI*2);
+  ctx.strokeStyle='rgba(74,144,212,0.12)'; ctx.lineWidth=1; ctx.stroke();
+
+  // 内輪 Major/minor
+  TW_CHORD_RING.forEach((chord,i)=>{
+    const a=rot+i*step, aN=a+step;
+    const isMajor=(chord.type==='major'||chord.type==='');
+    const isActive=(chord.root===S.root&&chord.type===S.type);
+    const baseCol=isMajor?'rgba(232,197,71,':'rgba(74,144,212,';
+    ctx.beginPath();
+    ctx.moveTo(cx+R_IN*Math.cos(a),cy+R_IN*Math.sin(a));
+    ctx.arc(cx,cy,R_OUT,a,aN);
+    ctx.arc(cx,cy,R_IN,aN,a,true);
+    ctx.closePath();
+    ctx.fillStyle=isActive?baseCol+'0.34)':baseCol+'0.05)';
+    ctx.fill();
+    ctx.strokeStyle=isActive?baseCol+'0.70)':'rgba(255,255,255,0.05)';
+    ctx.lineWidth=isActive?1.4:0.4; ctx.stroke();
+    // ラベル（アクティブと一定間隔のみ：密集回避）
+    if(isActive || i%2===0){
+      const midA=a+step/2, midR=(R_IN+R_OUT)/2;
+      const tx=cx+midR*Math.cos(midA), ty=cy+midR*Math.sin(midA);
+      ctx.save(); ctx.translate(tx,ty); ctx.rotate(midA+Math.PI/2);
+      ctx.font=isActive?'bold 6px DM Mono,monospace':'5px DM Mono,monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=isActive?(isMajor?'#e8c547':'#4a90d4'):'rgba(180,185,200,0.35)';
+      ctx.fillText(chord.root+(isMajor?'':'m'),0,0);
+      ctx.restore();
+    }
+  });
+  // 外輪 Sus
+  if(typeof TW_SUS_RING!=='undefined'){
+    TW_SUS_RING.forEach((sus,i)=>{
+      const a=rot+i*step, aN=a+step;
+      const isSus4=sus.type==='sus4';
+      const isActiveSus=(sus.root===S.root&&sus.type===S.type);
+      const susCol=isSus4?'rgba(74,170,114,':'rgba(154,106,212,';
+      ctx.beginPath();
+      ctx.moveTo(cx+R_OUT*Math.cos(a),cy+R_OUT*Math.sin(a));
+      ctx.arc(cx,cy,R_SUS,a,aN);
+      ctx.arc(cx,cy,R_OUT,aN,a,true);
+      ctx.closePath();
+      ctx.fillStyle=isActiveSus?susCol+'0.30)':susCol+'0.04)';
+      ctx.fill();
+      ctx.strokeStyle=isActiveSus?susCol+'0.70)':'rgba(255,255,255,0.04)';
+      ctx.lineWidth=isActiveSus?1.3:0.3; ctx.stroke();
+    });
+  }
+  ctx.restore();
+}
+
+
 // ── 島カルーセル描画 ──────────────────────────────
 // 上の海（コード円の上）に可視化モードを「島」として描く。
 // 横スクロール(_islandScroll)で島が流れ、浜辺正面(中央)の島が選択中モード。
@@ -3162,7 +3264,7 @@ function drawIslandCarousel(ctx){
     if(Math.abs(d)<0.002){ _islandScroll=_islandSnapTarget; _islandSnapping=false; }
     else { _islandScroll+=d*0.22; dirty=true; }
   }
-  const baseY = cy - SR - 30;          // 焦点島の基準Y（コード円の上）
+  const baseY = cy - SR - 100;          // 焦点島の基準Y（コード円の上・スライダーから離す）
   const maxI = _MODE_SEQ.length-1;
   // 焦点±2まで描く（±2は沖へ消えゆく気配）。3個見え＝±1が本体、±2はフェード。
   for(let d=-2; d<=2; d++){
@@ -3317,6 +3419,10 @@ function initCanvas(){
     // M5: TRITONE代理ノードのヒットテスト
     if(tritoneMode && ['radial','expand','chain'].includes(MAP_MODE)){
       if(hitTestTritone(x,y)) return;
+    }
+    // TWHL統合：中央のTone Wheel帯のタップでコード選択（RADIAL・TWHL ON時）
+    if(typeof toneWheelOpen!=='undefined' && toneWheelOpen && MAP_MODE==='radial'){
+      if(hitTestToneWheelInMap(x,y)) return;
     }
     const hit=hitNode(x,y);
     if(hit){
@@ -3499,7 +3605,7 @@ function initCanvas(){
       if(ad>1.2) continue;                        // 本体（見えている島）のみタップ可
       const depth=Math.min(ad/2,1);
       const ix=cx+off*_ISLAND_SPACING;
-      const iy=(cy+SR+30)+depth*40*0.5;
+      const iy=(cy+SR+100)+depth*40*0.5;
       const rr=30-12*depth*0.5;
       const dd=Math.hypot(x-ix,y-iy);
       if(dd<rr+6 && dd<bestD){ bestD=dd; best=i; }
@@ -8782,7 +8888,8 @@ function moveToChord(root,type){
   // 課題3: MIDI録音中ならコードをキャプチャ
   if(typeof recordMidiChord==='function')recordMidiChord(root,type,S.voicing);
   // S11: トーンホイール表示中なら中央コード表示を同期
-  if(toneWheelOpen&&twCtx) drawToneWheel();
+  // Tone Wheelはマップ円中央へ統合描画（drawToneWheelInMap）に移行したため別canvas描画は停止
+  // if(toneWheelOpen&&twCtx) drawToneWheel();
   // ボイシング自動選択（星評価最高 or 先頭）
   const pos=getVoicings(root,type);
   if(pos.length){
@@ -18054,12 +18161,14 @@ let twCanvas=null, twCtx=null;
 function toggleToneWheel(){
   toneWheelOpen=!toneWheelOpen;
   const btn=document.getElementById('twhl-btn');
-  const ov=document.getElementById('tone-wheel-overlay');
   if(btn) btn.classList.toggle('on',toneWheelOpen);
-  if(ov){
-    ov.classList.toggle('on',toneWheelOpen);
-    if(toneWheelOpen) initToneWheel();
+  // Tone Wheelはマップ円中央へ統合表示。別パネルは開かない。
+  // ON時、現在コードに合わせて初期回転を設定（中央統合リングの向き）。
+  if(toneWheelOpen && typeof TW_CHORD_RING!=='undefined'){
+    const rootIdx=TW_CHORD_RING.findIndex(c=>c.root===S.root&&c.type===S.type);
+    if(rootIdx>=0) twRotation=-rootIdx*(Math.PI*2/TW_N);
   }
+  invalidate();
 }
 
 function initToneWheel(){
