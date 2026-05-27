@@ -2571,10 +2571,7 @@ function drawFrame(){
     ctx.beginPath();ctx.moveTo(cx,cy);
     ctx.arc(cx,cy,MR,a1,a2);ctx.closePath();
     ctx.fillStyle=hexToRgba(sec.col,0.03);ctx.fill();
-    const midA=(a1+a2)/2;
-    ctx.font='8px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle=hexToRgba(sec.col,0.38);
-    ctx.fillText(sec.label,cx+MR*0.82*Math.cos(midA),cy+MR*0.82*Math.sin(midA));
+    // セクター名は上部凡例と二重なので非表示（色で十分識別可能）
   });
 
   // ── Guide rings ──
@@ -2704,8 +2701,8 @@ function drawFrame(){
     ctx.fillText(cs(node.root,node.type),x,y);
     ctx.shadowBlur=0;
 
-    // Relation label
-    if(node.label){
+    // Relation label（セクター内同一の冗長ラベルは非表示）
+    if(node.label && !(node.label==='Nat.m' || node.label==='Maj' || node.label==='para')){
       ctx.font='8px DM Mono,monospace';
       ctx.fillStyle=col;ctx.globalAlpha=0.55*op;
       ctx.fillText(node.label,x,y+nr+9);
@@ -2878,15 +2875,7 @@ function drawFrame(){
     ctx.globalAlpha = isDragging ? 1.0 : (otherDimmed ? 0.15 : (active ? 0.9 : 0.35));
     ctx.stroke(); ctx.globalAlpha = 1;
 
-    // H: アクティブ時にthumb内へ「×2」ラベル（ダブルタップリセットのヒント）
-    if(active && !isDragging && !otherDimmed){
-      ctx.font = 'bold 5px DM Mono,monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#000';
-      ctx.globalAlpha = 0.65;
-      ctx.fillText('×2', tx, ty);
-      ctx.globalAlpha = 1;
-    }
+    // ×2 ダブルタップリセットのヒントは常時表示不要のため削除
 
     // Labels
     ctx.font = '7px DM Mono,monospace'; ctx.textBaseline = 'middle'; ctx.lineCap = 'butt';
@@ -2898,16 +2887,7 @@ function drawFrame(){
     });
     ctx.globalAlpha = 1;
 
-    // Value near thumb
-    if(active && !isDragging){
-      const vr = deg2r(sl.cDeg + sl.disp * ARC_HALF);
-      ctx.font = 'bold 7.5px DM Mono,monospace'; ctx.textAlign = 'center';
-      ctx.fillStyle   = col;
-      ctx.globalAlpha = otherDimmed ? 0.15 : 0.9;
-      ctx.fillText((sl.val>0?'+':'')+Math.round(sl.val*10)/10,
-        cx+(L.SR-20)*Math.cos(vr), cy+(L.SR-20)*Math.sin(vr));
-      ctx.globalAlpha = 1;
-    }
+    // 静的なスライダー値表示は削除（ドラッグ中は中央に大きく表示される）
   });
 
   // A: ドラッグ中のスライダー名と値を中央に大きく表示
