@@ -687,22 +687,32 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 
 /* ── S9 PIVOT: 目標キー選択オーバーレイ ── */
-#pivot-overlay{
-  position:absolute;top:8px;left:8px;z-index:10;
-  display:none;flex-direction:column;gap:4px;align-items:flex-start;
+/* PIVOT: 上バー（表示系）/ 下バー（操作系）。PIVOTモード時のみ .on で表示 */
+#pivot-bar-top{
+  position:absolute;top:44px;left:8px;right:8px;z-index:11;
+  display:none;flex-direction:column;gap:4px;align-items:center;
+  background:rgba(13,13,16,0.9);border:1px solid rgba(74,144,212,0.35);
+  border-radius:8px;padding:8px 10px;
 }
-#pivot-overlay.on{display:flex;}
-.pivot-row{display:flex;gap:3px;align-items:center;}
-.pivot-lbl{font-family:var(--fm);font-size:7px;color:var(--dim);
+#pivot-bar-top.on{display:flex;}
+#pivot-bar-bottom{
+  position:absolute;bottom:42px;left:8px;right:8px;z-index:11;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(13,13,16,0.92);border:1px solid rgba(74,144,212,0.4);
+  border-radius:8px;padding:8px 10px;
+}
+#pivot-bar-bottom.on{display:flex;}
+.pivot-row{display:flex;gap:8px;align-items:center;}
+.pivot-lbl{font-family:var(--fm);font-size:11px;color:var(--dim);
   letter-spacing:.08em;padding:2px 0;}
 .pivot-sel{
-  font-family:var(--fm);font-size:8px;padding:2px 6px;
+  font-family:var(--fm);font-size:14px;padding:6px 12px;
   border:1px solid rgba(74,144,212,0.55);border-radius:var(--r);
   color:#4a90d4;background:rgba(13,13,16,0.92);
-  cursor:pointer;-webkit-appearance:none;appearance:none;
+  cursor:pointer;-webkit-appearance:none;appearance:none;min-width:54px;text-align:center;
 }
 .pivot-go{
-  font-family:var(--fm);font-size:7.5px;padding:2px 8px;
+  font-family:var(--fm);font-size:13px;padding:6px 16px;
   border:1px solid rgba(74,144,212,0.55);border-radius:var(--r);
   color:#4a90d4;background:rgba(13,13,16,0.92);
   cursor:pointer;white-space:nowrap;
@@ -710,30 +720,33 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
 }
 .pivot-go:active{background:rgba(74,144,212,0.18);}
 .pivot-steps{
-  font-family:var(--fm);font-size:7px;color:rgba(74,144,212,0.75);
-  letter-spacing:.04em;min-height:10px;
+  font-family:var(--fm);font-size:11px;color:rgba(74,144,212,0.75);
+  letter-spacing:.04em;min-height:13px;text-align:center;
 }
 .pivot-play{
-  font-family:var(--fm);font-size:7.5px;padding:2px 8px;
-  border:1px solid rgba(74,144,212,0.55);border-radius:var(--r);
-  color:#4a90d4;background:rgba(13,13,16,0.92);
+  font-family:var(--fm);font-size:13px;padding:6px 16px;
+  border:1px solid rgba(232,197,71,0.55);border-radius:var(--r);
+  color:#e8c547;background:rgba(13,13,16,0.92);
   cursor:pointer;white-space:nowrap;
   transition:background .12s;user-select:none;
 }
-.pivot-play:active{background:rgba(74,144,212,0.18);}
+.pivot-play:active{background:rgba(232,197,71,0.18);}
 .pivot-play.playing{
-  border-color:rgba(232,197,71,0.7);color:#e8c547;
+  border-color:rgba(232,197,71,0.9);color:#e8c547;background:rgba(232,197,71,0.12);
+}
+#pivot-detail{
+  font-family:var(--fm);font-size:9px;
+  color:rgba(74,144,212,0.8);letter-spacing:.03em;
+  line-height:1.5;text-align:center;
 }
 .pivot-prog-bar{
-  font-family:var(--fm);font-size:6px;
-  color:rgba(74,144,212,0.7);
-  letter-spacing:.03em;
-  max-width:200px;
-  display:flex;flex-wrap:wrap;gap:2px;align-items:center;
-  min-height:10px;
+  font-family:var(--fm);font-size:10px;
+  color:rgba(74,144,212,0.7);letter-spacing:.03em;
+  display:flex;flex-wrap:wrap;gap:4px;align-items:center;justify-content:center;
+  min-height:13px;
 }
 .pivot-prog-bar .pp-chord{
-  padding:1px 4px;border-radius:2px;
+  padding:2px 7px;border-radius:3px;
   border:1px solid rgba(74,144,212,0.3);
   color:rgba(74,144,212,0.85);
   transition:border-color .15s,color .15s,background .15s;
@@ -746,13 +759,13 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   opacity:0.45;
 }
 .pivot-prog-bar .pp-arr{
-  color:rgba(74,144,212,0.35);font-size:6px;
+  color:rgba(74,144,212,0.35);font-size:10px;
 }
 .pivot-step-indicator{
-  display:flex;gap:3px;align-items:center;min-height:8px;
+  display:flex;gap:6px;align-items:center;min-height:12px;justify-content:center;
 }
 .pivot-step-dot{
-  width:5px;height:5px;border-radius:50%;
+  width:9px;height:9px;border-radius:50%;
   background:rgba(74,144,212,0.2);
   border:1px solid rgba(74,144,212,0.35);
   transition:background .2s,border-color .2s;
@@ -1119,12 +1132,21 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
             user-select:none;
             pointer-events:none;
           ">← BACK</div>
-          <!-- S9 PIVOT: 目標キー選択オーバーレイ（左上） -->
-          <div id="pivot-overlay">
+          <!-- S9 PIVOT: 上バー（表示系）/ 下バー（操作系）に分離。PIVOTモード時のみ表示 -->
+          <div id="pivot-bar-top">
             <!-- O1: CHAINからの引き継ぎ表示バッジ -->
             <div id="pivot-from-badge"></div>
+            <div class="pivot-steps" id="pivot-steps-lbl"></div>
+            <!-- N1: ステップインジケーター -->
+            <div class="pivot-step-indicator" id="pivot-step-indicator"></div>
+            <!-- N1: ステップ別ピボットコード表示 -->
+            <div id="pivot-detail"></div>
+            <!-- N1: 生成コード進行バー -->
+            <div class="pivot-prog-bar" id="pivot-prog-bar"></div>
+          </div>
+          <div id="pivot-bar-bottom">
             <div class="pivot-row">
-              <span class="pivot-lbl">PIVOT TO →</span>
+              <span class="pivot-lbl">PIVOT TO</span>
               <select class="pivot-sel" id="pivot-to-sel">
                 <option value="C">C</option><option value="G">G</option>
                 <option value="D">D</option><option value="A">A</option>
@@ -1134,23 +1156,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
                 <option value="Bb">Bb</option><option value="F">F</option>
               </select>
               <div class="pivot-go" id="pivot-go-btn" onclick="runPivotBFS()">▶ GO</div>
-            </div>
-            <div class="pivot-steps" id="pivot-steps-lbl"></div>
-            <!-- N1: ステップインジケーター -->
-            <div class="pivot-step-indicator" id="pivot-step-indicator"></div>
-            <!-- N1: ステップ別ピボットコード表示 -->
-            <div id="pivot-detail" style="
-              font-family:var(--fm);font-size:6.5px;
-              color:rgba(74,144,212,0.8);
-              letter-spacing:.03em;
-              max-width:200px;
-              line-height:1.6;
-            "></div>
-            <!-- N1: 生成コード進行バー -->
-            <div class="pivot-prog-bar" id="pivot-prog-bar"></div>
-            <!-- N1: PLAYボタン -->
-            <div class="pivot-row" id="pivot-play-row" style="display:none;">
-              <div class="pivot-play" id="pivot-play-btn">▶ PLAY</div>
+              <div class="pivot-play" id="pivot-play-btn" style="display:none;">▶ PLAY</div>
             </div>
           </div>
           <!-- S11: トーンホイール（左下） -->
@@ -3256,7 +3262,9 @@ function drawIslandCarousel(ctx){
     if(Math.abs(d)<0.002){ _islandScroll=_islandSnapTarget; _islandSnapping=false; }
     else { _islandScroll+=d*0.22; dirty=true; }
   }
-  const baseY = cy - SR - 100;          // 焦点島の基準Y（コード円の上・スライダーから離す）
+  // 通常は円から離す(SR+100)。PIVOTモード時は円に寄せ(SR+58)、上端に表示バーの帯を作る。
+  const _pivotTight = (MAP_MODE==='pivot');
+  const baseY = cy - SR - (_pivotTight ? 58 : 100);  // 焦点島の基準Y（コード円の上）
   const maxI = _MODE_SEQ.length-1;
   // 焦点±2まで描く（±2は沖へ消えゆく気配）。3個見え＝±1が本体、±2はフェード。
   for(let d=-2; d<=2; d++){
@@ -18402,8 +18410,8 @@ function runPivotBFS(){
   pivotProg=buildPivotProgression(pivotPath);
   updatePivotProgBar(-1);
   // N1: PLAYボタン表示制御
-  const playRow=document.getElementById('pivot-play-row');
-  if(playRow) playRow.style.display=pivotProg.length?'flex':'none';
+  const playBtn=document.getElementById('pivot-play-btn');
+  if(playBtn) playBtn.style.display=pivotProg.length?'inline-block':'none';
   // N1: ステップインジケーター初期化
   updatePivotStepIndicator(-1);
 
@@ -18929,9 +18937,9 @@ function setMode(mode){
   else if(mode==='compass'){compassHits=[];lastCompassTap=null;updateCompassChainBtn();}
   else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';renderPath();}
   else if(mode==='pivot'){
-    // PIVOTオーバーレイを表示・目標キーのデフォルトを現在から1ステップ先に
-    const ov=document.getElementById('pivot-overlay');
-    if(ov) ov.classList.add('on');
+    // PIVOTバー（上=表示／下=操作）を表示
+    document.getElementById('pivot-bar-top')?.classList.add('on');
+    document.getElementById('pivot-bar-bottom')?.classList.add('on');
     // デフォルト目標キー: 5度圏で1つ先
     const altMap={'Gb':'F#','C#':'Db','D#':'Eb','G#':'Ab','A#':'Bb'};
     const fromKey=PIVOT_KEYS.includes(S.root)?S.root:(altMap[S.root]||'C');
@@ -18943,10 +18951,10 @@ function setMode(mode){
     pivotPath=[];pivotHighlight=new Set();
     if(pivotTimer){clearTimeout(pivotTimer);pivotTimer=null;}
   }
-  // PIVOT以外ではオーバーレイを非表示
+  // PIVOT以外ではバーを非表示
   if(mode!=='pivot'){
-    const ov=document.getElementById('pivot-overlay');
-    if(ov) ov.classList.remove('on');
+    document.getElementById('pivot-bar-top')?.classList.remove('on');
+    document.getElementById('pivot-bar-bottom')?.classList.remove('on');
     if(pivotTimer){clearTimeout(pivotTimer);pivotTimer=null;}
     // N1: 再生中なら停止
     stopPivotPlay();
