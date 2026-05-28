@@ -1099,7 +1099,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
   <div class="li"><div class="ldot" style="background:#d4823a"></div><span class="ltxt">Chromatic</span></div>
   <div class="li"><div class="ldot" style="background:#d44a6a"></div><span class="ltxt">Subst.</span></div>
 </div>
-<div class="tabs">
+<div class="tabs" style="display:none">
   <div class="tab on" data-tab="map">MAP</div>
   <div class="tab" data-tab="select">CHORD</div>
 </div>
@@ -3241,14 +3241,41 @@ function drawToneWheelInMap(ctx){
 // 横スクロール(_islandScroll)で島が流れ、浜辺正面(中央)の島が選択中モード。
 // 仕様: 3個見え（焦点＋左右1）／緩い遠近／端は沖へフェード／左右(赤道)は侵さない。
 const _ISLAND_SPACING=86;   // 島の横間隔(px)
-function _islandSilhouette(ctx,ix,iy,rr,seed,squish){
+// モードごとの「らしさ」を宿す形質。よく見ると違う程度の控えめな個性。
+// 未指定（オプション島など）は従来の不定形にフォールバック。
+//   elong : 横長率（1=均等, >1=横長）
+//   lobeN : 突起の数（radius を cos(lobeN·θ) で緩く変調）
+//   lobeAmp: 突起の振幅（0=なし, 大きいほどメリハリ）
+//   noise : seed由来の不規則さ（0=整然, 大きいほど歪む）
+const _ISLAND_SHAPE={
+  radial : {elong:1.00, lobeN:8, lobeAmp:0.05, noise:0.14},  // 円に近い・安定
+  expand : {elong:1.14, lobeN:3, lobeAmp:0.12, noise:0.20},  // 芽吹き・非対称な伸び
+  link   : {elong:1.26, lobeN:2, lobeAmp:0.22, noise:0.10, phaseFix:0},  // 2瘤・結節（横並び）
+  chain  : {elong:1.42, lobeN:3, lobeAmp:0.10, noise:0.14},  // 細長い連なり
+  compass: {elong:1.00, lobeN:4, lobeAmp:0.17, noise:0.09},  // 四方の張り・菱形気味
+  graph  : {elong:1.08, lobeN:7, lobeAmp:0.10, noise:0.38},  // 最も歪んだ有機形
+  wave   : {elong:1.34, lobeN:6, lobeAmp:0.09, noise:0.11},  // 横長のなめらかな波
+  bridge : {elong:1.40, lobeN:2, lobeAmp:0.28, noise:0.08, phaseFix:0},  // 強いくびれ・橋（横向き）
+  pivot  : {elong:1.00, lobeN:6, lobeAmp:0.12, noise:0.08},  // 回転対称・転回軸
+};
+
+function _islandSilhouette(ctx,ix,iy,rr,seed,squish,shape){
   // 決定的な不定形シルエット（Catmull-Rom風の閉曲線）
   const n=11; const pts=[];
   let s=seed>>>0;
   const rnd=()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+  // 形質（未指定なら従来の挙動：noise=0.36相当・変調なし・横長なし）
+  const sh = shape || {elong:1.0, lobeN:0, lobeAmp:0, noise:0.36};
+  // seed由来の位相（同じモードでも島ごとに少しだけ向きが違う＝自然さ）
+  // ただし phaseFix 指定時は固定（link/bridge のくびれを横向きに揃える）
+  const phase = (sh.phaseFix!==undefined) ? sh.phaseFix : rnd()*Math.PI*2;
   for(let i=0;i<n;i++){
-    const a=2*Math.PI*i/n; const rad=rr*(0.76+0.36*rnd());
-    pts.push([ix+rad*Math.cos(a), iy+rad*Math.sin(a)*squish]);
+    const a=2*Math.PI*i/n;
+    // 形質の変調：lobe（緩い突起）＋ seed由来noise
+    const lobe = sh.lobeAmp * Math.cos(sh.lobeN*a + phase);
+    const base = 0.80 + lobe;                       // 基準半径（円からの形）
+    const rad = rr * (base + sh.noise*rnd());       // noiseで自然な揺らぎ
+    pts.push([ix+rad*Math.cos(a)*sh.elong, iy+rad*Math.sin(a)*squish]);
   }
   ctx.beginPath();
   ctx.moveTo(pts[0][0],pts[0][1]);
@@ -3300,8 +3327,9 @@ function drawIslandCarousel(ctx){
     ctx.ellipse(x, y+rr*0.7, rr*0.82, rr*0.13, 0, 0, Math.PI*2);
     ctx.fillStyle=`rgba(140,160,200,${0.05*alpha})`; ctx.fill();
     // 島本体（シードはmod後のiを使用：同じ島は同じ形）
+    // モードの「らしさ」を宿す形質を渡す
     const seed=(i*2654435761)>>>0;
-    _islandSilhouette(ctx,x,y,rr,seed,0.56);
+    _islandSilhouette(ctx,x,y,rr,seed,0.56,_ISLAND_SHAPE[mode]);
     if(isFocus){
       ctx.fillStyle=`rgba(38,42,52,${0.92*alpha})`;
       ctx.strokeStyle=`rgba(232,197,71,${0.85*alpha})`; ctx.lineWidth=2.0;
