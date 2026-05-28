@@ -2960,7 +2960,7 @@ function drawFrame(){
     // P3: EXPANDモードでもSCRGオーバーレイを表示
     drawScaleRing(ctx);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
-    ctx.fillStyle='rgba(232,197,71,0.4)';ctx.fillText('EXPAND: TAP TO BRANCH / AGAIN TO COLLAPSE',10,10);
+    // EXPAND操作説明は削除（島カルーセルで選択済み）
   } else if(MAP_MODE==='graph'){
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle='rgba(13,13,16,1)';ctx.fillRect(0,0,W,H);
@@ -2972,7 +2972,7 @@ function drawFrame(){
   } else if(MAP_MODE==='link'){
     drawLink(ctx,rels);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
-    ctx.fillStyle='rgba(232,197,71,0.4)';ctx.fillText('LINK: TAP NODES TO SELECT',10,10);
+    // LINK操作説明は削除（島カルーセルで選択済み）
   } else if(MAP_MODE==='chain'){
     drawChain(ctx,rels);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
@@ -3078,6 +3078,30 @@ function drawFrame(){
 // ── 下の海：オプション島描画 ──
 // コード円の下に独立トグルのオプションを島として描く。
 // 横スクロール(_optScroll)で流れ、ON中の島は青く灯る。タップで点灯/消灯。
+// モード/オプションの状態ラベルを、対応する島カルーセル帯の近くに中央揃えで描く。
+// edge='top'   → 上カルーセル（モード）の少し上
+// edge='bottom'→ 下カルーセル（オプション）の少し下
+// PIVOTバーと干渉しないよう、カルーセルの外側（画面端寄り）に配置。
+function _drawCarouselStateLabel(ctx, text, edge, color, alpha, line){
+  const {cx,cy,SR}=L;
+  const ln=line||0;                       // 0=基本行, 1,2..=さらに外側へ積む
+  ctx.save();
+  ctx.font='bold 8px DM Mono,monospace';
+  ctx.textAlign='center';
+  ctx.fillStyle=color||'rgba(200,208,228,0.7)';
+  ctx.globalAlpha=(alpha!==undefined?alpha:0.7);
+  if(edge==='top'){
+    // 上カルーセル島(中心 cy-SR-40, 半径30)の上端より少し上。行ごとに上へ。
+    ctx.textBaseline='bottom';
+    ctx.fillText(text, cx, cy - SR - 40 - 30 - 8 - ln*11);
+  }else{
+    // 下カルーセル島(中心 cy+SR+40, 半径30)の下端より少し下。行ごとに下へ。
+    ctx.textBaseline='top';
+    ctx.fillText(text, cx, cy + SR + 40 + 30 + 8 + ln*11);
+  }
+  ctx.restore();
+}
+
 function drawOptIslands(ctx){
   const {cx,cy,SR}=L;
   if(_optSnapping){
@@ -11381,11 +11405,8 @@ function drawAugOverlay(ctx){
     const vRi=(ri+7)%12;
     const vAugRoot=NOTES[vRi];
 
-    // ラベル: "via Gaug" を左下に表示
-    ctx.font='bold 7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
-    ctx.fillStyle='#ffaa44';ctx.globalAlpha=0.65;
-    ctx.fillText('via '+vAugRoot+'aug  P3', 10, L.H-24);
-    ctx.globalAlpha=1;
+    // ラベル: "via Gaug P3" を下カルーセル帯（AUGMは下の島）の近くへ
+    _drawCarouselStateLabel(ctx, 'via '+vAugRoot+'aug  P3', 'bottom', '#ffaa44', 0.65);
 
     modCands.forEach(cand=>{
       const hit=nodeHits.find(h=>h.root===cand.root&&h.type===cand.type);
@@ -11755,16 +11776,11 @@ function drawModalOverlay(ctx){
     });
   });
 
-  // 現在モード名を中央下に表示
+  // 現在モード名を下カルーセル帯（MODEは下の島）の近くへ
   const currentMode=guessMode(S.type);
   if(currentMode){
     const mColor=MODAL_DATA[currentMode]?.color||'#9a6ad4';
-    ctx.save();
-    ctx.font='bold 7px DM Mono,monospace';
-    ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillStyle=mColor;ctx.globalAlpha=0.75;
-    ctx.fillText('MODE: '+(MODAL_DISPLAY[currentMode]||currentMode), cx, cy+42);
-    ctx.restore();
+    _drawCarouselStateLabel(ctx, 'MODE: '+(MODAL_DISPLAY[currentMode]||currentMode), 'bottom', mColor, 0.75);
   }
 
   // S6のみ件数・BOTH件数を左下に表示
@@ -11805,12 +11821,8 @@ function drawModalOverlay(ctx){
     ctx.restore();
   });
 
-  // カウント表示を更新（左下テキストにIC件数追加）
-  ctx.save();
-  ctx.font='bold 6.5px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
-  ctx.fillStyle='#ffffff';ctx.globalAlpha=0.35;
-  ctx.fillText(`S7:${s7OnlyCount} S6:${s6OnlyCount} BOTH:${bothCount} IC:${icCount}`, 10, H-10);
-  ctx.restore();
+  // カウント表示を下カルーセル帯の2行目へ（MODE:旋法ラベルと重ならないよう）
+  _drawCarouselStateLabel(ctx, `S7:${s7OnlyCount} S6:${s6OnlyCount} BOTH:${bothCount} IC:${icCount}`, 'bottom', '#ffffff', 0.4, 1);
 
   nodeHits.forEach(hit=>{
     if(hit.root===S.root&&hit.type===S.type) return;
@@ -12405,23 +12417,11 @@ function drawDimCircleOverlay(ctx){
       }
     }
 
-    // ── グループ情報テキスト ──
-    ctx.globalAlpha=alpha*0.75;
-    ctx.fillStyle=g.col;
-    ctx.font='bold 7px var(--fm,monospace)';
-    ctx.textAlign='left';ctx.textBaseline='bottom';
-    ctx.fillText(`S5 G${g.id}: ${g.dims.join('=')}°`, 10, L.H-36);
-    ctx.globalAlpha=alpha*0.55;
-    ctx.fillStyle='#e8c547';
-    ctx.font='6.5px var(--fm,monospace)';
-    ctx.fillText(`sub: ${g.dom7s.join(' ')}`, 10, L.H-24);
+    // ── グループ情報テキストを下カルーセル帯（DIMIは下の島）の近くへ ──
+    _drawCarouselStateLabel(ctx, `S5 G${g.id}: ${g.dims.join('=')}°  sub: ${g.dom7s.join(' ')}`, 'bottom', g.col, alpha*0.7);
   } else {
     // グループ未検出時
-    ctx.globalAlpha=alpha*0.45;
-    ctx.fillStyle='#666';
-    ctx.font='6.5px var(--fm,monospace)';
-    ctx.textAlign='left';ctx.textBaseline='bottom';
-    ctx.fillText('S5 DIMI: no group', 10, L.H-36);
+    _drawCarouselStateLabel(ctx, 'S5 DIMI: no group', 'bottom', '#666', alpha*0.5);
   }
 
   // ── 凡例 ──
@@ -12707,11 +12707,8 @@ function drawBartokOverlay(ctx){
     ctx.fillStyle=lg.col;
     ctx.fillText(lg.label, 10, L.H-38+i*12);
   });
-  // 現在キー表示
-  ctx.globalAlpha=alpha*0.55;
-  ctx.fillStyle='#888';
-  ctx.textAlign='right';
-  ctx.fillText('BRTK key: '+keyRoot, L.W-10, L.H-10);
+  // 現在キー表示を下カルーセル帯（BRTKは下の島）の近くへ
+  _drawCarouselStateLabel(ctx, 'BRTK key: '+keyRoot, 'bottom', '#888', alpha*0.7);
 
   ctx.restore();
 }
@@ -18021,10 +18018,7 @@ function _drawScaleRingExpand(ctx){
   });
   // モード名表示（左下）
   const modeDisplay=MODAL_DISPLAY[mode]||mode;
-  ctx.font='bold 6px DM Mono,monospace';
-  ctx.textAlign='left'; ctx.textBaseline='bottom';
-  ctx.fillStyle='rgba(74,170,114,0.5)';
-  ctx.fillText('SCRG: '+modeDisplay, 10, L.H-10);
+  _drawCarouselStateLabel(ctx, 'SCRG: '+modeDisplay, 'bottom', 'rgba(74,170,114,0.7)', 0.7);
   ctx.restore();
 }
 
@@ -18625,12 +18619,7 @@ function drawPivotMode(ctx){
   const tonicHit=nodeHits.find(h=>h.root===pivotTargetKey&&h.type==='major');
   if(tonicHit) drawStar(ctx,tonicHit.x,tonicHit.y,tonicHit.r+18,5,'#4a90d4',0.75);
 
-  if(pivotPath.length){
-    ctx.font='7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
-    ctx.fillStyle='rgba(74,144,212,0.65)';
-    const route=pivotPath.map(s=>s.fromKey).concat(pivotPath[pivotPath.length-1].toKey).join('>');
-    ctx.fillText('PIVOT: '+route,10,L.H-10);
-  }
+  // PIVOT経路のテキストは上バー（pivot-bar-top）に表示済みのためCanvas描画は削除
 }
 
 // ═══════════════════════
@@ -18688,10 +18677,8 @@ function drawBridge(ctx,rels){
     ctx.setLineDash([2,3]);ctx.globalAlpha=0.6;ctx.stroke();
     ctx.setLineDash([]);ctx.globalAlpha=1;
   });
-  // Mode label
-  ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
-  ctx.fillStyle='rgba(255,255,255,0.35)';
-  ctx.fillText(`CROSS-SECTOR BRIDGES: ${crossEdges.length}`,10,10);
+  // BRIDGE状態を上カルーセル帯（BRIDGEは上の島）の近くへ
+  _drawCarouselStateLabel(ctx, `CROSS-SECTOR BRIDGES: ${crossEdges.length}`, 'top', 'rgba(255,255,255,0.5)', 0.55);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -18890,9 +18877,7 @@ function drawCompassMode(ctx){
     });
   });
 
-  // ── COMPASS ラベル（左上） ──
-  ctx.font='bold 7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
-  ctx.fillStyle='rgba(255,255,255,0.25)';ctx.fillText('COMPASS P6',10,10);
+  // COMPASS P6 モード名は島カルーセルで表示済みのため削除
 
   // N2: 現在コードのムード表示（中央下）— getChordEmotionVecベースに統一
   {
