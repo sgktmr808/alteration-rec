@@ -2634,7 +2634,7 @@ function drawFrame(){
     // TWHL統合：RADIALでTone Wheel ON時、コードセルを外帯へ寄せ中央にリングの場所を空ける
     // （中央の現在コード自身は別途固定描画なので影響しない）
     const _twOn = (MAP_MODE==='radial' && typeof toneWheelOpen!=='undefined' && toneWheelOpen);
-    const mrEff = _twOn ? MR*0.76 : mr;
+    const mrEff = _twOn ? MR*0.82 : mr;
     const r=mrEff+(MR-mrEff)*(0.15+frac*0.85)*(1-pull*0.25)+rExtra;
     // Wobble: ±1.5px organic drift per node
     FX.wobbleTick+=0.00015;
@@ -3136,7 +3136,7 @@ function deg2r(d){return(d-90)*Math.PI/180;}
 function hitTestToneWheelInMap(x,y){
   if(typeof TW_CHORD_RING==='undefined') return false;
   const {cx,cy,MR}=L;
-  const R_IN=MR*0.22, R_OUT=MR*0.53, R_SUS=MR*0.68;
+  const R_IN=MR*0.22, R_OUT=MR*0.57, R_SUS=MR*0.74;
   const dx=x-cx, dy=y-cy;
   const dist=Math.sqrt(dx*dx+dy*dy);
   if(dist<R_IN || dist>R_SUS) return false;   // 帯の外（中央コードや外側はノード側へ）
@@ -3167,8 +3167,8 @@ function drawToneWheelInMap(ctx){
   const {cx,cy,MR}=L;
   // 半径帯を最大化（中央の現在コード〜コードセル内縁MR*0.64の手前）
   const R_IN  = MR*0.22;
-  const R_OUT = MR*0.53;   // Major/minor 内輪 外縁
-  const R_SUS = MR*0.68;   // Sus 外輪 外縁
+  const R_OUT = MR*0.57;   // Major/minor 内輪 外縁
+  const R_SUS = MR*0.74;   // Sus 外輪 外縁
   const N = TW_N;
   const step = Math.PI*2/N;
   const rot = (typeof twRotation!=='undefined') ? twRotation : 0;
@@ -3405,7 +3405,7 @@ function initCanvas(){
 
     // Tone Wheel（マップ統合）：中央リング帯のドラッグ＝回転候補。RADIAL・TWHL ON時。
     if(typeof toneWheelOpen!=='undefined' && toneWheelOpen && MAP_MODE==='radial'){
-      const rIn=L.MR*0.22, rOut=L.MR*0.68;
+      const rIn=L.MR*0.22, rOut=L.MR*0.74;
       if(dist>=rIn && dist<=rOut){
         _twMapDrag={ startAngle:angle, startRot:twRotation, moved:false, pointerId:e.pointerId, startX:x, startY:y };
         canvas.setPointerCapture(e.pointerId);
@@ -3502,7 +3502,8 @@ function initCanvas(){
       const movedPx=Math.hypot(x-_twMapDrag.startX, y-_twMapDrag.startY);
       if(!_twMapDrag.moved && Math.abs(delta)>0.04 && movedPx>6){ _twMapDrag.moved=true; _twRotating=true; }
       if(_twMapDrag.moved){
-        twRotation=_twMapDrag.startRot+delta;
+        // 回転速度をやや重く（指の角度変化の0.6倍だけ回す）
+        twRotation=_twMapDrag.startRot+delta*0.6;
         invalidate();
       }
       e.preventDefault();
