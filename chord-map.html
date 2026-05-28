@@ -1217,7 +1217,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
         </div>
 
         <!-- 上スワイプ促進インジケーター -->
-        <div class="swipe-pip" id="swipe-pip">
+        <div class="swipe-pip" id="swipe-pip" style="display:none">
           <div class="swipe-pip-bar"></div>
           <div class="swipe-pip-label">↑ SWIPE</div>
         </div>
@@ -2943,13 +2943,13 @@ function drawFrame(){
   } else if(MAP_MODE==='chain'){
     drawChain(ctx,rels);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
-    ctx.fillStyle='rgba(232,197,71,0.3)';ctx.fillText('CHAIN',10,10);
+    // モード名は島カルーセルで表示済みのため削除
   } else if(MAP_MODE==='bridge'){
     drawBridge(ctx,rels);
   } else if(MAP_MODE==='pivot'){
     drawPivotMode(ctx);
     ctx.font='8px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top';
-    ctx.fillStyle='rgba(74,144,212,0.4)';ctx.fillText('PIVOT S9: TAP TO MOVE',10,10);
+    // モード名は島カルーセルで表示済みのため削除
   } else if(MAP_MODE==='compass'){
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle='rgba(13,13,16,1)';ctx.fillRect(0,0,W,H);
@@ -11290,8 +11290,7 @@ function drawAugOverlay(ctx){
     ctx.globalAlpha=1;
   });
   ctx.font='bold 7px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
-  ctx.fillStyle='#00ff88';ctx.globalAlpha=0.6;
-  ctx.fillText('AUG HUB S4', 10, L.H-36);
+  // AUG HUB S4 ラベル削除（島カルーセルで表示済み）
   ctx.globalAlpha=1;
 
   // ── P3: 転調候補オーバーレイ（非augコード時に表示）──
@@ -12108,10 +12107,7 @@ function drawTriadSpaceOverlay(ctx){
     // RADIALのときだけ凡例・ヘッダ表示
     if(MAP_MODE==='radial'){
       _drawTriadSpaceLegend(ctx);
-      ctx.font='bold 6.5px DM Mono,monospace';
-      ctx.textAlign='left';ctx.textBaseline='top';
-      ctx.fillStyle='rgba(212,130,58,0.60)';ctx.globalAlpha=0.80;
-      ctx.fillText('TRVS S6: 1音変化コード', 10, 10);
+      // 'TRVS S6: 1音変化コード' ラベル削除（島カルーセルで表示済み）
     }
   } else if(MAP_MODE==='expand'){
     // EXPANDはoriginコードを基準に
@@ -12354,7 +12350,7 @@ function drawDimCircleOverlay(ctx){
   ctx.fillStyle='#9b59b6';
   ctx.font='6.5px var(--fm,monospace)';
   ctx.textAlign='right';ctx.textBaseline='bottom';
-  ctx.fillText('DIMI S5', L.W-10, L.H-10);
+  // 'DIMI S5' ラベル削除（島カルーセルで表示済み）
 
   ctx.restore();
 }
@@ -18923,6 +18919,8 @@ function renderLegend(){
   ).join('');
 }
 let sectorOpen=true;
+// PIVOT入退場時に中央描画オプション（TWHL/MODE）を自動退避・復元する
+let _pivotSavedOpts=null;
 document.getElementById('sector-hdr').addEventListener('click',()=>{
   sectorOpen=!sectorOpen;
   document.getElementById('sector-panel').className='sector-panel '+(sectorOpen?'open':'closed');
@@ -18945,6 +18943,19 @@ function setMode(mode){
   else if(mode==='compass'){compassHits=[];lastCompassTap=null;updateCompassChainBtn();}
   else if(mode==='chain'){CHAIN_FX.streams=[];CHAIN_FX.nodePulse={};CHAIN_FX.tick=0;_chainPosKey='';renderPath();}
   else if(mode==='pivot'){
+    // PIVOT入場時、中央描画と干渉するTWHL/MODEを自動OFFして経路を読みやすくする
+    // 既存状態は _pivotSavedOpts に退避し、PIVOT終了時に復元
+    _pivotSavedOpts={ twhl: toneWheelOpen, modal: modalMapMode };
+    if(toneWheelOpen){
+      toneWheelOpen=false;
+      const twBtn=document.getElementById('twhl-btn');
+      if(twBtn) twBtn.classList.remove('on');
+    }
+    if(modalMapMode){
+      modalMapMode=false;
+      const mBtn=document.getElementById('modal-map-btn');
+      if(mBtn) mBtn.classList.remove('on');
+    }
     // PIVOTバー（上=表示／下=操作）を表示
     document.getElementById('pivot-bar-top')?.classList.add('on');
     document.getElementById('pivot-bar-bottom')?.classList.add('on');
@@ -18969,6 +18980,21 @@ function setMode(mode){
     // O1: FROM CHAINバッジをリセット
     const badge=document.getElementById('pivot-from-badge');
     if(badge){badge.style.display='none';badge.textContent='';}
+    // PIVOT入場時に退避したTWHL/MODE状態を復元
+    if(_pivotSavedOpts){
+      if(_pivotSavedOpts.twhl && !toneWheelOpen){
+        toneWheelOpen=true;
+        const twBtn=document.getElementById('twhl-btn');
+        if(twBtn) twBtn.classList.add('on');
+      }
+      if(_pivotSavedOpts.modal && !modalMapMode){
+        modalMapMode=true;
+        modalOverlayAlpha=0;
+        const mBtn=document.getElementById('modal-map-btn');
+        if(mBtn) mBtn.classList.add('on');
+      }
+      _pivotSavedOpts=null;
+    }
   }
   relCache=null; sncCache=null; invalidate();
   updateSaveBtnVisibility();
