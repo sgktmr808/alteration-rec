@@ -2327,12 +2327,31 @@ const FEATURES={
 let MAP_MODE='radial';
 
 // ── 島カルーセル（上の海に浮かぶ可視化モード）──
-// _islandScroll: 連続スクロール位置（単位=島インデックス、小数可）。焦点=この四捨五入値。
+// _islandScroll: 連続スクロール位置（単位=島インデックス、小数可・無限ループ可）。
+// 焦点 = mod N でとったインデックス。
 let _islandScroll=0;
 let _islandSnapping=false;   // 指を離したあと焦点へイージング中か
 let _islandSnapTarget=0;     // スナップ先インデックス
 const _MODE_LABELS={radial:'RADIAL',expand:'EXPAND',link:'LINK',chain:'CHAIN',compass:'COMP',graph:'GRAPH',wave:'WAVE',bridge:'BRIDGE',pivot:'PIVOT'};
 const _MODE_SEQ=['radial','expand','link','chain','compass','graph','wave','bridge','pivot'];
+
+// ── 島カルーセルのループ用ヘルパー ──
+// インデックスを [0, N) に正規化（負も正も対応）
+function _modIdx(v, N){ return ((v % N) + N) % N; }
+// current（連続スクロール値）から targetIndex（[0,N)）に**最短距離**で到達する連続値を返す。
+// 例: current=8.0, targetIndex=0, N=9 → 9.0（時計回り1個分） vs -1.0（反時計回り1個分）。
+// 数値の安定のため、currentに近い側を選ぶ。
+function _nearestLoopTarget(current, targetIndex, N){
+  const base = Math.round(current / N) * N;       // currentに最も近いNの倍数
+  let best = base + targetIndex;
+  let bestD = Math.abs(best - current);
+  for(const k of [-1, 1]){
+    const cand = base + targetIndex + k*N;
+    const d = Math.abs(cand - current);
+    if(d < bestD){ bestD = d; best = cand; }
+  }
+  return best;
+}
 
 // ── 下の海：オプション島（独立トグル。流して眺め、タップで点灯）──
 let _optScroll=0;
@@ -3053,12 +3072,12 @@ function drawOptIslands(ctx){
     else { _optScroll+=d*0.22; dirty=true; }
   }
   const baseY = cy + SR + 40;            // 焦点島の基準Y（コード円のすぐ下に密着）
-  const maxI = _OPT_ISLANDS.length-1;
+  const N = _OPT_ISLANDS.length;
   for(let d=-2; d<=2; d++){
     const fi=_optScroll+d;
-    const i=Math.round(fi);
-    if(i<0||i>maxI) continue;
-    const off=i-_optScroll;
+    const rawI=Math.round(fi);
+    const i=_modIdx(rawI, N);
+    const off=rawI-_optScroll;
     const ad=Math.abs(off);
     if(ad>2.2) continue;
     const x=cx+off*_ISLAND_SPACING;
@@ -3072,12 +3091,12 @@ function drawOptIslands(ctx){
     const isl=_OPT_ISLANDS[i];
     const on=isl.isOn();
     const disabled=isl.disabled?isl.disabled():false;
-    const centered=(i===Math.round(_optScroll))&&ad<0.5;
+    const centered=(rawI===Math.round(_optScroll))&&ad<0.5;
     // 反射
     ctx.beginPath();
     ctx.ellipse(x,y+rr*0.7,rr*0.82,rr*0.13,0,0,Math.PI*2);
     ctx.fillStyle=`rgba(140,160,200,${0.05*alpha})`; ctx.fill();
-    // 島本体
+    // 島本体（シードはmod後のi＝同じ島は常に同じ形）
     const seed=((i+100)*2654435761)>>>0;
     _islandSilhouette(ctx,x,y,rr,seed,0.56);
     if(disabled){
@@ -3255,13 +3274,14 @@ function drawIslandCarousel(ctx){
   // 島の内縁が円外周(SR)のすぐ外に接するように配置（図で干渉なしを確認）。
   const ISLAND_GAP = 40;               // 円外周から島中心まで（島半径30+余白10）
   const baseY = cy - SR - ISLAND_GAP;  // 焦点島の基準Y（コード円のすぐ上）
-  const maxI = _MODE_SEQ.length-1;
+  const N = _MODE_SEQ.length;
   // 焦点±2まで描く（±2は沖へ消えゆく気配）。3個見え＝±1が本体、±2はフェード。
+  // ループ化: インデックスは mod N で循環。
   for(let d=-2; d<=2; d++){
     const fi = _islandScroll + d;                 // 連続インデックス（中央=_islandScroll）
-    const i = Math.round(fi);
-    if(i<0 || i>maxI) continue;
-    const off = i - _islandScroll;                // 中央からのずれ（-..+、0が正面）
+    const rawI = Math.round(fi);
+    const i = _modIdx(rawI, N);                   // 表示用インデックス（循環）
+    const off = rawI - _islandScroll;             // 中央からのずれ（-..+、0が正面）
     const ad = Math.abs(off);
     if(ad>2.2) continue;
     const x = cx + off*_ISLAND_SPACING;
@@ -3274,12 +3294,12 @@ function drawIslandCarousel(ctx){
     else alpha = Math.max(0, 0.55*(2.2-ad)/1.2);  // ad=1.0で~0.55 → ad=2.2で0
     if(alpha<=0.01) continue;
     const mode=_MODE_SEQ[i];
-    const isFocus = (i===Math.round(_islandScroll)) && ad<0.5;
+    const isFocus = (rawI===Math.round(_islandScroll)) && ad<0.5;
     // 海面の反射
     ctx.beginPath();
     ctx.ellipse(x, y+rr*0.7, rr*0.82, rr*0.13, 0, 0, Math.PI*2);
     ctx.fillStyle=`rgba(140,160,200,${0.05*alpha})`; ctx.fill();
-    // 島本体
+    // 島本体（シードはmod後のiを使用：同じ島は同じ形）
     const seed=(i*2654435761)>>>0;
     _islandSilhouette(ctx,x,y,rr,seed,0.56);
     if(isFocus){
@@ -3580,11 +3600,8 @@ function initCanvas(){
       _islandSnapping = false;                   // 慣性スナップ停止
     }
     // 連続スクロール：右へドラッグ→前の島へ（スクロール値は減少）
+    // ループ仕様：端の制限なし、無限にスクロール可能。
     let s = _modeSwipe.startScroll - dx / _ISLAND_DRAG_PER;
-    // 端は弾性的に少しだけ越えられる（行き過ぎは戻る）
-    const maxI = _modeOrder.length - 1;
-    if(s < 0) s = s * 0.35;
-    else if(s > maxI) s = maxI + (s - maxI) * 0.35;
     _islandScroll = s;
     invalidate();
   });
@@ -3592,13 +3609,12 @@ function initCanvas(){
   function _endIslandSwipe(){
     if(!_modeSwipe) return;
     _modeSwipe = null;
-    // 最寄りの島へスナップして確定
-    const maxI = _modeOrder.length - 1;
-    let target = Math.round(_islandScroll);
-    target = Math.max(0, Math.min(maxI, target));
-    _islandSnapTarget = target;
+    // 最寄りの島へスナップして確定（ループ：scrollはそのまま、modで対応モードを取る）
+    const N = _modeOrder.length;
+    const rawTarget = Math.round(_islandScroll);
+    _islandSnapTarget = rawTarget;                 // 連続値はクランプしない
     _islandSnapping = true;
-    const newMode = _modeOrder[target];
+    const newMode = _modeOrder[_modIdx(rawTarget, N)];
     if(newMode !== MAP_MODE) setMode(newMode);   // 公式の切替（各モード初期化を伴う）
     invalidate();
   }
@@ -3614,15 +3630,15 @@ function initCanvas(){
   function _inLowerSea(x, y){
     return y > L.cy + L.SR + 4;                  // コード円より下だけ
   }
-  // 下の海でタップされた島のインデックスを返す（無ければ -1）
+  // 下の海でタップされた島のインデックスを返す（無ければ -1。modで循環）
   function _optIslandAt(x, y){
     const {cx,cy,SR}=L;
-    const maxI=_OPT_ISLANDS.length-1;
+    const N=_OPT_ISLANDS.length;
     let best=-1, bestD=1e9;
     for(let d=-2; d<=2; d++){
-      const i=Math.round(_optScroll+d);
-      if(i<0||i>maxI) continue;
-      const off=i-_optScroll, ad=Math.abs(off);
+      const rawI=Math.round(_optScroll+d);
+      const i=_modIdx(rawI, N);
+      const off=rawI-_optScroll, ad=Math.abs(off);
       if(ad>1.2) continue;                        // 本体（見えている島）のみタップ可
       const depth=Math.min(ad/2,1);
       const ix=cx+off*_ISLAND_SPACING;
@@ -3652,9 +3668,8 @@ function initCanvas(){
       if(Math.abs(dx)<6) return;
       _optSwipe.moved=true; _optSnapping=false;
     }
+    // ループ仕様：端の制限なし
     let s=_optSwipe.startScroll - dx/_ISLAND_DRAG_PER;
-    const maxI=_OPT_ISLANDS.length-1;
-    if(s<0) s=s*0.35; else if(s>maxI) s=maxI+(s-maxI)*0.35;
     _optScroll=s; invalidate();
   });
   function _endOptSwipe(x, y){
@@ -3662,9 +3677,8 @@ function initCanvas(){
     const moved=_optSwipe.moved;
     _optSwipe=null;
     if(moved){
-      // スクロール確定：最寄りへスナップ
-      const maxI=_OPT_ISLANDS.length-1;
-      let t=Math.round(_optScroll); t=Math.max(0,Math.min(maxI,t));
+      // スクロール確定：最寄りへスナップ（連続値はクランプしない）
+      let t=Math.round(_optScroll);
       _optSnapTarget=t; _optSnapping=true; invalidate();
     }else{
       // タップ点灯：触れた島のトグルを呼ぶ
@@ -18999,8 +19013,13 @@ function setMode(mode){
   relCache=null; sncCache=null; invalidate();
   updateSaveBtnVisibility();
   // 島カルーセルを現在モードへ同期（ボタンクリック等での切替にも追従）
+  // ループ対応：現在の_islandScrollから最短距離になるmod-equivalentを選ぶ
   const _ii=_MODE_SEQ.indexOf(mode);
-  if(_ii>=0){ _islandSnapTarget=_ii; _islandSnapping=true; invalidate(); }
+  if(_ii>=0){
+    _islandSnapTarget = _nearestLoopTarget(_islandScroll, _ii, _MODE_SEQ.length);
+    _islandSnapping = true;
+    invalidate();
+  }
 }
 document.querySelectorAll('.mode-btn').forEach(b=>{
   b.addEventListener('click',()=>setMode(b.dataset.mode));
