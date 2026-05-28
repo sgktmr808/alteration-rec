@@ -3441,6 +3441,11 @@ function initCanvas(){
       e.preventDefault();
       return;
     }
+    // 海の生物のタップ（視覚反応：驚いて揺れる）
+    if(typeof _hitTestSeaCreature === 'function' && _hitTestSeaCreature(x, y)){
+      e.preventDefault();
+      return;
+    }
     // Loop Beach: タップ座標履歴に記録
     if(typeof _recordTapCoord === 'function') _recordTapCoord(x, y);
     fxAddTrail(x,y);
@@ -9444,6 +9449,26 @@ function _drawAndUpdateSeaGlass(ctx){
   if(_seaGlassShards.length) dirty = true;
 }
 
+// 生物のタップ判定（pointerdownから呼ぶ）。当たれば軽い驚き反応を起こして true を返す。
+function _hitTestSeaCreature(x, y){
+  if(typeof _seaCreature==='undefined' || !_seaCreature) return false;
+  const c=_seaCreature;
+  const sprite=_CREATURE_SPRITES[c.kind];
+  const dot=_SEA_CREATURE_DOT;
+  const spriteW=sprite.rows[0].length*dot;
+  const spriteH=sprite.rows.length*dot;
+  // 当たり判定は矩形（ドット絵に近い感覚）+ 周囲4pxの余裕
+  const cx2=c.x + spriteW/2;
+  const cy2=c.y;
+  const halfW=spriteW/2+4, halfH=spriteH/2+4;
+  if(Math.abs(x-cx2)>halfW || Math.abs(y-cy2)>halfH) return false;
+  // 驚き反応：揺れ増幅 + 短時間の速度ブースト + 一瞬明るくなる
+  c.startleT = Date.now();
+  c.startleSpeedBoost = (c.speed>0?1:-1) * 1.6;   // 進行方向に速度を一気に増す
+  dirty=true;
+  return true;
+}
+
 // ═══════════════════════════════════════════════════════
 // 海の生物（ピクセルアート）— BEACH ON時、余白の海をふらっと横切る
 // ・出現は _beachOn===true のときだけ（ビーチにいるから生物がいる、の素直な必然）
@@ -9543,10 +9568,17 @@ function _drawAndUpdateSeaCreature(ctx){
   const spriteW=sprite.rows[0].length*dot;
   const spriteH=sprite.rows.length*dot;
 
-  // 移動＋上下のゆらぎ（泳ぐ感じ）
-  c.x += c.speed;
-  c.bob += 0.06;
-  const yOff = Math.sin(c.bob)*2.2;
+  // 移動＋上下のゆらぎ（泳ぐ感じ）。驚き反応中はゆらぎ増幅。
+  const now=Date.now();
+  const tSinceStartle = c.startleT ? (now - c.startleT) : Infinity;
+  const startleAlive = tSinceStartle < 700;             // 反応の持続時間(ms)
+  const startleRatio = startleAlive ? (1 - tSinceStartle/700) : 0;   // 1→0で減衰
+  // 速度ブースト：減衰して通常速度に戻る
+  const speedBoost = startleAlive ? (c.startleSpeedBoost||0) * startleRatio : 0;
+  c.x += c.speed + speedBoost;
+  // 揺れ：驚き中は振幅を増す、周波数も上げる
+  c.bob += startleAlive ? (0.06 + 0.18*startleRatio) : 0.06;
+  const yOff = Math.sin(c.bob) * (2.2 + 5.0*startleRatio);
 
   // 画面外へ抜けたら消滅し、次の出現時刻を予約
   if((c.speed>0 && c.x > W+spriteW+10) || (c.speed<0 && c.x < -spriteW-10)){
@@ -9556,8 +9588,9 @@ function _drawAndUpdateSeaCreature(ctx){
   }
 
   ctx.save();
-  ctx.globalAlpha=0.62;                     // 余白の海に溶ける控えめさ
-  ctx.imageSmoothingEnabled=false;          // ドットをくっきり
+  // 驚き中は不透明度を上げて少し前に出す＋全体に白っぽいフラッシュ
+  ctx.globalAlpha = 0.62 + 0.30*startleRatio;
+  ctx.imageSmoothingEnabled=false;
   // 進行方向に応じて左右反転（スプライトは右向き基準）
   const flip = c.dir<0;
   const baseX = Math.round(c.x);
@@ -9573,6 +9606,13 @@ function _drawAndUpdateSeaCreature(ctx){
       ctx.fillStyle=col;
       ctx.fillRect(baseX+qx*dot, baseY+r*dot, dot, dot);
     }
+  }
+  // 驚き中の白フラッシュ：スプライト矩形に半透明の白を重ねて瞬間的に光らせる
+  if(startleRatio>0){
+    ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle=`rgba(255,255,255,${0.45*startleRatio})`;
+    ctx.fillRect(baseX, baseY, spriteW, spriteH);
+    ctx.globalCompositeOperation='source-over';
   }
   ctx.restore();
   dirty=true;  // 動いている間は再描画を継続
@@ -19158,6 +19198,8 @@ function setMode(mode){
       const twBtn=document.getElementById('twhl-btn');
       if(twBtn) twBtn.classList.remove('on');
     }
+    // 防御的クリア：PIVOT入場時もTWHLドラッグ/回転状態を確実にリセット
+    _twMapDrag=null; _twRotating=false; _twSpinVel=0;
     if(modalMapMode){
       modalMapMode=false;
       const mBtn=document.getElementById('modal-map-btn');
@@ -19203,6 +19245,9 @@ function setMode(mode){
       }
       _pivotSavedOpts=null;
     }
+    // 防御的クリア：PIVOT滞在中に残ったTWHLドラッグ/回転状態をリセット。
+    // RADIAL復帰後の選択不可（回転はするが選択できない）を防ぐ。
+    _twMapDrag=null; _twRotating=false;
   }
   relCache=null; sncCache=null; invalidate();
   updateSaveBtnVisibility();
