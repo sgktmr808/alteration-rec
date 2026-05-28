@@ -12164,7 +12164,7 @@ function _drawTriadSpaceNodes(ctx, baseRoot, baseType){
 
 // RADIAL外周に「TRVS凡例」を表示
 function _drawTriadSpaceLegend(ctx){
-  const W=L.W, H=L.H;
+  const {cx,cy,SR}=L;
   const entries=[
     TRVS_TYPE_STYLE.parallel,
     TRVS_TYPE_STYLE.relative,
@@ -12173,17 +12173,22 @@ function _drawTriadSpaceLegend(ctx){
     TRVS_TYPE_STYLE.other,
   ];
   ctx.save();
-  ctx.font='bold 6px DM Mono,monospace';
-  ctx.textBaseline='bottom';
-  let tx=W-10;
-  // 右下に横並びで表示（右から左へ）
-  for(let i=entries.length-1;i>=0;i--){
-    const e=entries[i];
-    ctx.textAlign='right';
-    ctx.fillStyle=e.col;ctx.globalAlpha=0.70;
-    ctx.fillText(e.label+':'+e.desc, tx, H-10);
-    tx-=(ctx.measureText(e.label+':'+e.desc).width+10);
-  }
+  ctx.font='bold 8px DM Mono,monospace';
+  ctx.textBaseline='top';
+  // 各項目の幅を測って全体幅を求め、下カルーセル帯に中央揃えで横並び
+  const labels=entries.map(e=>e.label+':'+e.desc);
+  const gap=10;
+  let totalW=0;
+  labels.forEach(l=>{ totalW+=ctx.measureText(l).width; });
+  totalW+=gap*(labels.length-1);
+  const y=cy + SR + 40 + 30 + 8 + 11;      // 下カルーセル島の下・2行目（他ラベルと重ならないよう）
+  let tx=cx - totalW/2;
+  ctx.textAlign='left';
+  entries.forEach((e,i)=>{
+    ctx.fillStyle=e.col; ctx.globalAlpha=0.70;
+    ctx.fillText(labels[i], tx, y);
+    tx+=ctx.measureText(labels[i]).width+gap;
+  });
   ctx.restore();
 }
 
@@ -12698,15 +12703,7 @@ function drawBartokOverlay(ctx){
   ctx.globalAlpha=alpha*0.75;
   ctx.font='7.5px var(--fm,monospace)';
   ctx.textAlign='left';ctx.textBaseline='top';
-  const legends=[
-    {col:'#4a90d4',label:'T: Tonic'},
-    {col:'#4aaa72',label:'S: Sub-Dom'},
-    {col:'#e8c547',label:'D: Dominant'},
-  ];
-  legends.forEach((lg,i)=>{
-    ctx.fillStyle=lg.col;
-    ctx.fillText(lg.label, 10, L.H-38+i*12);
-  });
+  // T/S/D凡例は削除（円周上にD-axis/T-axis/S-axisが表示済みのため冗長）
   // 現在キー表示を下カルーセル帯（BRTKは下の島）の近くへ
   _drawCarouselStateLabel(ctx, 'BRTK key: '+keyRoot, 'bottom', '#888', alpha*0.7);
 
