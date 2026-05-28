@@ -3407,7 +3407,7 @@ function initCanvas(){
     if(typeof toneWheelOpen!=='undefined' && toneWheelOpen && MAP_MODE==='radial'){
       const rIn=L.MR*0.22, rOut=L.MR*0.68;
       if(dist>=rIn && dist<=rOut){
-        _twMapDrag={ startAngle:angle, startRot:twRotation, moved:false, pointerId:e.pointerId };
+        _twMapDrag={ startAngle:angle, startRot:twRotation, moved:false, pointerId:e.pointerId, startX:x, startY:y };
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         return;   // メイン処理を抑止（回転 or タップ選択はmove/upで判定）
@@ -3497,7 +3497,10 @@ function initCanvas(){
     if(_twMapDrag && e.pointerId===_twMapDrag.pointerId){
       const ang=angleFromCenter(x,y);
       let delta=ang-_twMapDrag.startAngle;
-      if(!_twMapDrag.moved && Math.abs(delta)>0.04){ _twMapDrag.moved=true; _twRotating=true; }
+      // 中心付近では微小なブレでも角度が大きく変わるため、実移動距離(px)も条件に加える。
+      // 角度0.04rad かつ 移動6px以上 で初めて「回転」と判定（タップ選択を守る）。
+      const movedPx=Math.hypot(x-_twMapDrag.startX, y-_twMapDrag.startY);
+      if(!_twMapDrag.moved && Math.abs(delta)>0.04 && movedPx>6){ _twMapDrag.moved=true; _twRotating=true; }
       if(_twMapDrag.moved){
         twRotation=_twMapDrag.startRot+delta;
         invalidate();
