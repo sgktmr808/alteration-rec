@@ -2573,6 +2573,20 @@ function drawFrame(){
     if(dimCircleAlpha>0.999) dimCircleAlpha=1;
     dirty=true;
   }
+  // TWHL: フェードイン（ジワッと）＋慣性スピンの更新（drawFrame冒頭でdirtyを立てる）
+  if(typeof toneWheelOpen!=='undefined' && toneWheelOpen && MAP_MODE==='radial'){
+    if(_twAlpha<0.999){
+      _twAlpha+=(1-_twAlpha)*0.07;
+      if(_twAlpha>0.999) _twAlpha=1;
+      dirty=true;
+    }
+    if(!_twMapDrag && Math.abs(_twSpinVel)>0.00015){
+      twRotation+=_twSpinVel;
+      _twSpinVel*=0.94;                  // 摩擦（フレームごと6%減速）
+      if(Math.abs(_twSpinVel)<0.00015) _twSpinVel=0;
+      dirty=true;
+    }
+  }
   if(!dirty)return;
   dirty=false;
 
@@ -2634,7 +2648,7 @@ function drawFrame(){
     // TWHL統合：RADIALでTone Wheel ON時、コードセルを外帯へ寄せ中央にリングの場所を空ける
     // （中央の現在コード自身は別途固定描画なので影響しない）
     const _twOn = (MAP_MODE==='radial' && typeof toneWheelOpen!=='undefined' && toneWheelOpen);
-    const mrEff = _twOn ? MR*0.82 : mr;
+    const mrEff = _twOn ? MR*0.88 : mr;
     const r=mrEff+(MR-mrEff)*(0.15+frac*0.85)*(1-pull*0.25)+rExtra;
     // Wobble: ±1.5px organic drift per node
     FX.wobbleTick+=0.00015;
@@ -3136,7 +3150,7 @@ function deg2r(d){return(d-90)*Math.PI/180;}
 function hitTestToneWheelInMap(x,y){
   if(typeof TW_CHORD_RING==='undefined') return false;
   const {cx,cy,MR}=L;
-  const R_IN=MR*0.22, R_OUT=MR*0.57, R_SUS=MR*0.74;
+  const R_IN=MR*0.22, R_OUT=MR*0.62, R_SUS=MR*0.80;
   const dx=x-cx, dy=y-cy;
   const dist=Math.sqrt(dx*dx+dy*dy);
   if(dist<R_IN || dist>R_SUS) return false;   // 帯の外（中央コードや外側はノード側へ）
@@ -3165,10 +3179,11 @@ function drawToneWheelInMap(ctx){
   if(MAP_MODE!=='radial') return;
   if(typeof TW_CHORD_RING==='undefined') return;
   const {cx,cy,MR}=L;
-  // 半径帯を最大化（中央の現在コード〜コードセル内縁MR*0.64の手前）
+  // フェードイン進行・慣性スピンの更新は drawFrame 冒頭で実施済み（dirty維持のため）。
+  // 半径帯を最大化（中央の現在コード〜コードセル内縁の手前）
   const R_IN  = MR*0.22;
-  const R_OUT = MR*0.57;   // Major/minor 内輪 外縁
-  const R_SUS = MR*0.74;   // Sus 外輪 外縁
+  const R_OUT = MR*0.62;   // Major/minor 内輪 外縁
+  const R_SUS = MR*0.80;   // Sus 外輪 外縁
   const N = TW_N;
   const step = Math.PI*2/N;
   const rot = (typeof twRotation!=='undefined') ? twRotation : 0;
@@ -3176,6 +3191,7 @@ function drawToneWheelInMap(ctx){
   const hl = hot ? 1 : 0;
 
   ctx.save();
+  ctx.globalAlpha = _twAlpha;         // フェードイン全体に適用
   // 背景円（回転中は明るく前面に）
   ctx.beginPath(); ctx.arc(cx,cy,R_SUS,0,Math.PI*2);
   ctx.fillStyle=`rgba(74,144,212,${0.05+0.08*hl})`; ctx.fill();
@@ -3405,9 +3421,10 @@ function initCanvas(){
 
     // Tone Wheel（マップ統合）：中央リング帯のドラッグ＝回転候補。RADIAL・TWHL ON時。
     if(typeof toneWheelOpen!=='undefined' && toneWheelOpen && MAP_MODE==='radial'){
-      const rIn=L.MR*0.22, rOut=L.MR*0.74;
+      const rIn=L.MR*0.22, rOut=L.MR*0.80;
       if(dist>=rIn && dist<=rOut){
-        _twMapDrag={ startAngle:angle, startRot:twRotation, moved:false, pointerId:e.pointerId, startX:x, startY:y };
+        _twMapDrag={ startAngle:angle, startRot:twRotation, moved:false, pointerId:e.pointerId, startX:x, startY:y, lastAngle:angle, lastT:performance.now() };
+        _twSpinVel=0;   // 掴んだ瞬間、慣性スピンを止める
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         return;   // メイン処理を抑止（回転 or タップ選択はmove/upで判定）
@@ -3502,8 +3519,24 @@ function initCanvas(){
       const movedPx=Math.hypot(x-_twMapDrag.startX, y-_twMapDrag.startY);
       if(!_twMapDrag.moved && Math.abs(delta)>0.04 && movedPx>6){ _twMapDrag.moved=true; _twRotating=true; }
       if(_twMapDrag.moved){
-        // 回転速度をやや重く（指の角度変化の0.6倍だけ回す）
-        twRotation=_twMapDrag.startRot+delta*0.6;
+        // 速度連動の倍率：このフレームの角度増分(dStep)の速さで倍率を変える。
+        //   ゆっくり指を滑らせる → 倍率小（0.45・精密）
+        //   素早く動かす       → 倍率大（最大1.1・軽快）
+        let dStep = ang - _twMapDrag.lastAngle;
+        // 角度の折返し（±πをまたぐ）を補正
+        if(dStep>Math.PI) dStep-=Math.PI*2;
+        else if(dStep<-Math.PI) dStep+=Math.PI*2;
+        const now=performance.now();
+        const dt=Math.max(8, now-_twMapDrag.lastT);   // ms（下限8ms）
+        const angVel=Math.abs(dStep)/dt;              // rad/ms（指の角速度）
+        // angVel 0〜0.02 を 倍率 0.45〜1.1 にマップ（やや重い基調、速いと軽快）
+        const gain=0.45 + Math.min(0.65, angVel*32.5);
+        const applied=dStep*gain;
+        twRotation += applied;
+        // 慣性用：直近の適用角速度を角速度(rad/frame換算 ≈ applied)として記録
+        _twSpinVel = applied;
+        _twMapDrag.lastAngle = ang;
+        _twMapDrag.lastT = now;
         invalidate();
       }
       e.preventDefault();
@@ -18029,6 +18062,9 @@ const TW_SUS_RING=TW_CHORD_RING.map(c=>({
 
 let toneWheelOpen=false;
 let twRotation=0;      // 現在の回転角（ラジアン）
+let _twAlpha=0;        // TWHL フェードイン用 0.0〜1.0（ジワッと出現）
+let _twSpinVel=0;      // 慣性スピンの角速度（ラジアン/フレーム）
+let _twLastMoveT=0;    // 直近の回転入力時刻（慣性開始判定用）
 let twDragStart=null;  // {angle, rotation}
 let twCanvas=null, twCtx=null;
 // マップ円統合版Tone Wheelの回転ドラッグ状態
@@ -18039,6 +18075,7 @@ function toggleToneWheel(){
   toneWheelOpen=!toneWheelOpen;
   const btn=document.getElementById('twhl-btn');
   if(btn) btn.classList.toggle('on',toneWheelOpen);
+  if(toneWheelOpen){ _twAlpha=0; _twSpinVel=0; }  // ON時はゼロからジワッとフェードイン・慣性リセット
   // Tone Wheelはマップ円中央へ統合表示。別パネルは開かない。
   // ON時、現在コードに合わせて初期回転を設定（中央統合リングの向き）。
   if(toneWheelOpen && typeof TW_CHORD_RING!=='undefined'){
@@ -19030,6 +19067,7 @@ function setMode(mode){
     if(_pivotSavedOpts){
       if(_pivotSavedOpts.twhl && !toneWheelOpen){
         toneWheelOpen=true;
+        _twAlpha=0; _twSpinVel=0;  // 復元時もジワッと出す
         const twBtn=document.getElementById('twhl-btn');
         if(twBtn) twBtn.classList.add('on');
       }
