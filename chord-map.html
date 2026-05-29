@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.9.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.10.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -9497,9 +9497,10 @@ function _hitTestSeaCreature(x, y){
 // ═══════════════════════════════════════════════════════
 // ドットマップ: '.'=透明、英字=パレットキー。横向き（右進行を基準に定義）。
 const _CREATURE_SPRITES = {
-  // カニ：甲羅 + ハサミ + 脚。赤茶系。
+  // カニ：甲羅 + ハサミ + 脚。赤茶系。2フレームでハサミ・脚を控えめに動かす。
   crab: {
     pal:{ a:'#c0563a', b:'#e0764a', c:'#7a3525', e:'#1a1a1a' },
+    anim:{ style:'frames', period:760 },
     rows:[
       '..c.....c..',
       '.cac...cac.',
@@ -9509,10 +9510,20 @@ const _CREATURE_SPRITES = {
       '.b.a.a.a.b.',
       'c..c...c..c',
     ],
+    rows2:[
+      '.c.......c.',
+      '..ac...ca..',
+      '..b.aaa.b..',
+      '.baaaeaeaab',
+      'baaaaaaaaab',
+      '..b.a.a.b..',
+      '.c.c...c.c.',
+    ],
   },
-  // 海亀：甲羅 + 4ヒレ + 頭。緑系。
+  // 海亀：甲羅 + 4ヒレ + 頭。緑系。2フレームでヒレをゆっくり漕ぐ。
   turtle: {
     pal:{ a:'#3f8a5a', b:'#2c6741', c:'#5fae78', d:'#dce6a0', e:'#1a1a1a' },
+    anim:{ style:'frames', period:840 },
     rows:[
       '...ccccc...',
       '..cbabacb..',
@@ -9522,10 +9533,20 @@ const _CREATURE_SPRITES = {
       '..cbabacb..',
       'e..ccccc..e',
     ],
+    rows2:[
+      '...ccccc...',
+      '.dcbabacbd.',
+      '..cababac..',
+      '..cababab..',
+      '..cababac..',
+      '.dcbabacbd.',
+      'e..ccccc..e',
+    ],
   },
-  // 魚：流線形のボディ + 尾びれ + 目。青系。
+  // 魚：流線形のボディ + 尾びれ + 目。青系。2フレームで尾を振る。
   fish: {
     pal:{ a:'#4a90d4', b:'#6fb0e8', c:'#2c5f93', e:'#ffffff', p:'#1a1a1a' },
+    anim:{ style:'frames', period:520 },
     rows:[
       'c..bbb.....',
       'ccbbbbbbb..',
@@ -9534,6 +9555,45 @@ const _CREATURE_SPRITES = {
       'c.baaaaaab.',
       'cc.bbbbbb..',
       'c...bb.....',
+    ],
+    rows2:[
+      'c..bbb.....',
+      'c.bbbbbbb..',
+      'cbaaapaaab.',
+      'bpaaaaaaaab',
+      'ccbaaaaaab.',
+      'c.cbbbbbb..',
+      'cc..bb.....',
+    ],
+  },
+  // イカ：マントル（右）+ ヒレ + 触腕（左に尾を引く）。冷たい藤色。
+  //   手続き的うねり：行ごとに横へ微小オフセット＝全身がゆらりと泳ぐ。
+  squid: {
+    pal:{ a:'#8a7fc0', b:'#b0a8e0', c:'#5f5793', e:'#ffffff', p:'#1a1a1a' },
+    anim:{ style:'undulate', amp:1, rowPhase:0.7 },
+    rows:[
+      'c.c..bbaa..',
+      '.cc.baaaaab',
+      'cc.aaaeaaab',
+      '.ccaaaaaaab',
+      'cc.aaaeaaab',
+      '.cc.baaaaab',
+      'c.c..bbaa..',
+    ],
+  },
+  // タコ：丸い頭（右上）+ 八本の腕（下に垂れる）。薔薇色。
+  //   手続き的うねり：下方の腕の行ほど大きく横に波打つ。
+  octopus: {
+    pal:{ a:'#c06a8a', b:'#e090a8', c:'#8a3f5a', e:'#ffffff', p:'#1a1a1a' },
+    anim:{ style:'undulate', amp:1, rowPhase:0.9 },
+    rows:[
+      '...bbbb....',
+      '..baaaaab..',
+      '.baaeaaaab.',
+      '.baaaaaaab.',
+      '.caca.acac.',
+      '.c.c.c.c.c.',
+      'c..c.c.c..c',
     ],
   },
 };
@@ -9615,8 +9675,21 @@ function _drawAndUpdateSeaCreature(ctx){
   const flip = c.dir<0;
   const baseX = Math.round(c.x);
   const baseY = Math.round(c.y - spriteH/2 + yOff);
-  for(let r=0;r<sprite.rows.length;r++){
-    const row=sprite.rows[r];
+  // ── 単純アニメーション ──
+  //   frames: 2フレームをゆっくり交互（手足のある生物の離散的な動き）
+  //   undulate: 行ごとに横へ微小オフセット（柔らかい生物の連続的なうねり）
+  //   いずれも「言われて気づく」程度に抑える。驚き中は少しだけ活発に。
+  const anim = sprite.anim;
+  let rowsToDraw = sprite.rows;
+  if(anim && anim.style==='frames' && sprite.rows2){
+    const _per = (anim.period||700) * (startleAlive ? 0.45 : 1);  // 驚き中は素早く
+    if(Math.floor((now-(c.spawnT||now))/_per) % 2 === 1) rowsToDraw = sprite.rows2;
+  }
+  const _undAmp = (anim && anim.style==='undulate')
+    ? (anim.amp||1) * (1 + startleRatio*1.2) : 0;   // 驚き中は揺れ増幅
+  for(let r=0;r<rowsToDraw.length;r++){
+    const row=rowsToDraw[r];
+    const rowDx = _undAmp ? Math.round(Math.sin(c.bob + r*(anim.rowPhase||0.7)) * _undAmp) : 0;
     for(let q=0;q<row.length;q++){
       const ch=row[q];
       if(ch==='.') continue;
@@ -9624,7 +9697,7 @@ function _drawAndUpdateSeaCreature(ctx){
       if(!col) continue;
       const qx = flip ? (row.length-1-q) : q;
       ctx.fillStyle=col;
-      ctx.fillRect(baseX+qx*dot, baseY+r*dot, dot, dot);
+      ctx.fillRect(baseX+(qx+rowDx)*dot, baseY+r*dot, dot, dot);
     }
   }
   // 驚き中の白フラッシュ：スプライト矩形に半透明の白を重ねて瞬間的に光らせる
