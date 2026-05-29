@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.10.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -7531,7 +7531,12 @@ function _dbGrain(actx, dest, t, opt){
   const s = actx.createBufferSource(); s.buffer = b;
   const f = actx.createBiquadFilter(); f.type = opt.type || 'bandpass';
   f.frequency.value = (opt.freq ?? 2600) * (0.85 + Math.random() * 0.30); f.Q.value = opt.q ?? 1.0;
-  const g = actx.createGain(); g.gain.value = (opt.gain ?? 0.5) * (opt.vMul ?? 1);
+  const g = actx.createGain();
+  // [clickfix] 一定gain＋バッファ先頭フル振幅＝発音の段差クリックだった。
+  //   spray/_dbTint と同じく1.5msのオンセットフェードを入れて段差を消す（tailはバッファ内減衰）。
+  const _peak = (opt.gain ?? 0.5) * (opt.vMul ?? 1);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, _peak), t + 0.0015);
   s.connect(f); f.connect(g);
   if(actx.createStereoPanner){ const p = actx.createStereoPanner(); p.pan.value = (opt.pan ?? (Math.random()*2-1)) * 0.5; g.connect(p); p.connect(dest); }
   else g.connect(dest);
@@ -9596,6 +9601,60 @@ const _CREATURE_SPRITES = {
       'c..c.c.c..c',
     ],
   },
+  // クラゲ：傘（上）+ 触手（下に垂れる）。淡く冷たい水色＝最も「溶ける」。
+  //   pulse：行を縦に潰して傘がゆっくり脈動。pivot行に向かって収縮/膨張。
+  jellyfish: {
+    pal:{ a:'#7fb0c0', b:'#a8d8e0', c:'#5f8593', e:'#ffffff' },
+    anim:{ style:'pulse', amp:0.18, pivot:1 },
+    rows:[
+      '...bbbbb...',
+      '..baaaaab..',
+      '.baaaaaaab.',
+      '.c.c.c.c.c.',
+      '.c.c.c.c.c.',
+      '..c.c.c.c..',
+      '...c.c.c...',
+    ],
+  },
+  // エイ：幅広の翼で水平に滑空。尾は左に引く。スレートブルー。
+  //   2フレームで翼をはためかせる（離散的な羽ばたき）。
+  ray: {
+    pal:{ a:'#5a6f8a', b:'#8aa0c0', c:'#3a4a5f', e:'#ffffff' },
+    anim:{ style:'frames', period:720 },
+    rows:[
+      '....bb.....',
+      '..bbbbbb...',
+      'cbbbbbbbbe.',
+      'cbbbbbbbbb.',
+      'cbbbbbbbbe.',
+      '..bbbbbb...',
+      '....bb.....',
+    ],
+    rows2:[
+      '..bbbb.....',
+      '.bbbbbbb...',
+      'cbbbbbbbbe.',
+      'cbbbbbbbbb.',
+      'cbbbbbbbbe.',
+      '.bbbbbbb...',
+      '..bbbb.....',
+    ],
+  },
+  // タツノオトシゴ：小さく直立、吻は右上、尾は巻く。琥珀色。
+  //   undulate：全身がゆったり横に揺れて漂う。※縦長の生物を横長枠に収めた控えめ表現。
+  seahorse: {
+    pal:{ a:'#d0a040', b:'#e8c860', c:'#a07020', e:'#1a1a1a' },
+    anim:{ style:'undulate', amp:1, rowPhase:0.5 },
+    rows:[
+      '....aabb...',
+      '...caae....',
+      '...aaa.....',
+      '...aaa.....',
+      '..caaa.....',
+      '..ca.aa....',
+      '...cc.aa...',
+    ],
+  },
 };
 
 let _seaCreature = null;       // 現在泳いでいる1匹（nullなら不在）
@@ -9687,9 +9746,14 @@ function _drawAndUpdateSeaCreature(ctx){
   }
   const _undAmp = (anim && anim.style==='undulate')
     ? (anim.amp||1) * (1 + startleRatio*1.2) : 0;   // 驚き中は揺れ増幅
+  // pulse：縦の収縮/膨張係数（クラゲの脈動）。pivot行に向かって行をずらす。
+  const _pulseK = (anim && anim.style==='pulse')
+    ? Math.sin(c.bob) * (anim.amp||0.18) * (1 + startleRatio*1.0) : 0;
+  const _pivot = (anim && anim.pivot!=null) ? anim.pivot : 1;
   for(let r=0;r<rowsToDraw.length;r++){
     const row=rowsToDraw[r];
     const rowDx = _undAmp ? Math.round(Math.sin(c.bob + r*(anim.rowPhase||0.7)) * _undAmp) : 0;
+    const rowDy = _pulseK ? Math.round((r-_pivot) * _pulseK) : 0;
     for(let q=0;q<row.length;q++){
       const ch=row[q];
       if(ch==='.') continue;
@@ -9697,7 +9761,7 @@ function _drawAndUpdateSeaCreature(ctx){
       if(!col) continue;
       const qx = flip ? (row.length-1-q) : q;
       ctx.fillStyle=col;
-      ctx.fillRect(baseX+(qx+rowDx)*dot, baseY+r*dot, dot, dot);
+      ctx.fillRect(baseX+(qx+rowDx)*dot, baseY+(r+rowDy)*dot, dot, dot);
     }
   }
   // 驚き中の白フラッシュ：スプライト矩形に半透明の白を重ねて瞬間的に光らせる
