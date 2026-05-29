@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.1</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -17091,6 +17091,11 @@ function _playSceneNote(actx, hz, sc, t, out, panValue){
   vca.gain.setValueAtTime(0.001, t);
   vca.gain.linearRampToValueAtTime(sc.vol * 0.68, t + sc.attack);
   vca.gain.linearRampToValueAtTime(sc.vol * 0.68 * sc.sustain, t + sc.attack + sc.decay);
+  // [clickfix] 持続上限(_oscMaxLife)でoscを強制停止する際、sustain音量のまま切ると段差クリック。
+  //   GLASS/VELVET等の遅いシーンでコードを長く保持すると到達しやすい。停止直前に無音へ落とす。
+  //   通常のコードチェンジ時は _releaseSceneVoice が cancelScheduledValues で上書きするため無干渉。
+  vca.gain.setValueAtTime(sc.vol * 0.68 * sc.sustain, t + _oscMaxLife - 0.25);
+  vca.gain.linearRampToValueAtTime(0.0001, t + _oscMaxLife - 0.03);
 
   // OSC2 mix
   // osc2oct=2（1oct上）のとき: 薄い倍音として0.28程度
