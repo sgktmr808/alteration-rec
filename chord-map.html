@@ -3262,17 +3262,8 @@ function drawToneWheelInMap(ctx){
     ctx.fill();
     ctx.strokeStyle=isActive?`rgba(${baseCol},0.80)`:`rgba(255,255,255,${0.05+0.18*hl})`;
     ctx.lineWidth=isActive?1.6:0.4+hl*0.5; ctx.stroke();
-    // ラベル：アクティブ＋回転中は全表示、通常時は1つおき（密集回避）
-    if(isActive || hot || i%2===0){
-      const midA=a+step/2, midR=(R_IN+R_OUT)/2;
-      const tx=cx+midR*Math.cos(midA), ty=cy+midR*Math.sin(midA);
-      ctx.save(); ctx.translate(tx,ty); ctx.rotate(midA+Math.PI/2);
-      ctx.font=isActive?'bold 8px DM Mono,monospace':`${7}px DM Mono,monospace`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillStyle=isActive?(isMajor?'#e8c547':'#4a90d4'):`rgba(205,210,228,${0.4+0.4*hl})`;
-      ctx.fillText(chord.root+(isMajor?'':'m'),0,0);
-      ctx.restore();
-    }
+    // ラベル廃止：ルーレットとして位置で回すため文字は読まれない。
+    //   現在地はアクティブセクターのハイライト＋中央のコード名表示で示す。
   });
   // 外輪 Sus（控えめ）
   if(typeof TW_SUS_RING!=='undefined'){
