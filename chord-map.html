@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.8.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.9.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -2585,6 +2585,27 @@ function drawFrame(){
       _twSpinVel*=0.94;                  // 摩擦（フレームごと6%減速）
       if(Math.abs(_twSpinVel)<0.00015) _twSpinVel=0;
       dirty=true;
+      // ── ブラッシュ（着地の尾）──
+      //   減速の尾だけ鳴らす：速いと一音ずつ聴こえず滲むので、遅くなってから発音。
+      //   止まる手前ほど一音ずつ「息をする」＝Reich的フェイジングの着地感。静的シーンのみ。
+      const BRUSH_VEL_MAX=0.05;          // これ以上速いと滲むので無音
+      const _av=Math.abs(_twSpinVel);
+      if(_twIsStaticScene() && _av>0 && _av<BRUSH_VEL_MAX && typeof TW_N!=='undefined' && TW_N>0){
+        const _step=Math.PI*2/TW_N;
+        const _slotF=(-twRotation-Math.PI/2)/_step;          // ポインタ(着地位置)直下のスロット
+        const _slot=(((Math.round(_slotF))%TW_N)+TW_N)%TW_N;
+        if(_slot!==_twLastBrushSlot){
+          _twLastBrushSlot=_slot;
+          const _c=(typeof TW_CHORD_RING!=='undefined')?TW_CHORD_RING[_slot]:null;
+          if(_c && typeof ni==='function'){
+            // 遅くなるほどわずかに明瞭に（最も保護すべき"着地の一音"が一番はっきり）
+            const _vol=0.011+0.020*(1-_av/BRUSH_VEL_MAX);
+            _twBrushNote(ni(_c.root), _vol);
+          }
+        }
+      }
+    } else if(_twSpinVel===0){
+      _twLastBrushSlot=-1;               // 完全停止で次のスピンに備えリセット
     }
   }
   // 海の生物：BEACH ON時に出現を試みる（インターバル制御は関数内）
@@ -3459,6 +3480,7 @@ function initCanvas(){
       if(dist>=rIn && dist<=rOut){
         _twMapDrag={ startAngle:angle, startRot:twRotation, moved:false, pointerId:e.pointerId, startX:x, startY:y, lastAngle:angle, lastT:performance.now() };
         _twSpinVel=0;   // 掴んだ瞬間、慣性スピンを止める
+        _twLastBrushSlot=-1;  // 新しいスピンに備えブラッシュ履歴をリセット
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         return;   // メイン処理を抑止（回転 or タップ選択はmove/upで判定）
@@ -8404,11 +8426,17 @@ function _beachSchedule(){
         const _chordRippleSp = (_barsSinceChordSp >= 0 && _barsSinceChordSp <= 3) ? 1.3 : 1.0;
         const tail = spBeh.tail;
 
+        // ── ルーレット撹拌：回す勢いで spray 密度↑（和声の海をかき混ぜる）──
+        //   _twAgitation() は静的シーン＋TWHL ON＋回転中のみ非0。止まれば0＝地の密度に回帰。
+        //   原因（回す勢い）も結果（水面の賑わい）も知覚できる単一次元の結合。
+        const _twAgit = (typeof _twAgitation==='function') ? _twAgitation() : 0;
+        const _twSprayMul = 1 + _twAgit * 2.2;   // 全開で約3.2倍密
+
         // [TAIL/light] 静的シーンの「水面を滑る長い反射光」。
         //   ARPに依らず稀に立つ（凪いだ水面ほど鏡の反射がぽつぽつ立つ＝ARPオフでも残す）。
         //   通常より長いdecay・やや小音量・やや開いた(低lock=広pan)。
         let _fired = false;
-        if(tail && tail.mode === 'light' && Math.random() < (tail.prob ?? 0.06)){
+        if(tail && tail.mode === 'light' && Math.random() < Math.min(1,(tail.prob ?? 0.06)*_twSprayMul)){
           const _bakedDec = (spCfg.decayMs ?? 22) / 1000;
           const _decay = _bakedDec * (tail.decayMul ?? 4);
           const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + (Math.random() * 2 - 1) * stepSec * 0.03;
@@ -8444,7 +8472,8 @@ function _beachSchedule(){
                        * (1 + brightV * 0.30)
                        * (1 + (_arpLive ? _arpActivity * 0.25 : 0))
                        * _chordRippleSp
-                       * _arpAtten;
+                       * _arpAtten
+                       * _twSprayMul;
           if(Math.random() < prob){
             const jitter = (Math.random() * 2 - 1) * stepSec * (0.04 - lockDeg * 0.03);
             const _st = _beachNextBeat + grooveOffset(_sib) * stepSec + jitter;
@@ -18238,6 +18267,38 @@ let twRotation=0;      // 現在の回転角（ラジアン）
 let _twAlpha=0;        // TWHL フェードイン用 0.0〜1.0（ジワッと出現）
 let _twSpinVel=0;      // 慣性スピンの角速度（ラジアン/フレーム）
 let _twLastMoveT=0;    // 直近の回転入力時刻（慣性開始判定用）
+// ── ルーレットの弧（撹拌→着地）。回す＝海をかき混ぜ密度↑ / 減速＝静まり尾でブラッシュ。──
+//   静的シーン(glass/velvet/plain/strings)のみ。回しているときだけ作動し、止まれば余白に回帰。
+let _twLastBrushSlot=-1;  // ブラッシュ済みスロット（連打防止・スロット横断検出用）
+function _twIsStaticScene(){
+  return sceneCurrentName==='glass'||sceneCurrentName==='velvet'
+       ||sceneCurrentName==='plain'||sceneCurrentName==='strings';
+}
+// 撹拌量(0〜1)：回転の勢いから。回していない/閉じている/club系なら0＝完全に地の状態。
+function _twAgitation(){
+  if(typeof toneWheelOpen==='undefined'||!toneWheelOpen) return 0;
+  if(typeof MAP_MODE==='undefined'||MAP_MODE!=='radial') return 0;
+  if(!_twIsStaticScene()) return 0;
+  if(typeof _twSpinVel!=='number') return 0;
+  return Math.min(1, Math.abs(_twSpinVel)/0.08);  // |vel|≈0.08 で最大
+}
+// ブラッシュ：通過スロットのルート単音を極小音量で。冷たい残響(getOut)へ。scene engine非経由。
+function _twBrushNote(pc, vol){
+  const actx=(typeof safeGetCtx==='function')?safeGetCtx():null;
+  if(!actx||actx.state!=='running') return;
+  const t=actx.currentTime+0.005;
+  const freq=130.81*Math.pow(2, ((pc%12)+12)%12 / 12);  // C3基準の透明な中低域
+  const out=(typeof getOut==='function')?getOut(actx,0.55):actx.destination;
+  const g=actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t+0.012);  // 12ms attack
+  g.gain.exponentialRampToValueAtTime(0.0001, t+1.1);                   // 長い尾＝残響感
+  const o=actx.createOscillator(); o.type='sine'; o.frequency.value=freq;
+  const o2=actx.createOscillator(); o2.type='sine'; o2.frequency.value=freq*2.005; // 硝子質の上部partial
+  const g2=actx.createGain(); g2.gain.value=0.16;
+  o.connect(g); o2.connect(g2); g2.connect(g); g.connect(out);
+  o.start(t); o2.start(t); o.stop(t+1.25); o2.stop(t+1.25);
+}
 let twDragStart=null;  // {angle, rotation}
 let twCanvas=null, twCtx=null;
 // マップ円統合版Tone Wheelの回転ドラッグ状態
