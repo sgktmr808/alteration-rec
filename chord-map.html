@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.1</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.2</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -7826,6 +7826,25 @@ function _debrisSpaceNode(actx, t, bus){
     inGain.connect(delay);
     delay.connect(lp); lp.connect(fb); fb.connect(delay); // フィードバックループ
     lp.connect(wet); wet.connect(bus);
+    // [clickfix v40] このフィードバックループはstop/disconnect対象を持たず、debris発火ごとに
+    //   生成されると残響が可聴下に落ちても永久にレンダリングされ続ける（denormal処理でCPUを
+    //   食う）。これが積み上がり、時間経過でアンダーラン由来のクリックが漸増していた。
+    //   残響が十分減衰（≈-60dB）した後にループを切断して破棄する。可聴域の残響は従来どおり
+    //   鳴ってから片付けるため、聴感は不変。
+    {
+      const _fbVal  = fb.gain.value;
+      const _dtSec  = Math.min(1.4, dt);
+      // -60dB(≈0.001)まで減衰する時間 + 余裕。1.5〜8秒にクランプ。
+      const _ringOut = Math.min(8, Math.max(1.5,
+        _dtSec * (Math.log(0.001) / Math.log(Math.max(0.05, _fbVal))) + 0.3));
+      setTimeout(() => {
+        try{ fb.gain.value = 0; }catch(e){}   // ループ利得を0に（切断時の段差防止）
+        try{ fb.disconnect(); }catch(e){}     // フィードバックを断つ（永久処理の停止）
+        try{ delay.disconnect(); }catch(e){}
+        try{ lp.disconnect(); }catch(e){}
+        try{ wet.disconnect(); }catch(e){}
+      }, _ringOut * 1000);
+    }
     return inGain;
   }
 }
