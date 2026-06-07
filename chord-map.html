@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.4</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.12.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -16971,8 +16971,18 @@ function buildSceneVoicing(root, type, flavor, slComplex, slWarm, slStrange){
   }
 
   if(flavor === 'garage'){
-    // ── LOVE STAB: 変化なし・固定 ──
-    return notes.slice(0, Math.min(4, notes.length));
+    // ── LOVE STAB: root・3rd・5th・7th を優先（畳まれた拡張クラスターは捨てる）──
+    // 旧 notes.slice(0,4) は昇順下位4音を取るため、5音和音(m9等)では iv%12 で低位に畳まれた
+    // 拡張音(9th→2度 等)が下4音を占め、最高pcの7thが脱落していた。コードの素性を決める
+    // root/3rd/7th を明示的に拾い、5th を足して4音に収める。密度は足さず7thを戻すだけ。
+    const _pick = cands => ivs.find(iv => cands.includes(iv % 12));
+    const _ord = [0];                         // root は必ず
+    const _3 = _pick([3,4]);   if(_3!=null && !_ord.includes(_3)) _ord.push(_3); // 3rd
+    const _7 = _pick([10,11]); if(_7!=null && !_ord.includes(_7)) _ord.push(_7); // 7th
+    const _5 = _pick([7,6,8]); if(_5!=null && !_ord.includes(_5)) _ord.push(_5); // 5th
+    // 4音に満たなければ残りの構成音で埋める（トライアド等はここで完結＝従来と同一）
+    for(const iv of ivs){ if(_ord.length>=4) break; if(!_ord.includes(iv)) _ord.push(iv); }
+    return _ord.slice(0,4).map(iv => rootMidi + (iv % 12)).sort((a,b)=>a-b);
   }
 
   if(flavor === 'detroit'){
@@ -17552,6 +17562,47 @@ function playSceneChord(actx, root, type){
     if(voice) voice.midi = midi; // 共通ノード保持のためmidiを記録
     _sceneVoices.push(voice);
   });
+
+  // ── PLAIN「断片ブルーム」[v40 新案1] ──
+  // 9度を固定の構成音にせず、コード着地の少し後に真の9度(上声)がふわっと立ち上がり、
+  // また余白へ消える一過性の色にする。「和声の浜辺で欠片を拾い集める」核に忠実。
+  //   原因＝コード着地（聴こえる）→ 結果＝9度ブルーム（聴こえる）→ 因果が追える（ルール42）。
+  //   strange を頻度・音量のダイヤルに。strange<=0 では一切発音せず＝素のPLAINと完全一致
+  //   （無操作で地の状態を変えない）。常駐しないので余白を守る。
+  //   register: root+26（チェッド上声より上に浮かぶ高めの断片）。低く寄せたい場合は +14 に。
+  if(sceneCurrentName === 'plain'){
+    const _sg = Math.max(0, Math.min(1, strange));   // 0..1（負側は無発音）
+    if(_sg > 0.05 && Math.random() < _sg){            // 頻度: strange に比例
+      const _ri    = (typeof ni === 'function') ? ni(root) : 0;
+      const _bMidi = 48 + (_ri % 12) + 26;            // 真の9度・高め（浮かぶ断片）
+      const _bhz   = midi2hz(_bMidi);
+      const _bpeak = (sc.vol || 0.18) * 0.42 * (0.4 + 0.6 * _sg); // 音量: strange に比例・控えめ
+      const _bDelay  = 0.16 + Math.random() * 0.10;   // 着地の少し後にふわっと遅れて
+      const _bAttack = 0.7;                            // ゆっくり立ち上がり
+      const _bFade   = 1.8 + Math.random() * 0.6;      // ゆっくり余白へ消える
+      const _bt = tBase + _bDelay;
+
+      const _bosc = actx.createOscillator();
+      _bosc.type = 'sine'; _bosc.frequency.value = _bhz;
+      const _blp = actx.createBiquadFilter();
+      _blp.type = 'lowpass'; _blp.frequency.value = _bhz * 3; _blp.Q.value = 0.4;
+      const _beg = actx.createGain();
+      _beg.gain.setValueAtTime(0.0001, _bt);
+      _beg.gain.exponentialRampToValueAtTime(Math.max(0.0002, _bpeak), _bt + _bAttack);
+      _beg.gain.exponentialRampToValueAtTime(0.0001, _bt + _bAttack + _bFade);
+      const _bout = (typeof getOut === 'function')
+        ? getOut(actx, Math.min(0.7, (sc.wet || 0.4) + 0.3))   // 残響多めで airy
+        : out;
+      _bosc.connect(_blp); _blp.connect(_beg); _beg.connect(_bout);
+      const _bstop = _bt + _bAttack + _bFade + 0.1;
+      _bosc.start(_bt); _bosc.stop(_bstop);
+      // 後始末（漏れ防止・今回までの方針と一貫）
+      setTimeout(() => {
+        try{ _beg.disconnect(); }catch(e){}
+        try{ _blp.disconnect(); }catch(e){}
+      }, Math.round((_bstop - actx.currentTime + 0.2) * 1000));
+    }
+  }
 
   // 自動リリース（sustainに基づく）
   if(_sceneTrailTimer) clearTimeout(_sceneTrailTimer);
