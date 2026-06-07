@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.3</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.4</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -14601,6 +14601,22 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     loveDly.connect(loveDlyFb);
     loveDlyFb.connect(loveDly);
     loveDly.connect(loveDlyG);
+    // [clickfix v40] このフィードバックループ(loveDly↔loveDlyFb)はstop/disconnect対象を持たず、
+    //   LOVEのARPノートごとに生成されると残響が可聴下に落ちても永久にレンダリングされ続ける
+    //   （denormal処理でCPUを食う）。ビーチのdebris残像と同型の漏れ。残響が十分減衰（≈-60dB）
+    //   した後にループを切断・破棄する。可聴域の残響は従来どおり鳴ってから片付けるため聴感は不変。
+    {
+      const _fbVal   = loveDlyFb.gain.value;
+      const _dtSec   = loveDly.delayTime.value;
+      const _ringOut = Math.min(8, Math.max(1.5,
+        _dtSec * (Math.log(0.001) / Math.log(Math.max(0.05, _fbVal))) + 0.3));
+      setTimeout(() => {
+        try{ loveDlyFb.gain.value = 0; }catch(e){}  // ループ利得を0に（切断時の段差防止）
+        try{ loveDlyFb.disconnect(); }catch(e){}    // フィードバックを断つ（永久処理の停止）
+        try{ loveDly.disconnect(); }catch(e){}
+        try{ loveDlyG.disconnect(); }catch(e){}
+      }, _ringOut * 1000);
+    }
 
     // ルーティング: dry → dlyTarget（直接出力）+ rvbTarget（残響）
     const loveDryG = actx.createGain(); loveDryG.gain.value = 0.85;
