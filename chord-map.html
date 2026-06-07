@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.2</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.11.3</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -7357,7 +7357,11 @@ function _playBeachFootstep(actx, t, vol, sceneData, stepInBar, panOverride, vol
     flt.frequency.value = sd.noiseFreq ?? 180;
     flt.Q.value = 0.7;
     const nG  = actx.createGain();
-    nG.gain.value = vol * sd.noiseMix * vMul;
+    // [clickfix v40] バッファ先頭フル振幅＋一定ゲイン＝発音のオンセット段差クリック。
+    //   _dbGrain/wave/shell と同じく1.5msのオンセットフェードで段差を消す（tailはバッファ内減衰）。
+    const _nPeak = vol * sd.noiseMix * vMul;
+    nG.gain.setValueAtTime(0.0001, t);
+    nG.gain.exponentialRampToValueAtTime(Math.max(0.0002, _nPeak), t + 0.0015);
     src.connect(flt); flt.connect(nG); nG.connect(lp);
     src.start(t); src.stop(t + noiseDur + 0.02);
   }
@@ -7390,7 +7394,10 @@ function _playBeachSand(actx, t, vol, sceneData){
   flt.frequency.value = (sd.filterFreq ?? 2800) * (0.85 + Math.random() * 0.30);
   flt.Q.value = sd.filterQ ?? 1.0;
   const g = actx.createGain();
-  g.gain.value = vol * (sd.level ?? 0.07);
+  // [clickfix v40] 同上: バッファ先頭フル振幅＋一定ゲインのオンセット段差を1.5msフェードで除去。
+  const _sPeak = vol * (sd.level ?? 0.07);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, _sPeak), t + 0.0015);
   src.connect(flt); flt.connect(g);
   if(panner){
     panner.pan.value = (Math.random() * 2 - 1) * 0.4;
