@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.14.1</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.14.2</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -15322,18 +15322,22 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur){
   lpf.frequency.exponentialRampToValueAtTime(Math.max((sc.cutoff || 1200) * 0.5, 200), t + Math.min(0.18, _dur * 0.6));
   const osc2g = actx.createGain(); osc2g.gain.value = (sc.osc2oct && sc.osc2oct > 1) ? 0.28 : 0.55;
   const vca = actx.createGain();
-  const pk  = (sc.vol || 0.18) * 0.85 * (vel || 0.8);
-  vca.gain.setValueAtTime(0.0001, t);
-  vca.gain.exponentialRampToValueAtTime(Math.max(0.0002, pk), t + 0.006); // 6msアタック=クリック回避
-  vca.gain.exponentialRampToValueAtTime(0.0001, t + _dur);
+  const pk  = (sc.vol || 0.18) * 0.55 * (vel || 0.8); // 重なりのヘッドルーム確保（0.85→0.55）
+  const atk = 0.010;                                  // 10ms 直線アタック（0から＝確実にクリックなし）
+  const rel = 0.025;                                  // 終端の直線フェードアウト（stop段差を消す）
+  const bodyEnd = t + Math.max(atk + 0.02, _dur);
+  vca.gain.setValueAtTime(0, t);
+  vca.gain.linearRampToValueAtTime(Math.max(0.0002, pk), t + atk);
+  vca.gain.exponentialRampToValueAtTime(0.0008, bodyEnd);   // 本体は指数減衰
+  vca.gain.linearRampToValueAtTime(0, bodyEnd + rel);       // 0へ直線で着地（stop時クリック除去）
   osc1.connect(lpf); osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
   let _rg = null;
   const _rs = getSpaceReverbSend();
   if(_rs && _spaceReverbCtx === actx){
-    _rg = actx.createGain(); _rg.gain.value = 0.4; panner.connect(_rg); _rg.connect(_rs);
+    _rg = actx.createGain(); _rg.gain.value = 0.22; panner.connect(_rg); _rg.connect(_rs); // 送り過多回避（0.4→0.22）
   }
-  const stop = t + _dur + 0.05;
+  const stop = bodyEnd + rel + 0.01;
   osc1.start(t); osc1.stop(stop); osc2.start(t); osc2.stop(stop);
   // 後始末（毎拍多数発音するため漏れを残さない）
   setTimeout(() => {
