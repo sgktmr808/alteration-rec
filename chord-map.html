@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.14.2</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.15.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -8933,6 +8933,12 @@ function _beachSineStep(actx, stepSec){
   }
 
   _playBeachSineBass(actx, _beachNextBeat, deg, cfg, durSec, slVals);
+
+  // [Phase 3 統一版] VELVET: サインベース1音に噛み合わせてコードを発音（コードがリフになる）。
+  //   同じイベント源＝バスと完全ロック。onset/音価/コード文脈を直接使う。movingで静↔動モーフ。
+  if(sceneCurrentName === 'velvet'){
+    _playVelvetRiffStab(actx, _beachNextBeat, durSec, stepSec, slVals.moving);
+  }
 }
 
 // ── Canvas描画: Beach Grooveのパルスとラベル ──
@@ -15179,137 +15185,48 @@ function stopChordStrokeScheduler(){
 */
 
 // ═══════════════════════════════════════════════════════════
-// VELVET CHORD RIFF（Phase 3-1）
-//   VELVETのコードを moving スライダーで「ロングトーン↔反復リフ」に切替（案i）。
-//   リフはVELVET自身の音色を短いパーカッシブで刻む＝「コードがリフになる」（重ねない）。
-//   moving<=閾値: 既存のロングトーン（完全に従来どおり）。moving>閾値: リフ（pad抑制）。
-//   movingで「ロングトーン→疎な長音→小刻みリフ」へ連続的に立ち上がる（決定的・乱数なし）。
-//   自己ゲート式: 条件が外れた次tickで自動停止（アイドル空回りしない）。
+// VELVET CHORD RIFF（Phase 3 統一版）
+//   VELVETのコードはサインベース(_beachSineStep)に相乗りして発音＝「コードがリフになる」。
+//   moving 全域で連続モーフ:
+//     -1（静）: サインベース＝5thの地(ドローン)。コードはバス音価いっぱいに長く柔らかく保持＝ロングトーン的。
+//     +1（動）: サインベース＝歩く線。コードはバス音の中点に短いスタッカートで噛む＝シンコペした補完。
+//   音価・出現位置・エンベロープが moving で連続変化。バスのセルが moving でモーフ＝パターンも追従。
+//   非重複: 次のバス・オンセットまででクランプ（ユニゾンは1/16）。complex は和声(ボイシング)側。
+//   別スケジューラ・閾値・スイッチ・持続padは廃止（バス相乗りで一元化）。
 // ═══════════════════════════════════════════════════════════
-// リフ・パターン（complex で morph: 低=E疎 → D → B → A=4つ打ち）。各 32×16分。
-const _VELVET_RIFF_PATTERNS = [
-  // E: ミニマル疎（間が主役）
-  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0],
-  // D: クロスリズム
-  [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0, 0,0,1,0, 1,0,0,0, 1,0,0,1, 0,1,0,0],
-  // B: 8分主体・後半跳ね（Larry Heard的）
-  [1,0,1,0, 0,0,1,0, 0,0,1,0, 1,0,0,0, 1,0,1,0, 0,1,0,0, 1,0,0,0, 0,1,0,1],
-  // A: 4つ打ちハウス
-  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,1,0,0, 1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,0,0],
-];
-const _VELVET_RIFF_MOVING_THR = 0.03;   // moving がこれ超でリフ起動（中央直上）。以下は従来のロングトーン
-// complex(>=0領域) でパターン選択（決定的）。低=E疎 → A密。
-function _velvetRiffPattern(){
-  const c = Math.max(0, Math.min(1, sv('complex') || 0));
-  const idx = c < 0.25 ? 0 : c < 0.5 ? 1 : c < 0.75 ? 2 : 3;
-  return _VELVET_RIFF_PATTERNS[idx];
-}
-// 位置クラス別の基本音価（16分音符の倍数）: 強拍=長, 中拍=中, 裏拍=短 ＝抑揚
-function _velvetRiffDur16(pos){
-  if(pos % 8 === 0) return 3.0;   // 強拍: 伸びるアンカー
-  if(pos % 4 === 0) return 1.8;   // 中拍
-  return 1.0;                     // 裏拍: スタッカート
-}
-// 出現順（emergence e で段階解禁）: 強拍は最初から → 中拍 → 裏拍 の順に立ち上がる。
-// 低 e ほど疎（強拍のみ・長い音価）＝ロングトーンに近い。movingに対して連続的に小刻み化。
-function _velvetRiffUnlock(pos){
-  if(pos % 8 === 0) return 0.0;   // 強拍: e>0 で即
-  if(pos % 4 === 0) return 0.35;  // 中拍
-  return 0.70;                    // 裏拍: 最後に出現
-}
-function _velvetRiffActiveAt(pat, pos, e){
-  return pat[pos] === 1 && e >= _velvetRiffUnlock(pos);
-}
-// pos から「次に実際に鳴る（解禁済み）ヒット」までの16分数（被り防止クランプ用）
-function _velvetRiffGapActive(pat, pos, e){
-  for(let k = 1; k <= pat.length; k++){
-    if(_velvetRiffActiveAt(pat, (pos + k) % pat.length, e)) return k;
-  }
-  return pat.length;
-}
-let _velvetRiffTimer = null;
-let _velvetRiffPos = 0;
-let _velvetRiffNextBeat = 0;
 let _velvetRiffOut = null, _velvetRiffOutCtx = null;
-let _velvetRiffMidis = null, _velvetRiffKey = '';
-const _velvetRiffScheduleMs = 25;
 
-function _velvetRiffActive(){
-  return sceneCurrentName === 'velvet' && (sv('moving') || 0) > _VELVET_RIFF_MOVING_THR;
-}
-function _velvetRiffStart(){
-  if(_velvetRiffTimer) return;            // 冪等: 既稼働なら何もしない
-  if(!_velvetRiffActive()) return;
-  const actx = safeGetCtx();
-  if(!actx) return;
-  // 既存の持続pad（hold→riff遷移時など）を解放して「重ねない」を担保
-  if(_sceneVoices && _sceneVoices.length){
-    _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.25));
-    _sceneVoices = [];
-  }
-  safeResume(actx, () => {
-    if(_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
-    const _sixteenth = (60 / autoBpm) / 4;
-    const _elapsed = actx.currentTime - _masterClockOrigin;
-    _velvetRiffNextBeat = _masterClockOrigin + Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-    _velvetRiffPos = 0;
-    _velvetRiffTick();
-  });
-}
-function _velvetRiffStop(){
-  if(_velvetRiffTimer){ clearTimeout(_velvetRiffTimer); _velvetRiffTimer = null; }
-}
-function _velvetRiffTick(){
-  const actx = safeGetCtx();
-  // 自己ゲート: 条件を満たさなくなったら停止
-  if(!actx || actx.state !== 'running' || !_velvetRiffActive() || !S || S.root === undefined){
-    _velvetRiffTimer = null; return;
-  }
+// サインベース1音（onset=tBass, 長さ=durSec）に噛み合うコードを発音。movingで静↔動を連続モーフ。
+function _playVelvetRiffStab(actx, tBass, durSec, stepSec, moving){
+  if(!S || S.root === undefined) return;
   const sc = SCENE_PRESETS.velvet;
+  const a  = Math.max(0, Math.min(1, ((moving || 0) + 1) / 2)); // -1→0(静/長/ユニゾン) … +1→1(動/短/シンコペ)
   if(_velvetRiffOut === null || _velvetRiffOutCtx !== actx){
     _velvetRiffOut = getOut(actx, sc.wet || 0.4); _velvetRiffOutCtx = actx;
   }
-  const moving  = sv('moving') || 0;
-  // emergence e: 中央直上(閾値)=0 → moving=+1 で 1。movingに対して連続的にリフが立ち上がる。
-  const e = Math.max(0, Math.min(1, (moving - _VELVET_RIFF_MOVING_THR) / (1 - _VELVET_RIFF_MOVING_THR)));
-  // コードが変わったときだけボイシング再計算（無駄な計算を避ける）
-  const key = S.root + '|' + S.type;
-  if(key !== _velvetRiffKey){
-    _velvetRiffMidis = buildSceneVoicing(S.root, S.type, sc.voicingFlavor || 'rootless',
-                                         sv('complex'), sv('warm'), sv('strange'));
-    _velvetRiffKey = key;
-  }
-  const midis = _velvetRiffMidis;
-  const pat = _velvetRiffPattern();              // complex でパターン選択
-  const _sixteenth = (60 / autoBpm) / 4;
-  // 音価倍率: 低 e=ほぼ連続(長・pad的) → 高 e=スタッカート(短・推進)。movingで滑らかに変化。
-  const artMul = 2.6 - e * 1.9;
-  const lookAhead  = actx.currentTime + 0.10;
-  while(_velvetRiffNextBeat < lookAhead){
-    const t   = _velvetRiffNextBeat;
-    const pos = _velvetRiffPos % pat.length;
-    // 段階的出現: 強拍→中拍→裏拍 を e で解禁（決定的）。低 e は強拍のみ・長い＝ロングトーン寄り。
-    if(_velvetRiffActiveAt(pat, pos, e) && midis && midis.length){
-      // 抑揚＝位置クラス別音価 × artMul、グリッド相対。次の「鳴る」ヒットまででクランプ（被り防止）。
-      const gap   = _velvetRiffGapActive(pat, pos, e);
-      const dur16 = Math.min(_velvetRiffDur16(pos) * artMul, gap * 0.95);
-      const dur   = Math.max(0.08, dur16 * _sixteenth);
-      // ベロシティ: 低 e=弱め(pad的) → 高 e=強め。強拍/裏拍アクセントで抑揚を補強。
-      const accent = (pos % 8 === 0) ? 1.12 : (pos % 4 === 0) ? 1.0 : 0.9;
-      const vel = (0.45 + e * 0.5) * accent;
-      midis.forEach((m, i) => {
-        const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
-        _playVelvetRiffNote(actx, midi2hz(m), sc, t, _velvetRiffOut, pan, vel, dur);
-      });
-    }
-    _velvetRiffPos++;
-    _velvetRiffNextBeat += _sixteenth;
-  }
-  _velvetRiffTimer = setTimeout(_velvetRiffTick, _velvetRiffScheduleMs);
+  const midis = buildSceneVoicing(S.root, S.type, sc.voicingFlavor || 'rootless',
+                                  sv('complex'), sv('warm'), sv('strange'));
+  if(!midis || !midis.length) return;
+  // 出現位置: a=0 はバス・オンセットにユニゾン → a=1 はバス音の中点（シンコペ＝非重複ポジション）
+  const onset = tBass + durSec * (a * 0.5);
+  // 音価: a=0 はバス音価いっぱい（保持＝ロングトーン的）→ a=1 は短いスタッカート。
+  //   次のバス・オンセットまででクランプ（重ならない・ユニゾンは1/16）。
+  let dur = durSec * (0.9 - a * 0.78);                 // a=0:0.90*durSec … a=1:0.12*durSec
+  const maxDur = (tBass + durSec) - onset - stepSec;   // 次バスまで −1/16
+  dur = Math.max(stepSec * 0.9, Math.min(dur, Math.max(stepSec, maxDur)));
+  // エンベロープ: a=0 柔らかく長いアタック(pad的) → a=1 速いアタック(パーカッシブ)
+  const atk = 0.12 - a * 0.108;                        // a=0:0.12s … a=1:0.012s
+  const vel = 0.45 + a * 0.30;                         // 静かめ(pad)〜やや前(stab)
+  midis.forEach((m, i) => {
+    const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
+    _playVelvetRiffNote(actx, midi2hz(m), sc, onset, _velvetRiffOut, pan, vel, dur, atk);
+  });
 }
+
 // VELVETの音色（osc/filter/detune/width）を流用した短いパーカッシブ1音。自己破棄。
-function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur){
-  const _dur = (dur && dur > 0.02) ? dur : 0.28; // 音価（抑揚で可変）
+function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk){
+  const _dur = (dur && dur > 0.02) ? dur : 0.28; // 音価（movingで可変）
+  const _atk = (atk && atk > 0.002) ? atk : 0.010; // アタック（pad的に長く↔パーカッシブに短く）
   const nyq = actx.sampleRate / 2 - 100;
   const panner = actx.createStereoPanner();
   panner.pan.value = (panValue || 0) * (sc.width || 0.5);
@@ -15322,12 +15239,11 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur){
   lpf.frequency.exponentialRampToValueAtTime(Math.max((sc.cutoff || 1200) * 0.5, 200), t + Math.min(0.18, _dur * 0.6));
   const osc2g = actx.createGain(); osc2g.gain.value = (sc.osc2oct && sc.osc2oct > 1) ? 0.28 : 0.55;
   const vca = actx.createGain();
-  const pk  = (sc.vol || 0.18) * 0.55 * (vel || 0.8); // 重なりのヘッドルーム確保（0.85→0.55）
-  const atk = 0.010;                                  // 10ms 直線アタック（0から＝確実にクリックなし）
+  const pk  = (sc.vol || 0.18) * 0.55 * (vel || 0.8); // 重なりのヘッドルーム確保
   const rel = 0.025;                                  // 終端の直線フェードアウト（stop段差を消す）
-  const bodyEnd = t + Math.max(atk + 0.02, _dur);
+  const bodyEnd = t + Math.max(_atk + 0.02, _dur);
   vca.gain.setValueAtTime(0, t);
-  vca.gain.linearRampToValueAtTime(Math.max(0.0002, pk), t + atk);
+  vca.gain.linearRampToValueAtTime(Math.max(0.0002, pk), t + _atk);  // 直線アタック（0から＝クリックなし）
   vca.gain.exponentialRampToValueAtTime(0.0008, bodyEnd);   // 本体は指数減衰
   vca.gain.linearRampToValueAtTime(0, bodyEnd + rel);       // 0へ直線で着地（stop時クリック除去）
   osc1.connect(lpf); osc2.connect(osc2g); osc2g.connect(lpf);
@@ -17532,10 +17448,13 @@ function playSceneChord(actx, root, type){
   // 前回リリース中のボイスを即座に消音（濁り防止）
   _killReleasingVoices(actx);
 
-  // [Phase 3-1] VELVETリフ有効時: コードがリフになる＝持続padは一切出さない（重ねない）。
-  //   旧padを残さず解放し、リフ・スケジューラに委ねて早期return。
-  if(sceneCurrentName === 'velvet' && _velvetRiffActive()){
-    _velvetRiffStart();
+  // [Phase 3 統一版] VELVET: コードはサインベース相乗りの _playVelvetRiffStab が担う。
+  //   持続padは一切出さない（重ねない）。旧padは残さず解放して早期return。
+  if(sceneCurrentName === 'velvet'){
+    if(_sceneVoices && _sceneVoices.length){
+      _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
+      _sceneVoices = [];
+    }
     return;
   }
 
@@ -17921,21 +17840,6 @@ function applySLToArp(){
   }
 
   _rebuildArpIfNeeded();
-
-  // [Phase 3-1] スライダー変更（moving 等）で VELVET の hold↔リフ を即追従
-  //   moving>閾値: リフ起動（冪等）。閾値以下に戻った瞬間: リフ停止し現コードのpadを復帰。
-  if(sceneCurrentName === 'velvet'){
-    if(_velvetRiffActive()){
-      _velvetRiffStart();
-    } else if(_velvetRiffTimer){
-      // riff→hold 遷移（このとき1回だけ実行）
-      _velvetRiffStop();
-      if(S && S.root !== undefined){
-        const _a = safeGetCtx();
-        if(_a) playSceneChord(_a, S.root, S.type);
-      }
-    }
-  }
 }
 
 // ARPシーケンス再構築（パターン変更時）
