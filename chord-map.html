@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.13.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.14.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -15186,12 +15186,37 @@ function stopChordStrokeScheduler(){
 //   パターンは固定（中毒性＝同一反復）。movingで決定的にヒット密度が追従（乱数なし）。
 //   自己ゲート式: 条件が外れた次tickで自動停止（アイドル空回りしない）。
 // ═══════════════════════════════════════════════════════════
-// E: ミニマル疎（間が主役）。ヒット位置 0,8,14,20,26。
-const _VELVET_RIFF_PATTERN = [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0,
-                              0,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0];
-// 各ヒットが鳴り始める density 閾値（拍頭は常時、裏は moving が上がるほど順に追加＝決定的）
-const _VELVET_RIFF_HIT_THR = {0:0, 8:0, 14:0.33, 20:0.6, 26:0.85};
+// リフ・パターン（complex で morph: 低=E疎 → D → B → A=4つ打ち）。各 32×16分。
+const _VELVET_RIFF_PATTERNS = [
+  // E: ミニマル疎（間が主役）
+  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0],
+  // D: クロスリズム
+  [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0, 0,0,1,0, 1,0,0,0, 1,0,0,1, 0,1,0,0],
+  // B: 8分主体・後半跳ね（Larry Heard的）
+  [1,0,1,0, 0,0,1,0, 0,0,1,0, 1,0,0,0, 1,0,1,0, 0,1,0,0, 1,0,0,0, 0,1,0,1],
+  // A: 4つ打ちハウス
+  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,1,0,0, 1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,0,0],
+];
 const _VELVET_RIFF_MOVING_THR = 0.15;   // moving がこれ超でリフ起動
+// complex(>=0領域) でパターン選択（決定的）。低=E疎 → A密。
+function _velvetRiffPattern(){
+  const c = Math.max(0, Math.min(1, sv('complex') || 0));
+  const idx = c < 0.25 ? 0 : c < 0.5 ? 1 : c < 0.75 ? 2 : 3;
+  return _VELVET_RIFF_PATTERNS[idx];
+}
+// 位置クラス別の基本音価（16分音符の倍数）: 強拍=長, 中拍=中, 裏拍=短 ＝抑揚
+function _velvetRiffDur16(pos){
+  if(pos % 8 === 0) return 3.0;   // 強拍: 伸びるアンカー
+  if(pos % 4 === 0) return 1.8;   // 中拍
+  return 1.0;                     // 裏拍: スタッカート
+}
+// pos から次ヒットまでの16分ステップ数（被り防止クランプ用）
+function _velvetRiffGap16(pat, pos){
+  for(let k = 1; k <= pat.length; k++){
+    if(pat[(pos + k) % pat.length] === 1) return k;
+  }
+  return pat.length;
+}
 let _velvetRiffTimer = null;
 let _velvetRiffPos = 0;
 let _velvetRiffNextBeat = 0;
@@ -15244,20 +15269,26 @@ function _velvetRiffTick(){
     _velvetRiffKey = key;
   }
   const midis = _velvetRiffMidis;
+  const pat = _velvetRiffPattern();              // complex でパターン選択
   const _sixteenth = (60 / autoBpm) / 4;
+  // moving で音価の歯切れ: 閾値直上=伸ばし(×1.3) → 上限=詰める(×0.7)。
+  const artMul = 1.3 - density * 0.6;
   const lookAhead  = actx.currentTime + 0.10;
   while(_velvetRiffNextBeat < lookAhead){
     const t   = _velvetRiffNextBeat;
-    const pos = _velvetRiffPos % _VELVET_RIFF_PATTERN.length;
-    if(_VELVET_RIFF_PATTERN[pos] === 1){
-      const thr = _VELVET_RIFF_HIT_THR[pos] || 0;
-      if(density >= thr && midis && midis.length){
-        const vel = 0.55 + density * 0.4;
-        midis.forEach((m, i) => {
-          const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
-          _playVelvetRiffNote(actx, midi2hz(m), sc, t, _velvetRiffOut, pan, vel);
-        });
-      }
+    const pos = _velvetRiffPos % pat.length;
+    if(pat[pos] === 1 && midis && midis.length){
+      // 抑揚: 位置クラス別音価 × moving歯切れ、グリッド相対。次ヒットまででクランプ（被り防止）。
+      const gap   = _velvetRiffGap16(pat, pos);
+      const dur16 = Math.min(_velvetRiffDur16(pos) * artMul, gap * 0.95);
+      const dur   = Math.max(0.08, dur16 * _sixteenth);
+      // ベロシティ: moving=エネルギー + 強拍/裏拍アクセントで抑揚を補強
+      const accent = (pos % 8 === 0) ? 1.12 : (pos % 4 === 0) ? 1.0 : 0.9;
+      const vel = (0.5 + density * 0.45) * accent;
+      midis.forEach((m, i) => {
+        const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
+        _playVelvetRiffNote(actx, midi2hz(m), sc, t, _velvetRiffOut, pan, vel, dur);
+      });
     }
     _velvetRiffPos++;
     _velvetRiffNextBeat += _sixteenth;
@@ -15265,7 +15296,8 @@ function _velvetRiffTick(){
   _velvetRiffTimer = setTimeout(_velvetRiffTick, _velvetRiffScheduleMs);
 }
 // VELVETの音色（osc/filter/detune/width）を流用した短いパーカッシブ1音。自己破棄。
-function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel){
+function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur){
+  const _dur = (dur && dur > 0.02) ? dur : 0.28; // 音価（抑揚で可変）
   const nyq = actx.sampleRate / 2 - 100;
   const panner = actx.createStereoPanner();
   panner.pan.value = (panValue || 0) * (sc.width || 0.5);
@@ -15275,14 +15307,13 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel){
   const lpf = actx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.Q.value = sc.res || 0.5;
   const peak = Math.min((sc.cutoff || 1200) * (1 + (sc.envMod || 0) * 3.0), nyq);
   lpf.frequency.setValueAtTime(peak, t);
-  lpf.frequency.exponentialRampToValueAtTime(Math.max((sc.cutoff || 1200) * 0.5, 200), t + 0.18);
+  lpf.frequency.exponentialRampToValueAtTime(Math.max((sc.cutoff || 1200) * 0.5, 200), t + Math.min(0.18, _dur * 0.6));
   const osc2g = actx.createGain(); osc2g.gain.value = (sc.osc2oct && sc.osc2oct > 1) ? 0.28 : 0.55;
   const vca = actx.createGain();
   const pk  = (sc.vol || 0.18) * 0.85 * (vel || 0.8);
-  const dur = 0.28; // 短いパーカッシブ（柔らかめの減衰）
   vca.gain.setValueAtTime(0.0001, t);
   vca.gain.exponentialRampToValueAtTime(Math.max(0.0002, pk), t + 0.006); // 6msアタック=クリック回避
-  vca.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  vca.gain.exponentialRampToValueAtTime(0.0001, t + _dur);
   osc1.connect(lpf); osc2.connect(osc2g); osc2g.connect(lpf);
   lpf.connect(vca); vca.connect(panner); panner.connect(out);
   let _rg = null;
@@ -15290,7 +15321,7 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel){
   if(_rs && _spaceReverbCtx === actx){
     _rg = actx.createGain(); _rg.gain.value = 0.4; panner.connect(_rg); _rg.connect(_rs);
   }
-  const stop = t + dur + 0.05;
+  const stop = t + _dur + 0.05;
   osc1.start(t); osc1.stop(stop); osc2.start(t); osc2.stop(stop);
   // 後始末（毎拍多数発音するため漏れを残さない）
   setTimeout(() => {
