@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.16.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.17.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -15245,7 +15245,7 @@ function _velvetRiffTick(){
   }
   const moving = sv('moving') || 0;
   const a = Math.max(0, Math.min(1, (moving + 1) / 2)); // -1→0(長・レイドバック) … +1→1(やや短・前)
-  const durMul = 1.35 - a * 0.45;                       // 全体に長め。a=0:1.35 … a=1:0.90
+  const durMul = 2.0 - a * 0.6;                         // 全体に長め。a=0:2.0 … a=1:1.4（デフォルト約1.7）
   const swing  = (0.5 - a) * 0.28;                      // 裏/シンコペの位置ずれ。a=0:+後ろ … a=1:前（×16分）
   const key = S.root + '|' + S.type;
   if(key !== _velvetRiffKey){
@@ -15263,14 +15263,15 @@ function _velvetRiffTick(){
       const isHead = (pos % 4 === 0);                   // 拍頭はスウィングさせない
       const off = isHead ? 0 : swing * _sixteenth;
       const t = Math.max(actx.currentTime + 0.005, _velvetRiffNextBeat + off);
-      // 音価＝図の音価 × durMul（グリッド相対）。次の図ヒットまででクランプ（被り防止）。
+      // 音価＝図の音価 × durMul（グリッド相対）。次の図ヒットまででクランプ（やや余韻＝1.25倍まで許容）。
       let gap = _VELVET_FIGURE_LEN;
       for(let k = 1; k <= _VELVET_FIGURE_LEN; k++){
         if(_velvetFigureAt((pos + k) % _VELVET_FIGURE_LEN)){ gap = k; break; }
       }
-      const dur16 = Math.min(hit.dur * durMul, gap * 0.98);
+      let dur16 = Math.min(hit.dur * durMul, gap * 1.25);
+      if(isHead) dur16 = Math.min(dur16, 1.6);          // 頭は短いまま（伸ばしすぎない）
       const dur = Math.max(0.08, dur16 * _sixteenth);
-      const vel = isHead ? 0.5 : 0.62;                  // 頭は軽く、裏/シンコペは少し前に
+      const vel = isHead ? 0.5 : 0.62;
       const atk = Math.min(0.06, Math.max(0.012, dur * 0.12)); // 長い音は柔らかく
       midis.forEach((m, i) => {
         const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
@@ -15281,6 +15282,25 @@ function _velvetRiffTick(){
     _velvetRiffNextBeat += _sixteenth;
   }
   _velvetRiffTimer = setTimeout(_velvetRiffTick, _velvetRiffScheduleMs);
+}
+
+// VELVET リフ用 1/8 ドット・ディレイ（付点8分・BPM同期・単一インスタンス）。入力ノードを返す。
+let _velvetRiffDly = null, _velvetRiffDlyCtx = null, _velvetRiffDlyNode = null;
+function _getVelvetRiffDelay(actx){
+  const dt = (60 / autoBpm) * 0.75; // 付点8分 = 8分 ×1.5
+  if(_velvetRiffDly && _velvetRiffDlyCtx === actx){
+    try{ _velvetRiffDlyNode.delayTime.setTargetAtTime(dt, actx.currentTime, 0.08); }catch(e){}
+    return _velvetRiffDly;
+  }
+  const input = actx.createGain();
+  const dly = actx.createDelay(2.0); dly.delayTime.value = dt;
+  const fb  = actx.createGain(); fb.gain.value = 0.34;        // フィードバック
+  const lp  = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3000; // 繰り返しは丸める
+  const wet = actx.createGain(); wet.gain.value = 0.9;
+  const outBus = getOut(actx, 0.3);                            // master へ
+  input.connect(dly); dly.connect(lp); lp.connect(fb); fb.connect(dly); lp.connect(wet); wet.connect(outBus);
+  _velvetRiffDly = input; _velvetRiffDlyCtx = actx; _velvetRiffDlyNode = dly;
+  return input;
 }
 
 // VELVETの音色（osc/filter/detune/width）を流用した短いパーカッシブ1音。自己破棄。
@@ -15299,7 +15319,7 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk){
   lpf.frequency.exponentialRampToValueAtTime(Math.max((sc.cutoff || 1200) * 0.5, 200), t + Math.min(0.18, _dur * 0.6));
   const osc2g = actx.createGain(); osc2g.gain.value = (sc.osc2oct && sc.osc2oct > 1) ? 0.28 : 0.55;
   const vca = actx.createGain();
-  const pk  = (sc.vol || 0.18) * 0.55 * (vel || 0.8); // 重なりのヘッドルーム確保
+  const pk  = (sc.vol || 0.18) * 0.85 * (vel || 0.8); // リフ時の音量低下を補正（0.55→0.85）
   const rel = 0.025;                                  // 終端の直線フェードアウト（stop段差を消す）
   const bodyEnd = t + Math.max(_atk + 0.02, _dur);
   vca.gain.setValueAtTime(0, t);
@@ -15311,7 +15331,14 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk){
   let _rg = null;
   const _rs = getSpaceReverbSend();
   if(_rs && _spaceReverbCtx === actx){
-    _rg = actx.createGain(); _rg.gain.value = 0.22; panner.connect(_rg); _rg.connect(_rs); // 送り過多回避（0.4→0.22）
+    _rg = actx.createGain(); _rg.gain.value = 0.22; panner.connect(_rg); _rg.connect(_rs);
+  }
+  // 1/8d ディレイ送り（strange で増、デフォルトで薄くかかる）
+  let _dg = null;
+  const _dlyIn = _getVelvetRiffDelay(actx);
+  if(_dlyIn){
+    const amt = 0.13 + Math.max(0, sv('strange') || 0) * 0.5; // デフォルト薄く + strangeで増
+    _dg = actx.createGain(); _dg.gain.value = amt; panner.connect(_dg); _dg.connect(_dlyIn);
   }
   const stop = bodyEnd + rel + 0.01;
   osc1.start(t); osc1.stop(stop); osc2.start(t); osc2.stop(stop);
@@ -15322,6 +15349,7 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk){
     try{ vca.disconnect(); }catch(e){}
     try{ osc2g.disconnect(); }catch(e){}
     if(_rg){ try{ _rg.disconnect(); }catch(e){} }
+    if(_dg){ try{ _dg.disconnect(); }catch(e){} }
   }, Math.round((stop - actx.currentTime + 0.2) * 1000));
 }
 
