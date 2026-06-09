@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.17.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.17.1</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -15243,10 +15243,17 @@ function _velvetRiffTick(){
   if(_velvetRiffOut === null || _velvetRiffOutCtx !== actx){
     _velvetRiffOut = getOut(actx, sc.wet || 0.4); _velvetRiffOutCtx = actx;
   }
-  const moving = sv('moving') || 0;
-  const a = Math.max(0, Math.min(1, (moving + 1) / 2)); // -1→0(長・レイドバック) … +1→1(やや短・前)
-  const durMul = 2.0 - a * 0.6;                         // 全体に長め。a=0:2.0 … a=1:1.4（デフォルト約1.7）
-  const swing  = (0.5 - a) * 0.28;                      // 裏/シンコペの位置ずれ。a=0:+後ろ … a=1:前（×16分）
+  const m  = sv('moving') || 0;
+  const up = Math.max(0, m), down = Math.max(0, -m);
+  // 音価: 下=長い(→ロングトーン) / 上=短い。クランプも下で緩め（余韻→持続）。
+  const durMul   = 1.7 + down * 3.8 - up * 0.8;        // m=-1:5.5 / m=0:1.7 / m=+1:0.9
+  const clampMul = 1.0 + down * 0.6 - up * 0.15;       // m=-1:1.6 / m=0:1.0 / m=+1:0.85
+  // アタック: 下=遅い(スウェル) / 中=中 / 上=硬い(パンチ)。
+  const atkM = (m >= 0) ? (0.05 - up * 0.046) : (0.05 + down * 0.10); // m=-1:0.15 / m=0:0.05 / m=+1:0.004
+  // フィルター・エンベロープ深さ: 中央=0(フラット) → 上で深く。
+  const envDepth = up;                                 // 0(中央以下) … 1(上端)
+  // スウィング: 上で前のめり、下でレイドバック（控えめ）。
+  const swing = (down - up) * 0.18;
   const key = S.root + '|' + S.type;
   if(key !== _velvetRiffKey){
     _velvetRiffMidis = buildSceneVoicing(S.root, S.type, sc.voicingFlavor || 'rootless',
@@ -15255,27 +15262,34 @@ function _velvetRiffTick(){
   }
   const midis = _velvetRiffMidis;
   const _sixteenth = (60 / autoBpm) / 4;
+  // 下方向では裏拍を間引いて頭中心に＝ロングトーンへ収束（積み重なりも抑える）。
+  const _isHeadPos = (p) => (p % 4 === 0);
+  const _activeAt = (p) => {
+    const f = _velvetFigureAt(p); if(!f) return null;
+    if(_isHeadPos(p)) return f;
+    return (down < 0.7) ? f : null;            // 下端では裏を落とす
+  };
   const lookAhead = actx.currentTime + 0.10;
   while(_velvetRiffNextBeat < lookAhead){
     const pos = _velvetRiffPos % _VELVET_FIGURE_LEN;
-    const hit = _velvetFigureAt(pos);
+    const hit = _activeAt(pos);
     if(hit && midis && midis.length){
-      const isHead = (pos % 4 === 0);                   // 拍頭はスウィングさせない
+      const isHead = _isHeadPos(pos);
       const off = isHead ? 0 : swing * _sixteenth;
       const t = Math.max(actx.currentTime + 0.005, _velvetRiffNextBeat + off);
-      // 音価＝図の音価 × durMul（グリッド相対）。次の図ヒットまででクランプ（やや余韻＝1.25倍まで許容）。
+      // 次の「鳴る」ヒットまで（間引き考慮）でクランプ
       let gap = _VELVET_FIGURE_LEN;
       for(let k = 1; k <= _VELVET_FIGURE_LEN; k++){
-        if(_velvetFigureAt((pos + k) % _VELVET_FIGURE_LEN)){ gap = k; break; }
+        if(_activeAt((pos + k) % _VELVET_FIGURE_LEN)){ gap = k; break; }
       }
-      let dur16 = Math.min(hit.dur * durMul, gap * 1.25);
-      if(isHead) dur16 = Math.min(dur16, 1.6);          // 頭は短いまま（伸ばしすぎない）
+      let dur16 = Math.min(hit.dur * durMul, gap * clampMul);
+      const headCap = 1.6 + down * 40;                 // 上/中は頭短く、下では長く保持
+      if(isHead) dur16 = Math.min(dur16, headCap);
       const dur = Math.max(0.08, dur16 * _sixteenth);
-      const vel = isHead ? 0.5 : 0.62;
-      const atk = Math.min(0.06, Math.max(0.012, dur * 0.12)); // 長い音は柔らかく
-      midis.forEach((m, i) => {
+      const vel = isHead ? 0.52 : 0.62;
+      midis.forEach((mi, i) => {
         const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
-        _playVelvetRiffNote(actx, midi2hz(m), sc, t, _velvetRiffOut, pan, vel, dur, atk);
+        _playVelvetRiffNote(actx, midi2hz(mi), sc, t, _velvetRiffOut, pan, vel, dur, atkM, envDepth);
       });
     }
     _velvetRiffPos++;
@@ -15304,19 +15318,23 @@ function _getVelvetRiffDelay(actx){
 }
 
 // VELVETの音色（osc/filter/detune/width）を流用した短いパーカッシブ1音。自己破棄。
-function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk){
+function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk, envDepth){
   const _dur = (dur && dur > 0.02) ? dur : 0.28; // 音価（movingで可変）
-  const _atk = (atk && atk > 0.002) ? atk : 0.010; // アタック（pad的に長く↔パーカッシブに短く）
+  const _atk = (atk && atk > 0.002) ? atk : 0.010; // アタック（movingで可変＝下:遅い↔上:硬い）
+  const _ed  = Math.max(0, Math.min(1, envDepth || 0)); // フィルターenv深さ（中央=0=フラット）
   const nyq = actx.sampleRate / 2 - 100;
   const panner = actx.createStereoPanner();
   panner.pan.value = (panValue || 0) * (sc.width || 0.5);
   const osc1 = actx.createOscillator(); osc1.type = sc.osc1; osc1.frequency.value = hz;
   const osc2 = actx.createOscillator(); osc2.type = sc.osc2;
   osc2.frequency.value = hz * (sc.osc2oct || 1) * Math.pow(2, (sc.detune || 0) / 1200);
-  const lpf = actx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.Q.value = sc.res || 0.5;
-  const peak = Math.min((sc.cutoff || 1200) * (1 + (sc.envMod || 0) * 3.0), nyq);
+  const lpf = actx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.Q.value = (sc.res || 0.5) + _ed * 1.5; // 上でレゾ感
+  const _base = sc.cutoff || 1200;
+  const peak = Math.min(_base * (1 + _ed * 4.0), nyq);     // _ed=0→base(フラット) … =1→大きく開く
+  const fEnd = Math.max(_base * (1 - _ed * 0.6), 200);     // _ed=0→base(動かない) … =1→閉じる
+  const fEnvTime = Math.min(0.16, Math.max(0.04, _dur * 0.5));
   lpf.frequency.setValueAtTime(peak, t);
-  lpf.frequency.exponentialRampToValueAtTime(Math.max((sc.cutoff || 1200) * 0.5, 200), t + Math.min(0.18, _dur * 0.6));
+  lpf.frequency.exponentialRampToValueAtTime(fEnd, t + fEnvTime);
   const osc2g = actx.createGain(); osc2g.gain.value = (sc.osc2oct && sc.osc2oct > 1) ? 0.28 : 0.55;
   const vca = actx.createGain();
   const pk  = (sc.vol || 0.18) * 0.85 * (vel || 0.8); // リフ時の音量低下を補正（0.55→0.85）
