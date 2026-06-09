@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.17.1</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.17.2</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -15202,7 +15202,7 @@ const _VELVET_RIFF_FIGURE = [
 ];
 const _VELVET_FIGURE_LEN = 32;
 let _velvetRiffTimer = null, _velvetRiffPos = 0, _velvetRiffNextBeat = 0;
-let _velvetRiffOut = null, _velvetRiffOutCtx = null;
+let _velvetRiffOut = null, _velvetRiffOutCtx = null, _velvetRiffComp = null;
 let _velvetRiffMidis = null, _velvetRiffKey = '';
 const _velvetRiffScheduleMs = 25;
 
@@ -15241,13 +15241,17 @@ function _velvetRiffTick(){
   }
   const sc = SCENE_PRESETS.velvet;
   if(_velvetRiffOut === null || _velvetRiffOutCtx !== actx){
-    _velvetRiffOut = getOut(actx, sc.wet || 0.4); _velvetRiffOutCtx = actx;
+    _velvetRiffOut = getOut(actx, sc.wet || 0.4);
+    _velvetRiffComp = actx.createDynamicsCompressor();   // リミッター: 重なってもクリップさせない
+    _velvetRiffComp.threshold.value = -10; _velvetRiffComp.knee.value = 8;
+    _velvetRiffComp.ratio.value = 6; _velvetRiffComp.attack.value = 0.004; _velvetRiffComp.release.value = 0.14;
+    _velvetRiffComp.connect(_velvetRiffOut);
+    _velvetRiffOutCtx = actx;
   }
   const m  = sv('moving') || 0;
   const up = Math.max(0, m), down = Math.max(0, -m);
-  // 音価: 下=長い(→ロングトーン) / 上=短い。クランプも下で緩め（余韻→持続）。
-  const durMul   = 1.7 + down * 3.8 - up * 0.8;        // m=-1:5.5 / m=0:1.7 / m=+1:0.9
-  const clampMul = 1.0 + down * 0.6 - up * 0.15;       // m=-1:1.6 / m=0:1.0 / m=+1:0.85
+  // 音価: 下=長い(→ロングトーン) / 上=短い。
+  const durMul = 1.7 + down * 3.8 - up * 0.8;          // m=-1:5.5 / m=0:1.7 / m=+1:0.9
   // アタック: 下=遅い(スウェル) / 中=中 / 上=硬い(パンチ)。
   const atkM = (m >= 0) ? (0.05 - up * 0.046) : (0.05 + down * 0.10); // m=-1:0.15 / m=0:0.05 / m=+1:0.004
   // フィルター・エンベロープ深さ: 中央=0(フラット) → 上で深く。
@@ -15282,14 +15286,17 @@ function _velvetRiffTick(){
       for(let k = 1; k <= _VELVET_FIGURE_LEN; k++){
         if(_activeAt((pos + k) % _VELVET_FIGURE_LEN)){ gap = k; break; }
       }
-      let dur16 = Math.min(hit.dur * durMul, gap * clampMul);
-      const headCap = 1.6 + down * 40;                 // 上/中は頭短く、下では長く保持
-      if(isHead) dur16 = Math.min(dur16, headCap);
+      // 音価＝図の音価×durMul。下方向では「次の鳴る音まで」を埋めて連続化（ロングトーン）。
+      // 重なりは最大 +1/16 に制限＝積み重なりによるクリップ（クリック）を防ぐ。
+      const fill = gap + 1.0;
+      let dur16 = hit.dur * durMul;
+      dur16 = dur16 * (1 - down) + fill * down;         // down=1 で gap 充填＝連続
+      dur16 = Math.min(dur16, fill);
       const dur = Math.max(0.08, dur16 * _sixteenth);
       const vel = isHead ? 0.52 : 0.62;
       midis.forEach((mi, i) => {
         const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
-        _playVelvetRiffNote(actx, midi2hz(mi), sc, t, _velvetRiffOut, pan, vel, dur, atkM, envDepth);
+        _playVelvetRiffNote(actx, midi2hz(mi), sc, t, _velvetRiffComp, pan, vel, dur, atkM, envDepth);
       });
     }
     _velvetRiffPos++;
