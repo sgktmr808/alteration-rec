@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.18.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.18.1</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -15222,7 +15222,7 @@ const _CHORD_RIFF_CFG = {
 const _CHORD_RIFF_LEN = 32;
 let _chordRiffTimer = null, _chordRiffPos = 0, _chordRiffNextBeat = 0;
 let _chordRiffBus = {};                            // scene → {ctx, out, comp}
-let _chordRiffMidis = null, _chordRiffKey = '';
+let _chordRiffMidis = null, _chordRiffKey = '', _chordRiffLastScene = '';
 const _chordRiffScheduleMs = 25;
 
 function _chordRiffActive(){ return !!_CHORD_RIFF_CFG[sceneCurrentName]; }
@@ -15243,15 +15243,22 @@ function _chordRiffStart(){
   }
   safeResume(actx, () => {
     if(_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
-    const _sixteenth = (60 / autoBpm) / 4;
-    const _elapsed = actx.currentTime - _masterClockOrigin;
-    _chordRiffPos = Math.floor(Math.max(0, _elapsed) / _sixteenth) % _CHORD_RIFF_LEN;
-    _chordRiffNextBeat = _masterClockOrigin + Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+    _chordRiffResnap(actx);
     _chordRiffTick();
   });
 }
 function _chordRiffStop(){
   if(_chordRiffTimer){ clearTimeout(_chordRiffTimer); _chordRiffTimer = null; }
+}
+// _masterClockOrigin 基準の新グリッドへ位相を取り直す（BPM変更・シーン切替時）。
+// グリッドindexをそのままフィギュア位相に使う＝小節頭とフィギュア頭が常に一致（ARP/BEACHと同じ作法）。
+function _chordRiffResnap(actx){
+  if(_masterClockOrigin === null) return;
+  const _sixteenth = (60 / autoBpm) / 4;
+  const _elapsed = Math.max(0, actx.currentTime - _masterClockOrigin);
+  const _nextIdx = Math.ceil(_elapsed / _sixteenth);
+  _chordRiffNextBeat = _masterClockOrigin + _nextIdx * _sixteenth;
+  _chordRiffPos = _nextIdx % _CHORD_RIFF_LEN;
 }
 function _chordRiffTick(){
   const actx = safeGetCtx();
@@ -15261,6 +15268,11 @@ function _chordRiffTick(){
   const scene = sceneCurrentName;
   const cfg = _CHORD_RIFF_CFG[scene];
   const sc  = SCENE_PRESETS[scene];
+  // シーン切替（velvet↔love等）を検知したら位相を取り直す（タイマーはまたいで走るため）
+  if(scene !== _chordRiffLastScene){
+    _chordRiffLastScene = scene;
+    _chordRiffResnap(actx);
+  }
   let bus = _chordRiffBus[scene];
   if(!bus || bus.ctx !== actx){
     const out  = getOut(actx, sc.wet || 0.4);
@@ -20866,6 +20878,11 @@ document.getElementById('auto-mode-sel').addEventListener('change',e=>{
           _beachNextBeat = _masterClockOrigin + _gridPos;
         }
       }
+    }
+    // CHORD RIFF動作中: 新BPMグリッドへ位相を取り直す（これがないとリフだけ旧位相のままズレ続ける）
+    if(typeof _chordRiffTimer !== 'undefined' && _chordRiffTimer){
+      const actx=safeGetCtx();
+      if(actx) _chordRiffResnap(actx);
     }
   }
   // グローバル公開
