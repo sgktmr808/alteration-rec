@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.17.2</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.18.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -15179,43 +15179,62 @@ function stopChordStrokeScheduler(){
 */
 
 // ═══════════════════════════════════════════════════════════
-// VELVET CHORD RIFF（Phase 3 独立リフ版）
-//   バス連動は排除。独立した強くシンコペしたコードリフ。
-//   音価のうねり: 頭=短め / 8分裏=長短まちまち / 16分シンコペ=長短まちまち / 全体に長め。
-//   SLスライダー(moving)で音価スケールと発音位置(スウィング)が連続変化。
-//   complex は和声(ボイシング)側。音価を不均一にして硬さ(のっぺり)を避ける。
+// CHORD RIFF（Phase 3 シーン共通機構）
+//   独立した強くシンコペしたコードリフ。「コードがリフになる」（持続padを置換）。
+//   機構は一つ、シーン性格でフィギュア/質感を出し分け（_CHORD_RIFF_CFG）。現対象: VELVET / LOVE。
+//   moving: 下=音価が伸び錨中心に収束→ロングトーン / 中央=フラット / 上=硬いアタック＋フィルターenv深く。
+//   strange: 1/8d ディレイ送り（デフォルト薄め）。complex は和声(ボイシング)側。
 // ═══════════════════════════════════════════════════════════
-// 2小節(32×16分)の図。pos=16分位置, dur=16分音価。頭短く・裏や16分シンコペは長め＆まちまち。
-const _VELVET_RIFF_FIGURE = [
-  // bar 1
-  { pos: 0,  dur: 1.0 },   // 頭: 短い
-  { pos: 3,  dur: 3.5 },   // 1のア(16分シンコペ): 長め
-  { pos: 6,  dur: 2.5 },   // 2の&(8分裏): 中
-  { pos: 10, dur: 4.0 },   // 3の&(8分裏): 長い
-  { pos: 14, dur: 2.0 },   // 4の&(8分裏): 短め
-  // bar 2
-  { pos: 16, dur: 1.0 },   // 頭: 短い
-  { pos: 19, dur: 4.5 },   // 16分シンコペ: 長い
-  { pos: 23, dur: 2.0 },   // 16分シンコペ: 短め
-  { pos: 26, dur: 3.5 },   // 8分裏: 長め
-  { pos: 30, dur: 2.5 },   // 16分シンコペ(&): 中
-];
-const _VELVET_FIGURE_LEN = 32;
-let _velvetRiffTimer = null, _velvetRiffPos = 0, _velvetRiffNextBeat = 0;
-let _velvetRiffOut = null, _velvetRiffOutCtx = null, _velvetRiffComp = null;
-let _velvetRiffMidis = null, _velvetRiffKey = '';
-const _velvetRiffScheduleMs = 25;
+// シーン別リフ設定。figure: 2小節(32×16分)の図（pos=16分位置, dur=16分音価, anchor=下端でも残す錨）。
+// 機構は一つ、シーン性格でパラメータを出し分ける（spray テールと同じ思想）。
+const _CHORD_RIFF_CFG = {
+  velvet: {
+    // 頭短く・裏や16分シンコペは長め＆まちまち（既存の譜割りをそのまま）
+    figure: [
+      { pos: 0,  dur: 1.0, anchor: true },
+      { pos: 3,  dur: 3.5 }, { pos: 6,  dur: 2.5 }, { pos: 10, dur: 4.0 }, { pos: 14, dur: 2.0 },
+      { pos: 16, dur: 1.0, anchor: true },
+      { pos: 19, dur: 4.5 }, { pos: 23, dur: 2.0 }, { pos: 26, dur: 3.5 }, { pos: 30, dur: 2.5 },
+    ],
+    durBase: 1.7, durDown: 3.8, durUp: 0.8,        // durMul = base + down*durDown - up*durUp
+    atkMid: 0.05, atkUp: 0.046, atkDown: 0.10,     // atk: 中央0.05 → 上0.004(硬) / 下0.15(スウェル)
+    swing: 0.18, thinThr: 0.7,                     // 下端で非anchorを間引く閾値
+    velAnchor: 0.52, velOff: 0.62, volMul: 0.85,
+    envOpen: 4.0, envClose: 0.6, resAdd: 1.5,      // フィルターenv（上方向で深く）
+    dly: { base: 0.13, slAmt: 0.5, fb: 0.34, lp: 3000 },
+  },
+  love: {
+    // ハウスのオフビート・スタブ（124）: 8分裏を軸に16分シンコペの押しを混ぜる。頭は踏まない（床はビートに任せる）。
+    figure: [
+      { pos: 2,  dur: 2.0, anchor: true },         // 1の&: 錨
+      { pos: 6,  dur: 1.2 }, { pos: 10, dur: 2.8 }, { pos: 13, dur: 1.0 },
+      { pos: 18, dur: 2.0, anchor: true },         // 1の&(2小節目): 錨
+      { pos: 22, dur: 1.2 }, { pos: 25, dur: 2.5 }, { pos: 28, dur: 1.2 }, { pos: 30, dur: 1.0 },
+    ],
+    durBase: 1.25, durDown: 4.5, durUp: 0.5,       // 124なので基準短め・下では深いpadへ大きく伸ばす
+    atkMid: 0.03, atkUp: 0.027, atkDown: 0.12,     // 上0.003(パンチ＝ハウススタブ) / 下0.15
+    swing: 0.24, thinThr: 0.65,                    // ハウスなのでスウィングやや強め
+    velAnchor: 0.60, velOff: 0.66, volMul: 0.80,
+    envOpen: 5.0, envClose: 0.65, resAdd: 2.0,     // フィルターは深め（クラブ的な開閉）
+    dly: { base: 0.16, slAmt: 0.5, fb: 0.42, lp: 2600 },  // ダブ・コード気味に少し濃く
+  },
+};
+const _CHORD_RIFF_LEN = 32;
+let _chordRiffTimer = null, _chordRiffPos = 0, _chordRiffNextBeat = 0;
+let _chordRiffBus = {};                            // scene → {ctx, out, comp}
+let _chordRiffMidis = null, _chordRiffKey = '';
+const _chordRiffScheduleMs = 25;
 
-function _velvetRiffActive(){ return sceneCurrentName === 'velvet'; }
-function _velvetFigureAt(pos){
-  for(let i = 0; i < _VELVET_RIFF_FIGURE.length; i++){
-    if(_VELVET_RIFF_FIGURE[i].pos === pos) return _VELVET_RIFF_FIGURE[i];
+function _chordRiffActive(){ return !!_CHORD_RIFF_CFG[sceneCurrentName]; }
+function _chordRiffFigureAt(cfg, pos){
+  for(let i = 0; i < cfg.figure.length; i++){
+    if(cfg.figure[i].pos === pos) return cfg.figure[i];
   }
   return null;
 }
-function _velvetRiffStart(){
-  if(_velvetRiffTimer) return;            // 冪等
-  if(!_velvetRiffActive()) return;
+function _chordRiffStart(){
+  if(_chordRiffTimer) return;            // 冪等
+  if(!_chordRiffActive()) return;
   const actx = safeGetCtx();
   if(!actx) return;
   if(_sceneVoices && _sceneVoices.length){ // 既存padを解放（重ねない）
@@ -15226,65 +15245,68 @@ function _velvetRiffStart(){
     if(_masterClockOrigin === null) _masterClockOrigin = actx.currentTime;
     const _sixteenth = (60 / autoBpm) / 4;
     const _elapsed = actx.currentTime - _masterClockOrigin;
-    _velvetRiffPos = Math.floor(Math.max(0, _elapsed) / _sixteenth) % _VELVET_FIGURE_LEN;
-    _velvetRiffNextBeat = _masterClockOrigin + Math.ceil(_elapsed / _sixteenth) * _sixteenth;
-    _velvetRiffTick();
+    _chordRiffPos = Math.floor(Math.max(0, _elapsed) / _sixteenth) % _CHORD_RIFF_LEN;
+    _chordRiffNextBeat = _masterClockOrigin + Math.ceil(_elapsed / _sixteenth) * _sixteenth;
+    _chordRiffTick();
   });
 }
-function _velvetRiffStop(){
-  if(_velvetRiffTimer){ clearTimeout(_velvetRiffTimer); _velvetRiffTimer = null; }
+function _chordRiffStop(){
+  if(_chordRiffTimer){ clearTimeout(_chordRiffTimer); _chordRiffTimer = null; }
 }
-function _velvetRiffTick(){
+function _chordRiffTick(){
   const actx = safeGetCtx();
-  if(!actx || actx.state !== 'running' || !_velvetRiffActive() || !S || S.root === undefined){
-    _velvetRiffTimer = null; return;
+  if(!actx || actx.state !== 'running' || !_chordRiffActive() || !S || S.root === undefined){
+    _chordRiffTimer = null; return;
   }
-  const sc = SCENE_PRESETS.velvet;
-  if(_velvetRiffOut === null || _velvetRiffOutCtx !== actx){
-    _velvetRiffOut = getOut(actx, sc.wet || 0.4);
-    _velvetRiffComp = actx.createDynamicsCompressor();   // リミッター: 重なってもクリップさせない
-    _velvetRiffComp.threshold.value = -10; _velvetRiffComp.knee.value = 8;
-    _velvetRiffComp.ratio.value = 6; _velvetRiffComp.attack.value = 0.004; _velvetRiffComp.release.value = 0.14;
-    _velvetRiffComp.connect(_velvetRiffOut);
-    _velvetRiffOutCtx = actx;
+  const scene = sceneCurrentName;
+  const cfg = _CHORD_RIFF_CFG[scene];
+  const sc  = SCENE_PRESETS[scene];
+  let bus = _chordRiffBus[scene];
+  if(!bus || bus.ctx !== actx){
+    const out  = getOut(actx, sc.wet || 0.4);
+    const comp = actx.createDynamicsCompressor();   // リミッター: 重なってもクリップさせない
+    comp.threshold.value = -10; comp.knee.value = 8;
+    comp.ratio.value = 6; comp.attack.value = 0.004; comp.release.value = 0.14;
+    comp.connect(out);
+    bus = { ctx: actx, out, comp };
+    _chordRiffBus[scene] = bus;
   }
   const m  = sv('moving') || 0;
   const up = Math.max(0, m), down = Math.max(0, -m);
-  // 音価: 下=長い(→ロングトーン) / 上=短い。
-  const durMul = 1.7 + down * 3.8 - up * 0.8;          // m=-1:5.5 / m=0:1.7 / m=+1:0.9
+  // 音価: 下=長い(→ロングトーン/深いpad) / 上=短い。
+  const durMul = cfg.durBase + down * cfg.durDown - up * cfg.durUp;
   // アタック: 下=遅い(スウェル) / 中=中 / 上=硬い(パンチ)。
-  const atkM = (m >= 0) ? (0.05 - up * 0.046) : (0.05 + down * 0.10); // m=-1:0.15 / m=0:0.05 / m=+1:0.004
+  const atkM = (m >= 0) ? (cfg.atkMid - up * cfg.atkUp) : (cfg.atkMid + down * cfg.atkDown);
   // フィルター・エンベロープ深さ: 中央=0(フラット) → 上で深く。
-  const envDepth = up;                                 // 0(中央以下) … 1(上端)
-  // スウィング: 上で前のめり、下でレイドバック（控えめ）。
-  const swing = (down - up) * 0.18;
-  const key = S.root + '|' + S.type;
-  if(key !== _velvetRiffKey){
-    _velvetRiffMidis = buildSceneVoicing(S.root, S.type, sc.voicingFlavor || 'rootless',
-                                         sv('complex'), sv('warm'), sv('strange'));
-    _velvetRiffKey = key;
+  const envDepth = up;
+  // スウィング: 上で前のめり、下でレイドバック。
+  const swing = (down - up) * cfg.swing;
+  const key = scene + '|' + S.root + '|' + S.type;
+  if(key !== _chordRiffKey){
+    _chordRiffMidis = buildSceneVoicing(S.root, S.type, sc.voicingFlavor || 'rootless',
+                                        sv('complex'), sv('warm'), sv('strange'));
+    _chordRiffKey = key;
   }
-  const midis = _velvetRiffMidis;
+  const midis = _chordRiffMidis;
   const _sixteenth = (60 / autoBpm) / 4;
-  // 下方向では裏拍を間引いて頭中心に＝ロングトーンへ収束（積み重なりも抑える）。
-  const _isHeadPos = (p) => (p % 4 === 0);
+  // 下方向では非anchorを間引いて錨中心に＝ロングトーンへ収束（積み重なりも抑える）。
   const _activeAt = (p) => {
-    const f = _velvetFigureAt(p); if(!f) return null;
-    if(_isHeadPos(p)) return f;
-    return (down < 0.7) ? f : null;            // 下端では裏を落とす
+    const f = _chordRiffFigureAt(cfg, p); if(!f) return null;
+    if(f.anchor) return f;
+    return (down < cfg.thinThr) ? f : null;
   };
   const lookAhead = actx.currentTime + 0.10;
-  while(_velvetRiffNextBeat < lookAhead){
-    const pos = _velvetRiffPos % _VELVET_FIGURE_LEN;
+  while(_chordRiffNextBeat < lookAhead){
+    const pos = _chordRiffPos % _CHORD_RIFF_LEN;
     const hit = _activeAt(pos);
     if(hit && midis && midis.length){
-      const isHead = _isHeadPos(pos);
-      const off = isHead ? 0 : swing * _sixteenth;
-      const t = Math.max(actx.currentTime + 0.005, _velvetRiffNextBeat + off);
+      const isAnchor = !!hit.anchor;
+      const off = isAnchor ? 0 : swing * _sixteenth;   // 錨はスウィングさせない
+      const t = Math.max(actx.currentTime + 0.005, _chordRiffNextBeat + off);
       // 次の「鳴る」ヒットまで（間引き考慮）でクランプ
-      let gap = _VELVET_FIGURE_LEN;
-      for(let k = 1; k <= _VELVET_FIGURE_LEN; k++){
-        if(_activeAt((pos + k) % _VELVET_FIGURE_LEN)){ gap = k; break; }
+      let gap = _CHORD_RIFF_LEN;
+      for(let k = 1; k <= _CHORD_RIFF_LEN; k++){
+        if(_activeAt((pos + k) % _CHORD_RIFF_LEN)){ gap = k; break; }
       }
       // 音価＝図の音価×durMul。下方向では「次の鳴る音まで」を埋めて連続化（ロングトーン）。
       // 重なりは最大 +1/16 に制限＝積み重なりによるクリップ（クリック）を防ぐ。
@@ -15293,39 +15315,40 @@ function _velvetRiffTick(){
       dur16 = dur16 * (1 - down) + fill * down;         // down=1 で gap 充填＝連続
       dur16 = Math.min(dur16, fill);
       const dur = Math.max(0.08, dur16 * _sixteenth);
-      const vel = isHead ? 0.52 : 0.62;
+      const vel = isAnchor ? cfg.velAnchor : cfg.velOff;
       midis.forEach((mi, i) => {
         const pan = midis.length > 1 ? ((i / (midis.length - 1)) - 0.5) * 2 : 0;
-        _playVelvetRiffNote(actx, midi2hz(mi), sc, t, _velvetRiffComp, pan, vel, dur, atkM, envDepth);
+        _playChordRiffNote(actx, midi2hz(mi), sc, cfg, scene, t, bus.comp, pan, vel, dur, atkM, envDepth);
       });
     }
-    _velvetRiffPos++;
-    _velvetRiffNextBeat += _sixteenth;
+    _chordRiffPos++;
+    _chordRiffNextBeat += _sixteenth;
   }
-  _velvetRiffTimer = setTimeout(_velvetRiffTick, _velvetRiffScheduleMs);
+  _chordRiffTimer = setTimeout(_chordRiffTick, _chordRiffScheduleMs);
 }
 
-// VELVET リフ用 1/8 ドット・ディレイ（付点8分・BPM同期・単一インスタンス）。入力ノードを返す。
-let _velvetRiffDly = null, _velvetRiffDlyCtx = null, _velvetRiffDlyNode = null;
-function _getVelvetRiffDelay(actx){
+// リフ用 1/8 ドット・ディレイ（付点8分・BPM同期・シーン別単一インスタンス）。入力ノードを返す。
+let _chordRiffDly = {};                            // scene → {ctx, input, node}
+function _getChordRiffDelay(actx, scene, cfg){
   const dt = (60 / autoBpm) * 0.75; // 付点8分 = 8分 ×1.5
-  if(_velvetRiffDly && _velvetRiffDlyCtx === actx){
-    try{ _velvetRiffDlyNode.delayTime.setTargetAtTime(dt, actx.currentTime, 0.08); }catch(e){}
-    return _velvetRiffDly;
+  const c = _chordRiffDly[scene];
+  if(c && c.ctx === actx){
+    try{ c.node.delayTime.setTargetAtTime(dt, actx.currentTime, 0.08); }catch(e){}
+    return c.input;
   }
   const input = actx.createGain();
   const dly = actx.createDelay(2.0); dly.delayTime.value = dt;
-  const fb  = actx.createGain(); fb.gain.value = 0.34;        // フィードバック
-  const lp  = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3000; // 繰り返しは丸める
+  const fb  = actx.createGain(); fb.gain.value = (cfg.dly.fb || 0.34);
+  const lp  = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = (cfg.dly.lp || 3000); // 繰り返しは丸める
   const wet = actx.createGain(); wet.gain.value = 0.9;
   const outBus = getOut(actx, 0.3);                            // master へ
   input.connect(dly); dly.connect(lp); lp.connect(fb); fb.connect(dly); lp.connect(wet); wet.connect(outBus);
-  _velvetRiffDly = input; _velvetRiffDlyCtx = actx; _velvetRiffDlyNode = dly;
+  _chordRiffDly[scene] = { ctx: actx, input, node: dly };
   return input;
 }
 
-// VELVETの音色（osc/filter/detune/width）を流用した短いパーカッシブ1音。自己破棄。
-function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk, envDepth){
+// シーンの音色（osc/filter/detune/width）を流用したリフ1音。自己破棄。cfgでシーン別の質感を出し分け。
+function _playChordRiffNote(actx, hz, sc, cfg, scene, t, out, panValue, vel, dur, atk, envDepth){
   const _dur = (dur && dur > 0.02) ? dur : 0.28; // 音価（movingで可変）
   const _atk = (atk && atk > 0.002) ? atk : 0.010; // アタック（movingで可変＝下:遅い↔上:硬い）
   const _ed  = Math.max(0, Math.min(1, envDepth || 0)); // フィルターenv深さ（中央=0=フラット）
@@ -15335,16 +15358,16 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk, envD
   const osc1 = actx.createOscillator(); osc1.type = sc.osc1; osc1.frequency.value = hz;
   const osc2 = actx.createOscillator(); osc2.type = sc.osc2;
   osc2.frequency.value = hz * (sc.osc2oct || 1) * Math.pow(2, (sc.detune || 0) / 1200);
-  const lpf = actx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.Q.value = (sc.res || 0.5) + _ed * 1.5; // 上でレゾ感
+  const lpf = actx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.Q.value = (sc.res || 0.5) + _ed * cfg.resAdd; // 上でレゾ感
   const _base = sc.cutoff || 1200;
-  const peak = Math.min(_base * (1 + _ed * 4.0), nyq);     // _ed=0→base(フラット) … =1→大きく開く
-  const fEnd = Math.max(_base * (1 - _ed * 0.6), 200);     // _ed=0→base(動かない) … =1→閉じる
+  const peak = Math.min(_base * (1 + _ed * cfg.envOpen), nyq);  // _ed=0→base(フラット) … =1→大きく開く
+  const fEnd = Math.max(_base * (1 - _ed * cfg.envClose), 200); // _ed=0→base(動かない) … =1→閉じる
   const fEnvTime = Math.min(0.16, Math.max(0.04, _dur * 0.5));
   lpf.frequency.setValueAtTime(peak, t);
   lpf.frequency.exponentialRampToValueAtTime(fEnd, t + fEnvTime);
   const osc2g = actx.createGain(); osc2g.gain.value = (sc.osc2oct && sc.osc2oct > 1) ? 0.28 : 0.55;
   const vca = actx.createGain();
-  const pk  = (sc.vol || 0.18) * 0.85 * (vel || 0.8); // リフ時の音量低下を補正（0.55→0.85）
+  const pk  = (sc.vol || 0.18) * cfg.volMul * (vel || 0.8);
   const rel = 0.025;                                  // 終端の直線フェードアウト（stop段差を消す）
   const bodyEnd = t + Math.max(_atk + 0.02, _dur);
   vca.gain.setValueAtTime(0, t);
@@ -15360,9 +15383,9 @@ function _playVelvetRiffNote(actx, hz, sc, t, out, panValue, vel, dur, atk, envD
   }
   // 1/8d ディレイ送り（strange で増、デフォルトで薄くかかる）
   let _dg = null;
-  const _dlyIn = _getVelvetRiffDelay(actx);
+  const _dlyIn = _getChordRiffDelay(actx, scene, cfg);
   if(_dlyIn){
-    const amt = 0.13 + Math.max(0, sv('strange') || 0) * 0.5; // デフォルト薄く + strangeで増
+    const amt = cfg.dly.base + Math.max(0, sv('strange') || 0) * cfg.dly.slAmt;
     _dg = actx.createGain(); _dg.gain.value = amt; panner.connect(_dg); _dg.connect(_dlyIn);
   }
   const stop = bodyEnd + rel + 0.01;
@@ -17561,13 +17584,14 @@ function playSceneChord(actx, root, type){
   // 前回リリース中のボイスを即座に消音（濁り防止）
   _killReleasingVoices(actx);
 
-  // [Phase 3 独立リフ版] VELVET: コードは独立リフが担う。持続padは出さず、旧padを解放してリフ起動。
-  if(sceneCurrentName === 'velvet'){
+  // [Phase 3 リフ] リフ対象シーン（VELVET/LOVE）: コードは独立リフが担う。
+  //   持続padは出さず、旧padを解放してリフ起動。
+  if(_CHORD_RIFF_CFG[sceneCurrentName]){
     if(_sceneVoices && _sceneVoices.length){
       _sceneVoices.forEach(v => _releaseSceneVoice(v, actx, 0.3));
       _sceneVoices = [];
     }
-    _velvetRiffStart();
+    _chordRiffStart();
     return;
   }
 
@@ -17954,8 +17978,8 @@ function applySLToArp(){
 
   _rebuildArpIfNeeded();
 
-  // [Phase 3 独立リフ版] velvet では独立リフを起動（冪等・自己ゲート）。
-  if(sceneCurrentName === 'velvet') _velvetRiffStart();
+  // [Phase 3 リフ] リフ対象シーンでは独立リフを起動（冪等・自己ゲート）。
+  if(_CHORD_RIFF_CFG[sceneCurrentName]) _chordRiffStart();
 }
 
 // ARPシーケンス再構築（パターン変更時）
