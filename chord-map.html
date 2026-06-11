@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.20.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.21.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -14669,6 +14669,15 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     );
   }
   // LOVEはfilterをほぼ固定 → 輝きが持続する
+  // ただし moving上昇時のみ、開→閉のフィルターエンベロープを導入する [love-mv]
+  // （リフの「上=エネルギー付与（開→閉・パンチ）」と同じ語彙。moving=0では従来通り完全固定）
+  if(isLoveScene && _slArpLoveFiltEnv !== null && _slArpLoveFiltEnv > 0.02){
+    const _mvE     = Math.min(1, _slArpLoveFiltEnv);
+    const _lvPeak  = Math.min(baseCutoff * (1 + _mvE * 1.6), nyq);   // 上端で2.6倍から
+    const _lvClose = Math.max(baseCutoff * (1 - _mvE * 0.45), 120);  // 0.55倍へ閉じる
+    lpf.frequency.setValueAtTime(_lvPeak, startTime);
+    lpf.frequency.exponentialRampToValueAtTime(_lvClose, startTime + atk + decay);
+  }
 
   // ── VCA Envelope ──
   const env = actx.createGain();
@@ -14775,10 +14784,12 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     loveDly.delayTime.value = 60 / autoBpm / 4; // 1/16音符（BPM追従）
     const loveDlyFb = actx.createGain();
     // warm SLでディレイのフィードバックをコントロール（warm→残響豊か）
+    // + moving下降分を加算 [love-mv]。warm最大と重なっても発散しないよう0.60でハードキャップ
     const _warmVal = sv ? sv('warm') : 0;
-    loveDlyFb.gain.value = 0.32 + _warmVal * 0.18; // 0.14〜0.50
+    loveDlyFb.gain.value = Math.min(0.60, 0.32 + _warmVal * 0.18 + (_slArpDlyFbAdd || 0)); // 0.14〜0.60
     const loveDlyG = actx.createGain();
-    loveDlyG.gain.value = 0.52; // ディレイのwet量（深め）
+    // ディレイのwet量: 基準0.52、moving下端で0.78 [love-mv]
+    loveDlyG.gain.value = (_slArpDlyWet !== null ? _slArpDlyWet : 0.52);
     hiShelf.connect(loveDly);
     loveDly.connect(loveDlyFb);
     loveDlyFb.connect(loveDly);
@@ -18126,6 +18137,7 @@ function applySLToArp(){
     _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
     _slArpOctRange = null; _slArpPattern = null;
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
+    _slArpDlyWet = null; _slArpDlyFbAdd = null; _slArpLoveFiltEnv = null;
     _slArpAttack = null; _slArpDecay = null; _slArpOsc1Type = null; _slArpOsc2Type = null; _slArpFMDepth = null;
     _slArpFMDepthPluck = null; _slArpDarkRatioPluck = 0; _slArpCarrierMix = null;
     _slArpW7HpfFreq = null; _slArpW7FMWarm = null; _slArpW7Release = null; _slArpW7OctShift = null; _slArpW7Detune = null;
@@ -18148,6 +18160,15 @@ function applySLToArp(){
     _slArpRestProb = Math.max(0, Math.min(0.6, (sc.arpRestProb || 0.22) - tense * 0.15));
     _slArpGate   = Math.max(60, (sc.arpGate || 480) * (1.0 - moving * 0.4));
     _slArpEnvMod = null; _slArpSubGain = null; _slArpPattern = null;
+    // moving非対称語彙 [love-mv]: 上=エネルギー付与 / 中央=ニュートラル / 下=空間へ収束
+    const _mvUp   = Math.max(0, moving);
+    const _mvDown = Math.max(0, -moving);
+    // 下: ARPディレイ深化（動きが止まる代わりに残響空間が深くなる）
+    _slArpDlyWet      = 0.52 + _mvDown * 0.26;  // 0.52〜0.78（中央〜上=基準値）
+    _slArpDlyFbAdd    = _mvDown * 0.10;          // warm連動FBに加算（消費側で0.60キャップ）
+    // 上: フィルターエンベロープ導入（開→閉のパンチ。リフの「上」と同じ語彙）
+    // moving=0では従来通り完全固定＝「輝きが持続」の不変条件を保つ
+    _slArpLoveFiltEnv = _mvUp;
     _rebuildArpIfNeeded();
     return;
   }
@@ -18500,6 +18521,9 @@ let _slRhythmDensity = null;
 let _slArpGate     = null;
 let _slArpPattern  = null;
 let _slArpEnvMod   = null; // Scene固有: envMod上書き
+let _slArpDlyWet      = null; // LOVE: moving下→ディレイwet深化 [love-mv]
+let _slArpDlyFbAdd    = null; // LOVE: moving下→ディレイFB加算（消費側で0.60ハードキャップ）[love-mv]
+let _slArpLoveFiltEnv = null; // LOVE: moving上→フィルターenv導入量 0..1 [love-mv]
 let _slArpSubGain  = null; // Scene固有: sub osc gainの上書き（pluck/warm連動）
 let _slArpGhost    = null; // 全Scene共通: complex連動ゴースト音量上書き
 let _slArpAttack   = null; // Scene固有: attack上書き（STRINGS bright連動）
