@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.22.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.23.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -13599,7 +13599,9 @@ function _bottleCancelLP(){
 // 開封されないまま時間が過ぎたボトルは静かに沖へ戻る（手紙は海に残る）。
 let _bottleAshore = null;  // {letter, x, y, bob, leaveAt, opening, fade}
 let _bottleCard   = null;  // {l1, l2, until} 開封した手紙の表示
-const _BOTTLE_STARTUP_P = 0.35;   // 起動時の漂着確率
+// 【検証ビルド v14.23.0】起動時確率を一時的に1.0にしている。
+// 漂着→開封→移行→消滅の全フロー確認後、必ず 0.35 に戻すこと。
+const _BOTTLE_STARTUP_P = 1.0;    // 検証後 0.35 へ戻す
 const _BOTTLE_PLAY_P    = 0.06;   // プレイ中90秒ごとの漂着確率
 
 // 浜の余白（ノード・スライダーの外側、画面下半分）からスポットを選ぶ
@@ -14862,6 +14864,10 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     const _mvE     = Math.min(1, _slArpLoveFiltEnv);
     const _lvPeak  = Math.min(baseCutoff * (1 + _mvE * 1.6), nyq);   // 上端で2.6倍から
     const _lvClose = Math.max(baseCutoff * (1 - _mvE * 0.45), 120);  // 0.55倍へ閉じる
+    // sineは倍音が乏しく掃引が知覚閾下になるため、上昇時のみQを付加して
+    // フィルター自体に声を持たせる（リフの「上=resAdd」と同じ語彙）。
+    // biquadは自己発振しないが、安全のため3.0でハードキャップ。中央では従来のresのまま。
+    lpf.Q.value = Math.min(3.0, res + _mvE * 2.75);
     lpf.frequency.setValueAtTime(_lvPeak, startTime);
     lpf.frequency.exponentialRampToValueAtTime(_lvClose, startTime + atk + decay);
   }
