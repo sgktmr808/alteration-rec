@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.23.0</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.24.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -2630,6 +2630,17 @@ function fxDrawAndUpdate(ctx){
       ctx.restore();
       dirty=true;
     }
+  }
+
+  // 【検証ビルド v14.24.0】ボトル状態のデバッグ表示（B:手紙の本数 / 直近判定の結果）。
+  // 検証完了後に必ずこのブロックごと削除すること。
+  if(_bottleDebug){
+    ctx.save();
+    ctx.font='9px monospace';
+    ctx.textAlign='left';
+    ctx.fillStyle='rgba(232,197,71,0.5)';
+    ctx.fillText(`B:${_bottleDebug.count} ${_bottleDebug.last}`, 8, L.H-8);
+    ctx.restore();
   }
 
   // Keep dirty while FX active
@@ -13599,7 +13610,7 @@ function _bottleCancelLP(){
 // 開封されないまま時間が過ぎたボトルは静かに沖へ戻る（手紙は海に残る）。
 let _bottleAshore = null;  // {letter, x, y, bob, leaveAt, opening, fade}
 let _bottleCard   = null;  // {l1, l2, until} 開封した手紙の表示
-// 【検証ビルド v14.23.0】起動時確率を一時的に1.0にしている。
+// 【検証ビルド v14.24.0】起動時確率を一時的に1.0にしている。
 // 漂着→開封→移行→消滅の全フロー確認後、必ず 0.35 に戻すこと。
 const _BOTTLE_STARTUP_P = 1.0;    // 検証後 0.35 へ戻す
 const _BOTTLE_PLAY_P    = 0.06;   // プレイ中90秒ごとの漂着確率
@@ -13618,18 +13629,26 @@ function _bottlePickShoreSpot(){
   return null; // 余白が見つからない（小さい画面）＝今回は漂着しない
 }
 
+// 【検証ビルド】漂着判定の結果を画面隅に表示するための状態。検証完了後に表示ごと削除する。
+let _bottleDebug = { count: -1, last: 'init' };
+function _bottleDbg(s){
+  _bottleDebug.last = s;
+  dirty = true; if(typeof invalidate === 'function') invalidate();
+}
+
 // 漂着判定。古いボトルほど重み付けが高い（遠くまで行って帰ってきた）
 function _bottleTryArrive(p){
-  if(_bottleAshore || _bottleCard) return;
-  if(Math.random() >= p) return;
   const arr = _bottleLoadAll();
-  if(!arr.length) return;
+  _bottleDebug.count = arr.length;
+  if(_bottleAshore || _bottleCard){ _bottleDbg('busy'); return; }
+  if(!arr.length){ _bottleDbg('empty'); return; }
+  if(Math.random() >= p){ _bottleDbg('miss'); return; }
   let tot = 0;
   const ws = arr.map((_, i) => { const w = arr.length - i; tot += w; return w; });
   let r = Math.random() * tot, idx = 0;
   for(let i = 0; i < ws.length; i++){ r -= ws[i]; if(r <= 0){ idx = i; break; } }
   const spot = _bottlePickShoreSpot();
-  if(!spot) return;
+  if(!spot){ _bottleDbg('nospot'); return; }
   _bottleAshore = {
     letter: arr[idx],
     x: spot.x, y: spot.y,
@@ -13637,7 +13656,7 @@ function _bottleTryArrive(p){
     leaveAt: Date.now() + 150000 + Math.random() * 90000, // 2.5〜4分で沖へ戻る
     opening: false, fade: 1
   };
-  dirty = true; if(typeof invalidate === 'function') invalidate();
+  _bottleDbg('arrive');
 }
 
 // 開封: 手紙を表示し、保存から除去（消える）、次の小節頭で音の風景を適用
@@ -13705,6 +13724,16 @@ function _bottleApplyLetter(lt){
 // 漂着の機会: 起動時に1回 + プレイ中90秒ごとにごく稀
 setTimeout(() => _bottleTryArrive(_BOTTLE_STARTUP_P), 2600);
 setInterval(() => _bottleTryArrive(_BOTTLE_PLAY_P), 90000);
+// 復帰時にも判定する（恒久仕様）。iOSホーム画面アプリの「起動」はページ再読み込みでなく
+// 復帰であることが多く、上のタイマーが走り直さない。浜に戻ってきた瞬間も「起動」と同じ扱い。
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible'){
+    setTimeout(() => _bottleTryArrive(_BOTTLE_STARTUP_P), 1200);
+  }
+});
+window.addEventListener('pageshow', () => {
+  setTimeout(() => _bottleTryArrive(_BOTTLE_STARTUP_P), 1200);
+});
 
 // ── タップテンポ ──
 // 中央コードノードを叩いてBPMを設定する（4タップ平均・2秒リセット）
@@ -14858,19 +14887,6 @@ function _playSceneArpNote(actx, midi, startTime, dest, velMul, gateOverride){
     );
   }
   // LOVEはfilterをほぼ固定 → 輝きが持続する
-  // ただし moving上昇時のみ、開→閉のフィルターエンベロープを導入する [love-mv]
-  // （リフの「上=エネルギー付与（開→閉・パンチ）」と同じ語彙。moving=0では従来通り完全固定）
-  if(isLoveScene && _slArpLoveFiltEnv !== null && _slArpLoveFiltEnv > 0.02){
-    const _mvE     = Math.min(1, _slArpLoveFiltEnv);
-    const _lvPeak  = Math.min(baseCutoff * (1 + _mvE * 1.6), nyq);   // 上端で2.6倍から
-    const _lvClose = Math.max(baseCutoff * (1 - _mvE * 0.45), 120);  // 0.55倍へ閉じる
-    // sineは倍音が乏しく掃引が知覚閾下になるため、上昇時のみQを付加して
-    // フィルター自体に声を持たせる（リフの「上=resAdd」と同じ語彙）。
-    // biquadは自己発振しないが、安全のため3.0でハードキャップ。中央では従来のresのまま。
-    lpf.Q.value = Math.min(3.0, res + _mvE * 2.75);
-    lpf.frequency.setValueAtTime(_lvPeak, startTime);
-    lpf.frequency.exponentialRampToValueAtTime(_lvClose, startTime + atk + decay);
-  }
 
   // ── VCA Envelope ──
   const env = actx.createGain();
@@ -18330,7 +18346,7 @@ function applySLToArp(){
     _slArpGate = null; _slRhythmDensity = null; _slOsc2Mix = null;
     _slArpOctRange = null; _slArpPattern = null;
     _slArpEnvMod = null; _slArpSubGain = null; _slArpGhost = null;
-    _slArpDlyWet = null; _slArpDlyFbAdd = null; _slArpLoveFiltEnv = null;
+    _slArpDlyWet = null; _slArpDlyFbAdd = null;
     _slArpAttack = null; _slArpDecay = null; _slArpOsc1Type = null; _slArpOsc2Type = null; _slArpFMDepth = null;
     _slArpFMDepthPluck = null; _slArpDarkRatioPluck = 0; _slArpCarrierMix = null;
     _slArpW7HpfFreq = null; _slArpW7FMWarm = null; _slArpW7Release = null; _slArpW7OctShift = null; _slArpW7Detune = null;
@@ -18353,15 +18369,12 @@ function applySLToArp(){
     _slArpRestProb = Math.max(0, Math.min(0.6, (sc.arpRestProb || 0.22) - tense * 0.15));
     _slArpGate   = Math.max(60, (sc.arpGate || 480) * (1.0 - moving * 0.4));
     _slArpEnvMod = null; _slArpSubGain = null; _slArpPattern = null;
-    // moving非対称語彙 [love-mv]: 上=エネルギー付与 / 中央=ニュートラル / 下=空間へ収束
-    const _mvUp   = Math.max(0, moving);
+    // moving非対称語彙 [love-mv]: 中央=ニュートラル / 下=空間へ収束
+    // （上=フィルターenv導入はQ強化でも知覚閾下のため撤去。音高基準の掃引案は引き継ぎの種へ）
     const _mvDown = Math.max(0, -moving);
     // 下: ARPディレイ深化（動きが止まる代わりに残響空間が深くなる）
     _slArpDlyWet      = 0.52 + _mvDown * 0.26;  // 0.52〜0.78（中央〜上=基準値）
     _slArpDlyFbAdd    = _mvDown * 0.10;          // warm連動FBに加算（消費側で0.60キャップ）
-    // 上: フィルターエンベロープ導入（開→閉のパンチ。リフの「上」と同じ語彙）
-    // moving=0では従来通り完全固定＝「輝きが持続」の不変条件を保つ
-    _slArpLoveFiltEnv = _mvUp;
     _rebuildArpIfNeeded();
     return;
   }
@@ -18716,7 +18729,6 @@ let _slArpPattern  = null;
 let _slArpEnvMod   = null; // Scene固有: envMod上書き
 let _slArpDlyWet      = null; // LOVE: moving下→ディレイwet深化 [love-mv]
 let _slArpDlyFbAdd    = null; // LOVE: moving下→ディレイFB加算（消費側で0.60ハードキャップ）[love-mv]
-let _slArpLoveFiltEnv = null; // LOVE: moving上→フィルターenv導入量 0..1 [love-mv]
 let _slArpSubGain  = null; // Scene固有: sub osc gainの上書き（pluck/warm連動）
 let _slArpGhost    = null; // 全Scene共通: complex連動ゴースト音量上書き
 let _slArpAttack   = null; // Scene固有: attack上書き（STRINGS bright連動）
