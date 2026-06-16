@@ -1574,7 +1574,7 @@ body{font-family:var(--fj);background:var(--bg);color:var(--text);display:flex;f
           <div id="midi-export-btn" style="display:none"></div>
           <div id="midi-clear-btn" style="display:none"></div>
         </div>
-        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.24.1</div>
+        <div id="app-version" style="font-family:var(--fm);font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:.10em;text-align:center;padding:16px 0 8px;">v14.25.0</div>
       </div><!-- /#ctrl-screen -->
 
     </div><!-- /#map-slide -->
@@ -8123,8 +8123,16 @@ function _playBeachSineBass(actx, t, degree, cfg, durSec, slVals, absMidi, glide
     peak *= (1 + swell);
   }
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(peak, t + atk);
-  const sustainEnd = t + Math.max(atk + 0.05, durSec - rel);
+  // [clickfix v41] 短い音価（dur<atk+0.05）で sustainEnd が終端を追い越し、
+  // 減衰の途中で peak へ瞬間ジャンプして波形が不連続になる＝音の頭のクリック。
+  // LOVE等の動的セルは dur:1（高BPMで0.12秒）が出るため atk を音価内に収め、
+  // sustainEnd を必ず終端の手前にクランプして単調性（0→peak→減衰）を保証する。
+  const _atkEff = Math.min(atk, durSec * 0.4);
+  g.gain.linearRampToValueAtTime(peak, t + _atkEff);
+  const sustainEnd = Math.min(
+    t + Math.max(_atkEff + 0.005, durSec - rel),
+    t + durSec - 0.005
+  );
   g.gain.setValueAtTime(peak, sustainEnd);
   g.gain.exponentialRampToValueAtTime(0.0008, t + durSec);
 
@@ -8136,7 +8144,7 @@ function _playBeachSineBass(actx, t, degree, cfg, durSec, slVals, absMidi, glide
     // 3連符 or 付点8分の周期で gain をうねらせる
     const subdiv = (pat === 'triplet') ? 3 : 2;
     const period = (pat === 'triplet') ? durSec / 3 : durSec * 0.375; // 付点8分相当
-    let pt = t + atk;
+    let pt = t + _atkEff;
     let up = false;
     while(pt < t + durSec - 0.02){
       const lvl = up ? peak : peak * (1 - lfoDepth);
